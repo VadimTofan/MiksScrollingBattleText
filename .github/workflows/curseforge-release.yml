@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      upload_to_curseforge:
+        description: "Upload to CurseForge instead of running a package-only dry run"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -24,11 +30,24 @@ jobs:
         id: version
         shell: bash
         run: |
+          TOC_VERSION="$(sed -n 's/^## Version: //p' MikScrollingBattleText.toc | head -n 1)"
+          if [[ -z "${TOC_VERSION}" ]]; then
+            echo "Unable to read addon version from MikScrollingBattleText.toc"
+            exit 1
+          fi
+
           if [[ "${GITHUB_REF_TYPE}" == "tag" && -n "${GITHUB_REF_NAME}" ]]; then
             VERSION="${GITHUB_REF_NAME}"
+            EXPECTED_TAG="v${TOC_VERSION}"
+            if [[ "${VERSION}" != "${EXPECTED_TAG}" ]]; then
+              echo "Git tag ${VERSION} does not match TOC version ${EXPECTED_TAG}"
+              exit 1
+            fi
           else
-            VERSION="v$(sed -n 's/^## Version: //p' MikScrollingBattleText.toc | head -n 1)"
+            VERSION="v${TOC_VERSION}"
           fi
+
+          echo "toc_version=${TOC_VERSION}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
       - name: Build addon zip
@@ -99,6 +118,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
 
       - name: Upload release zip to CurseForge
+        if: github.event_name == 'push' || inputs.upload_to_curseforge == true
         shell: bash
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
@@ -114,6 +134,15 @@ jobs:
             --form "metadata=<dist/curseforge-metadata.json;type=application/json" \
             --form "file=@${{ steps.package.outputs.zip_path }};type=application/zip" \
             "${CURSEFORGE_UPLOAD_URL}"
+
+      - name: Dry run summary
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_to_curseforge != true
+        shell: bash
+        run: |
+          echo "Manual dry run completed."
+          echo "Packaged: ${{ steps.package.outputs.zip_name }}"
+          echo "TOC version: ${{ steps.version.outputs.toc_version }}"
+          echo "No CurseForge upload was performed."
 
       - name: Upload packaged zip as workflow artifact
         uses: actions/upload-artifact@v4
