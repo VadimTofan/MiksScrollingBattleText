@@ -26,6 +26,7 @@ local L = MikSBT.translations
 
 -- Local references to various functions for faster access.
 local EraseTable = MikSBT.EraseTable
+local Print = MikSBT.Print
 local DisableControls = MSBTPopups.DisableControls
 
 -- Local references to various variables for faster access.
@@ -4218,6 +4219,18 @@ end
 -- Reset Blizzard SCT tab functions.
 -------------------------------------------------------------------------------
 
+local function ResetBlizzardSCTTab_EnableControls()
+	for _, frame in pairs(tabFrames.resetBlizzardSCT.controls) do
+		if (frame.Enable) then frame:Enable() end
+	end
+end
+
+local function ResetBlizzardSCTTab_ConfirmReset()
+	MSBTProfiles.ResetOfficialBlizzardCombatText()
+	RefreshGeneralTabIfCreated()
+	Print("Blizzard scrolling combat text restored.", 0, 1, 0)
+end
+
 local function ResetBlizzardSCTTab_Create()
 	local tabFrame = tabFrames.resetBlizzardSCT
 	tabFrame.controls = {}
@@ -4247,9 +4260,14 @@ local function ResetBlizzardSCTTab_Create()
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("TOPLEFT", body, "BOTTOMLEFT", 0, -20)
 	button:SetClickHandler(
-		function()
-			MSBTProfiles.ResetOfficialBlizzardCombatText()
-			RefreshGeneralTabIfCreated()
+		function(this)
+			EraseTable(configTable)
+			configTable.parentFrame = tabFrame
+			configTable.anchorFrame = this
+			configTable.acknowledgeHandler = ResetBlizzardSCTTab_ConfirmReset
+			configTable.hideHandler = ResetBlizzardSCTTab_EnableControls
+			DisableControls(controls)
+			MSBTPopups.ShowAcknowledge(configTable)
 		end
 	)
 	controls.resetButton = button
@@ -4332,7 +4350,7 @@ tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
 tabFrame:SetScript("OnShow", LanguageTab_OnShow)
 tabFrames.language = tabFrame
-MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9998)
+MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9500)
 
 -- Create an empty frame for the Reset Blizzard SCT tab that will be dynamically created when shown.
 objLocale = L.TABS.resetBlizzardSCT or { label = "Reset Blizzard SCT", tooltip = "Restore Blizzard scrolling combat text CVars and clear MSBT Blizzard CT overrides." }
@@ -4340,5 +4358,5 @@ tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
 tabFrame:SetScript("OnShow", ResetBlizzardSCTTab_OnShow)
 tabFrames.resetBlizzardSCT = tabFrame
-MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9999)
+MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9000)
 

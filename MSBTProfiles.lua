@@ -2814,6 +2814,14 @@ local function ResetOfficialBlizzardCombatText()
 	if currentProfile then
 		SetOption(nil, "enableBlizzardV2CombatText", false)
 		SetOption(nil, "enableBlizzardV2CombatTextInGroup", false)
+		SetOption(nil, "disableOutgoingInGroup", false)
+		SetOption(nil, "disableIncomingInGroup", false)
+		SetOption(nil, "disableNotificationInGroup", false)
+		SetOption(nil, "disableStaticInGroup", false)
+	end
+
+	if savedVariables then
+		savedVariables.userDisabled = true
 	end
 
 	SetCVar("floatingCombatTextCombatDamage_v2", 1)
@@ -2824,6 +2832,8 @@ local function ResetOfficialBlizzardCombatText()
 	if (CombatText_UpdateDisplayedMessages) then
 		CombatText_UpdateDisplayedMessages()
 	end
+
+	module.ApplyContextOptions()
 end
 
 local function ApplyContextOptions()
