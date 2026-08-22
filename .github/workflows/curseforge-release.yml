@@ -75,47 +75,12 @@ jobs:
         id: metadata
         shell: bash
         run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          version = os.environ["VERSION"]
-          changelog_path = Path("CHANGELOG.md")
-          changelog = f"Automated release {version}"
-
-          if changelog_path.exists():
-            lines = changelog_path.read_text(encoding="utf-8").splitlines()
-            capture = False
-            collected = []
-            for line in lines:
-              if line.startswith("## "):
-                if capture:
-                  break
-                capture = True
-                continue
-              if capture:
-                collected.append(line)
-
-            text = "\n".join(collected).strip()
-            if text:
-              changelog = text
-
-          payload = {
-            "displayName": f"MikScrollingBattleText {version}",
-            "changelog": changelog,
-            "changelogType": "markdown",
-            "releaseType": "release"
-          }
-
-          Path("dist").mkdir(exist_ok=True)
-          Path("dist/curseforge-metadata.json").write_text(
-            json.dumps(payload),
-            encoding="utf-8",
-          )
-          PY
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+          python scripts/build_curseforge_metadata.py \
+            --version "${{ steps.version.outputs.version }}" \
+            --changelog CHANGELOG.md \
+            --output dist/curseforge-metadata.json \
+            --game-version Retail \
+            --game-version 12.1.0
 
       - name: Upload release zip to CurseForge
         if: github.event_name == 'push' || inputs.upload_to_curseforge == true

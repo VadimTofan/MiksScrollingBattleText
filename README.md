@@ -4,7 +4,7 @@ Mik's Scrolling Battle Text is a World of Warcraft addon that replaces Blizzard'
 
 ## Status
 
-- Current version: `12.021`
+- Current version: `12.022`
 - Supported interface values: `120100`, `11504`, `40400`, `110002`
 - Addon type: combat text replacement and combat event presentation
 

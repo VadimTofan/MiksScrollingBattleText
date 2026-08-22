@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.022
+
+- Fixed CurseForge release metadata to publish explicit WoW Retail `12.1.0` game-version names.
+- Bumped the addon version to `12.022`.
+
 ## v12.021
 
 - Fixed `UnitAttackSpeed("player")` secret-number handling in auto-attack fallback timing.
