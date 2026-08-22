@@ -1,0 +1,122 @@
+name: CurseForge Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      ADDON_NAME: MikScrollingBattleText
+      CURSEFORGE_PROJECT_ID: "1488089"
+      CURSEFORGE_UPLOAD_URL: https://wow.curseforge.com/api/projects/1488089/upload-file
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && -n "${GITHUB_REF_NAME}" ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="v$(sed -n 's/^## Version: //p' MikScrollingBattleText.toc | head -n 1)"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build addon zip
+        id: package
+        shell: bash
+        run: |
+          rm -rf dist
+          mkdir -p "dist/${ADDON_NAME}"
+          rsync -a \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'dist/' \
+            ./ "dist/${ADDON_NAME}/"
+
+          ZIP_NAME="${ADDON_NAME}-${{ steps.version.outputs.version }}.zip"
+          (
+            cd dist
+            zip -r "${ZIP_NAME}" "${ADDON_NAME}"
+          )
+
+          echo "zip_path=dist/${ZIP_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "zip_name=${ZIP_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build changelog metadata
+        id: metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          changelog_path = Path("CHANGELOG.md")
+          changelog = f"Automated release {version}"
+
+          if changelog_path.exists():
+            lines = changelog_path.read_text(encoding="utf-8").splitlines()
+            capture = False
+            collected = []
+            for line in lines:
+              if line.startswith("## "):
+                if capture:
+                  break
+                capture = True
+                continue
+              if capture:
+                collected.append(line)
+
+            text = "\n".join(collected).strip()
+            if text:
+              changelog = text
+
+          payload = {
+            "displayName": f"MikScrollingBattleText {version}",
+            "changelog": changelog,
+            "changelogType": "markdown",
+            "releaseType": "release"
+          }
+
+          Path("dist").mkdir(exist_ok=True)
+          Path("dist/curseforge-metadata.json").write_text(
+            json.dumps(payload),
+            encoding="utf-8",
+          )
+          PY
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Upload release zip to CurseForge
+        shell: bash
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          if [[ -z "${CF_API_TOKEN}" ]]; then
+            echo "CF_API_TOKEN secret is not configured."
+            exit 1
+          fi
+
+          curl --fail-with-body \
+            --request POST \
+            --header "X-Api-Token: ${CF_API_TOKEN}" \
+            --form "metadata=<dist/curseforge-metadata.json;type=application/json" \
+            --form "file=@${{ steps.package.outputs.zip_path }};type=application/zip" \
+            "${CURSEFORGE_UPLOAD_URL}"
+
+      - name: Upload packaged zip as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.zip_name }}
+          path: ${{ steps.package.outputs.zip_path }}
