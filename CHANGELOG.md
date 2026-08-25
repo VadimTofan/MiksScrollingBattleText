@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.023
+
+- Excluded non-runtime files from release bundles: `tests/`, `scripts/`, `README.md`, `CHANGELOG.md`, and `API.html`.
+- Added a regression test to keep release packaging focused on runtime addon files only.
+
 ## v12.022
 
 - Fixed CurseForge release metadata to publish explicit WoW Retail `12.1.0` game-version names.
