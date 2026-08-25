@@ -60,6 +60,11 @@ jobs:
             --exclude '.git/' \
             --exclude '.github/' \
             --exclude 'dist/' \
+            --exclude 'tests/' \
+            --exclude 'scripts/' \
+            --exclude 'README.md' \
+            --exclude 'CHANGELOG.md' \
+            --exclude 'API.html' \
             ./ "dist/${ADDON_NAME}/"
 
           ZIP_NAME="${ADDON_NAME}-${{ steps.version.outputs.version }}.zip"
