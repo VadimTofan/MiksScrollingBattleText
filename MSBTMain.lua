@@ -1024,6 +1024,9 @@ local function ParserEventsHandler(parserEvent)
 		return
 	end
 
+	local hideIncomingNames = (eventType == "damage" or eventType == "heal")
+		and string_find(eventTypeString, "INCOMING", 1, true) ~= nil
+
 	if eventType == "heal" and (eventTypeString == "SELF_HEAL" or eventTypeString == "SELF_HOT") then
 		RecordOutgoingSelfHealAmount(parserEvent.amount)
 	end
@@ -1083,13 +1086,13 @@ local function ParserEventsHandler(parserEvent)
 	end
 
 	if not mergeEligible then
-		local outputMessage = FormatEvent(eventSettings.message, parserEvent.amount, damageType, nil, nil, nil, affectedUnitName, affectedUnitClass, effectName, nil, nil, nil, nil, nil, true)
+		local outputMessage = FormatEvent(eventSettings.message, parserEvent.amount, damageType, nil, nil, nil, affectedUnitName, affectedUnitClass, effectName, nil, nil, nil, nil, hideIncomingNames, true)
 		DisplayEvent(eventSettings, outputMessage, effectTexture)
 
 	elseif currentProfile.mergeExclusions[effectName] or (not effectName and currentProfile.mergeSwingsDisabled) then
 
 		local hideSkills = effectTexture and not currentProfile.exclusiveSkillsDisabled or currentProfile.hideSkills
-		local outputMessage = FormatEvent(eventSettings.message, parserEvent.amount, damageType, parserEvent.overhealAmount, parserEvent.overkillAmount, parserEvent.powerType, affectedUnitName, affectedUnitClass, effectName, partialEffects, nil, ignoreDamageColoring, hideSkills, currentProfile.hideNames, true)
+		local outputMessage = FormatEvent(eventSettings.message, parserEvent.amount, damageType, parserEvent.overhealAmount, parserEvent.overkillAmount, parserEvent.powerType, affectedUnitName, affectedUnitClass, effectName, partialEffects, nil, ignoreDamageColoring, hideSkills, currentProfile.hideNames or hideIncomingNames, true)
 		DisplayEvent(eventSettings, outputMessage, effectTexture)
 
 	else
@@ -1109,6 +1112,7 @@ local function ParserEventsHandler(parserEvent)
 		combatEvent.class = affectedUnitClass
 		combatEvent.damageType = damageType
 		combatEvent.ignoreDamageColoring = ignoreDamageColoring
+		combatEvent.hideNames = hideIncomingNames
 		combatEvent.partialEffects = partialEffects
 		combatEvent.overhealAmount = parserEvent.overhealAmount
 		combatEvent.overkillAmount = parserEvent.overkillAmount
@@ -1188,7 +1192,7 @@ local function OnUpdateEventFrame(this, elapsed)
 		for i, combatEvent in ipairs(mergedEvents) do
 			eventSettings = currentProfile.events[combatEvent.isCrit and combatEvent.eventType .. "_CRIT" or combatEvent.eventType]
 			hideSkills = combatEvent.effectTexture and not exclusiveSkillsDisabled or currentProfile.hideSkills
-			outputMessage = FormatEvent(eventSettings.message, combatEvent.amount, combatEvent.damageType, combatEvent.overhealAmount, combatEvent.overkillAmount, combatEvent.powerType, combatEvent.name, combatEvent.class, combatEvent.effectName, combatEvent.partialEffects, combatEvent.mergeTrailer, combatEvent.ignoreDamageColoring, hideSkills, hideNames, true)
+			outputMessage = FormatEvent(eventSettings.message, combatEvent.amount, combatEvent.damageType, combatEvent.overhealAmount, combatEvent.overkillAmount, combatEvent.powerType, combatEvent.name, combatEvent.class, combatEvent.effectName, combatEvent.partialEffects, combatEvent.mergeTrailer, combatEvent.ignoreDamageColoring, hideSkills, hideNames or combatEvent.hideNames, true)
 			DisplayEvent(eventSettings, outputMessage, combatEvent.effectTexture)
 			mergedEvents[i] = nil
 			EraseTable(combatEvent)
@@ -2175,9 +2179,6 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 						if critSummaryOnly then
 							critMessageOnly = critMessageOnly .. critSummaryOnly
 						end
-						if queued.sourceName and queued.sourceName ~= "" and queued.sourceName ~= UNKNOWN then
-							critMessageOnly = string_format("%s - %s", critMessageOnly, queued.sourceName)
-						end
 						if queued.healSourceLabel and queued.healSourceLabel ~= "" then
 							critMessageOnly = string_format("%s [%s]", critMessageOnly, queued.healSourceLabel)
 						end
@@ -2208,9 +2209,6 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 						if nonCritSummary then
 							nonCritMessage = nonCritMessage .. nonCritSummary
 						end
-						if queued.sourceName and queued.sourceName ~= "" and queued.sourceName ~= UNKNOWN then
-							nonCritMessage = string_format("%s - %s", nonCritMessage, queued.sourceName)
-						end
 						if queued.healSourceLabel and queued.healSourceLabel ~= "" then
 							nonCritMessage = string_format("%s [%s]", nonCritMessage, queued.healSourceLabel)
 						end
@@ -2225,9 +2223,6 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 						if critSummary then
 							critMessage = critMessage .. critSummary
 						end
-						if queued.sourceName and queued.sourceName ~= "" and queued.sourceName ~= UNKNOWN then
-							critMessage = string_format("%s - %s", critMessage, queued.sourceName)
-						end
 						if queued.healSourceLabel and queued.healSourceLabel ~= "" then
 							critMessage = string_format("%s [%s]", critMessage, queued.healSourceLabel)
 						end
@@ -2240,9 +2235,6 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 			local summary = BuildHitSummary(queued.hitCount, queued.critCount, true)
 			if summary then
 				message = message .. summary
-			end
-			if queued.sourceName and queued.sourceName ~= "" and queued.sourceName ~= UNKNOWN then
-				message = string_format("%s - %s", message, queued.sourceName)
 			end
 			if queued.healSourceLabel and queued.healSourceLabel ~= "" then
 				message = string_format("%s [%s]", message, queued.healSourceLabel)
