@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.024
+
+- Removed unreliable attacker and healer names from incoming damage and healing.
+- Applied incoming name suppression to immediate, combined, and fallback combat output.
+
 ## v12.023
 
 - Excluded non-runtime files from release bundles: `tests/`, `scripts/`, `README.md`, `CHANGELOG.md`, and `API.html`.
