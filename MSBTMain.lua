@@ -1645,6 +1645,21 @@ local function ResolveOutgoingDamageEventSettings(isSpell)
 	end
 end
 
+-- Presentation used for the crit half of a batch. Falls back to the normal event
+-- settings marked as a crit when the profile's crit event is unavailable.
+local function ResolveCritDisplaySettings(eventSettings, critSettings)
+	if critSettings and not critSettings.disabled then
+		return critSettings
+	end
+
+	local fallbackSettings = {}
+	for k, v in pairs(eventSettings) do
+		fallbackSettings[k] = v
+	end
+	fallbackSettings.isCrit = true
+	return fallbackSettings
+end
+
 local function FlushOutgoingBatch(batchKey)
 	local batch = outgoingBatches[batchKey]
 	if not batch then
@@ -1659,50 +1674,33 @@ local function FlushOutgoingBatch(batchKey)
 
 	local currentProfile = MSBTProfiles.currentProfile
 	local critSettings = currentProfile.events[normalEventKey .. "_CRIT"]
-	local routeCritSeparately = false
-	if batch.critCount and batch.critCount > 0 and critSettings and not critSettings.disabled then
-		local normalScrollArea = eventSettings.scrollArea
-		local critScrollArea = critSettings.scrollArea
-		routeCritSeparately = normalScrollArea and critScrollArea and (normalScrollArea ~= critScrollArea)
+
+	local critCount = batch.critCount or 0
+	local critAmount = batch.critAmount or 0
+	if critAmount > batch.totalAmount then
+		critAmount = batch.totalAmount
 	end
 
-	if routeCritSeparately then
-		local critAmount = batch.critAmount or 0
-		if critAmount > batch.totalAmount then
-			critAmount = batch.totalAmount
-		end
+	-- Always split the group into its normal and crit halves. Merging them into a
+	-- single crit-styled message made one crit promote the whole batch, so during
+	-- sustained combat nearly every group carried crit font, color and stickiness.
+	if critCount > 0 and critAmount > 0 then
+		local critDisplaySettings = ResolveCritDisplaySettings(eventSettings, critSettings)
 
-		local nonCritCount = batch.hitCount - batch.critCount
+		local nonCritCount = batch.hitCount - critCount
 		local nonCritAmount = batch.totalAmount - critAmount
 		if nonCritCount > 0 and nonCritAmount > 0 then
 			local nonCritMessage = BuildOutgoingHitsMessage(nonCritAmount, nonCritCount, 0, batch.isSpell)
 			DisplayEvent(eventSettings, nonCritMessage, batch.effectTexture)
 		end
 
-		if batch.critCount > 0 and critAmount > 0 then
-			local critMessage = BuildOutgoingHitsMessage(critAmount, batch.critCount, batch.critCount, batch.isSpell)
-			DisplayEvent(critSettings, critMessage, batch.effectTexture)
-		end
+		local critMessage = BuildOutgoingHitsMessage(critAmount, critCount, critCount, batch.isSpell)
+		DisplayEvent(critDisplaySettings, critMessage, batch.effectTexture)
 		return
 	end
 
-	local message = BuildOutgoingHitsMessage(batch.totalAmount, batch.hitCount, batch.critCount, batch.isSpell)
-	local displaySettings = eventSettings
-	if batch.critCount and batch.critCount > 0 then
-		local colorSourceSettings = eventSettings
-		if critSettings and not critSettings.disabled then
-			colorSourceSettings = critSettings
-		end
-
-		displaySettings = {}
-		for k, v in pairs(colorSourceSettings) do
-			displaySettings[k] = v
-		end
-		-- Keep routing on the same resolved scroll area for merged output.
-		displaySettings.scrollArea = eventSettings.scrollArea
-		displaySettings.isCrit = true
-	end
-	DisplayEvent(displaySettings, message, batch.effectTexture)
+	local message = BuildOutgoingHitsMessage(batch.totalAmount, batch.hitCount, critCount, batch.isSpell)
+	DisplayEvent(eventSettings, message, batch.effectTexture)
 end
 
 local function QueueOutgoingBatch(spellIDUsed, normalizedAmount, isCrit, effectTexture, forceIsSpell)
@@ -2002,6 +2000,38 @@ local function BuildHitSummary(hitCount, critCount, singleCritLabel)
 	return nil
 end
 
+local function BuildIncomingDamageLine(settings, amount, hitCount, critCount, damageSource)
+	local message = BuildActionMessage(settings, amount)
+	if not message or message == "" then
+		return nil
+	end
+
+	local summary = BuildHitSummary(hitCount, critCount, true)
+	if summary then
+		message = message .. summary
+	end
+	if damageSource and damageSource ~= "" then
+		message = string_format("%s - %s", message, damageSource)
+	end
+	return message
+end
+
+local function BuildIncomingHealLine(settings, amount, hitCount, critCount, healSourceLabel)
+	local message = BuildActionMessage(settings, amount)
+	if not message or message == "" then
+		return nil
+	end
+
+	local summary = BuildHitSummary(hitCount, critCount, true)
+	if summary then
+		message = message .. summary
+	end
+	if healSourceLabel and healSourceLabel ~= "" then
+		message = string_format("%s [%s]", message, healSourceLabel)
+	end
+	return message
+end
+
 local function GetIncomingHealSourceLabel(flagText, schoolMask)
 	local flag = flagText and string_upper(tostring(flagText)) or ""
 	local school = schoolMask and string_upper(tostring(schoolMask)) or ""
@@ -2041,74 +2071,37 @@ local function QueueIncomingDamageBatch(normalizedAmount, isCrit, damageSource)
 			end
 			local critSettings = currentProfile.events.INCOMING_DAMAGE_CRIT
 
-			local messageTemplateSettings = eventSettings or critSettings
-			local message = BuildActionMessage(messageTemplateSettings, queued.totalAmount)
-			if not message or message == "" then
-				return
+			local critCount = queued.critCount or 0
+			local critAmount = queued.critAmount or 0
+			if critAmount > queued.totalAmount then
+				critAmount = queued.totalAmount
 			end
 
-			local routeCritSeparately = false
-			if queued.critCount and queued.critCount > 0 and critSettings and not critSettings.disabled then
-				local normalScrollArea = eventSettings.scrollArea
-				local critScrollArea = critSettings.scrollArea
-				routeCritSeparately = normalScrollArea and critScrollArea and (normalScrollArea ~= critScrollArea)
-			end
+			-- Always split the group into its normal and crit halves. Merging them
+			-- into a single crit-styled message let one crit promote the whole batch.
+			if critCount > 0 and critAmount > 0 then
+				local critDisplaySettings = ResolveCritDisplaySettings(eventSettings, critSettings)
 
-			if routeCritSeparately then
-				local critAmount = queued.critAmount or 0
-				if critAmount > queued.totalAmount then
-					critAmount = queued.totalAmount
-				end
-
-				local nonCritCount = queued.hitCount - queued.critCount
+				local nonCritCount = queued.hitCount - critCount
 				local nonCritAmount = queued.totalAmount - critAmount
 				if nonCritCount > 0 and nonCritAmount > 0 then
-					local nonCritMessage = BuildActionMessage(eventSettings, nonCritAmount)
-					if nonCritMessage and nonCritMessage ~= "" then
-						local nonCritSummary = BuildHitSummary(nonCritCount, 0, true)
-						if nonCritSummary then
-							nonCritMessage = nonCritMessage .. nonCritSummary
-						end
-						if queued.damageSource and queued.damageSource ~= "" then
-							nonCritMessage = string_format("%s - %s", nonCritMessage, queued.damageSource)
-						end
+					local nonCritMessage = BuildIncomingDamageLine(eventSettings, nonCritAmount, nonCritCount, 0, queued.damageSource)
+					if nonCritMessage then
 						DisplayEvent(eventSettings, nonCritMessage)
 					end
 				end
 
-				if queued.critCount > 0 and critAmount > 0 then
-					local critMessage = BuildActionMessage(critSettings, critAmount)
-					if critMessage and critMessage ~= "" then
-						local critSummary = BuildHitSummary(queued.critCount, queued.critCount, true)
-						if critSummary then
-							critMessage = critMessage .. critSummary
-						end
-						if queued.damageSource and queued.damageSource ~= "" then
-							critMessage = string_format("%s - %s", critMessage, queued.damageSource)
-						end
-						DisplayEvent(critSettings, critMessage)
-					end
+				local critMessage = BuildIncomingDamageLine(critDisplaySettings, critAmount, critCount, critCount, queued.damageSource)
+				if critMessage then
+					DisplayEvent(critDisplaySettings, critMessage)
 				end
 				return
 			end
 
-			local summary = BuildHitSummary(queued.hitCount, queued.critCount, true)
-			if summary then
-				message = message .. summary
+			local message = BuildIncomingDamageLine(eventSettings, queued.totalAmount, queued.hitCount, critCount, queued.damageSource)
+			if message then
+				DisplayEvent(eventSettings, message)
 			end
-			if queued.damageSource and queued.damageSource ~= "" then
-				message = string_format("%s - %s", message, queued.damageSource)
-			end
-
-			local displaySettings = eventSettings
-			if queued.critCount and queued.critCount > 0 then
-				displaySettings = {}
-				for k, v in pairs(eventSettings) do
-					displaySettings[k] = v
-				end
-				displaySettings.isCrit = true
-			end
-			DisplayEvent(displaySettings, message)
 		end)
 	end
 
@@ -2163,94 +2156,47 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 				return
 			end
 
-			local routeCritSeparately = false
-			if queued.critCount and queued.critCount > 0 and normalEnabled and critEnabled then
-				local normalScrollArea = eventSettings.scrollArea
-				local critScrollArea = critSettings.scrollArea
-				routeCritSeparately = normalScrollArea and critScrollArea and (normalScrollArea ~= critScrollArea)
+			local critCount = queued.critCount or 0
+			local critAmount = queued.critAmount or 0
+			if critAmount > queued.totalAmount then
+				critAmount = queued.totalAmount
 			end
 
 			if not normalEnabled then
-				local critAmountOnly = queued.critAmount or 0
-				if critEnabled and queued.critCount and queued.critCount > 0 and critAmountOnly > 0 then
-					local critMessageOnly = BuildActionMessage(critSettings, critAmountOnly)
-					if critMessageOnly and critMessageOnly ~= "" then
-						local critSummaryOnly = BuildHitSummary(queued.critCount, queued.critCount, true)
-						if critSummaryOnly then
-							critMessageOnly = critMessageOnly .. critSummaryOnly
-						end
-						if queued.healSourceLabel and queued.healSourceLabel ~= "" then
-							critMessageOnly = string_format("%s [%s]", critMessageOnly, queued.healSourceLabel)
-						end
+				if critEnabled and critCount > 0 and critAmount > 0 then
+					local critMessageOnly = BuildIncomingHealLine(critSettings, critAmount, critCount, critCount, queued.healSourceLabel)
+					if critMessageOnly then
 						DisplayEvent(critSettings, critMessageOnly, queued.effectTexture)
 					end
 				end
 				return
 			end
 
-			local messageTemplateSettings = eventSettings or critSettings
-			local message = BuildActionMessage(messageTemplateSettings, queued.totalAmount)
-			if not message or message == "" then
-				return
-			end
+			-- Always split the group into its normal and crit halves. Merging them
+			-- into a single crit-styled message let one crit promote the whole batch.
+			if critCount > 0 and critAmount > 0 then
+				local critDisplaySettings = ResolveCritDisplaySettings(eventSettings, critSettings)
 
-			if routeCritSeparately then
-				local critAmount = queued.critAmount or 0
-				if critAmount > queued.totalAmount then
-					critAmount = queued.totalAmount
-				end
-
-				local nonCritCount = queued.hitCount - queued.critCount
+				local nonCritCount = queued.hitCount - critCount
 				local nonCritAmount = queued.totalAmount - critAmount
 				if nonCritCount > 0 and nonCritAmount > 0 then
-					local nonCritMessage = BuildActionMessage(eventSettings, nonCritAmount)
-					if nonCritMessage and nonCritMessage ~= "" then
-						local nonCritSummary = BuildHitSummary(nonCritCount, 0, true)
-						if nonCritSummary then
-							nonCritMessage = nonCritMessage .. nonCritSummary
-						end
-						if queued.healSourceLabel and queued.healSourceLabel ~= "" then
-							nonCritMessage = string_format("%s [%s]", nonCritMessage, queued.healSourceLabel)
-						end
+					local nonCritMessage = BuildIncomingHealLine(eventSettings, nonCritAmount, nonCritCount, 0, queued.healSourceLabel)
+					if nonCritMessage then
 						DisplayEvent(eventSettings, nonCritMessage, queued.effectTexture)
 					end
 				end
 
-				if critEnabled and queued.critCount > 0 and critAmount > 0 then
-					local critMessage = BuildActionMessage(critSettings, critAmount)
-					if critMessage and critMessage ~= "" then
-						local critSummary = BuildHitSummary(queued.critCount, queued.critCount, true)
-						if critSummary then
-							critMessage = critMessage .. critSummary
-						end
-						if queued.healSourceLabel and queued.healSourceLabel ~= "" then
-							critMessage = string_format("%s [%s]", critMessage, queued.healSourceLabel)
-						end
-						DisplayEvent(critSettings, critMessage, queued.effectTexture)
-					end
+				local critMessage = BuildIncomingHealLine(critDisplaySettings, critAmount, critCount, critCount, queued.healSourceLabel)
+				if critMessage then
+					DisplayEvent(critDisplaySettings, critMessage, queued.effectTexture)
 				end
 				return
 			end
 
-			local summary = BuildHitSummary(queued.hitCount, queued.critCount, true)
-			if summary then
-				message = message .. summary
+			local message = BuildIncomingHealLine(eventSettings, queued.totalAmount, queued.hitCount, critCount, queued.healSourceLabel)
+			if message then
+				DisplayEvent(eventSettings, message, queued.effectTexture)
 			end
-			if queued.healSourceLabel and queued.healSourceLabel ~= "" then
-				message = string_format("%s [%s]", message, queued.healSourceLabel)
-			end
-
-			local displaySettings = eventSettings
-			if queued.critCount and queued.critCount > 0 and critEnabled then
-				displaySettings = {}
-				for k, v in pairs(critSettings) do
-					displaySettings[k] = v
-				end
-				-- Keep merged routing on the base scroll area.
-				displaySettings.scrollArea = eventSettings.scrollArea
-				displaySettings.isCrit = true
-			end
-			DisplayEvent(displaySettings, message, queued.effectTexture)
 		end)
 	end
 
