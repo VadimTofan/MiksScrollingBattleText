@@ -1645,19 +1645,23 @@ local function ResolveOutgoingDamageEventSettings(isSpell)
 	end
 end
 
--- Presentation used for the crit half of a batch. Falls back to the normal event
--- settings marked as a crit when the profile's crit event is unavailable.
-local function ResolveCritDisplaySettings(eventSettings, critSettings)
-	if critSettings and not critSettings.disabled then
+local function ShouldSplitCritBatch(eventSettings, critSettings, critCount)
+	local normalScrollArea = eventSettings and eventSettings.scrollArea
+	local critScrollArea = critSettings and critSettings.scrollArea
+
+	return critCount and critCount > 0
+		and critSettings and not critSettings.disabled
+		and normalScrollArea and critScrollArea
+		and normalScrollArea ~= critScrollArea
+end
+
+local function ResolveBatchDisplaySettings(eventSettings, critSettings, hitCount, critCount)
+	if hitCount and hitCount > 0 and hitCount == critCount
+		and critSettings and not critSettings.disabled then
 		return critSettings
 	end
 
-	local fallbackSettings = {}
-	for k, v in pairs(eventSettings) do
-		fallbackSettings[k] = v
-	end
-	fallbackSettings.isCrit = true
-	return fallbackSettings
+	return eventSettings
 end
 
 local function FlushOutgoingBatch(batchKey)
@@ -1681,12 +1685,7 @@ local function FlushOutgoingBatch(batchKey)
 		critAmount = batch.totalAmount
 	end
 
-	-- Always split the group into its normal and crit halves. Merging them into a
-	-- single crit-styled message made one crit promote the whole batch, so during
-	-- sustained combat nearly every group carried crit font, color and stickiness.
-	if critCount > 0 and critAmount > 0 then
-		local critDisplaySettings = ResolveCritDisplaySettings(eventSettings, critSettings)
-
+	if ShouldSplitCritBatch(eventSettings, critSettings, critCount) then
 		local nonCritCount = batch.hitCount - critCount
 		local nonCritAmount = batch.totalAmount - critAmount
 		if nonCritCount > 0 and nonCritAmount > 0 then
@@ -1695,12 +1694,13 @@ local function FlushOutgoingBatch(batchKey)
 		end
 
 		local critMessage = BuildOutgoingHitsMessage(critAmount, critCount, critCount, batch.isSpell)
-		DisplayEvent(critDisplaySettings, critMessage, batch.effectTexture)
+		DisplayEvent(critSettings, critMessage, batch.effectTexture)
 		return
 	end
 
 	local message = BuildOutgoingHitsMessage(batch.totalAmount, batch.hitCount, critCount, batch.isSpell)
-	DisplayEvent(eventSettings, message, batch.effectTexture)
+	local displaySettings = ResolveBatchDisplaySettings(eventSettings, critSettings, batch.hitCount, critCount)
+	DisplayEvent(displaySettings, message, batch.effectTexture)
 end
 
 local function QueueOutgoingBatch(spellIDUsed, normalizedAmount, isCrit, effectTexture, forceIsSpell)
@@ -2077,11 +2077,7 @@ local function QueueIncomingDamageBatch(normalizedAmount, isCrit, damageSource)
 				critAmount = queued.totalAmount
 			end
 
-			-- Always split the group into its normal and crit halves. Merging them
-			-- into a single crit-styled message let one crit promote the whole batch.
-			if critCount > 0 and critAmount > 0 then
-				local critDisplaySettings = ResolveCritDisplaySettings(eventSettings, critSettings)
-
+			if ShouldSplitCritBatch(eventSettings, critSettings, critCount) then
 				local nonCritCount = queued.hitCount - critCount
 				local nonCritAmount = queued.totalAmount - critAmount
 				if nonCritCount > 0 and nonCritAmount > 0 then
@@ -2091,16 +2087,22 @@ local function QueueIncomingDamageBatch(normalizedAmount, isCrit, damageSource)
 					end
 				end
 
-				local critMessage = BuildIncomingDamageLine(critDisplaySettings, critAmount, critCount, critCount, queued.damageSource)
+				local critMessage = BuildIncomingDamageLine(critSettings, critAmount, critCount, critCount, queued.damageSource)
 				if critMessage then
-					DisplayEvent(critDisplaySettings, critMessage)
+					DisplayEvent(critSettings, critMessage)
 				end
 				return
 			end
 
 			local message = BuildIncomingDamageLine(eventSettings, queued.totalAmount, queued.hitCount, critCount, queued.damageSource)
 			if message then
-				DisplayEvent(eventSettings, message)
+				local displaySettings = ResolveBatchDisplaySettings(
+					eventSettings,
+					critSettings,
+					queued.hitCount,
+					critCount
+				)
+				DisplayEvent(displaySettings, message)
 			end
 		end)
 	end
@@ -2172,11 +2174,7 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 				return
 			end
 
-			-- Always split the group into its normal and crit halves. Merging them
-			-- into a single crit-styled message let one crit promote the whole batch.
-			if critCount > 0 and critAmount > 0 then
-				local critDisplaySettings = ResolveCritDisplaySettings(eventSettings, critSettings)
-
+			if ShouldSplitCritBatch(eventSettings, critSettings, critCount) then
 				local nonCritCount = queued.hitCount - critCount
 				local nonCritAmount = queued.totalAmount - critAmount
 				if nonCritCount > 0 and nonCritAmount > 0 then
@@ -2186,16 +2184,22 @@ local function QueueIncomingHealBatch(normalizedAmount, isCrit, effectTexture, s
 					end
 				end
 
-				local critMessage = BuildIncomingHealLine(critDisplaySettings, critAmount, critCount, critCount, queued.healSourceLabel)
+				local critMessage = BuildIncomingHealLine(critSettings, critAmount, critCount, critCount, queued.healSourceLabel)
 				if critMessage then
-					DisplayEvent(critDisplaySettings, critMessage, queued.effectTexture)
+					DisplayEvent(critSettings, critMessage, queued.effectTexture)
 				end
 				return
 			end
 
 			local message = BuildIncomingHealLine(eventSettings, queued.totalAmount, queued.hitCount, critCount, queued.healSourceLabel)
 			if message then
-				DisplayEvent(eventSettings, message, queued.effectTexture)
+				local displaySettings = ResolveBatchDisplaySettings(
+					eventSettings,
+					critSettings,
+					queued.hitCount,
+					critCount
+				)
+				DisplayEvent(displaySettings, message, queued.effectTexture)
 			end
 		end)
 	end
