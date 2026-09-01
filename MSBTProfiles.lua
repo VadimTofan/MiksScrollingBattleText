@@ -1081,38 +1081,6 @@ if IsClassic then
 				message		= "+%e",
 				scrollArea	= "Static",
 			},
-			NOTIFICATION_COOLDOWN = {
-				message		= "%e " .. L.MSG_READY_NOW .. "!",
-				scrollArea	= "Static",
-				fontSize	= 22,
-				soundFile	= "MSBT Cooldown",
-				skillColorR	= 1,
-				skillColorG	= 0,
-				skillColorB	= 0,
-			},
-			NOTIFICATION_PET_COOLDOWN = {
-				colorR		= 0.57,
-				colorG		= 0.58,
-				message		= PET .. " %e " .. L.MSG_READY_NOW .. "!",
-				scrollArea	= "Static",
-				fontSize	= 22,
-				soundFile	= "MSBT Cooldown",
-				skillColorR	= 1,
-				skillColorG	= 0.41,
-				skillColorB	= 0.41,
-			},
-			NOTIFICATION_ITEM_COOLDOWN = {
-				colorR		= 0.784,
-				colorG		= 0.784,
-				colorB		= 0,
-				message		= " %e " .. L.MSG_READY_NOW .. "!",
-				scrollArea	= "Static",
-				fontSize	= 22,
-				soundFile	= "MSBT Cooldown",
-				skillColorR	= 1,
-				skillColorG	= 0.588,
-				skillColorB	= 0.588,
-			},
 			NOTIFICATION_LOOT = {
 				colorB		= 0,
 				message		= "+%a %e (%t)",
@@ -1159,23 +1127,23 @@ if IsClassic then
 			},
 
 			MSBT_TRIGGER_LOW_HEALTH = {
+				disabled		= true,
 				colorG			= 0.5,
 				colorB			= 0.5,
 				message			= L.MSG_TRIGGER_LOW_HEALTH .. "! (%a)",
 				alwaysSticky	= true,
 				fontSize		= 26,
-				soundFile		= "MSBT Low Health",
 				mainEvents		= "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}",
 				exceptions		= "recentlyFired;;lt;;5",
 				iconSkill		= SPELLID_FIRST_AID,
 			},
 			MSBT_TRIGGER_LOW_MANA = {
+				disabled		= true,
 				colorR			= 0.5,
 				colorG			= 0.5,
 				message			= L.MSG_TRIGGER_LOW_MANA .. "! (%a)",
 				alwaysSticky	= true,
 				fontSize		= 26,
-				soundFile		= "MSBT Low Mana",
 				classes			= "DRUID,MAGE,PALADIN,PRIEST,SHAMAN,WARLOCK",
 				mainEvents		= "UNIT_POWER_UPDATE{powerType;;eq;;0;;unitID;;eq;;player;;threshold;;lt;;35}",
 				exceptions		= "recentlyFired;;lt;;5",
@@ -1298,10 +1266,6 @@ if IsClassic then
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
-
-		cooldownExclusions				= {},
-		ignoreCooldownThreshold			= {},
-		cooldownThreshold				= 5,
 
 		qualityExclusions				= {
 			[LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor] = true,
@@ -2295,38 +2259,6 @@ else
 				message		= "+%e",
 				scrollArea	= "Static",
 			},
-			NOTIFICATION_COOLDOWN = {
-				message		= "%e " .. L.MSG_READY_NOW .. "!",
-				scrollArea	= "Static",
-				fontSize	= 22,
-				soundFile	= "MSBT Cooldown",
-				skillColorR	= 1,
-				skillColorG	= 0,
-				skillColorB	= 0,
-			},
-			NOTIFICATION_PET_COOLDOWN = {
-				colorR		= 0.57,
-				colorG		= 0.58,
-				message		= PET .. " %e " .. L.MSG_READY_NOW .. "!",
-				scrollArea	= "Static",
-				fontSize	= 22,
-				soundFile	= "MSBT Cooldown",
-				skillColorR	= 1,
-				skillColorG	= 0.41,
-				skillColorB	= 0.41,
-			},
-			NOTIFICATION_ITEM_COOLDOWN = {
-				colorR		= 0.784,
-				colorG		= 0.784,
-				colorB		= 0,
-				message		= " %e " .. L.MSG_READY_NOW .. "!",
-				scrollArea	= "Static",
-				fontSize	= 22,
-				soundFile	= "MSBT Cooldown",
-				skillColorR	= 1,
-				skillColorG	= 0.588,
-				skillColorB	= 0.588,
-			},
 			NOTIFICATION_LOOT = {
 				colorB		= 0,
 				message		= "+%a %e (%t)",
@@ -2411,23 +2343,23 @@ else
 			},
 
 			MSBT_TRIGGER_LOW_HEALTH = {
+				disabled		= true,
 				colorG			= 0.5,
 				colorB			= 0.5,
 				message			= L.MSG_TRIGGER_LOW_HEALTH .. "! (%a)",
 				alwaysSticky	= true,
 				fontSize		= 26,
-				soundFile		= "MSBT Low Health",
 				mainEvents		= "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}",
 				exceptions		= "recentlyFired;;lt;;5",
 				iconSkill		= SPELLID_FIRST_AID,
 			},
 			MSBT_TRIGGER_LOW_MANA = {
+				disabled		= true,
 				colorR			= 0.5,
 				colorG			= 0.5,
 				message			= L.MSG_TRIGGER_LOW_MANA .. "! (%a)",
 				alwaysSticky	= true,
 				fontSize		= 26,
-				soundFile		= "MSBT Low Mana",
 				classes			= "DRUID,MAGE,PALADIN,PRIEST,SHAMAN,WARLOCK",
 				mainEvents		= "UNIT_POWER_UPDATE{powerType;;eq;;0;;unitID;;eq;;player;;threshold;;lt;;35}",
 				exceptions		= "recentlyFired;;lt;;5",
@@ -2621,10 +2553,6 @@ else
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
 
-		cooldownExclusions				= {},
-		ignoreCooldownThreshold			= {},
-		cooldownThreshold				= 5,
-
 		qualityExclusions				= {
 			[LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor] = true,
 		},
@@ -2791,9 +2719,7 @@ local function SetAddonEnabled(isEnabled)
 		MikSBT.Main.Enable()
 		MikSBT.Parser.Enable()
 		MikSBT.Triggers.Enable()
-		MikSBT.Cooldowns.Enable()
 	else
-		MikSBT.Cooldowns.Disable()
 		MikSBT.Triggers.Disable()
 		MikSBT.Parser.Disable()
 		MikSBT.Main.Disable()

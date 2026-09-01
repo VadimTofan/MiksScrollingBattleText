@@ -13,7 +13,6 @@ local profile = {
 	normalOutlineIndex = 1,
 	normalFontAlpha = 80,
 	stickyCritsDisabled = false,
-	soundsDisabled = false,
 	skillIconsDisabled = false,
 }
 local area = {
@@ -50,10 +49,6 @@ DisplayService:Configure({
 		["Area Crit"] = "crit.ttf",
 		["Area Normal"] = "normal.ttf",
 	},
-	iterateSounds = function()
-		return pairs({})
-	end,
-	playSound = function() end,
 	isModDisabled = function()
 		return false
 	end,
@@ -62,7 +57,6 @@ DisplayService:Configure({
 	end,
 	outlineMap = { "", "OUTLINE", "THICKOUTLINE" },
 	defaultArea = "Notification",
-	defaultSoundPath = "Sounds/",
 })
 
 -- Given / When

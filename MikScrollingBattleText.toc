@@ -38,7 +38,6 @@ Components\DamageMeterSource.lua
 Components\OutgoingCombat.lua
 Components\ParserNotifications.lua
 Components\UtilityNotifications.lua
-Components\ItemCooldownTracker.lua
 Display\ScrollAreas.lua
 Display\DisplayService.lua
 Localization\localization.xml
@@ -47,7 +46,6 @@ MSBTParser.lua
 MSBTMedia.lua
 Display\AnimationEngine.lua
 MSBTTriggers.lua
-MSBTCooldowns.lua
 Components\LootNotifications.lua
 MSBTMain.lua
 Display\AnimationStyles.lua

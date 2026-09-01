@@ -236,13 +236,10 @@ DisplayService:Configure({
 	end,
 	scrollAreas = ScrollAreas,
 	fonts = fonts,
-	iterateSounds = MSBTMedia.IterateSounds,
-	playSound = PlaySoundFile,
 	isModDisabled = IsModDisabled,
 	display = Display,
 	outlineMap = OUTLINE_MAP,
 	defaultArea = DEFAULT_SCROLL_AREA,
-	defaultSoundPath = DEFAULT_SOUND_PATH,
 })
 local function AnimateEvent(displayEvent)
 	local fontString = displayEvent.fontString

@@ -45,9 +45,6 @@
 			</div>
 			<b>Sounds:</b>
 			<div class="TOCSection">
-				<a href="#SoundsOverview">Sounds Overview</a><br />
-				<a href="#MikSBT.RegisterSound">MikSBT.RegisterSound</a><br />
-				<a href="#MikSBT.IterateSounds">MikSBT.IterateSounds</a><br />
 
 			</div>
 			<b>Custom Animation Styles:</b>
@@ -388,108 +385,6 @@
 			This function has superseded the <span style="color: red;">MikSBT.GetScrollAreaList</span> function. The
 			old function created a new table and returned it every time it was called which was wasteful.
 		</div>
-
-
-		<div class="SectionTitle"><a name="SoundsOverview"></a>Sounds Overview</div>
-		<a href="#TOC">Return to TOC</a><br /><br />
-		<div class="SectionDesc">
-			MSBT allows you to register sounds which the user can assign to be played when events and triggers occur.<br /><br />
-
-			The <a href="#MikSBT.RegisterSound">MikSBT.RegisterSound</a> function is used to register the sounds, and the
-			registered sounds may be obtained by using the <a href="#MikSBT.IterateSounds">MikSBT.IterateSounds</a> function.
-		</div>
-
-
-		<div class="SectionTitle"><a name="MikSBT.RegisterSound"></a>MikSBT.RegisterSound</div>
-		<a href="#TOC">Return to TOC</a><br /><br />
-		<div class="SectionDesc">
-			Registers a sound with MSBT and Shared Media.<br /><br />
-			Sound registration is not permanent. It must be done each load. In this manner if the user were to remove
-			a mod that registers custom sounds, the sounds would simply no longer be available.
-		</div>
-		<div class="SubsectionTitle">Syntax</div>
-		<div class="SubsectionBody">
-			<div class="Syntax"><b>MikSBT.RegisterSound(</b><i>soundName</i><b>,</b> <i>soundPath</i><b>)</b></div>
-		</div>
-
-		<div class="SubsectionTitle">Parameters</div>
-		<div class="SubsectionBody">
-			<table cellspacing="3">
-				<tr>
-					<td class="ParameterName" nowrap="nowrap"><i>soundName</i> (Required)</td>
-					<td class="ParameterDesc">
-						The name to use for the sound. This name will be displayed in the sound selection
-						dialogs.
-					</td>
-				</tr>
-				<tr>
-					<td class="ParameterName" nowrap="nowrap"><i>soundPath</i> (Required)</td>
-					<td class="ParameterDesc">The filesystem path to where the sound resides.</td>
-				</tr>
-			</table>
-		</div>
-
-		<div class="SubsectionTitle">Return Values</div>
-		<div class="SubsectionBody">
-			None.
-		</div>
-
-		<div class="SubsectionTitle">Example</div>
-		<div class="SubsectionBody">
-			<div class="Syntax">
-				-- Registers an mp3 sound named "MyUberSound1" with MSBT.<br />
-				MikSBT.RegisterSound("MyUberSound1", "Interface\\AddOns\\MyModName\\Sounds\\MyUberSound1.mp3");<br /><br />
-				-- Registers an ogg sound named "MyUberSound2" with MSBT.<br />
-				MikSBT.RegisterSound("MyUberSound2", "Interface\\AddOns\\MyModName\\Sounds\\MyUberSound2.ogg");
-			</div>
-		</div>
-
-		<div class="SubsectionTitle">Remarks</div>
-		<div class="SubsectionBody">
-			If you attempt to register a sound name that already exists, the function will quietly fail.
-		</div>
-
-
-		<div class="SectionTitle"><a name="MikSBT.IterateSounds"></a>MikSBT.IterateSounds</div>
-		<a href="#TOC">Return to TOC</a><br /><br />
-		<div class="SectionDesc">
-			Returns an iterator function for the table containing the registered sounds.
-		</div>
-		<div class="SubsectionTitle">Syntax</div>
-		<div class="SubsectionBody">
-			<div class="Syntax"><i>for soundName, soundPath in</i> <b>MikSBT.IterateSounds()</b> <i>do</i></div>
-		</div>
-
-		<div class="SubsectionTitle">Parameters</div>
-		<div class="SubsectionBody">None.</div>
-
-		<div class="SubsectionTitle">Return Values</div>
-		<div class="SubsectionBody">
-			<table cellspacing="3">
-				<tr>
-					<td class="ParameterName" nowrap="nowrap"><i>iterator</i></td>
-					<td class="ParameterDesc">
-						An iterator function for the table containing the registered sounds.<br /><br />
-						The format of the table is as follows:<br /><br />
-						&nbsp;&nbsp;["SoundName1"] = "Sound Path 1"<br />
-						&nbsp;&nbsp;["SoundName2"] = "Sound Path 2"<br />
-					</td>
-				</tr>
-			</table>
-		</div>
-
-		<div class="SubsectionTitle">Examples</div>
-		<div class="SubsectionBody">
-			<div class="Syntax">
-				-- Print the sound names registered with MSBT.<br />
-				for soundName, soundPath in MikSBT.IterateSounds() do<br />
-					&nbsp;DEFAULT_CHAT_FRAME:AddMessage(soundName);<br />
-				end<br />
-			</div>
-		</div>
-
-		<div class="SubsectionTitle">Remarks</div>
-		<div class="SubsectionBody">None.</div>
 
 
 		<div class="SectionTitle"><a name="CustomAnimationStylesOverview"></a>Custom Animation Styles Overview</div>

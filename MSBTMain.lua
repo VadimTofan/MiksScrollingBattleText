@@ -1221,10 +1221,8 @@ MikSBT.DISPLAYTYPE_STATIC			= "Static"
 MikSBT.RegisterFont					= MSBTMedia.RegisterFont
 MikSBT.RegisterAnimationStyle		= MSBTAnimations.RegisterAnimationStyle
 MikSBT.RegisterStickyAnimationStyle	= MSBTAnimations.RegisterStickyAnimationStyle
-MikSBT.RegisterSound				= MSBTMedia.RegisterSound
 MikSBT.IterateFonts					= MSBTMedia.IterateFonts
 MikSBT.IterateScrollAreas			= MSBTAnimations.IterateScrollAreas
-MikSBT.IterateSounds				= MSBTMedia.IterateSounds
 MikSBT.DisplayMessage				= MSBTAnimations.DisplayMessage
 MikSBT.IsModDisabled				= MSBTProfiles.IsModDisabled
 

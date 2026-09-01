@@ -6,36 +6,6 @@ function DisplayService:Configure(config)
 	self.config = config
 end
 
-function DisplayService:PlayEventSound(eventSettings, profile)
-	local soundFile = eventSettings.soundFile
-	if not soundFile or profile.soundsDisabled then
-		return true
-	end
-
-	for soundName, soundPath in self.config.iterateSounds() do
-		if soundName == soundFile then
-			soundFile = soundPath
-		end
-	end
-
-	if type(soundFile) == "string" then
-		if soundFile == "" then
-			return true
-		end
-
-		local lowerPath = string.lower(soundFile)
-		if not string.find(soundFile, "\\", nil, true)
-			and not string.find(soundFile, "/", nil, true) then
-			soundFile = self.config.defaultSoundPath .. soundFile
-		elseif (string.find(lowerPath, "interface", nil, true) or 0) ~= 1 then
-			return false
-		end
-	end
-
-	self.config.playSound(soundFile, "Master")
-	return true
-end
-
 function DisplayService:DisplayEvent(eventSettings, message, texturePath)
 	local profile = self.config.getProfile()
 	local scrollAreas = self.config.scrollAreas
@@ -72,10 +42,6 @@ function DisplayService:DisplayEvent(eventSettings, message, texturePath)
 	end
 
 	isSticky = isSticky or eventSettings.alwaysSticky
-	if not self:PlayEventSound(eventSettings, profile) then
-		return
-	end
-
 	self.config.display(
 		message,
 		area,
