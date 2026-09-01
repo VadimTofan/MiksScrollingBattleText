@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.025
+
+- Fixed batched combat events incorrectly using critical-hit styling when only some hits were critical.
+- Split normal and critical hits into their configured scroll areas.
+
 ## v12.024
 
 - Removed unreliable attacker and healer names from incoming damage and healing.
