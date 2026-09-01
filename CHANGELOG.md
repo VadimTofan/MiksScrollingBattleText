@@ -4,6 +4,15 @@
 
 - Fixed batched combat events incorrectly using critical-hit styling when only some hits were critical.
 - Split normal and critical hits into their configured scroll areas.
+- Reorganized the addon into focused core, API, service, display, combat,
+  tracking, and configuration components.
+- Added guarded adapters for Blizzard restricted values and modern combat APIs.
+- Preserved stacked outgoing hits, incoming filtering, profile behavior, and
+  scrolling-area output through the componentized event pipeline.
+- Removed unsupported cooldown tracking, event sounds, bundled sound assets,
+  and their obsolete options and localization entries.
+- Removed unreachable options tabs and commented-out legacy code.
+- Added Lua 5.1 parsing and automated component regression coverage.
 
 ## v12.024
 
