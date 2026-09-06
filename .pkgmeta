@@ -1,0 +1,48 @@
+package-as: MikScrollingBattleText
+enable-nolib-creation: no
+
+# Keep release notes available to tooling without adding them to the addon ZIP.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - .pkgmeta
+  - .github
+  - .vscode
+  - .idea
+  - .agents
+  - .codex
+  - .gitignore
+  - .gitattributes
+  - .editorconfig
+  - .release
+  - dist
+  - tests
+  - scripts
+  - docs
+  - skills
+  - Diagnostics
+  - Sounds
+  - README.md
+  - CHANGELOG.md
+  - API.html
+  - Research.md
+  - AGENTS.md
+  - RTK.md
+  - "*/README*"
+  - "*.log"
+  - "*.bak"
+  - "*.tmp"
+  - "*.swp"
+  - "*~"
+  - "*.pyc"
+  - "*.zip"
+  - "*.psd"
+  - .DS_Store
+  - "*/.DS_Store"
+  - Thumbs.db
+  - "*/Thumbs.db"
+  - __pycache__
+  - "*/__pycache__"
+  - MSBTOptions/Artwork/TriggerSettingsIcon*

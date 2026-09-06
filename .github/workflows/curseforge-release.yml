@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve release version
         id: version
@@ -51,30 +53,20 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
       - name: Build addon zip
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d -e -l -n "{package-name}-${{ steps.version.outputs.version }}"
+
+      - name: Verify packaged archive
         id: package
         shell: bash
+        env:
+          MSBT_RELEASE_ZIP: .release/MikScrollingBattleText-${{ steps.version.outputs.version }}.zip
         run: |
-          rm -rf dist
-          mkdir -p "dist/${ADDON_NAME}"
-          rsync -a \
-            --exclude '.git/' \
-            --exclude '.github/' \
-            --exclude 'dist/' \
-            --exclude 'tests/' \
-            --exclude 'scripts/' \
-            --exclude 'README.md' \
-            --exclude 'CHANGELOG.md' \
-            --exclude 'API.html' \
-            ./ "dist/${ADDON_NAME}/"
+          python -m unittest tests.test_release_packaging
 
-          ZIP_NAME="${ADDON_NAME}-${{ steps.version.outputs.version }}.zip"
-          (
-            cd dist
-            zip -r "${ZIP_NAME}" "${ADDON_NAME}"
-          )
-
-          echo "zip_path=dist/${ZIP_NAME}" >> "${GITHUB_OUTPUT}"
-          echo "zip_name=${ZIP_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "zip_path=${MSBT_RELEASE_ZIP}" >> "${GITHUB_OUTPUT}"
+          echo "zip_name=$(basename "${MSBT_RELEASE_ZIP}")" >> "${GITHUB_OUTPUT}"
 
       - name: Build changelog metadata
         id: metadata
