@@ -4,7 +4,7 @@ Mik's Scrolling Battle Text is a World of Warcraft addon that replaces Blizzard'
 
 ## Status
 
-- Current version: `12.023`
+- Current version: `12.026`
 - Supported interface values: `120100`, `11504`, `40400`, `110002`
 - Addon type: combat text replacement and combat event presentation
 
@@ -56,6 +56,32 @@ The addon options are split into focused sections:
 
 Exact command availability depends on the current addon modules and client build.
 
+## Custom Sounds
+
+1. Place an `.ogg` or `.mp3` file under WoW's `Interface/AddOns` directory. A
+   separate personal media folder keeps it outside MSBT's update directory, for
+   example `Interface\AddOns\MySounds\bell.ogg`.
+2. Fully restart WoW after adding sound files.
+3. Open `/msbt`, then select `General`. Check `Enable Sounds` and use `Add Sound`
+   to register a name and the file's path relative to your WoW folder.
+4. In `Events`, open an event's settings, select the sound, use `Play` to preview
+   it, then save. The custom-file button also accepts a path without registration.
+
+Choose `None` to clear an event's sound. Existing saved assignments and sounds
+registered through LibSharedMedia are also available. Event playback follows
+the event, scroll-area, group, and addon enable settings; preview is available
+even when `Enable Sounds` is unchecked.
+
+Legacy filenames such as `bell.ogg` resolve under
+`Interface\AddOns\MikScrollingBattleText\Sounds\`; provide your own files there
+if using that form. MSBT no longer bundles sound files or provides cooldown,
+low-health, or low-mana sound alerts.
+
+Other addons can call `MikSBT.RegisterSound(name, pathOrFileID)` after MSBT loads
+and enumerate registrations with `MikSBT.IterateSounds()`. Programmatic
+registrations must be repeated each session; registrations made through
+`Add Sound` are saved automatically.
+
 ## Files You May Care About
 
 - [MikScrollingBattleText.toc](MikScrollingBattleText.toc): addon metadata and load order
@@ -71,6 +97,16 @@ Exact command availability depends on the current addon modules and client build
 ## Release Workflow
 
 This repository includes a GitHub Actions workflow for packaging and publishing releases to CurseForge.
+
+BigWigs' packager builds the ZIP using `.pkgmeta`. Its exclusions keep tests,
+build tools, docs, editor/agent settings, backups, local custom sounds, and unused
+Trigger Settings icons out of releases without deleting repository files.
+
+The completed ZIP is checked before upload for missing TOC/XML dependencies,
+unexpected files, and intact runtime assets. Update `.pkgmeta` when excluding
+additional development files, and update the archive tests when adding runtime
+media. BigWigs runs in package-only mode; the existing CurseForge upload step
+still controls publishing and game-version metadata.
 
 Release flow:
 

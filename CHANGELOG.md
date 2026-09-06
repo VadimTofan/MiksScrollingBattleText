@@ -1,5 +1,18 @@
 # Changelog
 
+## v12.026
+
+- Restored custom event sounds, including General's Enable Sounds and Add Sound
+  controls, per-event sound selection, custom file paths, and playback previews.
+- Restored saved custom sound registrations and event assignments, plus sounds
+  registered through LibSharedMedia or MSBT's public sound API.
+- Event sounds respect disabled events, scroll areas, group suppression, and the
+  global sound setting. Cooldown and bundled alert sounds remain removed.
+- Switched release ZIP creation to BigWigs' packager with `.pkgmeta` exclusions
+  for development files and unused Trigger Settings icons.
+- Added checks of the completed ZIP before upload to reject unexpected files
+  and missing TOC/XML dependencies while preserving runtime assets and notices.
+
 ## v12.025
 
 - Fixed batched combat events incorrectly using critical-hit styling when only some hits were critical.
