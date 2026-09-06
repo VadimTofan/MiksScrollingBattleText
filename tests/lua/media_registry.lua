@@ -8,7 +8,8 @@ local sharedMedia = {
 	Register = function(_, mediaType, name, path)
 		registrations[mediaType .. ":" .. name] = path
 	end,
-	List = function()
+	List = function(_, mediaType)
+		if mediaType == "sound" then return {} end
 		return { "Shared Font" }
 	end,
 	Fetch = function(_, mediaType, name)

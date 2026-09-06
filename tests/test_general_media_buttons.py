@@ -8,7 +8,7 @@ OPTIONS_TABS_FILE = REPOSITORY_ROOT / "MSBTOptions" / "MSBTOptionsTabs.lua"
 
 # Describe: General tab media controls
 class GeneralMediaButtonTests(unittest.TestCase):
-    def test_general_tab_omits_custom_media_buttons(self):
+    def test_general_tab_offers_custom_sounds_without_custom_fonts(self):
         # Given
         source = OPTIONS_TABS_FILE.read_text(encoding="utf-8-sig")
 
@@ -19,7 +19,7 @@ class GeneralMediaButtonTests(unittest.TestCase):
 
         # Then
         self.assertNotIn('L.BUTTONS["addCustomFont"]', general_tab)
-        self.assertNotIn('L.BUTTONS["addCustomSound"]', general_tab)
+        self.assertIn('L.BUTTONS["addCustomSound"]', general_tab)
         self.assertIn(
             'controls.partialEffectsButton, "TOPLEFT", 0, 10',
             general_tab,

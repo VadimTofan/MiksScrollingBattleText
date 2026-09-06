@@ -7,27 +7,17 @@ LOCALIZATION = ROOT / "MSBTOptions" / "Localization"
 
 
 class RemovedFeatureLocalizationTests(unittest.TestCase):
-    def test_removed_sound_and_cooldown_keys_are_not_localized(self):
+    def test_removed_legacy_features_are_not_localized(self):
         # Given
         removed_keys = (
             "L.SOUNDS",
             "MSG_CUSTOM_SOUNDS",
-            "MSG_INVALID_CUSTOM_SOUND_NAME",
-            "MSG_SOUND_NAME_ALREADY_EXISTS",
-            "MSG_INVALID_SOUND_FILE",
             '["cooldowns"]',
-            '["enableSounds"]',
             '["enablePlayerCooldowns"]',
             '["enablePetCooldowns"]',
             '["enableItemCooldowns"]',
-            '["addCustomSound"]',
-            '["customSound"]',
-            '["playSound"]',
             '["cooldownExclusions"]',
             '["ignoreCooldownThreshold"]',
-            '["customSoundName"]',
-            '["customSoundPath"]',
-            '["soundFile"]',
             '["cooldownThreshold"]',
             '["ITEM_COOLDOWN_NAME"]',
             '["SKILL_COOLDOWN"]',
@@ -45,7 +35,6 @@ class RemovedFeatureLocalizationTests(unittest.TestCase):
             '["enableBlizzardHealing"]',
             '["textShadowing"]',
             '["exclusiveSkills"]',
-            '["sound"]',
             '["addCustomFont"]',
             '["editCustomFont"]',
             '["deleteCustomFont"]',

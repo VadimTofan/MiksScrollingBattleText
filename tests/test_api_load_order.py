@@ -17,6 +17,7 @@ class ApiLoadOrderTests(unittest.TestCase):
         ]
         expected_api = [
             "API\\RestrictedValue.lua",
+            "API\\Sounds.lua",
             "API\\Spells.lua",
             "API\\Units.lua",
             "API\\Combat.lua",
