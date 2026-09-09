@@ -137,7 +137,8 @@ local OUTGOING_SIGNAL_CONFIDENCE_WINDOW = 1.25
 local INCOMING_SELF_HEAL_ICON_ATTRIBUTION_WINDOW = 12.0
 local SELF_HEAL_MATCH_WINDOW = 1.0
 local SELF_HEAL_MATCH_TOLERANCE = 1
-local DAMAGE_METER_FALLBACK_STALE_TIME = 0.35
+local OUTGOING_CRIT_MATCH_WINDOW = 0.35
+local OUTGOING_CRIT_MATCH_TOLERANCE = 0.10
 local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
@@ -961,22 +962,23 @@ local damageMeterSource = DamageMeterSource:New({
 	queue = function(...)
 		outgoingBatcher:Queue(...)
 	end,
+	consumeCriticalCandidate = function(spellID, amount, pollTime)
+		return outgoingCombat:ConsumeCriticalCandidate(
+			spellID,
+			amount,
+			pollTime
+		)
+	end,
 	newTicker = C_Timer.NewTicker,
 	damageType = Enum and Enum.DamageMeterType
 		and Enum.DamageMeterType.DamageDone,
 	pollInterval = 0.1,
-	freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
 })
 
 outgoingCombat = OutgoingCombat:New({
 	batcher = outgoingBatcher,
 	damageMeter = damageMeterSource,
-	getProfile = function()
-		return MSBTProfiles.currentProfile
-	end,
 	normalizeNumber = NormalizeNumber,
-	buildActionMessage = BuildActionMessage,
-	display = DisplayEvent,
 	getTime = GetTime,
 	inCombat = InCombatLockdown,
 	isTargetValid = IsOutgoingTargetContextValid,
@@ -995,6 +997,8 @@ outgoingCombat = OutgoingCombat:New({
 	dotDuration = DOT_FALLBACK_DURATION,
 	dotSpells = DOT_FALLBACK_SPELLS,
 	timedDotSpells = DOT_FALLBACK_TIMED_SPELLS,
+	critMatchWindow = OUTGOING_CRIT_MATCH_WINDOW,
+	critMatchTolerance = OUTGOING_CRIT_MATCH_TOLERANCE,
 })
 local selfHealTracker = SelfHealTracker:New({
 	getTime = GetTime,
@@ -1033,17 +1037,14 @@ function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
 end
 
 function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask)
-	if incomingCombat:HandleUnitCombat(
+	incomingCombat:HandleUnitCombat(
 		unitTarget,
 		action,
 		flagText,
 		amount,
 		schoolMask
-	) then
-		return
-	end
-
-	outgoingCombat:HandleUnitCombat(
+	)
+	outgoingCombat:RecordCriticalCandidate(
 		unitTarget,
 		action,
 		flagText,
@@ -1227,8 +1228,5 @@ MikSBT.IterateFonts					= MSBTMedia.IterateFonts
 MikSBT.IterateScrollAreas			= MSBTAnimations.IterateScrollAreas
 MikSBT.DisplayMessage				= MSBTAnimations.DisplayMessage
 MikSBT.IsModDisabled				= MSBTProfiles.IsModDisabled
-
-
-
 
 

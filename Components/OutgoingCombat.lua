@@ -11,6 +11,7 @@ function OutgoingCombat:New(config)
 		dotRequiresAura = true,
 		dotExpires = 0,
 		lastAutoAttackTime = 0,
+		criticalCandidate = nil,
 	}, self)
 end
 
@@ -29,6 +30,7 @@ function OutgoingCombat:ResetCombatState()
 	self.dotRequiresAura = true
 	self.dotExpires = 0
 	self.lastAutoAttackTime = 0
+	self.criticalCandidate = nil
 	if self.config.damageMeter then
 		self.config.damageMeter:Reset()
 	end
@@ -135,80 +137,65 @@ function OutgoingCombat:ResolveAttribution(now, isDamage)
 	return spellID, texture
 end
 
-function OutgoingCombat:QueueDamage(
-	spellID,
-	amount,
-	isCrit,
-	texture,
-	schoolMask
-)
-	local forceIsSpell = spellID == self.config.autoAttackSpellID
-		and self.config.isLikelySpellSchool(schoolMask)
-		or nil
-	if spellID == self.config.autoAttackSpellID then
-		self.lastAutoAttackTime = self.config.getTime()
-	end
-	self.config.batcher:Queue(
-		spellID,
-		amount,
-		isCrit,
-		texture,
-		forceIsSpell
-	)
-end
-
-function OutgoingCombat:HandleUnitCombat(
+function OutgoingCombat:RecordCriticalCandidate(
 	unitTarget,
 	action,
 	flagText,
 	amount,
 	schoolMask
 )
-	if unitTarget ~= "target" then
+	if unitTarget ~= "target" or action ~= "WOUND"
+		or flagText ~= "CRITICAL" then
 		return false
 	end
 	if not self.config.inCombat() or not self.config.isTargetValid() then
-		return true
+		return false
 	end
 
-	local isDamage = action == "WOUND"
 	local normalizedAmount = self.config.normalizeNumber(amount)
+	if not normalizedAmount or normalizedAmount <= 0 then
+		return false
+	end
+
 	local now = self.config.getTime()
-	if isDamage and not self:HasRecentSignal(now, schoolMask) then
-		return true
+	if not self:HasRecentSignal(now, schoolMask) then
+		return false
 	end
 
-	local spellID, texture = self:ResolveAttribution(now, isDamage)
+	local spellID = self:ResolveAttribution(now, true)
 	if not spellID then
-		return true
-	end
-	if isDamage then
-		if not normalizedAmount or normalizedAmount <= 0 then
-			return true
-		end
-		if self.config.damageMeter and self.config.damageMeter:IsActive()
-			and self.config.damageMeter:IsDeltaFresh(now)
-			and spellID ~= self.dotSpellID then
-			return true
-		end
-		self:QueueDamage(
-			spellID,
-			normalizedAmount,
-			flagText == "CRITICAL",
-			texture,
-			schoolMask
-		)
-		return true
+		return false
 	end
 
-	local profile = self.config.getProfile()
-	local settings = profile.events["OUTGOING_" .. tostring(action or "")]
-	if settings and not settings.disabled then
-		local message = self.config.buildActionMessage(settings, normalizedAmount)
-		if message and message ~= "" then
-			self.config.display(settings, message, texture)
-		end
+	self.criticalCandidate = {
+		spellID = spellID,
+		amount = normalizedAmount,
+		time = now,
+	}
+	return true
+end
+
+function OutgoingCombat:ConsumeCriticalCandidate(spellID, amount, now)
+	local candidate = self.criticalCandidate
+	if not candidate then
+		return false
 	end
+	if now - candidate.time > self.config.critMatchWindow then
+		self.criticalCandidate = nil
+		return false
+	end
+	if spellID ~= candidate.spellID then
+		return false
+	end
+
+	local amountDifference = math.abs(amount - candidate.amount)
+	local allowedDifference = candidate.amount
+		* self.config.critMatchTolerance
+	if amountDifference > allowedDifference then
+		return false
+	end
+
+	self.criticalCandidate = nil
 	return true
 end
 

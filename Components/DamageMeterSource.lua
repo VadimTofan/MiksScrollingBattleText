@@ -6,7 +6,6 @@ function DamageMeterSource:New(config)
 		config = config,
 		lastTotals = {},
 		lastPollTime = 0,
-		lastDeltaTime = 0,
 		ticker = nil,
 	}, self)
 end
@@ -15,19 +14,11 @@ function DamageMeterSource:IsActive()
 	return self.config.isAvailable()
 end
 
-function DamageMeterSource:IsDeltaFresh(now)
-	if self.lastDeltaTime <= 0 then
-		return false
-	end
-	return now - self.lastDeltaTime <= self.config.freshDuration
-end
-
 function DamageMeterSource:Reset()
 	for key in pairs(self.lastTotals) do
 		self.lastTotals[key] = nil
 	end
 	self.lastPollTime = 0
-	self.lastDeltaTime = 0
 end
 
 local function WasGUIDProcessed(processedGUIDs, sourceGUID)
@@ -62,8 +53,12 @@ function DamageMeterSource:ProcessSpell(sourceIndex, damageSpell)
 			delta = normalizedTotal
 		end
 		if delta > 0 then
-			self.config.queue(spellID, delta, false)
-			self.lastDeltaTime = self.lastPollTime
+			local isCrit = self.config.consumeCriticalCandidate(
+				spellID,
+				delta,
+				self.lastPollTime
+			)
+			self.config.queue(spellID, delta, isCrit == true)
 		end
 		self.lastTotals[key] = normalizedTotal
 	end)
