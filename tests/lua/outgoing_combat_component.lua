@@ -3,32 +3,12 @@ MikSBT = {
 }
 
 local now = 10
-local queued
-local displayed
-local displayCount = 0
 local OutgoingCombat = dofile("Components/OutgoingCombat.lua")
 local component = OutgoingCombat:New({
 	batcher = {
-		Queue = function(_, ...)
-			queued = { ... }
-		end,
 		Reset = function() end,
 	},
-	getProfile = function()
-		return {
-			events = {
-				OUTGOING_DODGE = { message = "Dodged" },
-			},
-		}
-	end,
 	normalizeNumber = tonumber,
-	buildActionMessage = function(settings)
-		return settings.message
-	end,
-	display = function(settings, message, texture)
-		displayCount = displayCount + 1
-		displayed = { settings, message, texture }
-	end,
 	getTime = function()
 		return now
 	end,
@@ -61,16 +41,15 @@ local component = OutgoingCombat:New({
 	dotDuration = 18,
 	dotSpells = {},
 	timedDotSpells = {},
-	getDamageMeterDeltaFresh = function()
-		return false
-	end,
+	critMatchWindow = 0.35,
+	critMatchTolerance = 0.10,
 })
 
 -- Given a recent successful player spell
 component:HandleSpellcastSucceeded("player", 1234)
 
--- When matching outgoing damage arrives
-local handled = component:HandleUnitCombat(
+-- When a matching critical target event arrives
+local handled = component:RecordCriticalCandidate(
 	"target",
 	"WOUND",
 	"CRITICAL",
@@ -79,27 +58,61 @@ local handled = component:HandleUnitCombat(
 )
 
 -- Then
-assert(handled == true, "outgoing target damage was not handled")
-assert(queued[1] == 1234, "recent spell was not attributed")
-assert(queued[2] == 100, "outgoing amount changed")
-assert(queued[3] == true, "outgoing crit flag changed")
-assert(queued[4] == "texture-1234", "outgoing texture changed")
+assert(handled == true, "critical candidate was not recorded")
 
--- Given a non-damage target action
-component:HandleUnitCombat("target", "DODGE", nil, nil, nil)
+-- When the damage meter reports an approximately matching amount
+local isCrit = component:ConsumeCriticalCandidate(1234, 109, now)
 
 -- Then
-assert(displayed[2] == "Dodged", "outgoing action was not displayed")
-assert(component:HandleUnitCombat("player", "WOUND", nil, 10, 1) == false,
-	"non-target combat was consumed")
+assert(isCrit == true, "matching damage meter amount was not marked critical")
+assert(component:ConsumeCriticalCandidate(1234, 109, now) == false,
+	"critical candidate was reused")
 
--- Given no recent spell attribution
-now = 20
-local displaysBeforeUnattributedAction = displayCount
+-- Given a critical event whose amount differs by more than ten percent
+now = 11
+component:HandleSpellcastSucceeded("player", 1234)
+component:RecordCriticalCandidate("target", "WOUND", "CRITICAL", 100, 4)
 
--- When
-component:HandleUnitCombat("target", "DODGE", nil, nil, nil)
+-- When / Then
+assert(component:ConsumeCriticalCandidate(1234, 111, now) == false,
+	"damage meter amount outside tolerance was marked critical")
+
+-- Given a matching candidate that has expired
+now = 12
+component:HandleSpellcastSucceeded("player", 1234)
+component:RecordCriticalCandidate("target", "WOUND", "CRITICAL", 100, 4)
+
+-- When / Then
+now = 12.36
+assert(component:ConsumeCriticalCandidate(1234, 100, now) == false,
+	"expired critical candidate was matched")
+
+-- Given invalid and non-critical UNIT_COMBAT events
+now = 13
+component:HandleSpellcastSucceeded("player", 1234)
+
+-- When / Then
+assert(component:RecordCriticalCandidate(
+	"player",
+	"WOUND",
+	"CRITICAL",
+	100,
+	4
+) == false, "non-target critical event was recorded")
+assert(component:RecordCriticalCandidate(
+	"target",
+	"WOUND",
+	"NORMAL",
+	100,
+	4
+) == false, "normal hit was recorded as a critical candidate")
+
+-- Given a recorded candidate
+component:RecordCriticalCandidate("target", "WOUND", "CRITICAL", 100, 4)
+
+-- When combat state resets
+component:ResetCombatState()
 
 -- Then
-assert(displayCount == displaysBeforeUnattributedAction,
-	"unattributed outgoing action received an auto-attack fallback")
+assert(component:ConsumeCriticalCandidate(1234, 100, now) == false,
+	"combat reset retained a critical candidate")

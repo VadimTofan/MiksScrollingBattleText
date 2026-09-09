@@ -5,7 +5,7 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: outgoing combat attribution component
 class OutgoingCombatComponentTests(unittest.TestCase):
-    def test_component_attributes_recent_spells_and_routes_target_actions(self):
+    def test_component_records_and_matches_critical_candidates(self):
         # Given
         script_name = "outgoing_combat_component.lua"
 

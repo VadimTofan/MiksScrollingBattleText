@@ -6,6 +6,7 @@ local now = 10
 local total = 100
 local restrictedSource = false
 local queued = {}
+local matchedAmounts = {}
 local tickerCancelled = false
 local DamageMeterSource = dofile("Components/DamageMeterSource.lua")
 local source = DamageMeterSource:New({
@@ -45,6 +46,14 @@ local source = DamageMeterSource:New({
 	queue = function(spellID, amount, isCrit)
 		queued[#queued + 1] = { spellID, amount, isCrit }
 	end,
+	consumeCriticalCandidate = function(spellID, amount, pollTime)
+		matchedAmounts[#matchedAmounts + 1] = {
+			spellID,
+			amount,
+			pollTime,
+		}
+		return amount == 50
+	end,
 	newTicker = function(_, callback)
 		return {
 			callback = callback,
@@ -55,7 +64,6 @@ local source = DamageMeterSource:New({
 	end,
 	damageType = 1,
 	pollInterval = 0.1,
-	freshDuration = 0.35,
 })
 
 -- Given / When
@@ -69,7 +77,10 @@ assert(#queued == 2, "damage meter source duplicated a source GUID")
 assert(queued[1][1] == 1234 and queued[1][2] == 100,
 	"initial damage meter total changed")
 assert(queued[2][2] == 50, "damage meter delta changed")
-assert(source:IsDeltaFresh(now), "recent damage meter delta was stale")
+assert(queued[1][3] == false, "unmatched meter delta was marked critical")
+assert(queued[2][3] == true, "matched meter delta was not marked critical")
+assert(matchedAmounts[2][3] == now,
+	"critical matcher did not receive the poll time")
 
 -- Given / When
 source:Start()
@@ -78,7 +89,6 @@ source:Stop()
 -- Then
 assert(tickerCancelled, "damage meter ticker was not cancelled")
 source:Reset()
-assert(not source:IsDeltaFresh(now), "reset retained meter freshness")
 
 -- Given a source whose spell table is restricted
 restrictedSource = true
