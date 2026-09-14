@@ -23,7 +23,6 @@ ignore:
   - docs
   - skills
   - Diagnostics
-  - Sounds
   - README.md
   - CHANGELOG.md
   - API.html

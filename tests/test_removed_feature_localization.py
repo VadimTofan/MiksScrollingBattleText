@@ -19,7 +19,6 @@ class RemovedFeatureLocalizationTests(unittest.TestCase):
             '["cooldownExclusions"]',
             '["ignoreCooldownThreshold"]',
             '["cooldownThreshold"]',
-            '["ITEM_COOLDOWN_NAME"]',
             '["SKILL_COOLDOWN"]',
             '["PET_COOLDOWN"]',
             '["ITEM_COOLDOWN"]',

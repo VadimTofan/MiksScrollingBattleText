@@ -16,7 +16,7 @@ ARTWORK_NAMES = {
     "FontSettingsIcon", "FontSettingsIconDisable", "FontSettingsIconHighlight",
 }
 DEVELOPMENT_DIRECTORIES = {
-    "tests", "scripts", "dist", "docs", "skills", "Sounds", "Diagnostics",
+    "tests", "scripts", "dist", "docs", "skills", "Diagnostics",
     "__pycache__",
 }
 
@@ -73,12 +73,13 @@ def assert_runtime_archive(test: unittest.TestCase, archive: ZipFile) -> set[str
             and path.stem in ARTWORK_NAMES
             and path.suffix in {".blp", ".tga", ".dds"}
         )
+        is_sound = name == "Sounds/Cooldown.ogg"
         is_license = any(
             path.name.lower() == stem
             or path.name.lower().startswith((stem + ".", stem + "-"))
             for stem in ("license", "licence", "copying", "notice", "copyright", "ofl")
         )
-        test.assertTrue(is_font or is_artwork or is_license,
+        test.assertTrue(is_font or is_artwork or is_sound or is_license,
                         f"Unexpected packaged file: {name}")
     return files
 
@@ -127,11 +128,12 @@ class ReleasePackagingTests(unittest.TestCase):
         self.assertIn("manual-changelog:", pkgmeta)
         for excluded in (
             "tests", "scripts", ".github", ".vscode", ".agents", ".codex",
-            ".release", "dist", "Sounds", "README.md", "CHANGELOG.md",
+            ".release", "dist", "README.md", "CHANGELOG.md",
             "API.html", "Research.md",
             "MSBTOptions/Artwork/TriggerSettingsIcon*",
         ):
             self.assertIn(f"  - {excluded}\n", pkgmeta)
+        self.assertNotIn("  - Sounds\n", pkgmeta)
 
     def test_workflow_builds_with_bigwigs_then_checks_before_upload(self):
         # Given
@@ -155,7 +157,7 @@ class ReleasePackagingTests(unittest.TestCase):
 
     def test_archive_gate_accepts_dependencies_media_and_license_notices(self):
         # Given
-        files = self.runtime
+        files = self.runtime | {"Sounds/Cooldown.ogg": "Cooldown audio"}
 
         # When
         packaged = self.inspect_fixture(files)
@@ -202,6 +204,7 @@ class ReleasePackagingTests(unittest.TestCase):
             # Then: newly restored sounds and binary assets are retained.
             self.assertIn("API/Sounds.lua", files)
             self.assertIn("MSBTOptions/MSBTOptionsSounds.lua", files)
+            self.assertIn("Sounds/Cooldown.ogg", files)
             assets = list((REPOSITORY_ROOT / "Fonts").glob("*.ttf"))
             assets += [
                 path for path in (REPOSITORY_ROOT / "MSBTOptions/Artwork").glob("*.blp")

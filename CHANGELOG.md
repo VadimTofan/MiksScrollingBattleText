@@ -1,5 +1,12 @@
 # Changelog
 
+## v12.027
+
+- Restored item cooldown-ready notifications for used trinkets and potions.
+- Restored the bundled cooldown sound and its event settings.
+- Kept Low Health and Low Mana notifications disabled and did not bundle
+  their unused sounds.
+
 ## v12.026
 
 - Restored custom event sounds, including General's Enable Sounds and Add Sound
