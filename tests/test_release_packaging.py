@@ -36,7 +36,13 @@ def assert_runtime_archive(test: unittest.TestCase, archive: ZipFile) -> set[str
         files.add(relative)
 
     # TOCs and nested XML includes must retain every loaded dependency.
-    pending = [f"{ADDON_NAME}.toc", "MSBTOptions/MSBTOptions.toc"]
+    root_tocs = sorted(
+        name
+        for name in files
+        if PurePosixPath(name).parent == PurePosixPath(".")
+        and PurePosixPath(name).suffix.lower() == ".toc"
+    )
+    pending = root_tocs + ["MSBTOptions/MSBTOptions.toc"]
     loaded = set()
     while pending:
         path = posixpath.normpath(pending.pop())
@@ -89,6 +95,9 @@ class ReleasePackagingTests(unittest.TestCase):
     def setUp(self):
         self.runtime = {
             f"{ADDON_NAME}.toc": "\ufeff## Interface: 120100\nMain.lua\nLocale\\main.xml\n",
+            f"{ADDON_NAME}_Camelot.toc": (
+                "## Interface: 16001\nMain.lua\nLocale\\main.xml\n"
+            ),
             "Main.lua": "-- Runtime\n",
             "Locale/main.xml": (
                 '<Ui xmlns="http://www.blizzard.com/wow/ui/">'

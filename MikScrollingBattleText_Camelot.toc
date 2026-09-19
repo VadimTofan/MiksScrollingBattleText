@@ -1,0 +1,62 @@
+## Interface: 16001
+## Version: 12.028
+## Title: Mik's Scrolling Battle Text
+## Author: Mikord
+## Notes: Scrolls battle information around the character model.
+## SavedVariables: MSBTProfiles_SavedVars, MSBT_SavedMedia
+## SavedVariablesPerCharacter: MSBTProfiles_SavedVarsPerChar
+## OptionalDeps: LibSharedMedia-3.0
+
+Libs\LibStub.lua
+Libs\CallbackHandler-1.0.lua
+Libs\LibSharedMedia-3.0.lua
+
+MikSBT.lua
+Compatibility\Client.lua
+Core\Diagnostics.lua
+Core\EventBus.lua
+Core\ComponentRegistry.lua
+Core\Addon.lua
+Configuration\ProfileStore.lua
+Configuration\MediaRegistry.lua
+Configuration\RuntimeController.lua
+API\RestrictedValue.lua
+API\Sounds.lua
+API\Spells.lua
+API\Units.lua
+API\Combat.lua
+API\Cooldowns.lua
+API\BlizzardCombatText.lua
+Compatibility\LegacyAPI.lua
+Services\Formatter.lua
+Services\Batcher.lua
+Services\Throttler.lua
+Services\EventRouter.lua
+Services\EventPipeline.lua
+Components\SelfHealTracker.lua
+Components\IncomingCombat.lua
+Components\OutgoingBatcher.lua
+Components\DamageMeterSource.lua
+Components\OutgoingCombat.lua
+Components\ParserNotifications.lua
+Components\UtilityNotifications.lua
+Components\ItemCooldownTracker.lua
+Display\ScrollAreas.lua
+Display\DisplayService.lua
+Localization\localization.xml
+MSBTProfiles.lua
+MSBTParser.lua
+MSBTMedia.lua
+Display\AnimationEngine.lua
+MSBTTriggers.lua
+MSBTCooldowns.lua
+Components\LootNotifications.lua
+MSBTMain.lua
+Display\AnimationStyles.lua
+
+MSBTOptions\Localization\localization.xml
+MSBTOptions\MSBTOptionsControls.lua
+MSBTOptions\MSBTOptionsPopups.lua
+MSBTOptions\MSBTOptionsMain.lua
+MSBTOptions\MSBTOptionsSounds.lua
+MSBTOptions\MSBTOptionsTabs.lua

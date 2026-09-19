@@ -20,6 +20,14 @@ local messages = {}
 MikSBT.Print = function(message) messages[#messages + 1] = message end
 MikSBT.Profiles.savedMedia.sounds = {}
 WOW_PROJECT_ID, WOW_PROJECT_CLASSIC, WOW_PROJECT_CATACLYSM_CLASSIC = 1, 2, 5
+MikSBT.Compatibility = {
+	Client = {
+		isClassicContent = true,
+		isCataClassic = false,
+		isVanillaContent = true,
+		hasModernAPI = true,
+	},
+}
 NONE = "None"
 LocalizedClassList = function() return {} end
 GetLocale = function() return "enUS" end

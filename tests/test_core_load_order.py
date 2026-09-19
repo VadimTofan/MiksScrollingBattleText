@@ -24,9 +24,11 @@ class CoreLoadOrderTests(unittest.TestCase):
 
         # When
         namespace_index = toc_lines.index("MikSBT.lua")
-        core_lines = toc_lines[namespace_index + 1 : namespace_index + 5]
+        compatibility_line = toc_lines[namespace_index + 1]
+        core_lines = toc_lines[namespace_index + 2 : namespace_index + 6]
 
         # Then
+        self.assertEqual(compatibility_line, "Compatibility\\Client.lua")
         self.assertEqual(core_lines, expected_core)
         self.assertLess(
             toc_lines.index("Core\\Addon.lua"),

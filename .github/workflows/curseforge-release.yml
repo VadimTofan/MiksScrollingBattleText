@@ -77,7 +77,8 @@ jobs:
             --changelog CHANGELOG.md \
             --output dist/curseforge-metadata.json \
             --game-version Retail \
-            --game-version 12.1.0
+            --game-version 12.1.0 \
+            --game-version 1.60.1
 
       - name: Upload release zip to CurseForge
         if: github.event_name == 'push' || inputs.upload_to_curseforge == true

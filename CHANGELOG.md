@@ -1,5 +1,17 @@
 # Changelog
 
+## v12.028
+
+- Added WoW Forever 1.60.1 support through a dedicated Camelot interface file.
+- Added explicit Forever client detection for its Classic-content and modern-API
+  combination.
+- Fixed Forever options loading when only the modern localized class-list API is
+  available.
+- Enabled immediate ranged outgoing damage through Forever's modern damage-meter
+  API while retaining the guarded fallback for clients without it.
+- Added CurseForge 1.60.1 release metadata and automated Forever compatibility
+  coverage.
+
 ## v12.027
 
 - Restored item cooldown-ready notifications for used trinkets and potions.

@@ -1,4 +1,8 @@
 import unittest
+from pathlib import Path
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 class CurseForgeMetadataTests(unittest.TestCase):
@@ -22,6 +26,16 @@ class CurseForgeMetadataTests(unittest.TestCase):
         self.assertEqual(metadata["changelogType"], "markdown")
         self.assertEqual(metadata["releaseType"], "release")
         self.assertEqual(metadata["gameVersionNames"], ["Retail", "12.1.0"])
+
+    def test_release_workflow_marks_the_archive_for_forever(self):
+        # Given
+        workflow_path = REPOSITORY_ROOT / ".github/workflows/curseforge-release.yml"
+
+        # When
+        workflow = workflow_path.read_text(encoding="utf-8")
+
+        # Then
+        self.assertIn("--game-version 1.60.1", workflow)
 
 
 if __name__ == "__main__":
