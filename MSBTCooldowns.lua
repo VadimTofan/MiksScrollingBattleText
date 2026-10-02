@@ -11,6 +11,7 @@ local DisplayEvent = MikSBT.Animations.DisplayEvent
 local HandleCooldowns = MSBTTriggers.HandleCooldowns or function() end
 
 local eventFrame = CreateFrame("Frame")
+local isEnabled = false
 
 local function NormalizeNumber(value)
 	local success, result = pcall(function()
@@ -45,9 +46,12 @@ local function IsItemTrackingEnabled()
 end
 
 local function UpdateRegisteredEvents()
-	itemTracker:SetEnabled(IsItemTrackingEnabled())
-	itemTracker:Reset()
-	eventFrame:Hide()
+	itemTracker:SetEnabled(isEnabled and IsItemTrackingEnabled())
+	if next(itemTracker.watchedItems) or next(itemTracker.activeCooldowns) then
+		eventFrame:Show()
+	else
+		eventFrame:Hide()
+	end
 end
 
 local function RecordItemUse(itemID)
@@ -89,11 +93,13 @@ local function UseItemByNameHook(itemName)
 end
 
 local function Enable()
+	isEnabled = true
 	UpdateRegisteredEvents()
 end
 
 local function Disable()
-	itemTracker:Reset()
+	isEnabled = false
+	itemTracker:SetEnabled(false)
 	eventFrame:Hide()
 end
 
