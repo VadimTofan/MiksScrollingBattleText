@@ -120,3 +120,35 @@ assert(#callbacks == callbacksBeforeHeal,
 	"matching outgoing self-heal was queued as incoming")
 assert(component:HandleUnitCombat("target", "WOUND", nil, 50, nil) == false,
 	"non-player combat was consumed")
+
+-- Given an old incoming damage timer and a new batch after reset.
+component:QueueDamage(10, false)
+local oldTimer = callbacks[#callbacks]
+component:Reset()
+component:QueueDamage(20, false)
+local newTimer = callbacks[#callbacks]
+local previousCount = #displayed
+
+-- When the old timer fires.
+oldTimer()
+
+-- Then it cannot display or remove the replacement damage batch.
+assert(#displayed == previousCount, "old damage timer flushed a new batch")
+newTimer()
+assert(#displayed == previousCount + 1, "new damage batch never displayed")
+
+-- Given an old heal timer and a replacement heal batch after reset.
+component:QueueHeal(10, false, nil, "Healer", nil, "SELF_HEAL")
+oldTimer = callbacks[#callbacks]
+component:Reset()
+component:QueueHeal(20, false, nil, "Healer", nil, "SELF_HEAL")
+newTimer = callbacks[#callbacks]
+previousCount = #displayed
+
+-- When the old heal timer fires.
+oldTimer()
+
+-- Then only the replacement timer can flush the new heal batch.
+assert(#displayed == previousCount, "old heal timer flushed a new batch")
+newTimer()
+assert(#displayed == previousCount + 1, "new heal batch never displayed")

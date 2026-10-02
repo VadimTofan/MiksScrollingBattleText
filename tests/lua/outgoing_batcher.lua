@@ -66,3 +66,18 @@ callbacks[2]()
 -- Then
 assert(displayed[2] == "150 (2 hits, 1 Crit)",
 	"reset batch was displayed")
+
+-- Given an old timer followed by a new batch for the same spell after reset.
+batcher:Queue(1234, 10, false)
+batcher:Reset()
+batcher:Queue(1234, 20, false)
+local previousDisplay = displayed
+
+-- When the old timer fires before the new batch's timer.
+callbacks[3]()
+
+-- Then the replacement batch remains pending until its own timer fires.
+assert(displayed == previousDisplay, "old timer displayed the replacement batch")
+assert(batcher.batches["1234"], "old timer removed the replacement batch")
+callbacks[4]()
+assert(displayed[2] == "20", "replacement timer did not flush its own batch")

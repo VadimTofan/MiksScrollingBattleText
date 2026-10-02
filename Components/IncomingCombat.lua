@@ -207,7 +207,9 @@ function IncomingCombat:QueueDamage(amount, isCrit, damageSource)
 		}
 		self.damageBatches[batchKey] = batch
 		self.config.after(self.config.groupDelay, function()
-			DisplayDamageBatch(self, batchKey)
+			if self.damageBatches[batchKey] == batch then
+				DisplayDamageBatch(self, batchKey)
+			end
 		end)
 	end
 
@@ -338,7 +340,9 @@ function IncomingCombat:QueueHeal(
 		}
 		self.healBatches[batchKey] = batch
 		self.config.after(self.config.groupDelay, function()
-			DisplayHealBatch(self, batchKey)
+			if self.healBatches[batchKey] == batch then
+				DisplayHealBatch(self, batchKey)
+			end
 		end)
 	end
 
