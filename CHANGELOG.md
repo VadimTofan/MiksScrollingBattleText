@@ -1,5 +1,11 @@
 # Changelog
 
+## v12.029
+
+- Prevented profile changes from calling Blizzard's combat-text message refresh
+  on modern-API clients, avoiding the reported secret-number taint error.
+- Preserved combat-text message refresh on legacy clients.
+
 ## v12.028
 
 - Added WoW Forever 1.60.1 support through a dedicated Camelot interface file.
