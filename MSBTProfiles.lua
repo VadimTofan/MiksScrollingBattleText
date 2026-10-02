@@ -2713,7 +2713,7 @@ local function DisableBlizzardCombatText()
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", 0)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", 0)
 	SHOW_COMBAT_TEXT = "0"
-	if (CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
+	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
 end
 
 local function SetBlizzardCombatTextV2Enabled(isEnabled)
@@ -2728,7 +2728,7 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
 	SHOW_COMBAT_TEXT = isEnabled and "1" or "0"
-	if (CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
+	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
 end
 
 local function IsInGroupContext()
@@ -2792,7 +2792,7 @@ local function ResetOfficialBlizzardCombatText()
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", 1)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", 1)
 
-	if (CombatText_UpdateDisplayedMessages) then
+	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then
 		CombatText_UpdateDisplayedMessages()
 	end
 
