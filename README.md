@@ -35,7 +35,7 @@ The addon options are split into focused sections:
 - `Cooldowns`: cooldown alert configuration
 - `Loot`: item and currency display behavior
 - `Spam Control`: throttling and merge rules
-- `Profile`: profile management
+- `Profile`: profile management and copy/paste import/export
 - `Language`: localization selection
 - `Restore Blizzard SCT`: restores Blizzard scrolling combat text settings and disables MSBT-specific overrides
 
@@ -55,6 +55,32 @@ The addon options are split into focused sections:
 - `/msbt reset`
 
 Exact command availability depends on the current addon modules and client build.
+
+## Moving Profiles Between Clients
+
+1. Open `/msbt`, select `Profile`, and choose the profile to transfer.
+2. Click `Export`, then press `Ctrl+C` to copy the selected string.
+3. Save that string in a text file or paste it on the destination client.
+4. On the destination, open `Profile`, click `Import`, paste the string,
+   enter a new profile name, and click `Import` in the dialog.
+
+An import creates and selects a new profile. Existing names cannot be overwritten,
+and imports must be performed outside combat. Invalid or damaged strings report
+an error without changing saved profiles.
+
+The `!MSBT:1!` string contains compressed settings grouped into General, Scroll
+Areas, Events, Triggers, Spam Control, Loot Alerts, and Cooldowns. Export resolves
+inherited defaults so source settings survive different destination defaults.
+The account-wide master enable/disable switch stays unchanged.
+
+Referenced font and sound registrations are included, but their files must be
+installed separately. Existing saved media registrations are preserved. Imports
+from another game build or language show a reminder to check spell settings,
+triggers, fonts, and sounds; settings do not make unavailable game features work.
+
+Profile transfer uses bundled LibSerialize (MIT) and LibDeflate (zlib license).
+The pinned upstream revisions are recorded in `Libs/README-ProfileTransfer.md`,
+and both licenses are included with the addon.
 
 ## Custom Sounds
 

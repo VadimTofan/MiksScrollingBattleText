@@ -8,6 +8,8 @@
 ## OptionalDeps: LibSharedMedia-3.0
 
 Libs\LibStub.lua
+Libs\LibSerialize.lua
+Libs\LibDeflate.lua
 Libs\CallbackHandler-1.0.lua
 Libs\LibSharedMedia-3.0.lua
 
@@ -20,6 +22,7 @@ Core\Addon.lua
 Configuration\ProfileStore.lua
 Configuration\MediaRegistry.lua
 Configuration\RuntimeController.lua
+Configuration\ProfileTransfer.lua
 API\RestrictedValue.lua
 API\Sounds.lua
 API\Spells.lua
@@ -59,4 +62,5 @@ MSBTOptions\MSBTOptionsControls.lua
 MSBTOptions\MSBTOptionsPopups.lua
 MSBTOptions\MSBTOptionsMain.lua
 MSBTOptions\MSBTOptionsSounds.lua
+MSBTOptions\MSBTOptionsProfileTransfer.lua
 MSBTOptions\MSBTOptionsTabs.lua

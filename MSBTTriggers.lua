@@ -472,6 +472,7 @@ local function UpdateTriggers()
 	end
 
 	EraseTable(triggerExceptions)
+	EraseTable(firedTimes)
 
 	local currentProfileTriggers = rawget(MSBTProfiles.currentProfile, "triggers")
 	if currentProfileTriggers then

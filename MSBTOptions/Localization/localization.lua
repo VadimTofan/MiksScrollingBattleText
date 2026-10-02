@@ -67,6 +67,27 @@ L.MSG_ITEMS							= "Items"
 L.MSG_ITEM_ALREADY_EXISTS			= "Item name already exists."
 L.MSG_INVALID_ITEM_NAME				= "Invalid item name."
 
+L.PROFILE_TRANSFER = {
+	exportTitle = "Export Profile", importTitle = "Import Profile",
+	export = "Export", import = "Import", close = "Close",
+	selectAll = "Select All", name = "New profile name:",
+	exportHelp = "Press Ctrl+C to copy the selected profile string.",
+	importHelp = "Paste a profile string below and enter a new profile name.",
+	mediaNote = "Custom font and sound files must be installed separately. " ..
+		"Settings and spells may differ between game versions or languages.",
+	imported = "Profile imported: %s",
+	compatibility = "This profile came from a different game version or " ..
+		"language. Check spell settings, triggers, fonts, and sounds.",
+	errors = {
+		INVALID_NAME = "Enter a profile name (1-64 characters).",
+		PROFILE_EXISTS = "That profile already exists. Choose a new name.",
+		INVALID_TEXT = "Invalid or damaged profile string. Copy the full export.",
+		INVALID_DATA = "The profile contains invalid or unsupported settings.",
+		TOO_LARGE = "The profile exceeds the supported transfer size.",
+		IN_COMBAT = "Wait until combat ends before importing a profile.",
+	},
+}
+
 
 ------------------------------
 -- Interface tabs

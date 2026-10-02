@@ -636,6 +636,45 @@ local function ProfileTab_Populate()
 	ProfileTab_ToggleDeleteButton()
 end
 
+local function ProfileTab_ImportSucceeded(name, details)
+	local dropdown = tabFrames.profile.controls.profileDropdown
+	dropdown:AddItem(name, name)
+	dropdown:Sort()
+	ProfileTab_Populate()
+	RefreshGeneralTabIfCreated()
+	local locale = L.PROFILE_TRANSFER
+	Print(string.format(locale.imported, name), 0, 1, 0)
+	if details.clientMismatch or details.localeMismatch then
+		Print(locale.compatibility, 1, 0.8, 0)
+	end
+end
+
+local function ProfileTab_ShowTransfer(isExport)
+	local tabFrame = tabFrames.profile
+	local controls = tabFrame.controls
+	local text, errorCode
+	if isExport then
+		text, errorCode = MSBTProfiles.ExportProfile(
+			controls.profileDropdown:GetSelectedID())
+		if not text then
+			Print(L.PROFILE_TRANSFER.errors[errorCode], 1, 0.3, 0.3)
+			return
+		end
+	end
+	local config = {
+		parentFrame = tabFrame,
+		hideHandler = ProfileTab_EnableControls,
+		importHandler = MSBTProfiles.ImportProfile,
+		successHandler = ProfileTab_ImportSucceeded,
+	}
+	DisableControls(controls)
+	if isExport then
+		MSBTOptions.ProfileTransfer.ShowExport(config, text)
+	else
+		MSBTOptions.ProfileTransfer.ShowImport(config)
+	end
+end
+
 local function ProfileTab_Create()
 	local tabFrame = tabFrames.profile
 	tabFrame.controls = {}
@@ -716,6 +755,20 @@ local function ProfileTab_Create()
 		end
 	)
 	controls.deleteProfileButton = button
+
+	button = MSBTControls.CreateOptionButton(tabFrame)
+	button:Configure(20, L.PROFILE_TRANSFER.export,
+		L.PROFILE_TRANSFER.exportHelp)
+	button:SetPoint("TOPLEFT", controls.copyProfileButton, "BOTTOMLEFT", 0, -20)
+	button:SetClickHandler(function() ProfileTab_ShowTransfer(true) end)
+	controls.exportProfileButton = button
+
+	button = MSBTControls.CreateOptionButton(tabFrame)
+	button:Configure(20, L.PROFILE_TRANSFER.import,
+		L.PROFILE_TRANSFER.importHelp)
+	button:SetPoint("LEFT", controls.exportProfileButton, "RIGHT", 10, 0)
+	button:SetClickHandler(function() ProfileTab_ShowTransfer(false) end)
+	controls.importProfileButton = button
 
 	ProfileTab_Populate()
 	tabFrame.created = true

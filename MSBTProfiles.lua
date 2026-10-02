@@ -2935,6 +2935,34 @@ local function ResetProfile(profileName, showOutput)
 	end
 end
 
+local function GetProfileTransfer()
+	return MikSBT.Configuration.ProfileTransfer:New({
+		masterProfile = masterProfile,
+		version = MikSBT.VERSION .. "." .. MikSBT.SVN_REVISION,
+		client = Client.interfaceVersion,
+		locale = GetLocale(),
+	})
+end
+
+local function ExportProfile(profileName)
+	local profile = savedVariables.profiles[profileName]
+	if not profile then return nil, "INVALID_NAME" end
+	return GetProfileTransfer():Export(profileName, profile, {
+		fonts = MikSBT.Media.fonts,
+		sounds = MikSBT.Media.sounds,
+	})
+end
+
+local function ImportProfile(text, profileName)
+	if InCombatLockdown() then return nil, "IN_COMBAT" end
+	local name, details = GetProfileTransfer():Import(
+		text, profileName, savedVariables.profiles, savedMedia)
+	if not name then return nil, details end
+	MikSBT.Media.OnVariablesInitialized()
+	SelectProfile(name)
+	return name, details
+end
+
 local function InitSavedVariables()
 	local store = MikSBT.Configuration.ProfileStore:New({
 		globals = _G,
@@ -3076,6 +3104,8 @@ module.CopyProfile					= CopyProfile
 module.DeleteProfile				= DeleteProfile
 module.ResetProfile					= ResetProfile
 module.SelectProfile				= SelectProfile
+module.ExportProfile				= ExportProfile
+module.ImportProfile				= ImportProfile
 module.SetOption					= SetOption
 module.SetOptionUserDisabled		= SetOptionUserDisabled
 module.IsModDisabled				= IsModDisabled
