@@ -279,7 +279,7 @@ local function OnUpdateAnimationFrame(this, elapsed)
 
 	for _, animationArray in pairs(animationData) do
 
-		for _, displayEvents in pairs(animationArray) do
+		for areaSettings, displayEvents in pairs(animationArray) do
 			numEvents = #displayEvents
 
 			for i = 1, numEvents do
@@ -310,6 +310,9 @@ local function OnUpdateAnimationFrame(this, elapsed)
 					displayEventCache[#displayEventCache + 1] = displayEvent
 					displayEvent.animationComplete = false
 				end
+			end
+			if #displayEvents == 0 then
+				animationArray[areaSettings] = nil
 			end
 		end
 	end
