@@ -17,6 +17,7 @@ function Throttler:Queue(key, event, duration, now)
 		}
 		self.windows[key] = window
 	end
+	window.duration = duration
 
 	if window.remaining > 0 then
 		window.lastEventTime = now
@@ -34,11 +35,11 @@ function Throttler:Queue(key, event, duration, now)
 	return false, true
 end
 
-function Throttler:Tick(elapsed)
+function Throttler:Tick(elapsed, now)
 	local hasActiveWindow = false
 	local releasedEvents = false
 
-	for _, window in pairs(self.windows) do
+	for key, window in pairs(self.windows) do
 		if window.remaining > 0 then
 			window.remaining = window.remaining - elapsed
 			if window.remaining > 0 then
@@ -49,6 +50,13 @@ function Throttler:Tick(elapsed)
 					window.events[index] = nil
 				end
 				releasedEvents = true
+			end
+		end
+		if window.remaining <= 0 then
+			if now and now - window.lastEventTime < window.duration then
+				hasActiveWindow = true
+			else
+				self.windows[key] = nil
 			end
 		end
 	end

@@ -617,7 +617,7 @@ local function OnUpdateThrottleFrame(this, elapsed)
 	lastThrottleUpdate = lastThrottleUpdate + elapsed
 
 	if lastThrottleUpdate >= THROTTLE_UPDATE_TIME then
-		local hasActiveWindow = Throttler:Tick(lastThrottleUpdate)
+		local hasActiveWindow = Throttler:Tick(lastThrottleUpdate, GetTime())
 		if not hasActiveWindow then
 			this:Hide()
 		end
