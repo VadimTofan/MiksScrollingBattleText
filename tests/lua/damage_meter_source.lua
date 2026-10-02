@@ -87,3 +87,20 @@ restrictedSource = true
 assert(pcall(function()
 	source:Poll()
 end), "restricted damage meter source escaped protected handling")
+
+-- Given a player in a vehicle without a pet GUID.
+local polledGUIDs = {}
+source.config.unitGUID = function(unit)
+	if unit == "player" then return "player-guid" end
+	if unit == "vehicle" then return "vehicle-guid" end
+end
+source.config.getSessionSource = function(guid)
+	polledGUIDs[#polledGUIDs + 1] = guid
+end
+
+-- When the damage meter polls all sources.
+source:Poll()
+
+-- Then the nil pet slot does not hide the vehicle source.
+assert(#polledGUIDs == 2 and polledGUIDs[2] == "vehicle-guid",
+	"vehicle source was skipped when no pet exists")
