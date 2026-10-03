@@ -18,7 +18,6 @@ L.INCOMING_PET_EVENTS = {}
 L.OUTGOING_PLAYER_EVENTS = {}
 L.OUTGOING_PET_EVENTS = {}
 L.NOTIFICATION_EVENTS = {}
-L.TRIGGER_DATA = {}
 L.OUTLINES = {}
 L.TEXT_ALIGNS = {}
 L.ANIMATION_STYLE_DATA = {}
@@ -34,19 +33,7 @@ L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "Scroll area name already exists."
 L.MSG_INVALID_SCROLL_AREA_NAME		= "Invalid scroll area name."
 L.MSG_ACKNOWLEDGE_TEXT				= "Are you sure you wish to perform this action?"
 L.MSG_NORMAL_PREVIEW_TEXT			= "Normal"
-L.MSG_NEW_TRIGGER					= "New Trigger"
-L.MSG_TRIGGER_CLASSES				= "Trigger Classes"
-L.MSG_MAIN_EVENTS					= "Main Events"
-L.MSG_TRIGGER_EXCEPTIONS			= "Trigger Exceptions"
-L.MSG_EVENT_CONDITIONS				= "Event Conditions"
 L.MSG_DISPLAY_QUALITY				= "Display alerts for items of this quality."
-L.MSG_SKILLS						= "Skills"
-L.MSG_SKILL_ALREADY_EXISTS			= "Skill name already exists."
-L.MSG_INVALID_SKILL_NAME			= "Invalid skill name."
-L.MSG_HOSTILE						= "Hostile"
-L.MSG_ANY							= "Any"
-L.MSG_CONDITION						= "Condition"
-L.MSG_CONDITIONS					= "Conditions"
 L.MSG_ITEM_QUALITIES				= "Item qualities"
 L.MSG_ITEMS							= "Items"
 L.MSG_ITEM_ALREADY_EXISTS			= "Item name already exists."
@@ -129,7 +116,6 @@ obj["hideNames"]				= { label="Hide Names", tooltip="Don't display unit names fo
 obj["hideFullOverheals"]		= { label="Hide Full Overheals", tooltip="Don't display non periodic heals that have an effective heal amount of zero."}
 obj["hideFullHoTOverheals"]		= { label="Hide Full HoT Overheals", tooltip="Don't display heals over time that have an effective heal amount of zero."}
 obj["hideMergeTrailer"]			= { label="Hide Merge Trailer", tooltip="Don't display the trailer that specifies the number of hits and crits at the end of merged events."}
-obj["allClasses"]				= { label="All Classes"}
 obj["lootedItems"]				= { label="Looted Items", tooltip="Display notifications when items are looted."}
 obj["moneyGains"]				= { label="Money Gains", tooltip="Enable money you gain."}
 obj["currencyGains"]			= { label="Currency Gains", tooltip="Display notifications for gained currency."}
@@ -153,10 +139,6 @@ obj["textAlign"]			= { label="Text Align:", tooltip="The alignment of the text f
 obj["iconAlign"]			= { label="Icon Align:", tooltip="The alignment of skill icons relative to the text."}
 obj["eventCategory"]		= { label="Event Category:", tooltip="The category of events to configure."}
 obj["outputScrollArea"]		= { label="Output Scroll Area:", tooltip="Selects the scroll area to use for output."}
-obj["mainEvent"]			= { label="Main Event:"}
-obj["triggerCondition"]		= { label="Condition:", tooltip="The condition to test."}
-obj["triggerRelation"]		= { label="Relation:"}
-obj["triggerParameter"]		= { label="Parameter:"}
 
 
 
@@ -183,23 +165,6 @@ obj["toggleAll"]				= { label="Toggle All", tooltip="Toggle the enable state of 
 obj["moveAll"]					= { label="Move All", tooltip="Moves all of the events in the selected category to the specified scroll area."}
 obj["eventFontSettings"]		= { tooltip="Click to edit the font settings for the event."}
 obj["eventSettings"]			= { tooltip="Click to edit the event settings such as the output scroll area, output message, sound, etc."}
-obj["addTrigger"]				= { label="Add New Trigger", tooltip="Add a new trigger."}
-obj["triggerSettings"]			= { tooltip="Click to configure the trigger conditions."}
-obj["deleteTrigger"]			= { tooltip="Click to delete the trigger."}
-obj["editTriggerClasses"]		= { tooltip="Click to edit the classes the trigger applies to."}
-obj["addMainEvent"]				= { label="Add Event", tooltip="When ANY of these events occur and their defined conditions are true, the trigger will fire unless one of the specified exceptions is true."}
-obj["addTriggerException"]		= { label="Add Exception", tooltip="When ANY of these exceptions are true, the trigger will not fire."}
-obj["editEventConditions"]		= { tooltip="Click to edit the conditions for the event."}
-obj["deleteMainEvent"]			= { tooltip="Click to delete the event."}
-obj["addEventCondition"]		= { label="Add Condition", tooltip="When ALL of these conditions are true for the selected event, the trigger will fire unless one of the specified exceptions is true."}
-obj["editCondition"]			= { tooltip="Click to edit the condition."}
-obj["deleteCondition"]			= { tooltip="Click to delete the condition."}
-obj["throttleList"]				= { label="Throttle List", tooltip="Set custom throttle times for specified skills."}
-obj["mergeExclusions"]			= { label="Merge Exclusions", tooltip="Prevent specified skills from being merged."}
-obj["skillSuppressions"]		= { label="Skill Suppressions", tooltip="Suppress skills by their name."}
-obj["skillSubstitutions"]		= { label="Skill Substitutions", tooltip="Substitute skill names with customized values."}
-obj["addSkill"]					= { label="Add Skill", tooltip="Add a new skill to the list."}
-obj["deleteSkill"]				= { tooltip="Click to delete the skill."}
 obj["itemsAllowed"]				= { label="Items Allowed", tooltip="Always show specified items regardless of item quality."}
 obj["itemExclusions"]			= { label="Item Exclusions", tooltip="Prevent specified items from being displayed."}
 obj["addItem"]					= { label="Add Item", tooltip="Add a new item to the list."}
@@ -215,8 +180,6 @@ obj["xOffset"]			= { label="X Offset:", tooltip="The X offset of the selected sc
 obj["yOffset"]			= { label="Y Offset:", tooltip="The Y offset of the selected scroll area."}
 obj["eventMessage"]		= { label="Output message:", tooltip="The message that will be displayed when the event occurs."}
 obj["iconSkill"]		= { label="Icon Skill:", tooltip="The name or spell ID of a skill whose icon will be displayed when the event occurs.\n\nMSBT will automatically try to figure out an appropriate icon if one is not specified.\n\nNOTE: A spell ID must be used in place of a name if the skill is not in the spellbook for the class that is playing when the event occurs. Most online databases such as wowhead can be used to discover it."}
-obj["skillName"]		= { label="Skill name:", tooltip="The name of the skill to add."}
-obj["substitutionText"]	= { label="Substition text:", tooltip="The text to be substituted for the skill name."}
 obj["itemName"]			= { label="Item name:", tooltip="The name of the item to add."}
 
 
@@ -236,7 +199,6 @@ obj["damageThreshold"]		= { label="Damage Threshold", tooltip="The threshold tha
 obj["dotThrottleTime"]		= { label="DoT Throttle Time", tooltip="The number of seconds to throttle DoTs."}
 obj["hotThrottleTime"]		= { label="HoT Throttle Time", tooltip="The number of seconds to throttle HoTs."}
 obj["powerThrottleTime"]	= { label="Power Throttle Time", tooltip="The number of seconds to throttle power changes."}
-obj["skillThrottleTime"]	= { label="Throttle Time", tooltip="The number of seconds to throttle the skill."}
 
 
 obj = L.EVENT_CATEGORIES
@@ -465,140 +427,6 @@ obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="NPC Killing Blows", tooltip="Ena
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="Extra Attacks", tooltip="Enable when you gain extra attacks such as windfury, thrash, sword spec, etc."}
 obj["NOTIFICATION_ENEMY_BUFF"]			= { label="Enemy Buff Gains", tooltip="Enable buffs your currently targeted enemy gains."}
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="Monster Emotes", tooltip="Enable emotes by the currently targeted monster."}
-
-
-
-obj = L.TRIGGER_DATA
-obj["SWING_DAMAGE"]				= "Swing Damage"
-obj["RANGE_DAMAGE"]				= "Range Damage"
-obj["SPELL_DAMAGE"]				= "Skill Damage"
-obj["GENERIC_DAMAGE"]			= "Swing/Range/Skill Damage"
-obj["SPELL_PERIODIC_DAMAGE"]	= "Periodic Skill Damage (DoT)"
-obj["DAMAGE_SHIELD"]			= "Damage Shield Damage"
-obj["DAMAGE_SPLIT"]				= "Split Damage"
-obj["ENVIRONMENTAL_DAMAGE"]		= "Environmental Damage"
-obj["SWING_MISSED"]				= "Swing Miss"
-obj["RANGE_MISSED"]				= "Range Miss"
-obj["SPELL_MISSED"]				= "Skill Miss"
-obj["GENERIC_MISSED"]			= "Swing/Range/Skill Miss"
-obj["SPELL_PERIODIC_MISSED"]	= "Periodic Skill Miss"
-obj["SPELL_DISPEL_FAILED"]		= "Dispel Failed"
-obj["DAMAGE_SHIELD_MISSED"]		= "Damage Shield Miss"
-obj["SPELL_HEAL"]				= "Heal"
-obj["SPELL_PERIODIC_HEAL"]		= "Periodic Heal (HoT)"
-obj["SPELL_ENERGIZE"]			= "Power Gain"
-obj["SPELL_PERIODIC_ENERGIZE"]	= "Periodic Power Gain"
-obj["SPELL_DRAIN"]				= "Power Drain"
-obj["SPELL_PERIODIC_DRAIN"]		= "Periodic Power Drain"
-obj["SPELL_LEECH"]				= "Power Leech"
-obj["SPELL_PERIODIC_LEECH"]		= "Periodic Power Leech"
-obj["SPELL_INTERRUPT"]			= "Skill Interrupt"
-obj["SPELL_AURA_APPLIED"]		= "Aura Application"
-obj["SPELL_AURA_REMOVED"]		= "Aura Removal"
-obj["SPELL_STOLEN"]				= "Aura Stolen"
-obj["SPELL_DISPEL"]				= "Aura Dispel"
-obj["SPELL_AURA_REFRESH"]		= "Aura Refresh"
-obj["SPELL_AURA_BROKEN_SPELL"]	= "Aura Broken"
-obj["ENCHANT_APPLIED"]			= "Enchant Application"
-obj["ENCHANT_REMOVED"]			= "Enchant Removal"
-obj["SPELL_CAST_START"]			= "Cast Start"
-obj["SPELL_CAST_SUCCESS"]		= "Cast Success"
-obj["SPELL_CAST_FAILED"]		= "Cast Failure"
-obj["SPELL_SUMMON"]				= "Summon"
-obj["SPELL_CREATE"]				= "Create"
-obj["PARTY_KILL"]				= "Killing Blow"
-obj["UNIT_DESTROYED"]			= "Unit Destroy"
-obj["SPELL_EXTRA_ATTACKS"]		= "Extra Attacks"
-obj["UNIT_HEALTH"]				= "Health Change"
-obj["UNIT_POWER"]				= "Power Change"
-
-obj["sourceName"]				= "Source Unit Name"
-obj["sourceAffiliation"]		= "Source Unit Affiliation"
-obj["sourceReaction"]			= "Source Unit Reaction"
-obj["sourceControl"]			= "Source Unit Control"
-obj["sourceUnitType"]			= "Source Unit Type"
-obj["recipientName"]			= "Recipient Unit Name"
-obj["recipientAffiliation"]		= "Recipient Unit Affiliation"
-obj["recipientReaction"]		= "Recipient Unit Reaction"
-obj["recipientControl"]			= "Recipient Unit Control"
-obj["recipientUnitType"]		= "Recipient Unit Type"
-obj["skillID"]					= "Skill ID"
-obj["skillName"]				= "Skill Name"
-obj["skillSchool"]				= "Skill School"
-obj["extraSkillID"]				= "Extra Skill ID"
-obj["extraSkillName"]			= "Extra Skill Name"
-obj["extraSkillSchool"]			= "Extra Skill School"
-obj["amount"]					= "Amount"
-obj["overkillAmount"]			= "Overkill Amount"
-obj["damageType"]				= "Damage Type"
-obj["resistAmount"]				= "Resist Amount"
-obj["blockAmount"]				= "Block Amount"
-obj["absorbAmount"]				= "Absorb Amount"
-obj["isCrit"]					= "Crit"
-obj["isGlancing"]				= "Glancing Hit"
-obj["isCrushing"]				= "Crushing Blow"
-obj["extraAmount"]				= "Extra Amount"
-obj["missType"]					= "Miss Type"
-obj["hazardType"]				= "Hazard Type"
-obj["powerType"]				= "Power Type"
-obj["auraType"]					= "Aura Type"
-obj["threshold"]				= "Threshold"
-obj["unitID"]					= "Unit ID"
-obj["unitReaction"]				= "Unit Reaction"
-obj["itemID"]					= "Item ID"
-obj["itemName"]					= "Item Name"
-
-obj["activeTalents"]			= "Active Talents"
-obj["buffActive"]				= "Buff Active"
-obj["buffInactive"]				= "Buff Inactive"
-obj["currentCP"]				= "Current Combo Points"
-obj["currentPower"]				= "Current Power"
-obj["inCombat"]					= "In Combat"
-obj["recentlyFired"]			= "Trigger Recently Fired"
-obj["trivialTarget"]			= "Trivial Target"
-obj["unavailableSkill"]			= "Unavailable Skill"
-obj["warriorStance"]			= "Warrior Stance"
-obj["zoneName"]					= "Zone Name"
-obj["zoneType"]					= "Zone Type"
-
-obj["eq"]						= "Is Equal To"
-obj["ne"]						= "Is Not Equal To"
-obj["like"]						= "Is Like"
-obj["unlike"]					= "Is Not Like"
-obj["lt"]						= "Is Less Than"
-obj["gt"]						= "Is Greater Than"
-
-obj["affiliationMine"]			= "Mine"
-obj["affiliationParty"]			= "Party Member"
-obj["affiliationRaid"]			= "Raid Member"
-obj["affiliationOutsider"]		= "Outsider"
-obj["affiliationTarget"]		= TARGET
-obj["affiliationFocus"]			= FOCUS
-obj["affiliationYou"]			= YOU
-
-obj["reactionFriendly"]			= "Friendly"
-obj["reactionNeutral"]			= "Neutral"
-obj["reactionHostile"]			= HOSTILE
-
-obj["controlServer"]			= "Server"
-obj["controlHuman"]				= "Human"
-
-obj["unitTypePlayer"]			= PLAYER
-obj["unitTypeNPC"]				= "NPC"
-obj["unitTypePet"]				= PET
-obj["unitTypeGuardian"]			= "Guardian"
-obj["unitTypeObject"]			= "Object"
-
-obj["auraTypeBuff"]				= "Buff"
-obj["auraTypeDebuff"]			= "Debuff"
-
-obj["zoneTypeArena"]			= "Arena"
-obj["zoneTypePvP"]				= BATTLEGROUND
-obj["zoneTypeParty"]			= "5 man instance"
-obj["zoneTypeRaid"]				= "Raid instance"
-
-obj["booleanTrue"]				= "True"
-obj["booleanFalse"]				= "False"
 
 
 

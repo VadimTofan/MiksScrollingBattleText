@@ -118,32 +118,6 @@ local function ProfileTab_ToggleDeleteButton()
 	end
 end
 
-local BLIZZARD_COMBAT_TEXT_V2_CVARS = {
-	"floatingCombatTextCombatHealing_v2",
-	"floatingCombatTextCombatDamage_v2",
-	"floatingCombatTextCombatLogPeriodicSpells_v2",
-	"floatingCombatTextPetMeleeDamage_v2",
-	"floatingCombatTextPetSpellDamage_v2",
-}
-
-local function GeneralTab_SetBlizzardCombatTextV2Enabled(isEnabled)
-	local value = isEnabled and 1 or 0
-	for _, cvarName in ipairs(BLIZZARD_COMBAT_TEXT_V2_CVARS) do
-		SetCVar(cvarName, value)
-	end
-end
-
-local function GeneralTab_IsBlizzardCombatTextV2Enabled()
-	for _, cvarName in ipairs(BLIZZARD_COMBAT_TEXT_V2_CVARS) do
-		local cvarValue = GetCVar(cvarName)
-		if cvarValue == nil or tonumber(cvarValue) == 0 then
-			return false
-		end
-	end
-	return true
-end
-
-
 local function GeneralTab_EnableControls()
 	for name, frame in pairs(tabFrames.general.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -172,17 +146,6 @@ GeneralTab_Populate = function()
 		controls.blizzardCombatTextV2InGroupCheckbox:SetChecked(not not currentProfile.enableBlizzardV2CombatTextInGroup)
 	end
 	controls.animationSpeedSlider:SetValue(currentProfile.animationSpeed)
-end
-
-
-local function GenerelTab_ValidateProfileName(profileName)
-	if (not profileName or profileName == "") then
-		return L.MSG_INVALID_PROFILE_NAME
-	end
-
-	if (MSBTProfiles.savedVariables.profiles[profileName]) then
-		return L.MSG_PROFILE_ALREADY_EXISTS
-	end
 end
 
 

@@ -14,19 +14,7 @@ L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "스크롤 영역 이름이 이미 존재합�
 L.MSG_INVALID_SCROLL_AREA_NAME		= "허용되지 않는 스크롤 영역 이름입니다."
 L.MSG_ACKNOWLEDGE_TEXT				= "이 동작을 수행 하시겠습니까?"
 L.MSG_NORMAL_PREVIEW_TEXT			= "기본"
-L.MSG_NEW_TRIGGER					= "새로운 트리거"
-L.MSG_TRIGGER_CLASSES				= "직업 트리거"
-L.MSG_MAIN_EVENTS					= "메인 이벤트"
-L.MSG_TRIGGER_EXCEPTIONS			= "트리거 예외"
-L.MSG_EVENT_CONDITIONS				= "이벤트 조건"
 L.MSG_DISPLAY_QUALITY				= "이 품질의 아이템을 위한 알림을 표시합니다."
-L.MSG_SKILLS						= "기술"
-L.MSG_SKILL_ALREADY_EXISTS			= "기술 이름이 이미 존재합니다."
-L.MSG_INVALID_SKILL_NAME			= "허용되지 않는 기술 이름입니다."
-L.MSG_HOSTILE						= "적대적"
-L.MSG_ANY							= "모두"
-L.MSG_CONDITION						= "조건"
-L.MSG_CONDITIONS					= "조건 (복수)"
 L.MSG_ITEM_QUALITIES				= "아이템 품질"
 L.MSG_ITEMS							= "아이템"
 L.MSG_ITEM_ALREADY_EXISTS			= "아이템 이름이 이미 존재합니다."
@@ -74,7 +62,6 @@ obj["hideNames"]				= { label="유닛 이름 숨김", tooltip="받은, 대상이
 obj["hideFullOverheals"]		= { label="최대 초과치유 숨김", tooltip="0의 치유량 효과를 가진 치유는 표시하지 않습니다."}
 obj["hideFullHoTOverheals"]		= { label="최대 순간 초과치유 숨김", tooltip="0의 치유량 효과를 가진 시간이 지난 치유는 표시하지 않습니다."}
 obj["hideMergeTrailer"]			= { label="요약 병합 숨김", tooltip="적중 및 치명타로 병합된 이벤트 마지막에 특정한 숫자 요약을 표시하지 않습니다."}
-obj["allClasses"]				= { label="모든 클래스"}
 obj["lootedItems"]				= { label="획득한 아이템", tooltip="아이템을 획득했을때 알림 메세지를 표시합니다."}
 obj["moneyGains"]				= { label="금전 획득", tooltip="당신의 금전 획득 사용."}
 obj["alwaysShowQuestItems"]		= { label="퀘스트 아이템 항상 표시", tooltip="선택된 품질에 관계없이 퀘스트 아이템을 항상 표시합니다."}
@@ -97,10 +84,6 @@ obj["textAlign"]			= { label="텍스트 정렬:", tooltip="애니메이션의 �
 obj["iconAlign"]			= { label="아이콘 정렬:", tooltip="문자와 관련된 기술 아이콘의 정렬."}
 obj["eventCategory"]		= { label="이벤트 분류:", tooltip="설정하려는 이벤트 분류."}
 obj["outputScrollArea"]		= { label="출력 스크롤 영역:", tooltip="출력에 사용할 스크롤 영역을 선택합니다."}
-obj["mainEvent"]			= { label="메인 이벤트:"}
-obj["triggerCondition"]		= { label="조건:", tooltip="판별할 조건."}
-obj["triggerRelation"]		= { label="관계:"}
-obj["triggerParameter"]		= { label="매개변수 (parameter):"}
 
 
 
@@ -126,23 +109,6 @@ obj["toggleAll"]				= { label="모두 바꾸기", tooltip="선택한 분류의 �
 obj["moveAll"]					= { label="모두 이동", tooltip="선택한 분류의 모든 이벤트를 지정한 스크롤 영역으로 이동시킵니다."}
 obj["eventFontSettings"]		= { tooltip="이벤트에 대한 글꼴 설정을 수정하려면 클릭하세요."}
 obj["eventSettings"]			= { tooltip="스크롤 영역, 출력 메시지, 효과음 등과 같은 이벤트 설정을 수정하려면 클릭하세요."}
-obj["addTrigger"]				= { label="새로운 트리거 추가", tooltip="새로운 트리거를 추가합니다."}
-obj["triggerSettings"]			= { tooltip="트리거를 설정하려면 클릭하세요."}
-obj["deleteTrigger"]			= { tooltip="트리거를 삭제하려면 클릭하세요."}
-obj["editTriggerClasses"]		= { tooltip="트리거를 적용할 클래스를 수정하려면 클릭하세요."}
-obj["addMainEvent"]				= { label="이벤트 추가", tooltip="이벤트중 어느 하나라도 발생하여 설정한 조건이 만족되면 아래의 예외 조건이 어느 하나라도 만족되지 않는다면 트리거가 발동 됩니다."}
-obj["addTriggerException"]		= { label="예외 추가", tooltip="예외 조건중 어느 하나라도 만족되면, 트리거는 발동되지 않습니다."}
-obj["editEventConditions"]		= { tooltip="이벤트에 대한 조건을 수정하려면 클릭하세요."}
-obj["deleteMainEvent"]			= { tooltip="이벤트를 삭제하려면 클릭하세요."}
-obj["addEventCondition"]		= { label="조건 추가", tooltip="이벤트중 어느 하나라도 발생하여 설정한 조건이 만족되면 아래의 예외 조건이 어느 하나라도 만족되지 않는다면 트리거가 발동 됩니다."}
-obj["editCondition"]			= { tooltip="조건을 수정하려면 클릭하세요."}
-obj["deleteCondition"]			= { tooltip="조건을 삭제하려면 클릭하세요."}
-obj["throttleList"]				= { label="기술 출력시간", tooltip="명시한 기술을 출력하는 단위시간을 설정하십시오."}
-obj["mergeExclusions"]			= { label="병합 제외", tooltip="명시한 기술을 병합에서 제외됩니다."}
-obj["skillSuppressions"]		= { label="제외시킬 기술", tooltip="제외시킬 기술의 이름을 명시합니다."}
-obj["skillSubstitutions"]		= { label="기술 이름 대체", tooltip="기술의 이름을 사용자가 입력한 글자로 대체합니다."}
-obj["addSkill"]					= { label="기술 추가", tooltip="목록에 새로운 기술을 추가합니다."}
-obj["deleteSkill"]				= { tooltip="기술을 삭제하려면 클릭하세요."}
 obj["itemsAllowed"]				= { label="허용된 아이템", tooltip="아이템 품질에 관계없이 특정한 아이템을 항상 표시합니다."}
 obj["itemExclusions"]			= { label="제외 아이템", tooltip="특정한 아이템이 계속 표시되는 것으로부터 방지합니다."}
 obj["addItem"]					= { label="아이템 추가", tooltip="목록에 새로운 아이템을 추가합니다."}
@@ -158,8 +124,6 @@ obj["xOffset"]			= { label="X 좌표:", tooltip="선택된 스크롤 영역의 X
 obj["yOffset"]			= { label="Y 좌표:", tooltip="선택된 스크롤 영역의 Y 좌표."}
 obj["eventMessage"]		= { label="출력 메세지 입력:", tooltip="이벤트 발생시 출력되는 메세지."}
 obj["iconSkill"]		= { label="기술 아이콘:", tooltip="이벤트 발생 시 아이콘을 표시할 기술의 이름입니다."}
-obj["skillName"]		= { label="기술 이름 입력:", tooltip="추가되는 기술의 이름."}
-obj["substitutionText"]	= { label="대체 텍스트:", tooltip="기술 이름을 대체할 텍스트."}
 obj["itemName"]			= { label="아이템 이름:", tooltip="추가시킬 아이템의 이름."}
 
 
@@ -179,7 +143,6 @@ obj["damageThreshold"]		= { label="피해량 표시 기준", tooltip="피해량�
 obj["dotThrottleTime"]		= { label="지속적인 피해량 (DoT) 출력시간", tooltip="지속적인 피해량 (DoT)을 출력하는 단위시간 (초)."}
 obj["hotThrottleTime"]		= { label="지속적인 치유량 (HoT) 출력시간", tooltip="지속적인 치유량 (HoT)을 출력하는 단위시간 (초)."}
 obj["powerThrottleTime"]	= { label="마력 변화 출력시간", tooltip="마력 (마나, 분노, 기력, 룬 마력) 변화를 출력하는 단위시간 (초)"}
-obj["skillThrottleTime"]	= { label="출력시간 (초)", tooltip="기술을 출력하는 단위시간 (초)."}
 
 
 obj = L.EVENT_CATEGORIES
@@ -395,138 +358,6 @@ obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="NPC 결정타", tooltip="NPC에 
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="추가타 공격", tooltip="추가타 공격 (우뢰 폭풍, 도검 전문화 등.) 효과를 얻었음을 알려줍니다."}
 obj["NOTIFICATION_ENEMY_BUFF"]			= { label="적의 버프 획득", tooltip="당신의 적대적 대상이 버프를 획득하면 알려줍니다."}
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="몬스터 감정표현", tooltip="당신의 대상 몬스터의 감정 표현을 알려줍니다."}
-
-
-
-obj = L.TRIGGER_DATA
-obj["SWING_DAMAGE"]				= "근접 피해"
-obj["RANGE_DAMAGE"]				= "원거리 피해"
-obj["SPELL_DAMAGE"]				= "주문 피해"
-obj["GENERIC_DAMAGE"]			= "피해량"
-obj["SPELL_PERIODIC_DAMAGE"]	= "주기적인 주문 피해 (DoT)"
-obj["DAMAGE_SHIELD"]			= "피해막 피해"
-obj["DAMAGE_SPLIT"]				= "분할 피해"
-obj["ENVIRONMENTAL_DAMAGE"]		= "환경적인 피해"
-obj["SWING_MISSED"]				= "근접 빗나감"
-obj["RANGE_MISSED"]				= "원거리 빗나감"
-obj["SPELL_MISSED"]				= "주문 빗나감"
-obj["GENERIC_MISSED"]			= "빗나감 (적중하지 않음)"
-obj["SPELL_PERIODIC_MISSED"]	= "주기적인 주문 빗나감"
-obj["SPELL_DISPEL_FAILED"]		= "주문 해제 실패"
-obj["DAMAGE_SHIELD_MISSED"]		= "피해막 빗나감"
-obj["SPELL_HEAL"]				= "치유"
-obj["SPELL_PERIODIC_HEAL"]		= "주기적인 치유 (HoT)"
-obj["SPELL_ENERGIZE"]			= "마력 (마나/분노 등) 획득"
-obj["SPELL_PERIODIC_ENERGIZE"]	= "주기적인 마력 (마나/분노 등) 획득"
-obj["SPELL_DRAIN"]				= "마력 (마나/분노 등) 유출"
-obj["SPELL_PERIODIC_DRAIN"]		= "주기적인 (마나/분노 등) 마력 유출"
-obj["SPELL_LEECH"]				= "마력 (마나/분노 등) 착취"
-obj["SPELL_PERIODIC_LEECH"]		= "주기적인 마력 (마나/분노 등) 착취"
-obj["SPELL_INTERRUPT"]			= "주문 차단"
-obj["SPELL_AURA_APPLIED"]		= "오라 받음"
-obj["SPELL_AURA_REMOVED"]		= "오라 사라짐"
-obj["SPELL_STOLEN"]				= "주문 훔치기"
-obj["SPELL_DISPEL"]				= "주문 해제"
-obj["SPELL_AURA_REFRESH"]		= "오라 복원"
-obj["SPELL_AURA_BROKEN_SPELL"]	= "오라 중단됨"
-obj["ENCHANT_APPLIED"]			= "무기 강화 받음"
-obj["ENCHANT_REMOVED"]			= "무기 강화 사라짐"
-obj["SPELL_CAST_START"]			= "시전 시작"
-obj["SPELL_CAST_SUCCESS"]		= "시전 성공"
-obj["SPELL_CAST_FAILED"]		= "시전 실패"
-obj["SPELL_SUMMON"]				= "소환"
-obj["SPELL_CREATE"]				= "창조"
-obj["PARTY_KILL"]				= "결정타"
-obj["UNIT_DESTROYED"]			= "유닛 사라짐"
-obj["SPELL_EXTRA_ATTACKS"]		= "추가 공격"
-obj["UNIT_HEALTH"]				= "생명력 변화"
-obj["UNIT_POWER"]				= "마력 변화"
-
-obj["sourceName"]				= "이벤트를 제공한 유닛의 이름"
-obj["sourceAffiliation"]		= "이벤트를 제공한 유닛의 소속"
-obj["sourceReaction"]			= "이벤트를 제공한 유닛과의 관계"
-obj["sourceControl"]			= "이벤트를 제공한 유닛의 제어"
-obj["sourceUnitType"]			= "이벤트를 제공한 유닛 유형"
-obj["recipientName"]			= "이벤트를 받은 유닛의 이름"
-obj["recipientAffiliation"]		= "이벤트를 받은 유닛의 소속"
-obj["recipientReaction"]		= "이벤트를 받은 유닛과의 관계"
-obj["recipientControl"]			= "이벤트를 받은 유닛의 제어"
-obj["recipientUnitType"]		= "이벤트를 받은 유닛의 유형"
-obj["skillID"]					= "기술 ID"
-obj["skillName"]				= "기술 이름"
-obj["skillSchool"]				= "기술 속성"
-obj["extraSkillID"]				= "추가 기술 ID"
-obj["extraSkillName"]			= "추가 기술 이름"
-obj["extraSkillSchool"]			= "추가 기술 속성"
-obj["amount"]					= "수치 (양)"
-obj["overkillAmount"]			= "초과 피해"
-obj["damageType"]				= "피해 속성"
-obj["resistAmount"]				= "저항한 피해"
-obj["blockAmount"]				= "방어한 피해"
-obj["absorbAmount"]				= "흡수한 피해"
-obj["isCrit"]					= "치명타"
-obj["isGlancing"]				= "비껴맞음"
-obj["isCrushing"]				= "강타"
-obj["extraAmount"]				= "추가 피해"
-obj["missType"]					= "빗나감 종류"
-obj["hazardType"]				= "위험요소 종류"
-obj["powerType"]				= "마력 종류"
-obj["auraType"]					= "오라 종류"
-obj["threshold"]				= "기준 (양/시간)"
-obj["unitID"]					= "유닛 ID"
-obj["unitReaction"]				= "유닛 반응"
-
-obj["activeTalents"]			= "활성된 특성"
-obj["buffActive"]				= "활성된 버프"
-obj["buffInactive"]				= "비활성된 버프"
-obj["currentCP"]				= "현재 연계 점수"
-obj["currentPower"]				= "현재 마력 (마나/분노 등)"
-obj["inCombat"]					= "전투중"
-obj["recentlyFired"]			= "최근 발동된 트리거"
-obj["trivialTarget"]			= "무시 대상"
-obj["unavailableSkill"]			= "배우지 않은 기술"
-obj["warriorStance"]			= "전사 태세"
-obj["zoneName"]					= "지역 이름"
-obj["zoneType"]					= "지역 유형"
-
-obj["eq"]						= "일치함 ( = )"
-obj["ne"]						= "일치하지 않음 ( ≠ )"
-obj["like"]						= "유사함"
-obj["unlike"]					= "유사하지 않음"
-obj["lt"]						= "보다 작음 ( < )"
-obj["gt"]						= "보다 큼 ( > )"
-
-obj["affiliationMine"]			= "자신의 것"
-obj["affiliationParty"]			= "파티원"
-obj["affiliationRaid"]			= "공격대원"
-obj["affiliationOutsider"]		= "제 3자"
-obj["affiliationTarget"]		= TARGET
-obj["affiliationFocus"]			= "주시 대상"
-obj["affiliationYou"]			= YOU
-
-obj["reactionFriendly"]			= "우호적인"
-obj["reactionNeutral"]			= "중립적인"
-obj["reactionHostile"]			= "적대적인"
-
-obj["controlServer"]			= "서버"
-obj["controlHuman"]				= "유저"
-
-obj["unitTypePlayer"]			= PLAYER
-obj["unitTypeNPC"]				= "NPC"
-obj["unitTypePet"]				= PET
-obj["unitTypeGuardian"]			= "수호물"
-obj["unitTypeObject"]			= "객체"
-
-obj["auraTypeBuff"]				= "버프"
-obj["auraTypeDebuff"]			= "디버프"
-
-obj["zoneTypeArena"]			= "투기장"
-obj["zoneTypePvP"]				= BATTLEGROUND
-obj["zoneTypeParty"]			= "5인 던전"
-obj["zoneTypeRaid"]				= "공격대 던전"
-
-obj["booleanTrue"]				= "True"
-obj["booleanFalse"]				= "False"
 
 
 

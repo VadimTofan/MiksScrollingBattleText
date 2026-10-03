@@ -13,19 +13,7 @@ L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "Une zone de défilement portant ce nom exist
 L.MSG_INVALID_SCROLL_AREA_NAME		= "Nom de zone de défilement invalide."
 L.MSG_ACKNOWLEDGE_TEXT				= "Etes-vous certain de vouloir effectuer cette action?"
 L.MSG_NORMAL_PREVIEW_TEXT			= "Normal"
-L.MSG_NEW_TRIGGER					= "Nouveau déclencheur"
-L.MSG_TRIGGER_CLASSES				= "Classes du déclencheur"
-L.MSG_MAIN_EVENTS					= "Evènements principaux"
-L.MSG_TRIGGER_EXCEPTIONS			= "Exceptions du déclenchement"
-L.MSG_EVENT_CONDITIONS				= "Conditions de l'évènement"
 L.MSG_DISPLAY_QUALITY				= "Afficher une alerte pour les items de cette qualité."
-L.MSG_SKILLS						= "Compétences"
-L.MSG_SKILL_ALREADY_EXISTS			= "Cette compétence existe déjà."
-L.MSG_INVALID_SKILL_NAME			= "Nom de compétence invalide."
-L.MSG_HOSTILE						= "Hostile"
-L.MSG_ANY							= "Tous"
-L.MSG_CONDITION						= "Condition"
-L.MSG_CONDITIONS					= "Conditions"
 L.MSG_ITEM_QUALITIES				= "Qualité des Items"
 L.MSG_ITEMS							= "Items"
 L.MSG_ITEM_ALREADY_EXISTS			= "Le nom de l'item existe déjà."
@@ -70,7 +58,6 @@ obj["abbreviateSkills"]		= { label="Compétences Abrégées", tooltip="Nom des c
 obj["hideSkills"]			= { label="Cacher les Noms des Compétences", tooltip="Ne pas afficher les noms de compétences pour les évènements entrants et sortants.\n\nVous abandonnerez quelques possibilités de personnalisation de l'évènement si vous utilisez cette option car le code %s sera ignoré."}
 obj["hideNames"]			= { label="Cacher les Noms des Unités", tooltip="Ne pas afficher les noms des unités pour les évènements entrants et sortants.\n\nVous abandonnerez quelques possibilités de personnalisation de l'évènement si vous utilisez cette option car le code %n sera ignoré."}
 obj["hideFullOverheals"]	= { label="Cacher les Soins en Excès Total", tooltip="Ne pas afficher les soins qui ont un soin effectif égal à zéro."}
-obj["allClasses"]			= { label="Toutes les classes"}
 obj["lootedItems"]			= { label="Items Ramassés", tooltip="Affiche les notifications quand des items sont ramassés."}
 obj["moneyGains"]			= { label="Gains d'argent", tooltip="Affiche vos gains d'argent."}
 obj["alwaysShowQuestItems"]	= { label="Toujours Montrer les Items de Quête", tooltip="Toujours montrer les items de quête quelle que soit la sélection selon la qualité des items."}
@@ -93,10 +80,6 @@ obj["textAlign"]			= { label="Alignement du texte:", tooltip="Alignement du text
 obj["iconAlign"]			= { label="Alignement de l'icône:", tooltip="L'alignement des icônes de compétence par rapport au texte."}
 obj["eventCategory"]		= { label="Catégorie d'évènement:", tooltip="La catégorie de l'évènement à configurer."}
 obj["outputScrollArea"]		= { label="Zone de défilement de sortie:", tooltip="Sélectionne la zone de défilement à utiliser."}
-obj["mainEvent"]			= { label="Evènement principal:"}
-obj["triggerCondition"]		= { label="Condition:", tooltip="La condition à tester."}
-obj["triggerRelation"]		= { label="Relation:"}
-obj["triggerParameter"]		= { label="Paramètre:"}
 
 
 
@@ -122,23 +105,6 @@ obj["toggleAll"]				= { label="Changer Tout", tooltip="Modifie l'état des évè
 obj["moveAll"]					= { label="Déplacer Tout", tooltip="Déplace tous les évènements dans la catégorie sélectionnée vers la zone de défilement spécifiée."}
 obj["eventFontSettings"]		= { tooltip="Cliquer pour éditer les paramètres de police de l'évènement."}
 obj["eventSettings"]			= { tooltip="Cliquer pour éditer les paramètres de l'évènement comme la zone de défilement, message, sonore, etc."}
-obj["addTrigger"]				= { label="Ajouter un déclencheur", tooltip="Ajoute un nouveau déclencheur."}
-obj["triggerSettings"]			= { tooltip="Cliquer pour configurer les conditions du déclencheur."}
-obj["deleteTrigger"]			= { tooltip="Cliquer pour supprimer ce déclencheur."}
-obj["editTriggerClasses"]		= { tooltip="Cliquer pour déterminer à quelles classes le déclencheur s'applique."}
-obj["addMainEvent"]				= { label="Ajouter un évènement", tooltip="Quand n'importe lequel de ces évènements survient et que leurs conditions définies sont vraies, le déclencheur s'activera à moins qu'une des exceptions spécifiées soient vraies."}
-obj["addTriggerException"]		= { label="Ajouter une exception", tooltip="Quand n'importe laquelle de ces exceptions est vraie, le déclencheur ne s'activera pas."}
-obj["editEventConditions"]		= { tooltip="Cliquer pour éditer les conditions de l'évènement."}
-obj["deleteMainEvent"]			= { tooltip="Cliquer pour supprimer l'évènement."}
-obj["addEventCondition"]		= { label="Ajouter une condition", tooltip="Quand TOUTES les conditions sont vraies pour l'évènement sélectionné, le déclencheur s'activera à moins qu'une des exceptions spécifiées soit vraie."}
-obj["editCondition"]			= { tooltip="Cliquer pour éditer la condition."}
-obj["deleteCondition"]			= { tooltip="Cliquer pour supprimer la condition."}
-obj["throttleList"]				= { label="Commande de puissance", tooltip="Définit des durées personnalisées pour les compétences spécifiées."}
-obj["mergeExclusions"]			= { label="Exclusions de la fusion", tooltip="Définit la liste des compétences qui ne seront pas fusionnées."}
-obj["skillSuppressions"]		= { label="Compétences supprimées", tooltip="Supprime des compétences en fonction de leur nom."}
-obj["skillSubstitutions"]		= { label="Compétences substituées", tooltip="Substitue les nom des compétences avec des valeurs personnalisées."}
-obj["addSkill"]					= { label="Ajouter une compétence", tooltip="Ajoute une nouvelle compétence à la liste."}
-obj["deleteSkill"]				= { tooltip="Cliquer pour supprimer cette compétence."}
 obj["itemsAllowed"]				= { label="Items Autorisés", tooltip="Toujours montrer les items spécifiés quelle que soit leur qualité."}
 obj["itemExclusions"]			= { label="Item Interdit", tooltip="Empêche d'afficher les items spécifiés."}
 obj["addItem"]					= { label="Ajouter un Item", tooltip="Ajoute un nouvel item à la liste."}
@@ -153,8 +119,6 @@ obj["xOffset"]			= { label="Décalage X:", tooltip="Le décalage horizontal de l
 obj["yOffset"]			= { label="Décalage Y:", tooltip="Le décalage vertical de la zone de défilement."}
 obj["eventMessage"]		= { label="Message affiché:", tooltip="Le message affiché quand l'évènement intervient."}
 obj["iconSkill"]		= { label="Icône de la compétence:", tooltip="Le nom ou le numéro d'ID d'une compétence dont l'icône sera affichée quand l'évènement survient.\n\nMSBT essayera automatiquement d'afficher une icône appropriée si aucune n'est spécifiée.\n\nNOTE: une numéro d'ID doit être utilisé à la place du nom si la compétence n'est pas dans le livre de sort de la classe jouée quand l'évènement survient. La plupart des bases de données en ligne comme wowhead permettent de rechercher cette ID."}
-obj["skillName"]		= { label="Nom de la compétence:", tooltip="Le nom de la compétence à ajouter."}
-obj["substitutionText"]	= { label="Texte de substitution:", tooltip="Le texte à substituer pour le nom de la compétence."}
 obj["itemName"]			= { label="Nom de l'item:", tooltip="Le nom de l'item à ajouter."}
 
 
@@ -174,7 +138,6 @@ obj["damageThreshold"]		= { label="Seuil des dommages", tooltip="Le seuil que le
 obj["dotThrottleTime"]		= { label="Temps de spam des DoT", tooltip="Le nombre de secondes à prendre en compte pour afficher les DoT."}
 obj["hotThrottleTime"]		= { label="Temps de spam des HoT", tooltip="Le nombre de secondes à prendre en compte pour afficher les HoT."}
 obj["powerThrottleTime"]	= { label="Temps de spam des Gains", tooltip="Le nombre de secondes à prendre en compte pour afficher les gains de puissance."}
-obj["skillThrottleTime"]	= { label="Contrôle du temps", tooltip="Le nombre de secondes à prendre en compte pour afficher la compétence."}
 
 
 obj = L.EVENT_CATEGORIES
@@ -368,137 +331,6 @@ obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="Coups fatals sur un PNJ", toolti
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="Attaques supplémentaires", tooltip="Afficher les gains d'attaques supplémentaires, comme Windfury, etc."}
 obj["NOTIFICATION_ENEMY_BUFF"]			= { label="Gains de buff ennemi", tooltip="Affiche les buffs que gagne votre ennemi ciblé."}
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="Emote des monstres", tooltip="Affiche les emotes du monstre que vous ciblez."}
-
-
-
-obj = L.TRIGGER_DATA
-obj["SWING_DAMAGE"]				= "Dommage du Swing"
-obj["RANGE_DAMAGE"]				= "Dommage à Distance"
-obj["SPELL_DAMAGE"]				= "Dommage de Compétence"
-obj["GENERIC_DAMAGE"]			= "Dommage de Swing/Distance/Compétence"
-obj["SPELL_PERIODIC_DAMAGE"]	= "Dommage de Compétence Périodique (DoT)"
-obj["DAMAGE_SHIELD"]			= "Dommage de Bouclier"
-obj["DAMAGE_SPLIT"]				= "Dommage de Split"
-obj["ENVIRONMENTAL_DAMAGE"]		= "Dommage de l'Environnement"
-obj["SWING_MISSED"]				= "Manque du Swing"
-obj["RANGE_MISSED"]				= "Manque à Distance"
-obj["SPELL_MISSED"]				= "Manque d'une Compétence"
-obj["GENERIC_MISSED"]			= "Manque de Swing/Distance/Compétence"
-obj["SPELL_PERIODIC_MISSED"]	= "Manque d'une Compétence Périodique"
-obj["SPELL_DISPEL_FAILED"]		= "Manque d'une Dissipation"
-obj["DAMAGE_SHIELD_MISSED"]		= "Manque d'un Dommage de Bouclier"
-obj["SPELL_HEAL"]				= "Soin"
-obj["SPELL_PERIODIC_HEAL"]		= "Soin Périodique (HoT)"
-obj["SPELL_ENERGIZE"]			= "Gain de Puissance"
-obj["SPELL_PERIODIC_ENERGIZE"]	= "Gain de Puissance Périodique"
-obj["SPELL_DRAIN"]				= "Drain de Puissance"
-obj["SPELL_PERIODIC_DRAIN"]		= "Drain de Puissance Périodique"
-obj["SPELL_LEECH"]				= "Sangsue de Puissance"
-obj["SPELL_PERIODIC_LEECH"]		= "Sangsue de Puissance Périodique"
-obj["SPELL_INTERRUPT"]			= "Interruption de Compétence"
-obj["SPELL_AURA_APPLIED"]		= "Aura Appliquée"
-obj["SPELL_AURA_REMOVED"]		= "Aura Enlevée"
-obj["SPELL_STOLEN"]				= "Aura Volée"
-obj["SPELL_DISPEL"]				= "Aura Dissipée"
-obj["SPELL_AURA_BROKEN_SPELL"]	= "Aura Cassée"
-obj["ENCHANT_APPLIED"]			= "Enchantement Appliqué"
-obj["ENCHANT_REMOVED"]			= "Enchantement Enlevé"
-obj["SPELL_CAST_START"]			= "Sort Incanté"
-obj["SPELL_CAST_SUCCESS"]		= "Sort Réussi"
-obj["SPELL_CAST_FAILED"]		= "Sort Echoué"
-obj["SPELL_SUMMON"]				= "Invoquer"
-obj["SPELL_CREATE"]				= "Créer"
-obj["PARTY_KILL"]				= "Coup Fatal"
-obj["UNIT_DESTROYED"]			= "Unité Détruite"
-obj["SPELL_EXTRA_ATTACKS"]		= "Attaque Supplémentaire"
-obj["UNIT_HEALTH"]				= "Modification des Points de Vie"
-obj["UNIT_POWER"]				= "Modification de Puissance"
-
-obj["sourceName"]				= "Origine Unité Nom"
-obj["sourceAffiliation"]		= "Origine Unité Affiliation"
-obj["sourceReaction"]			= "Origine Unité Réaction"
-obj["sourceControl"]			= "Origine Unité Contrôle"
-obj["sourceUnitType"]			= "Origine Unité Type"
-obj["recipientName"]			= "Destinataire Unité Nom"
-obj["recipientAffiliation"]		= "Destinataire Unité Affiliation"
-obj["recipientReaction"]		= "Destinataire Unité Réaction"
-obj["recipientControl"]			= "Destinataire Unité Contrôle"
-obj["recipientUnitType"]		= "Destinataire Unité Type"
-obj["skillID"]					= "Compétence ID"
-obj["skillName"]				= "Compétence Nom"
-obj["skillSchool"]				= "Compétence Ecole"
-obj["extraSkillID"]				= "Extra Compétence ID"
-obj["extraSkillName"]			= "Extra Compétence Nom"
-obj["extraSkillSchool"]			= "Extra Compétence Ecole"
-obj["amount"]					= "Quantité"
-obj["overkillAmount"]			= "Quantité de dommages en excès"
-obj["damageType"]				= "Dommage Type"
-obj["resistAmount"]				= "Quantité Résistée"
-obj["blockAmount"]				= "Quantité Bloquée"
-obj["absorbAmount"]				= "Quantité Absorbée"
-obj["isCrit"]					= "Critique"
-obj["isGlancing"]				= "Coup Diminué"
-obj["isCrushing"]				= "Coup Ecrasé"
-obj["extraAmount"]				= "Extra Quantité"
-obj["missType"]					= "Type Manque"
-obj["hazardType"]				= "Type Hazard"
-obj["powerType"]				= "Type Puissance"
-obj["auraType"]					= "Type Aura"
-obj["threshold"]				= "Seuil"
-obj["unitID"]					= "Unité ID"
-obj["unitReaction"]				= "Unité Réaction"
-
-obj["activeTalents"]	= "Talents Actifs"
-obj["buffActive"]		= "Buff Actif"
-obj["buffInactive"]		= "Buff Inactif"
-obj["currentCP"]		= "Points de Combo Actuels"
-obj["currentPower"]		= "Puissance Actuelle"
-obj["inCombat"]			= "En combat"
-obj["recentlyFired"]	= "Déclencheur Récemment Activé"
-obj["trivialTarget"]	= "Cible Insignifiante"
-obj["unavailableSkill"]	= "Compétence Indisponible"
-obj["warriorStance"]	= "Position de Combat"
-obj["zoneName"]			= "Nom de la Zone"
-obj["zoneType"]			= "Type de la Zone"
-
-obj["eq"]		= "Est égal à"
-obj["ne"]		= "N'est pas égal à"
-obj["like"]		= "Est comme"
-obj["unlike"]	= "N'est pas comme"
-obj["lt"]		= "Est moins que"
-obj["gt"]		= "Est plus grand que"
-
-obj["affiliationMine"]		= "A Moi"
-obj["affiliationParty"]		= "Membre du Groupe"
-obj["affiliationRaid"]		= "Membre du Raid"
-obj["affiliationOutsider"]	= "Etranger"
-obj["affiliationTarget"]	= "Cible"
-obj["affiliationFocus"]		= "Focus"
-obj["affiliationYou"]		= "Vous"
-
-obj["reactionFriendly"]	= "Ami"
-obj["reactionNeutral"]	= "Neutre"
-obj["reactionHostile"]	= "Hostile"
-
-obj["controlServer"]	= "Serveur"
-obj["controlHuman"]		= "Humain"
-
-obj["unitTypePlayer"]	= "Joueur"
-obj["unitTypeNPC"]		= "NPC"
-obj["unitTypePet"]		= "Familier"
-obj["unitTypeGuardian"]	= "Gardien"
-obj["unitTypeObject"]	= "Objet"
-
-obj["auraTypeBuff"]		= "Buff"
-obj["auraTypeDebuff"]	= "Debuff"
-
-obj["zoneTypeArena"]	= "Arène"
-obj["zoneTypePvP"]		= "Champ de Bataille"
-obj["zoneTypeParty"]	= "Instance 5"
-obj["zoneTypeRaid"]		= "Instance de raid"
-
-obj["booleanTrue"]	= "Vrai"
-obj["booleanFalse"]	= "Faux"
 
 
 

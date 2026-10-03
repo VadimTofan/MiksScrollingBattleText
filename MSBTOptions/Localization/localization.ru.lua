@@ -13,19 +13,7 @@ L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "Название области прокру
 L.MSG_INVALID_SCROLL_AREA_NAME		= "Неверное название области прокрутки."
 L.MSG_ACKNOWLEDGE_TEXT				= "Вы уверены что хотите выполнить данное действие?"
 L.MSG_NORMAL_PREVIEW_TEXT			= "Нормальный"
-L.MSG_NEW_TRIGGER					= "Новый триггер"
-L.MSG_TRIGGER_CLASSES				= "Триггер классы"
-L.MSG_MAIN_EVENTS					= "Главные события"
-L.MSG_TRIGGER_EXCEPTIONS			= "Триггер исключения"
-L.MSG_EVENT_CONDITIONS				= "Условие события"
 L.MSG_DISPLAY_QUALITY				= "Показывать оповещение для предметов этого качества."
-L.MSG_SKILLS						= "Навыки"
-L.MSG_SKILL_ALREADY_EXISTS			= "Название навыка уже существует."
-L.MSG_INVALID_SKILL_NAME			= "Неверное название навыка."
-L.MSG_HOSTILE						= "Вражеский"
-L.MSG_ANY							= "Любой"
-L.MSG_CONDITION						= "Условие"
-L.MSG_CONDITIONS					= "Условия"
 L.MSG_ITEM_QUALITIES				= "Качество предмета"
 L.MSG_ITEMS							= "Предметы"
 L.MSG_ITEM_ALREADY_EXISTS			= "Название предмета уже существует."
@@ -73,7 +61,6 @@ obj["hideNames"]				= { label="Скрыть имена", tooltip="Не отоб�
 obj["hideFullOverheals"]		= { label="Скрыть избыточное исц.", tooltip="Не показывать исцеление которого эффективное значение лечения равно нулю."}
 obj["hideFullHoTOverheals"]		= { label="Скрыть полное избыточное ИзВ", tooltip="Не показывать исцеление за время которого эффективное значение лечения равно нулю."}
 obj["hideMergeTrailer"]			= { label="Скрыть трейлер объединенных", tooltip="Не показывать трейлер, который определяет количество попаданий и критов в конце объединенных событий."}
-obj["allClasses"]				= { label="Все классы"}
 obj["lootedItems"]				= { label="Добыча предметов", tooltip="Выводит оповещение когда вы подбераете предметы."}
 obj["moneyGains"]				= { label="Получ. денег", tooltip="Вкл/Выкл оповещение когда вы получаете деньги."}
 obj["alwaysShowQuestItems"]		= { label="Предметы заданий", tooltip="Всегда показывать предметы заданий не обращающий внимания на выбор качества."}
@@ -96,10 +83,6 @@ obj["textAlign"]			= { label="Выравнивание текста:", tooltip="
 obj["iconAlign"]			= { label="Выравнивание иконки:", tooltip="Выравнивание иконки способности по отношению к тексту."}
 obj["eventCategory"]		= { label="Категория события:", tooltip="Для настройки событий выберите желаемую категорию."}
 obj["outputScrollArea"]		= { label="Область вывода:", tooltip="Выберите область прокрутки для вывода информации."}
-obj["mainEvent"]			= { label="Главные события:"}
-obj["triggerCondition"]		= { label="Условие:", tooltip="Условие для теста."}
-obj["triggerRelation"]		= { label="Отношение:"}
-obj["triggerParameter"]		= { label="Параметр:"}
 
 
 
@@ -125,23 +108,6 @@ obj["toggleAll"]				= { label="Переключить ВСЕ", tooltip="Вкл/�
 obj["moveAll"]					= { label="Переместить ВСЕ", tooltip="Переместить ВСЕ события в выбранной категории в указанную область прокрутки."}
 obj["eventFontSettings"]		= { tooltip="Кликните для редактирования настройки шрифта для события."}
 obj["eventSettings"]			= { tooltip="Кликните для редактирования настроек события, области вывода, исходящие сообщения, звуки, и т.д."}
-obj["addTrigger"]				= { label="Добавить триггер", tooltip="Добавить новый триггер."}
-obj["triggerSettings"]			= { tooltip="Кликните для настройки условий триггера."}
-obj["deleteTrigger"]			= { tooltip="Кликните для удаления триггера."}
-obj["editTriggerClasses"]		= { tooltip="Кликните для редактирования классов к которым будет задействован данный триггер."}
-obj["addMainEvent"]				= { label="Добавить событие", tooltip="Когда случаются КАКИЕ-НИБУДЬ события и их условия действительны, триггер просигналит.\n\nЗа исключением если одно из установленных исключений не будет действительно."}
-obj["addTriggerException"]		= { label="Добавить исключение", tooltip="Когда КАКОЕ-НИБУДЬ исключение будет действительно, триггер не просигналит."}
-obj["editEventConditions"]		= { tooltip="Кликните для редактирования условий события."}
-obj["deleteMainEvent"]			= { tooltip="Кликните для удаления события."}
-obj["addEventCondition"]		= { label="Добавить условие", tooltip="Когда КАКОЕ-НИБУДЬ условие будет действительно для выбранного события, триггер просигналит если не будет не одного действительного исключения."}
-obj["editCondition"]			= { tooltip="Кликните для редактирования условия."}
-obj["deleteCondition"]			= { tooltip="Кликните для удаления условия."}
-obj["throttleList"]				= { label="Список регулировок", tooltip="Установка индивидуального времени для определённых навыков."}
-obj["mergeExclusions"]			= { label="Слияние исключение", tooltip="Предотвращать слияние определённых навыков."}
-obj["skillSuppressions"]		= { label="Блокир-ка навыков", tooltip="Скрывать навыки по их названиям."}
-obj["skillSubstitutions"]		= { label="Замена навыков", tooltip="Заменить название навыка на пользовательское значение."}
-obj["addSkill"]					= { label="Добавить навык", tooltip="Добавить новый навык в список."}
-obj["deleteSkill"]				= { tooltip="Кликните для удаления навыка."}
 obj["itemsAllowed"]				= { label="Дозволенные предметы", tooltip="Всегда показывать указанные предметы, независимо от качества предмета."}
 obj["itemExclusions"]			= { label="Исключение предметов", tooltip="Запрет на отображение, указанных предметов."}
 obj["addItem"]					= { label="Добавить предмет", tooltip="Добавить новый предмет в список."}
@@ -157,8 +123,6 @@ obj["xOffset"]			= { label="X смещение:", tooltip="Смещение по
 obj["yOffset"]			= { label="Y смещение:", tooltip="Смещение по Y в выбранной области прокрутки."}
 obj["eventMessage"]		= { label="Сообщение вывода:", tooltip="Сообщение которое будет отображаться при свершении события."}
 obj["iconSkill"]		= { label="Иконка навыка:", tooltip="Название или идентификатор заклинания чья иконка должна отображаться при свершении события.\n\nMSBT будет автоматически пробовать найти подходящую иконку если нет назначенной.\n\nПРИМЕЧАНИЕ: Если навык не может быть найден в книге заклинаний играющего класса в момент свершения событий то идентификатор заклинания должен использоваться вместо названия. Может быть использовано для поиска большинство онлайновых баз данных таких как wowhead."}
-obj["skillName"]		= { label="Название навыка:", tooltip="Название навыка который будет добавлен."}
-obj["substitutionText"]	= { label="Текст замещения:", tooltip="Текст который будет заменять название навыка."}
 obj["itemName"]			= { label="Название предмета:", tooltip="Название добавляемого предмета."}
 
 
@@ -178,7 +142,6 @@ obj["damageThreshold"]		= { label="Порог. вел. урона", tooltip="П�
 obj["dotThrottleTime"]		= { label="Регулятор УзВ", tooltip="Число секунд, чтобы замедлить отображение Урона за Время."}
 obj["hotThrottleTime"]		= { label="Регулятор ИзВ", tooltip="Число секунд, чтобы замедлить отображение Исцеления за Время."}
 obj["powerThrottleTime"]	= { label="Регулятор времени энергии", tooltip="Число секунд, чтобы замедлить отображение изменения энергии."}
-obj["skillThrottleTime"]	= { label="Регулятор время", tooltip="Число секунд, чтобы замедлить отображение навыков."}
 
 
 obj = L.EVENT_CATEGORIES
@@ -389,138 +352,6 @@ obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="Победный удар НИП
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="Экстра атаки", tooltip="Вкл/Выкл оповещение когда вы получаете дополнительные атаки такие как Оружие неистовства ветра, Специализация на владении мечами, и т.д."}
 obj["NOTIFICATION_ENEMY_BUFF"]			= { label="Получ. врагом полож. эффектов", tooltip="Вкл/Выкл оповещение о получении положительных эффектов вашей текущей враждебной цели."}
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="Эмоции монстров", tooltip="Вкл/Выкл эмоции монстров которые в текущий момент в цели."}
-
-
-
-obj = L.TRIGGER_DATA
-obj["SWING_DAMAGE"]				= "Обычный Урон"
-obj["RANGE_DAMAGE"]				= "Дальний урон"
-obj["SPELL_DAMAGE"]				= "Урон навыков"
-obj["GENERIC_DAMAGE"]			= "Рывок/Навык/Дальний урон"
-obj["SPELL_PERIODIC_DAMAGE"]	= "Периодический урон навыка (УзВ)"
-obj["DAMAGE_SHIELD"]			= "Урон от Ранящего щита"
-obj["DAMAGE_SPLIT"]				= "Прерывистый урон"
-obj["ENVIRONMENTAL_DAMAGE"]		= "Урон окружающей среды"
-obj["SWING_MISSED"]				= "Промах рывка"
-obj["RANGE_MISSED"]				= "Дальний промах"
-obj["SPELL_MISSED"]				= "Промах навыка"
-obj["GENERIC_MISSED"]			= "Рывок/Навык/Дальний промах"
-obj["SPELL_PERIODIC_MISSED"]	= "Промах Периодического навыка"
-obj["SPELL_DISPEL_FAILED"]		= "Неудачное Рассеивание"
-obj["DAMAGE_SHIELD_MISSED"]		= "Промах Ранящего щита"
-obj["SPELL_HEAL"]				= "Исцеление"
-obj["SPELL_PERIODIC_HEAL"]		= "Периодическое исцеление (ИзВ)"
-obj["SPELL_ENERGIZE"]			= "Прирост энергии"
-obj["SPELL_PERIODIC_ENERGIZE"]	= "Периодический прирост энергии"
-obj["SPELL_DRAIN"]				= "Похищение энергии"
-obj["SPELL_PERIODIC_DRAIN"]		= "Периодическое похищение энергии"
-obj["SPELL_LEECH"]				= "Выпивание энергии"
-obj["SPELL_PERIODIC_LEECH"]		= "Периодическое выпивание энергии"
-obj["SPELL_INTERRUPT"]			= "Прерывание Навыка"
-obj["SPELL_AURA_APPLIED"]		= "Использование Ауры"
-obj["SPELL_AURA_REMOVED"]		= "Снятие Аура"
-obj["SPELL_STOLEN"]				= "Хищение Ауры"
-obj["SPELL_DISPEL"]				= "Рассеивание Ауры"
-obj["SPELL_AURA_REFRESH"]		= "Обновление ауры"
-obj["SPELL_AURA_BROKEN_SPELL"]	= "Прекращение ауры"
-obj["ENCHANT_APPLIED"]			= "Использование Очарования"
-obj["ENCHANT_REMOVED"]			= "Снятие очарования"
-obj["SPELL_CAST_START"]			= "Начало Чтения"
-obj["SPELL_CAST_SUCCESS"]		= "Успешное Чтение"
-obj["SPELL_CAST_FAILED"]		= "Неудачное Чтение"
-obj["SPELL_SUMMON"]				= "Призывание"
-obj["SPELL_CREATE"]				= "Создавание"
-obj["PARTY_KILL"]				= "Победный Удар"
-obj["UNIT_DESTROYED"]			= "Ликвидация объекта"
-obj["SPELL_EXTRA_ATTACKS"]		= "Экстра атаки"
-obj["UNIT_HEALTH"]				= "Изменение здоровья"
-obj["UNIT_POWER"]				= "Изменение энергии"
-
-obj["sourceName"]				= "Название источника"
-obj["sourceAffiliation"]		= "Источник принадлежности объекта"
-obj["sourceReaction"]			= "Источник реакции объекта"
-obj["sourceControl"]			= "Источник контроля объекта"
-obj["sourceUnitType"]			= "Тип источника"
-obj["recipientName"]			= "Название получателя"
-obj["recipientAffiliation"]		= "Получатель принадлежности объекта"
-obj["recipientReaction"]		= "Получатель реакции объекта"
-obj["recipientControl"]			= "Получатель контроля объекта"
-obj["recipientUnitType"]		= "Тип получателя"
-obj["skillID"]					= "ID навыка"
-obj["skillName"]				= "Название навыка"
-obj["skillSchool"]				= "Школа навыка"
-obj["extraSkillID"]				= "Экстра ID навыка"
-obj["extraSkillName"]			= "Экстра название навыка"
-obj["extraSkillSchool"]			= "Экстра школа навыка"
-obj["amount"]					= "Значение"
-obj["overkillAmount"]			= "Значение многократного уничтожения"
-obj["damageType"]				= "Тип урона"
-obj["resistAmount"]				= "Значение сопрот."
-obj["blockAmount"]				= "Значение блока"
-obj["absorbAmount"]				= "Значение поглот."
-obj["isCrit"]					= "Крит"
-obj["isGlancing"]				= "Косые удары"
-obj["isCrushing"]				= "Сокрушительный удар"
-obj["extraAmount"]				= "Экстра значение"
-obj["missType"]					= "Тип промаха"
-obj["hazardType"]				= "Тип опасности"
-obj["powerType"]				= "Тип энергии"
-obj["auraType"]					= "Тип ауры"
-obj["threshold"]				= "Порог"
-obj["unitID"]					= "ID объекта"
-obj["unitReaction"]				= "Реакция объекта"
-
-obj["activeTalents"]			= "Активный талант"
-obj["buffActive"]				= "Активность заклинания"
-obj["buffInactive"]				= "Бездействующий бафф"
-obj["currentCP"]				= "Текущие очки энергии"
-obj["currentPower"]				= "Текущая сила"
-obj["inCombat"]					= "В бою"
-obj["recentlyFired"]			= "Недавно просигналивший триггер"
-obj["trivialTarget"]			= "Обычная цель"
-obj["unavailableSkill"]			= "Недоступный навык"
-obj["warriorStance"]			= "Стоики война"
-obj["zoneName"]					= "Название зоны"
-obj["zoneType"]					= "Тип зоны"
-
-obj["eq"]						= "Равен"
-obj["ne"]						= "Не равен"
-obj["like"]						= "Похожий"
-obj["unlike"]					= "Не похожий"
-obj["lt"]						= "Меньше чем"
-obj["gt"]						= "Больше чем"
-
-obj["affiliationMine"]			= "Моё"
-obj["affiliationParty"]			= "Участник группы"
-obj["affiliationRaid"]			= "Участник рейда"
-obj["affiliationOutsider"]		= "Аутсайдер"
-obj["affiliationTarget"]		= TARGET
-obj["affiliationFocus"]			= "Фокус"
-obj["affiliationYou"]			= YOU
-
-obj["reactionFriendly"]			= "Дружелюбный"
-obj["reactionNeutral"]			= "Нейтральный"
-obj["reactionHostile"]			= HOSTILE
-
-obj["controlServer"]			= "Сервер"
-obj["controlHuman"]				= "Человек"
-
-obj["unitTypePlayer"]			= PLAYER
-obj["unitTypeNPC"]				= "НИП"
-obj["unitTypePet"]				= PET
-obj["unitTypeGuardian"]			= "Страж"
-obj["unitTypeObject"]			= "Объект"
-
-obj["auraTypeBuff"]				= "Полож. эффект"
-obj["auraTypeDebuff"]			= "Отриц. эффект"
-
-obj["zoneTypeArena"]			= "Арена"
-obj["zoneTypePvP"]				= BATTLEGROUND
-obj["zoneTypeParty"]			= "Подземелье на 5-чел"
-obj["zoneTypeRaid"]				= "Рейдовое подземелье"
-
-obj["booleanTrue"]				= "Верный"
-obj["booleanFalse"]				= "Неверный"
 
 
 

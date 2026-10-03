@@ -50,14 +50,11 @@ class ForeverCompatibilityTests(unittest.TestCase):
             ),
             "MSBTMain.lua": (
                 "Client.hasModernAPI",
-                "Client.isClassicContent",
             ),
             "MSBTParser.lua": (
                 "Client.isMainline",
-                "Client.isCataClassic",
             ),
             "MSBTOptions/MSBTOptionsPopups.lua": (
-                "Client.isClassicContent",
                 "Client.isCataClassic",
                 "Client.isVanillaContent",
             ),

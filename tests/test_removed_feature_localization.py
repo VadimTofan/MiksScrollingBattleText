@@ -7,6 +7,28 @@ LOCALIZATION = ROOT / "MSBTOptions" / "Localization"
 
 
 class RemovedFeatureLocalizationTests(unittest.TestCase):
+    def test_unreachable_editors_leave_no_translation_tables_or_artwork(self):
+        # Given translations and artwork previously used by removed editors.
+        sources = list(LOCALIZATION.glob("*.lua"))
+        unused_keys = (
+            "L.TRIGGER_DATA", "L.MSG_NEW_TRIGGER", "L.MSG_TRIGGER_CLASSES",
+            "L.MSG_MAIN_EVENTS", "L.MSG_TRIGGER_EXCEPTIONS",
+            "L.MSG_EVENT_CONDITIONS", "L.MSG_SKILLS",
+            '["triggerCondition"]', '["addMainEvent"]', '["addSkill"]',
+        )
+
+        # When inspecting all translated editor resources.
+        for path in sources:
+            source = path.read_text(encoding="utf-8-sig")
+
+            # Then translations for unreachable editors are absent.
+            for key in unused_keys:
+                self.assertTrue(key not in source, path.name + ": " + key)
+        self.assertEqual(
+            list((ROOT / "MSBTOptions/Artwork").glob("TriggerSettingsIcon*.blp")),
+            [],
+        )
+
     def test_removed_legacy_features_are_not_localized(self):
         # Given
         removed_keys = (
