@@ -15,10 +15,6 @@ Libs\LibSharedMedia-3.0.lua
 
 MikSBT.lua
 Compatibility\Client.lua
-Core\Diagnostics.lua
-Core\EventBus.lua
-Core\ComponentRegistry.lua
-Core\Addon.lua
 Configuration\ProfileStore.lua
 Configuration\MediaRegistry.lua
 Configuration\RuntimeController.lua
@@ -27,16 +23,10 @@ API\RestrictedValue.lua
 API\Sounds.lua
 API\Spells.lua
 API\Units.lua
-API\Combat.lua
 API\Cooldowns.lua
-API\BlizzardCombatText.lua
 Compatibility\LegacyAPI.lua
 Services\Formatter.lua
-Services\Batcher.lua
-Services\Throttler.lua
 Services\EventRouter.lua
-Services\EventPipeline.lua
-Components\SelfHealTracker.lua
 Components\IncomingCombat.lua
 Components\OutgoingBatcher.lua
 Components\DamageMeterSource.lua

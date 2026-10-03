@@ -8,7 +8,7 @@ TOC_FILE = REPOSITORY_ROOT / "MikScrollingBattleText.toc"
 
 # Describe: configuration runtime load order
 class ConfigurationLoadOrderTests(unittest.TestCase):
-    def test_configuration_loads_after_core_and_before_profile_facades(self):
+    def test_configuration_loads_after_namespace_and_before_profile_facades(self):
         # Given
         toc_lines = [
             line.strip()
@@ -30,7 +30,7 @@ class ConfigurationLoadOrderTests(unittest.TestCase):
         # Then
         self.assertEqual(configuration_lines, expected_configuration)
         self.assertLess(
-            toc_lines.index("Core\\Addon.lua"),
+            toc_lines.index("Compatibility\\Client.lua"),
             configuration_index,
         )
         self.assertLess(

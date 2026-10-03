@@ -4,7 +4,6 @@ local callbacks, displayed = {}, {}
 local profile = {events = {INCOMING_HEAL = {message = "%a"}}}
 local incoming = Incoming:New({
 	getProfile = function() return profile end,
-	selfHealTracker = {Reset = function() end},
 	groupDelay = 0.12,
 	after = function(_, callback) callbacks[#callbacks + 1] = callback end,
 	buildActionMessage = function(_, amount) return tostring(amount) end,

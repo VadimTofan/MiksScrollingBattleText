@@ -22,7 +22,7 @@ class NotificationComponentsIntegrationTests(unittest.TestCase):
             "local UtilityNotifications = MikSBT.Components.UtilityNotifications",
             source,
         )
-        self.assertIn("parserNotifications:HandlePower(", source)
+        self.assertIn("parserNotifications:HandleHonor(", source)
         self.assertIn("utilityNotifications:HandlePowerUpdate(", source)
         self.assertIn("utilityNotifications:HandleCombatEnter()", source)
         self.assertIn("utilityNotifications:HandleCombatLeave()", source)

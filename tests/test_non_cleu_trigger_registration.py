@@ -15,7 +15,7 @@ class NonCleuTriggerRegistrationTests(unittest.TestCase):
         # When
         registration_block = source.split(
             'eventFrame:SetScript("OnEvent", OnEvent)', 1
-        )[1].split("CreateCaptureFuncs()", 1)[0]
+        )[1].split("CreateTestFuncs()", 1)[0]
 
         # Then
         self.assertEqual(registration_block.count("SafeRegisterUnitEvent("), 2)

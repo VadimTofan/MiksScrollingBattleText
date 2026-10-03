@@ -18,14 +18,8 @@ class IncomingCombatIntegrationTests(unittest.TestCase):
             "local IncomingCombat = MikSBT.Components.IncomingCombat",
             source,
         )
-        self.assertIn(
-            "local SelfHealTracker = MikSBT.Components.SelfHealTracker",
-            source,
-        )
-        self.assertIn("local selfHealTracker = SelfHealTracker:New({", source)
         self.assertIn("local incomingCombat", source)
         self.assertIn("incomingCombat = IncomingCombat:New({", source)
-        self.assertIn("incomingCombat:RecordOutgoingSelfHeal(", source)
         self.assertIn("incomingCombat:HandleUnitCombat(", source)
         self.assertIn("incomingCombat:Reset()", source)
         self.assertNotIn("local incomingDamageBatches = {}", source)
@@ -41,10 +35,6 @@ class IncomingCombatIntegrationTests(unittest.TestCase):
         toc_lines = TOC_FILE.read_text(encoding="utf-8-sig").splitlines()
 
         # When / Then
-        self.assertLess(
-            toc_lines.index("Components\\SelfHealTracker.lua"),
-            toc_lines.index("Components\\IncomingCombat.lua"),
-        )
         self.assertLess(
             toc_lines.index("Components\\IncomingCombat.lua"),
             toc_lines.index("MSBTMain.lua"),

@@ -5,7 +5,7 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: Blizzard unit API boundary
 class UnitApiTests(unittest.TestCase):
-    def test_unit_adapter_returns_only_accessible_typed_values(self):
+    def test_unit_adapter_rejects_restricted_aura_results(self):
         # Given
         script_name = "unit_api.lua"
 

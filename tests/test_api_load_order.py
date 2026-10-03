@@ -20,9 +20,7 @@ class ApiLoadOrderTests(unittest.TestCase):
             "API\\Sounds.lua",
             "API\\Spells.lua",
             "API\\Units.lua",
-            "API\\Combat.lua",
             "API\\Cooldowns.lua",
-            "API\\BlizzardCombatText.lua",
             "Compatibility\\LegacyAPI.lua",
         ]
 

@@ -1,55 +1,33 @@
-MikSBT = {
-	Components = {},
+MikSBT = { Components = {} }
+local Notifications = dofile("Components/ParserNotifications.lua")
+local notifications = Notifications:New()
+
+-- Describe: supported chat notification routes preserve player filtering.
+local cases = {
+	{ "HandleHonor", {}, "NOTIFICATION_HONOR_GAIN" },
+	{ "HandleReputation", { factionName = "Guild" }, "NOTIFICATION_REP_GAIN", "Guild" },
+	{ "HandleReputation", { factionName = "Guild", isLoss = true }, "NOTIFICATION_REP_LOSS", "Guild" },
+	{ "HandleProficiency", { skillName = "Cooking" }, "NOTIFICATION_SKILL_GAIN", "Cooking" },
+	{ "HandleExperience", {}, "NOTIFICATION_EXPERIENCE_GAIN" },
 }
+for _, case in ipairs(cases) do
+	-- Given a chat notification belonging to the player.
+	local event = case[2]
+	event.recipientUnit = "player"
 
-local ParserNotifications = dofile("Components/ParserNotifications.lua")
-local notifications = ParserNotifications:New({
-	uniquePowerTypes = { [3] = true },
-	alternatePowerType = 10,
-	testFlagsAll = function(flags, mask)
-		return flags == mask
-	end,
-	guardianHumanMask = 5,
-	serverControlMask = 7,
-	classMap = {
-		["target-guid"] = "DRUID",
-	},
-})
+	-- When the real notification component resolves it.
+	local eventType, effectName = notifications[case[1]](notifications, event)
 
--- Given
-local profile = {
-	showAllPowerGains = false,
-	powerThreshold = 10,
-}
+	-- Then the existing event type and effect name are returned.
+	assert(eventType == case[3], case[1] .. " route changed")
+	assert(effectName == case[4], case[1] .. " effect name changed")
 
--- When
-local eventType, skillName, unitName, unitClass, mergeEligible =
-	notifications:HandlePower({
-		recipientUnit = "player",
-		amount = 25,
-		powerType = 10,
-		skillName = "Power Spell",
-	}, profile)
+	-- Given a notification belonging to another unit.
+	event.recipientUnit = "target"
 
--- Then
-assert(eventType == "NOTIFICATION_ALT_POWER_GAIN",
-	"alternate power route changed")
-assert(skillName == "Power Spell", "power skill changed")
-assert(mergeEligible == true, "power notification stopped merging")
-assert(notifications:HandlePower({ powerType = 3 }, profile) == nil,
-	"unique power type was routed")
+	-- When the same route is resolved.
+	local otherEvent = notifications[case[1]](notifications, event)
 
--- Given / When
-eventType, _, unitName, unitClass = notifications:HandleKill({
-	sourceUnit = "player",
-	recipientUnit = "target",
-	recipientFlags = 7,
-	recipientName = "Target",
-	recipientGUID = "target-guid",
-})
-
--- Then
-assert(eventType == "NOTIFICATION_NPC_KILLING_BLOW",
-	"killing-blow route changed")
-assert(unitName == "Target" and unitClass == "DRUID",
-	"killing-blow target data changed")
+	-- Then the player notification is suppressed.
+	assert(otherEvent == nil, case[1] .. " routed another unit")
+end

@@ -80,16 +80,6 @@ assert(string.find(message, "Physical", 1, true), "damage type was not replaced"
 assert(string.find(message, "|cFFff0000", 1, true),
 	"damage coloring was not applied")
 assert(hiddenName == " - 4,500", "hidden-name formatting changed")
-assert(Formatter:FormatPartialEffects(4500) == " (4500 absorbed)",
-	"partial amounts were grouped while groupNumbers was disabled")
-
--- Given grouped partial-effect numbers
-profile.groupNumbers = true
-
--- When / Then
-assert(Formatter:FormatPartialEffects(4500) == " (4,500 absorbed)",
-	"partial amounts were not grouped")
-
 -- Given short-number formatting
 profile.shortenNumbers = true
 

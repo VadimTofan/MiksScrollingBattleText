@@ -17,17 +17,8 @@ local callbacks = {}
 local displayed = {}
 local now = 10
 
-local SelfHealTracker = dofile("Components/SelfHealTracker.lua")
-local selfHealTracker = SelfHealTracker:New({
-	getTime = function()
-		return now
-	end,
-	matchWindow = 1,
-	tolerance = 1,
-})
 local IncomingCombat = dofile("Components/IncomingCombat.lua")
 local component = IncomingCombat:New({
-	selfHealTracker = selfHealTracker,
 	getProfile = function()
 		return profile
 	end,
@@ -101,11 +92,10 @@ assert(#displayed == 1, "incoming damage batch displayed incorrectly")
 assert(displayed[1].message == "150 (2 hits, 1 Crit) - fire",
 	"incoming damage summary changed")
 
--- Given an outgoing self-heal amount
-component:RecordOutgoingSelfHeal(75)
+-- Given a UNIT_COMBAT self-heal with no combat-log producer.
 local callbacksBeforeHeal = #callbacks
 
--- When the matching UNIT_COMBAT heal arrives
+-- When its UNIT_COMBAT heal arrives.
 local healHandled = component:HandleUnitCombat(
 	"player",
 	"HEAL",
@@ -116,8 +106,11 @@ local healHandled = component:HandleUnitCombat(
 
 -- Then
 assert(healHandled == true, "incoming heal was not handled")
-assert(#callbacks == callbacksBeforeHeal,
-	"matching outgoing self-heal was queued as incoming")
+assert(#callbacks == callbacksBeforeHeal + 1,
+	"incoming self-heal was not queued")
+callbacks[#callbacks]()
+assert(displayed[#displayed].message:find("75", 1, true),
+	"incoming self-heal amount was lost")
 assert(component:HandleUnitCombat("target", "WOUND", nil, 50, nil) == false,
 	"non-player combat was consumed")
 

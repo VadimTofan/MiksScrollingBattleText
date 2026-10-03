@@ -23,7 +23,6 @@ local tracker = Tracker:New({
 	getItemCooldown = function() return 10, 2 end,
 	normalizeNumber = tonumber,
 	display = function(_, message, icon) displayed = { message, icon } end,
-	handleCooldown = function() end,
 	unknown = "Unknown",
 	watchDelay = 1,
 	updateInterval = 0.1,
