@@ -30,17 +30,6 @@ class AnimationComponentIntegrationTests(unittest.TestCase):
         self.assertIn('local moduleName = "Animations"', source)
         self.assertIn("MikSBT[moduleName] = module", source)
 
-    def test_api_documentation_uses_the_component_style_path(self):
-        # Given
-        api_file = REPOSITORY_ROOT / "API.html"
-
-        # When
-        source = api_file.read_text(encoding="utf-8-sig")
-
-        # Then
-        self.assertIn("Display/AnimationStyles.lua", source)
-        self.assertNotIn("MSBTAnimationStyles.lua", source)
-
 
 if __name__ == "__main__":
     unittest.main()

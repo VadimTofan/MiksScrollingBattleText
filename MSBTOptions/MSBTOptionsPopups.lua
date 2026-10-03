@@ -1,19 +1,10 @@
--------------------------------------------------------------------------------
--- Title: MSBT Options Popups
--- Author: Mikord
--------------------------------------------------------------------------------
 
--- Create module and set its name.
 local module = {}
 local moduleName = "Popups"
 MSBTOptions[moduleName] = module
 
 
--------------------------------------------------------------------------------
--- Imports.
--------------------------------------------------------------------------------
 
--- Local references to various modules for faster access.
 local MSBTControls = MSBTOptions.Controls
 local MSBTProfiles = MikSBT.Profiles
 local MSBTAnimations = MikSBT.Animations
@@ -23,12 +14,10 @@ local MSBTMain = MikSBT.Main
 local MSBTMedia = MikSBT.Media
 local L = MikSBT.translations
 
--- Local references to various functions for faster access.
 local EraseTable = MikSBT.EraseTable
 local GetSkillName = MikSBT.GetSkillName
 local ConvertType = MSBTTriggers.ConvertType
 
--- Local references to various variables for faster access.
 local fonts = MSBTMedia.fonts
 
 local Client = MikSBT.Compatibility.Client
@@ -38,9 +27,6 @@ local IsVanillaClassic = Client.isVanillaContent
 
 
 
--------------------------------------------------------------------------------
--- Private constants.
--------------------------------------------------------------------------------
 
 local OUTLINE_MAP = {"", "OUTLINE", "THICKOUTLINE", "MONOCHROME", "MONOCHROME,OUTLINE", "MONOCHROME,THICKOUTLINE"}
 local DEFAULT_TEXT_ALIGN_INDEX = 2
@@ -54,41 +40,27 @@ local PREVIEW_ICON_PATH = "Interface\\Icons\\INV_Misc_AhnQirajTrinket_03"
 local FLAG_YOU = 0xF0000000
 local CLASS_NAMES = {}
 
--------------------------------------------------------------------------------
--- Private variables.
--------------------------------------------------------------------------------
 
--- Prevent tainting global _.
 local _
 
 local popupFrames = {}
 
--- Backdrop to reuse for the popup frames.
 local popupBackdrop = {
 	bgFile = "Interface\\Addons\\MikScrollingBattleText\\MSBTOptions\\Artwork\\PlainBackdrop",
 	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	insets = {left = 6, right = 6, top = 6, bottom = 6},
 }
 
--- Backdrop to reuse for the scroll area mover frame.
 local moverBackdrop = {
 	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 }
 
--- Reusable table for return settings.
 local returnSettings = {}
 
--- Reusable table to configure popup frames.
 local tempConfig = {}
 
 
--------------------------------------------------------------------------------
--- Utility functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Returns an iterator for the passed table sorted by its keys.
--- ****************************************************************************
 local function PairsByKeys(t)
 	local temp = {}
 	for k in pairs(t) do temp[#temp + 1] = k end
@@ -107,18 +79,12 @@ local function PairsByKeys(t)
 end
 
 
--- ****************************************************************************
--- Called when a popup is hidden.
--- ****************************************************************************
 local function OnHidePopup(this)
 	PlaySound(799)
 	if (this.hideHandler) then this.hideHandler() end
 end
 
 
--- ****************************************************************************
--- Creates a new generic popup.
--- ****************************************************************************
 local function CreatePopup()
 	local frame = CreateFrame("Frame", nil, UIParent, BackdropTemplateMixin and "BackdropTemplate")
 	frame:Hide()
@@ -139,18 +105,12 @@ local function CreatePopup()
 	frame:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
 	end)
-	-- Register the frame with the main module.
 	MSBTOptions.Main.RegisterPopupFrame(frame)
 	return frame
 end
 
 
--- ****************************************************************************
--- Changes the passed popup frame's parent.
--- ****************************************************************************
 local function ChangePopupParent(frame, parent)
-	-- Changing the parent can cause the frame to be hidden, so ensure the hide
-	-- handler isn't called.
 	local oldHandler = frame.hideHandler
 	frame.hideHandler = nil
 	frame:SetParent(parent or UIParent)
@@ -159,9 +119,6 @@ local function ChangePopupParent(frame, parent)
 end
 
 
--- ****************************************************************************
--- Disables the controls in the passed table.
--- ****************************************************************************
 local function DisableControls(controlsTable)
 	for _, frame in pairs(controlsTable) do
 		if (frame.Disable) then frame:Disable() end
@@ -169,10 +126,6 @@ local function DisableControls(controlsTable)
 end
 
 
--- ****************************************************************************
--- Toggles the state of a font dropdown control when an inherit checkbox is
--- changed.
--- ****************************************************************************
 local function ToggleDropdownInheritState(dropdown, isInherited, inheritedValue)
 	if (isInherited) then
 		dropdown:SetSelectedID(inheritedValue)
@@ -185,10 +138,6 @@ local function ToggleDropdownInheritState(dropdown, isInherited, inheritedValue)
 end
 
 
--- ****************************************************************************
--- Toggles the state of a font slider control when an inherit checkbox is
--- changed.
--- ****************************************************************************
 local function ToggleSliderInheritState(slider, isInherited, inheritedValue)
 	if (isInherited) then
 		slider:SetValue(inheritedValue)
@@ -203,34 +152,22 @@ end
 
 
 
--------------------------------------------------------------------------------
--- Input frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Called when the text in the input frame editbox changes to allow validation.
--- ****************************************************************************
 local function ValidateInputCallback(message)
 	local frame = popupFrames.inputFrame
 
-	-- Clear validation message and enable okay button.
 	frame.validateFontString:SetText("")
 	frame.okayButton:Enable()
 
-	-- Disable the save button and display the validation message if validation failed.
 	if (message) then
 		frame.validateFontString:SetText(message)
 		frame.okayButton:Disable()
 	end
 end
 
--- ****************************************************************************
--- Called when the text in the input frame editbox changes to allow validation.
--- ****************************************************************************
 local function ValidateInput(this)
 	local frame = popupFrames.inputFrame
 
-	-- Clear validation message and enable okay button.
 	frame.validateFontString:SetText("")
 	frame.okayButton:Enable()
 
@@ -239,7 +176,6 @@ local function ValidateInput(this)
 		local secondText = frame.secondInputEditbox:GetText()
 		local message = frame.validateHandler(firstText, frame.showSecondEditbox and secondText, ValidateInputCallback)
 
-		-- Disable the save button and display the validation message if validation failed.
 		if (message) then
 			frame.validateFontString:SetText(message)
 			frame.okayButton:Disable()
@@ -248,9 +184,6 @@ local function ValidateInput(this)
 end
 
 
--- ****************************************************************************
--- Calls the save handler with the entered input.
--- ****************************************************************************
 local function SaveInput()
 	local frame = popupFrames.inputFrame
 	if (frame.saveHandler and frame.okayButton:IsEnabled() ~= 0) then
@@ -264,15 +197,11 @@ local function SaveInput()
 end
 
 
--- ****************************************************************************
--- Creates the popup input frame.
--- ****************************************************************************
 local function CreateInput()
 	local frame = CreatePopup()
 	frame:SetWidth(350)
 	frame:SetHeight(130)
 
-	-- Input editbox.
 	local editbox = MSBTControls.CreateEditbox(frame)
 	editbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -25)
 	editbox:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -25)
@@ -283,7 +212,6 @@ local function CreateInput()
 	editbox:SetTextChangedHandler(ValidateInput)
 	frame.inputEditbox = editbox
 
-	-- Second input editbox.
 	editbox = MSBTControls.CreateEditbox(frame)
 	editbox:SetPoint("TOPLEFT", frame.inputEditbox, "BOTTOMLEFT", 0, -10)
 	editbox:SetPoint("TOPRIGHT", frame.inputEditbox, "BOTTOMRIGHT", 0, -10)
@@ -295,7 +223,6 @@ local function CreateInput()
 	frame.secondInputEditbox = editbox
 
 
-	-- Okay button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["inputOkay"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -303,7 +230,6 @@ local function CreateInput()
 	button:SetClickHandler(SaveInput)
 	frame.okayButton = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["inputCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -312,7 +238,6 @@ local function CreateInput()
 		frame:Hide()
 	end)
 
-	-- Validation text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 30, 20)
 	fontString:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 20)
@@ -322,21 +247,14 @@ local function CreateInput()
 end
 
 
--- ****************************************************************************
--- Shows the popup input frame using the passed config.
--- ****************************************************************************
 local function ShowInput(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.inputFrame) then popupFrames.inputFrame = CreateInput() end
 
-	-- Set parent.
 	local frame = popupFrames.inputFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate.
 	local editbox = frame.inputEditbox
 	editbox:SetLabel(configTable.editboxLabel)
 	editbox:SetTooltip(configTable.editboxTooltip)
@@ -357,7 +275,6 @@ local function ShowInput(configTable)
 	end
 
 
-	-- Configure the frame.
 	frame.showSecondEditbox = configTable.showSecondEditbox
 	frame.validateHandler = configTable.validateHandler
 	frame.saveHandler = configTable.saveHandler
@@ -371,25 +288,17 @@ local function ShowInput(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Acknowledge frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Creates the popup acknowledge frame.
--- ****************************************************************************
 local function CreateAcknowledge()
 	local frame = CreatePopup()
 	frame:SetWidth(350)
 	frame:SetHeight(90)
 
-	-- Acknowledge text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -20)
 	fontString:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -20)
 	fontString:SetText(L.MSG_ACKNOWLEDGE_TEXT)
 
-	-- Yes button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	button:Configure(20, YES, nil)
 	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 15)
@@ -400,7 +309,6 @@ local function CreateAcknowledge()
 		end
 	end)
 
-	-- No button.
 	button = MSBTControls.CreateOptionButton(frame)
 	button:Configure(20, NO, nil)
 	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 15)
@@ -412,22 +320,15 @@ local function CreateAcknowledge()
 end
 
 
--- ****************************************************************************
--- Shows the popup acknowledge frame using the passed config.
--- ****************************************************************************
 local function ShowAcknowledge(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.acknowledgeFrame) then popupFrames.acknowledgeFrame = CreateAcknowledge() end
 
 
-	-- Set parent.
 	local frame = popupFrames.acknowledgeFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Configure the frame.
 	frame.acknowledgeHandler = configTable.acknowledgeHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -438,13 +339,7 @@ local function ShowAcknowledge(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Font frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Updates the return settings table with the selected font values.
--- ****************************************************************************
 local function UpdateFontSettings()
 	local frame = popupFrames.fontFrame
 
@@ -466,9 +361,6 @@ local function UpdateFontSettings()
 end
 
 
--- ****************************************************************************
--- Updates the normal and crit font previews.
--- ****************************************************************************
 local function UpdateFontPreviews()
 	local frame = popupFrames.fontFrame
 
@@ -498,21 +390,16 @@ local function UpdateFontPreviews()
 end
 
 
--- ****************************************************************************
--- Creates the popup font frame.
--- ****************************************************************************
 local function CreateFontPopup()
 	local frame = CreatePopup()
 	frame:SetWidth(450)
 	frame:SetHeight(380)
 
-	-- Title text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
 	frame.titleFontString = fontString
 
 
-	-- Normal container frame.
 	local normalFrame = CreateFrame("Frame", nil, frame)
 	normalFrame:SetWidth(195)
 	normalFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -60)
@@ -520,14 +407,12 @@ local function CreateFontPopup()
 	frame.normalFrame = normalFrame
 
 
-	-- Normal controls container frame.
 	local normalControlsFrame = CreateFrame("Frame", nil, normalFrame)
 	normalControlsFrame:SetWidth(155)
 	normalControlsFrame:SetPoint("TOPLEFT")
 	normalControlsFrame:SetPoint("BOTTOMLEFT")
 	frame.normalControlsFrame = normalControlsFrame
 
-	-- Normal font dropdown.
 	local dropdown = MSBTControls.CreateDropdown(normalControlsFrame)
 	local objLocale = L.DROPDOWNS["normalFont"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
@@ -538,7 +423,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalFontDropdown = dropdown
 
-	-- Normal outline dropdown.
 	dropdown = MSBTControls.CreateDropdown(normalControlsFrame)
 	objLocale = L.DROPDOWNS["normalOutline"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
@@ -551,7 +435,6 @@ local function CreateFontPopup()
 	end
 	frame.normalOutlineDropdown = dropdown
 
-	-- Normal font size slider.
 	local slider = MSBTControls.CreateSlider(normalControlsFrame)
 	objLocale = L.SLIDERS["normalFontSize"]
 	slider:Configure(150, objLocale.label, objLocale.tooltip)
@@ -563,7 +446,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalFontSizeSlider = slider
 
-	-- Normal font opacity slider.
 	slider = MSBTControls.CreateSlider(normalControlsFrame)
 	objLocale = L.SLIDERS["normalFontOpacity"]
 	slider:Configure(150, objLocale.label, objLocale.tooltip)
@@ -575,7 +457,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalFontOpacitySlider = slider
 
-	-- Normal preview.
 	fontString = normalControlsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("BOTTOM", normalControlsFrame, "BOTTOM", 0, 10)
 	fontString:SetText(L.MSG_NORMAL_PREVIEW_TEXT)
@@ -583,14 +464,12 @@ local function CreateFontPopup()
 
 
 
-	-- Normal inherit container frame.
 	local normalInheritFrame = CreateFrame("Frame", nil, normalFrame)
 	normalInheritFrame:SetWidth(40)
 	normalInheritFrame:SetPoint("TOPLEFT", normalControlsFrame, "TOPRIGHT")
 	normalInheritFrame:SetPoint("BOTTOMLEFT", normalControlsFrame, "BOTTOMRIGHT")
 	frame.normalInheritFrame = normalInheritFrame
 
-	-- Inherit normal font name checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(normalInheritFrame)
 	objLocale = L.CHECKBOXES["inheritField"]
 	checkbox:Configure(20, nil, objLocale.tooltip)
@@ -601,7 +480,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalFontCheckbox = checkbox
 
-	-- Inherit normal outline index checkbox.
 	checkbox = MSBTControls.CreateCheckbox(normalInheritFrame)
 	checkbox:Configure(20, nil, objLocale.tooltip)
 	checkbox:SetPoint("BOTTOMLEFT", frame.normalOutlineDropdown, "BOTTOMRIGHT", 10, 0)
@@ -611,7 +489,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalOutlineCheckbox = checkbox
 
-	-- Inherit normal font size checkbox.
 	checkbox = MSBTControls.CreateCheckbox(normalInheritFrame)
 	checkbox:Configure(20, nil, objLocale.tooltip)
 	checkbox:SetPoint("BOTTOMLEFT", frame.normalFontSizeSlider, "BOTTOMRIGHT", 10, 5)
@@ -621,7 +498,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalFontSizeCheckbox = checkbox
 
-	-- Inherit normal font opacity checkbox.
 	checkbox = MSBTControls.CreateCheckbox(normalInheritFrame)
 	checkbox:Configure(20, nil, objLocale.tooltip)
 	checkbox:SetPoint("BOTTOMLEFT", frame.normalFontOpacitySlider, "BOTTOMRIGHT", 10, 5)
@@ -631,7 +507,6 @@ local function CreateFontPopup()
 	end)
 	frame.normalFontOpacityCheckbox = checkbox
 
-	-- Inherit normal column label.
 	fontString = normalInheritFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("BOTTOM", frame.normalFontCheckbox, "TOP", 0, 7)
 	fontString:SetText(L.CHECKBOXES["inheritField"].label)
@@ -639,7 +514,6 @@ local function CreateFontPopup()
 
 
 
-	-- Crit container frame.
 	local critFrame = CreateFrame("Frame", nil, frame)
 	critFrame:SetWidth(195)
 	critFrame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -60)
@@ -647,14 +521,12 @@ local function CreateFontPopup()
 	frame.critFrame = critFrame
 
 
-	-- Crit controls container frame.
 	local critControlsFrame = CreateFrame("Frame", nil, critFrame)
 	critControlsFrame:SetWidth(155)
 	critControlsFrame:SetPoint("TOPLEFT")
 	critControlsFrame:SetPoint("BOTTOMLEFT")
 	frame.critControlsFrame = critControlsFrame
 
-	-- Crit font dropdown.
 	dropdown = MSBTControls.CreateDropdown(critControlsFrame)
 	objLocale = L.DROPDOWNS["critFont"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
@@ -665,7 +537,6 @@ local function CreateFontPopup()
 	end)
 	frame.critFontDropdown = dropdown
 
-	-- Crit outline dropdown.
 	dropdown = MSBTControls.CreateDropdown(critControlsFrame)
 	objLocale = L.DROPDOWNS["critOutline"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
@@ -678,7 +549,6 @@ local function CreateFontPopup()
 	end
 	frame.critOutlineDropdown = dropdown
 
-	-- Crit font size slider.
 	slider = MSBTControls.CreateSlider(critControlsFrame)
 	objLocale = L.SLIDERS["critFontSize"]
 	slider:Configure(150, objLocale.label, objLocale.tooltip)
@@ -690,7 +560,6 @@ local function CreateFontPopup()
 	end)
 	frame.critFontSizeSlider = slider
 
-	-- Crit font opacity slider.
 	slider = MSBTControls.CreateSlider(critControlsFrame)
 	objLocale = L.SLIDERS["critFontOpacity"]
 	slider:Configure(150, objLocale.label, objLocale.tooltip)
@@ -702,7 +571,6 @@ local function CreateFontPopup()
 	end)
 	frame.critFontOpacitySlider = slider
 
-	-- Crit Preview.
 	fontString = critControlsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("BOTTOM", critControlsFrame, "BOTTOM", 0, 10)
 	fontString:SetText(L.MSG_CRIT)
@@ -710,7 +578,6 @@ local function CreateFontPopup()
 
 
 
-	-- Crit inherit container frame.
 	local critInheritFrame = CreateFrame("Frame", nil, critFrame)
 	critInheritFrame:SetWidth(40)
 	critInheritFrame:SetPoint("TOPLEFT", critControlsFrame, "TOPRIGHT")
@@ -718,7 +585,6 @@ local function CreateFontPopup()
 	frame.critInheritFrame = critInheritFrame
 
 
-	-- Inherit crit font name checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(critInheritFrame)
 	objLocale = L.CHECKBOXES["inheritField"]
 	checkbox:Configure(20, nil, objLocale.tooltip)
@@ -729,7 +595,6 @@ local function CreateFontPopup()
 	end)
 	frame.critFontCheckbox = checkbox
 
-	-- Inherit crit outline index checkbox.
 	checkbox = MSBTControls.CreateCheckbox(critInheritFrame)
 	checkbox:Configure(20, nil, objLocale.tooltip)
 	checkbox:SetPoint("BOTTOMLEFT", frame.critOutlineDropdown, "BOTTOMRIGHT", 10, 0)
@@ -739,7 +604,6 @@ local function CreateFontPopup()
 	end)
 	frame.critOutlineCheckbox = checkbox
 
-	-- Inherit crit font size checkbox.
 	checkbox = MSBTControls.CreateCheckbox(critInheritFrame)
 	checkbox:Configure(20, nil, objLocale.tooltip)
 	checkbox:SetPoint("BOTTOMLEFT", frame.critFontSizeSlider, "BOTTOMRIGHT", 10, 5)
@@ -749,7 +613,6 @@ local function CreateFontPopup()
 	end)
 	frame.critFontSizeCheckbox = checkbox
 
-	-- Inherit crit font opacity checkbox.
 	checkbox = MSBTControls.CreateCheckbox(critInheritFrame)
 	checkbox:Configure(20, nil, objLocale.tooltip)
 	checkbox:SetPoint("BOTTOMLEFT", frame.critFontOpacitySlider, "BOTTOMRIGHT", 10, 5)
@@ -759,12 +622,10 @@ local function CreateFontPopup()
 	end)
 	frame.critFontOpacityCheckbox = checkbox
 
-	-- Inherit normal column label.
 	fontString = critInheritFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("BOTTOM", frame.critFontCheckbox, "TOP", 0, 7)
 	fontString:SetText(L.CHECKBOXES["inheritField"].label)
 
-	-- Save button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -777,7 +638,6 @@ local function CreateFontPopup()
 		end
 	end)
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -787,27 +647,19 @@ local function CreateFontPopup()
 	end)
 
 
-	-- Register the frame with the main module.
 	MSBTOptions.Main.RegisterPopupFrame(frame)
 	return frame
 end
 
 
--- ****************************************************************************
--- Shows the popup font frame using the passed config.
--- ****************************************************************************
 local function ShowFont(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.fontFrame) then popupFrames.fontFrame = CreateFontPopup() end
 
-	-- Set parent.
 	local frame = popupFrames.fontFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Show / Hide appropriate controls.
 	if (configTable.hideNormal) then frame.normalFrame:Hide() else frame.normalFrame:Show() end
 	if (configTable.hideCrit) then frame.critFrame:Hide() else frame.critFrame:Show() end
 	if (configTable.hideInherit) then frame.normalInheritFrame:Hide() else frame.normalInheritFrame:Show() end
@@ -816,12 +668,10 @@ local function ShowFont(configTable)
 	frame.hideCrit = configTable.hideCrit
 
 
-	-- Populate data.
 	local dropdown, checkbox, slider
 	frame.titleFontString:SetText(configTable.title)
 
 	if (not configTable.hideNormal) then
-		-- Normal font name.
 		dropdown = frame.normalFontDropdown
 		dropdown:Clear()
 		for fontName in pairs(fonts) do
@@ -833,21 +683,18 @@ local function ShowFont(configTable)
 		if (configTable.normalFontName) then dropdown:SetSelectedID(configTable.normalFontName) end
 		ToggleDropdownInheritState(dropdown, checkbox:GetChecked(), configTable.inheritedNormalFontName)
 
-		-- Normal outline index.
 		dropdown = frame.normalOutlineDropdown
 		checkbox = frame.normalOutlineCheckbox
 		checkbox:SetChecked(not configTable.normalOutlineIndex or false)
 		if (configTable.normalOutlineIndex) then dropdown:SetSelectedID(configTable.normalOutlineIndex) end
 		ToggleDropdownInheritState(dropdown, checkbox:GetChecked(), configTable.inheritedNormalOutlineIndex)
 
-		-- Normal font size.
 		slider = frame.normalFontSizeSlider
 		checkbox = frame.normalFontSizeCheckbox
 		checkbox:SetChecked(not configTable.normalFontSize or false)
 		if (configTable.normalFontSize) then slider:SetValue(configTable.normalFontSize) end
 		ToggleSliderInheritState(slider, checkbox:GetChecked(), configTable.inheritedNormalFontSize)
 
-		-- Normal font opacity.
 		slider = frame.normalFontOpacitySlider
 		checkbox = frame.normalFontOpacityCheckbox
 		checkbox:SetChecked(not configTable.normalFontAlpha or false)
@@ -857,7 +704,6 @@ local function ShowFont(configTable)
 
 
 	if (not configTable.hideCrit) then
-		-- Crit font name.
 		dropdown = frame.critFontDropdown
 		dropdown:Clear()
 		for fontName in pairs(fonts) do
@@ -869,21 +715,18 @@ local function ShowFont(configTable)
 		if (configTable.critFontName) then dropdown:SetSelectedID(configTable.critFontName) end
 		ToggleDropdownInheritState(dropdown, checkbox:GetChecked(), configTable.inheritedCritFontName)
 
-		-- Crit outline index.
 		dropdown = frame.critOutlineDropdown
 		checkbox = frame.critOutlineCheckbox
 		checkbox:SetChecked(not configTable.critOutlineIndex or false)
 		if (configTable.critOutlineIndex) then dropdown:SetSelectedID(configTable.critOutlineIndex) end
 		ToggleDropdownInheritState(dropdown, checkbox:GetChecked(), configTable.inheritedCritOutlineIndex)
 
-		-- Crit font size.
 		slider = frame.critFontSizeSlider
 		checkbox = frame.critFontSizeCheckbox
 		checkbox:SetChecked(not configTable.critFontSize or false)
 		if (configTable.critFontSize) then slider:SetValue(configTable.critFontSize) end
 		ToggleSliderInheritState(slider, checkbox:GetChecked(), configTable.inheritedCritFontSize)
 
-			-- Crit font opacity.
 		slider = frame.critFontOpacitySlider
 		checkbox = frame.critFontOpacityCheckbox
 		checkbox:SetChecked(not configTable.critFontAlpha or false)
@@ -892,7 +735,6 @@ local function ShowFont(configTable)
 	end
 
 
-	-- Store inherited settings.
 	frame.inheritedNormalFontName = configTable.inheritedNormalFontName
 	frame.inheritedNormalOutlineIndex = configTable.inheritedNormalOutlineIndex
 	frame.inheritedNormalFontSize = configTable.inheritedNormalFontSize
@@ -903,7 +745,6 @@ local function ShowFont(configTable)
 	frame.inheritedCritFontAlpha = configTable.inheritedCritFontAlpha
 
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -916,21 +757,13 @@ local function ShowFont(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Partial effects frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Creates the popup partial effects frame.
--- ****************************************************************************
 local function CreatePartialEffects()
 	local frame = CreatePopup()
 
-	-- Close button.
 	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
 
-	-- Color partial effects.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["colorPartialEffects"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -941,7 +774,6 @@ local function CreatePartialEffects()
 	frame.colorCheckbox = checkbox
 
 
-	-- Partial effects.
 	local anchor = checkbox
 	local colorswatch, editbox
 	local maxWidth = 0
@@ -987,21 +819,14 @@ local function CreatePartialEffects()
 end
 
 
--- ****************************************************************************
--- Shows the popup damage partial effects frame using the passed config.
--- ****************************************************************************
 local function ShowPartialEffects(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.partialEffectsFrame) then popupFrames.partialEffectsFrame = CreatePartialEffects() end
 
-	-- Set parent.
 	local frame = popupFrames.partialEffectsFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	frame.colorCheckbox:SetChecked(not MSBTProfiles.currentProfile.partialColoringDisabled)
 
 	local profileEntry
@@ -1012,7 +837,6 @@ local function ShowPartialEffects(configTable)
 		frame[effectType .. "Editbox"]:SetText(profileEntry.trailer)
 	end
 
-	-- Configure the frame.
 	frame.hideHandler = configTable.hideHandler
 	frame:ClearAllPoints()
 	frame:SetPoint(configTable.anchorPoint or "TOPLEFT", configTable.anchorFrame, configTable.relativePoint or "BOTTOMLEFT")
@@ -1021,13 +845,7 @@ local function ShowPartialEffects(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Damage color frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Creates the popup damage colors frame.
--- ****************************************************************************
 local function CreateDamageColors()
 	local frame = CreatePopup()
 	frame:SetSize(300, 300)
@@ -1040,11 +858,9 @@ local function CreateDamageColors()
 	content:SetSize(10, 5)
 	scrollFrame:SetScrollChild(content)
 
-	-- Close button.
 	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
 
-	-- Color damage amounts.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["colorDamageAmounts"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -1055,7 +871,6 @@ local function CreateDamageColors()
 	frame.colorCheckbox = checkbox
 
 
-	-- Damage types.
 	local anchor = content
 	local globalStringSchoolIndex = 0
 	local colorswatch, fontString
@@ -1085,21 +900,14 @@ local function CreateDamageColors()
 end
 
 
--- ****************************************************************************
--- Shows the popup damage type colors frame using the passed config.
--- ****************************************************************************
 local function ShowDamageColors(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.damageColorsFrame) then popupFrames.damageColorsFrame = CreateDamageColors() end
 
-	-- Set parent.
 	local frame = popupFrames.damageColorsFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	frame.colorCheckbox:SetChecked(not MSBTProfiles.currentProfile.damageColoringDisabled)
 
 	local profileEntry
@@ -1109,7 +917,6 @@ local function ShowDamageColors(configTable)
 		frame[profileKey .. "Checkbox"]:SetChecked(not profileEntry.disabled)
 	end
 
-	-- Configure the frame.
 	frame.hideHandler = configTable.hideHandler
 	frame:ClearAllPoints()
 	frame:SetPoint(configTable.anchorPoint or "TOPLEFT", configTable.anchorFrame, configTable.relativePoint or "BOTTOMLEFT")
@@ -1118,9 +925,6 @@ local function ShowDamageColors(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Class color frame functions.
--------------------------------------------------------------------------------
 
 local classString = "DEATHKNIGHT DRUID HUNTER MAGE MONK PALADIN PRIEST ROGUE SHAMAN WARLOCK WARRIOR DEMONHUNTER EVOKER"
 if IsCataClassic then
@@ -1129,19 +933,14 @@ elseif IsVanillaClassic then
 	classString = "DRUID HUNTER MAGE PALADIN PRIEST ROGUE SHAMAN WARLOCK WARRIOR"
 end
 
--- ****************************************************************************
--- Creates the popup class colors frame.
--- ****************************************************************************
 local function CreateClassColors()
 	local frame = CreatePopup()
 	frame:SetWidth(260)
 	frame:SetHeight(350)
 
-	-- Close button.
 	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
 
-	-- Color class amounts.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["colorUnitNames"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -1152,7 +951,6 @@ local function CreateClassColors()
 	frame.colorCheckbox = checkbox
 
 
-	-- Classes.
 	local anchor = checkbox
 	local globalStringSchoolIndex = 0
 	local colorswatch, fontString
@@ -1181,21 +979,14 @@ local function CreateClassColors()
 end
 
 
--- ****************************************************************************
--- Shows the popup damage type colors frame using the passed config.
--- ****************************************************************************
 local function ShowClassColors(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.classColorsFrame) then popupFrames.classColorsFrame = CreateClassColors() end
 
-	-- Set parent.
 	local frame = popupFrames.classColorsFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	frame.colorCheckbox:SetChecked(not MSBTProfiles.currentProfile.classColoringDisabled)
 
 	local profileEntry
@@ -1205,7 +996,6 @@ local function ShowClassColors(configTable)
 		frame[class .. "Checkbox"]:SetChecked(not profileEntry.disabled)
 	end
 
-	-- Configure the frame.
 	frame.hideHandler = configTable.hideHandler
 	frame:ClearAllPoints()
 	frame:SetPoint(configTable.anchorPoint or "TOPLEFT", configTable.anchorFrame, configTable.relativePoint or "BOTTOMLEFT")
@@ -1214,61 +1004,45 @@ local function ShowClassColors(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Scroll area config frame functions.
--------------------------------------------------------------------------------
 
--- **********************************************************************************
--- This function copies the current scroll area settings into the passed table key.
--- **********************************************************************************
 local function CopyTempScrollAreaSettings(settingsTable)
 	local frame = popupFrames.scrollAreaConfigFrame
 	EraseTable(settingsTable)
 
-	-- Get the original settings.
 	local tempSettings
 	for saKey, saSettings in pairs(MSBTAnimations.scrollAreas) do
 		settingsTable[saKey] = {}
 		tempSettings = settingsTable[saKey]
 
-		-- Normal.
 		tempSettings.animationStyle = saSettings.animationStyle or DEFAULT_ANIMATION_STYLE
 		tempSettings.direction = saSettings.direction
 		tempSettings.behavior = saSettings.behavior
 		tempSettings.textAlignIndex = saSettings.textAlignIndex or DEFAULT_TEXT_ALIGN_INDEX
 
-		-- Sticky.
 		tempSettings.stickyAnimationStyle = saSettings.stickyAnimationStyle or DEFAULT_STICKY_ANIMATION_STYLE
 		tempSettings.stickyDirection = saSettings.stickyDirection
 		tempSettings.stickyBehavior = saSettings.stickyBehavior
 		tempSettings.stickyTextAlignIndex = saSettings.stickyTextAlignIndex or DEFAULT_TEXT_ALIGN_INDEX
 
-		-- Positioning.
 		tempSettings.scrollHeight = saSettings.scrollHeight or DEFAULT_SCROLL_HEIGHT
 		tempSettings.scrollWidth = saSettings.scrollWidth or DEFAULT_SCROLL_WIDTH
 		tempSettings.offsetX = saSettings.offsetX or 0
 		tempSettings.offsetY = saSettings.offsetY or 0
 
-		-- Speed.
 		tempSettings.inheritedAnimationSpeed = MSBTProfiles.currentProfile.animationSpeed
 		tempSettings.animationSpeed = saSettings.animationSpeed
 
-		-- Icon.
 		tempSettings.iconAlign = saSettings.iconAlign or DEFAULT_ICON_ALIGN
 		tempSettings.skillIconsDisabled = saSettings.skillIconsDisabled
 	end
 end
 
 
--- ****************************************************************************
--- Changes the normal animation style to the passed value.
--- ****************************************************************************
 local function ChangeAnimationStyle(styleKey)
 	local frame = popupFrames.scrollAreaConfigFrame
 	local styleSettings = MSBTAnimations.animationStyles[styleKey]
 	local firstEntry, name, objLocale
 
-	-- Normal direction.
 	frame.directionDropdown:Clear()
 	if (styleSettings.availableDirections) then
 		for direction in string.gmatch(styleSettings.availableDirections, "[^;]+") do
@@ -1279,12 +1053,10 @@ local function ChangeAnimationStyle(styleKey)
 		end
 		frame.directionDropdown:SetSelectedID(firstEntry)
 	else
-		-- No available directions, so just add a normal entry.
 		frame.directionDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
 		frame.directionDropdown:SetSelectedID("MSBT_NORMAL")
 	end
 
-	-- Normal behavior.
 	firstEntry = nil
 	frame.behaviorDropdown:Clear()
 	if (styleSettings.availableBehaviors) then
@@ -1296,22 +1068,17 @@ local function ChangeAnimationStyle(styleKey)
 		end
 		frame.behaviorDropdown:SetSelectedID(firstEntry)
 	else
-		-- No available behaviors, so just add a normal entry.
 		frame.behaviorDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
 		frame.behaviorDropdown:SetSelectedID("MSBT_NORMAL")
 	end
 end
 
 
--- ****************************************************************************
--- Changes the sticky animation style to the passed value.
--- ****************************************************************************
 local function ChangeStickyAnimationStyle(styleKey)
 	local frame = popupFrames.scrollAreaConfigFrame
 	local styleSettings = MSBTAnimations.stickyAnimationStyles[styleKey]
 	local firstEntry, name, objLocale
 
-	-- Sticky direction.
 	frame.stickyDirectionDropdown:Clear()
 	if (styleSettings.availableDirections) then
 		for direction in string.gmatch(styleSettings.availableDirections, "[^;]+") do
@@ -1322,12 +1089,10 @@ local function ChangeStickyAnimationStyle(styleKey)
 		end
 		frame.stickyDirectionDropdown:SetSelectedID(firstEntry)
 	else
-		-- No available directions, so just add a normal entry.
 		frame.stickyDirectionDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
 		frame.stickyDirectionDropdown:SetSelectedID("MSBT_NORMAL")
 	end
 
-	-- Sticky behavior.
 	firstEntry = nil
 	frame.stickyBehaviorDropdown:Clear()
 	if (styleSettings.availableBehaviors) then
@@ -1339,23 +1104,18 @@ local function ChangeStickyAnimationStyle(styleKey)
 		end
 		frame.stickyBehaviorDropdown:SetSelectedID(firstEntry)
 	else
-		-- No available behaviors, so just add a normal entry.
 		frame.stickyBehaviorDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
 		frame.stickyBehaviorDropdown:SetSelectedID("MSBT_NORMAL")
 	end
 end
 
 
--- ****************************************************************************
--- Changes the scroll area to configure to the passed value.
--- ****************************************************************************
 local function ChangeConfigScrollArea(scrollArea)
 	local frame = popupFrames.scrollAreaConfigFrame
 	frame.currentScrollArea = scrollArea
 	local saSettings = frame.previewSettings[scrollArea]
 	local name, objLocale
 
-	-- Normal animation style.
 	frame.animationStyleDropdown:Clear()
 	for styleKey, settings in pairs(MSBTAnimations.animationStyles) do
 		objLocale = settings.localizationTable
@@ -1365,13 +1125,11 @@ local function ChangeConfigScrollArea(scrollArea)
 	frame.animationStyleDropdown:SetSelectedID(saSettings.animationStyle)
 	ChangeAnimationStyle(saSettings.animationStyle)
 
-	-- Normal direction, behavior, and text align.
 	if (saSettings.direction) then frame.directionDropdown:SetSelectedID(saSettings.direction) end
 	if (saSettings.behavior) then frame.behaviorDropdown:SetSelectedID(saSettings.behavior) end
 	frame.textAlignDropdown:SetSelectedID(saSettings.textAlignIndex)
 
 
-	-- Sticky animation style.
 	frame.stickyAnimationStyleDropdown:Clear()
 	for styleKey, settings in pairs(MSBTAnimations.stickyAnimationStyles) do
 		objLocale = settings.localizationTable
@@ -1381,43 +1139,33 @@ local function ChangeConfigScrollArea(scrollArea)
 	frame.stickyAnimationStyleDropdown:SetSelectedID(saSettings.stickyAnimationStyle)
 	ChangeStickyAnimationStyle(saSettings.stickyAnimationStyle)
 
-	-- Sticky direction, behavior, and text align.
 	if (saSettings.stickyDirection) then frame.stickyDirectionDropdown:SetSelectedID(saSettings.stickyDirection) end
 	if (saSettings.stickyBehavior) then frame.stickyBehaviorDropdown:SetSelectedID(saSettings.stickyBehavior) end
 	frame.stickyTextAlignDropdown:SetSelectedID(saSettings.stickyTextAlignIndex)
 
-	-- Scroll height and width.
 	frame.scrollHeightSlider:SetValue(saSettings.scrollHeight)
 	frame.scrollWidthSlider:SetValue(saSettings.scrollWidth)
 
-	-- Animation speed
 	local isSpeedInherited = not saSettings.animationSpeed or saSettings.animationSpeed == saSettings.inheritedAnimationSpeed
 	frame.animationSpeedCheckbox:SetChecked(isSpeedInherited)
 	if (saSettings.animationSpeed) then frame.animationSpeedSlider:SetValue(saSettings.animationSpeed) end
 	ToggleSliderInheritState(frame.animationSpeedSlider, isSpeedInherited , saSettings.inheritedAnimationSpeed)
 
-	-- X and Y offset.
 	frame.xOffsetEditbox:SetText(saSettings.offsetX)
 	frame.yOffsetEditbox:SetText(saSettings.offsetY)
 
-	-- Icon.
 	frame.iconAlignDropdown:SetSelectedID(saSettings.iconAlign)
 	frame.iconsDisabledCheckbox:SetChecked(saSettings.skillIconsDisabled)
 
-	-- Reset the backdrop color of all the scroll area mover frames to grey.
 	for _, moverFrame in pairs(frame.moverFrames) do
 		moverFrame:SetBackdropColor(0.8, 0.8, 0.8, 1.0)
 	end
 
-	-- Set the selected scroll area mover frame to red and raise it.
 	frame.moverFrames[scrollArea]:SetBackdropColor(0.5, 0.05, 0.05, 1.0)
 	frame.moverFrames[scrollArea]:Raise()
 end
 
 
--- **********************************************************************************
--- This function repositions the mover frame for the passed scroll area.
--- **********************************************************************************
 local function RepositionScrollAreaMoverFrame(scrollArea)
 	local configFrame = popupFrames.scrollAreaConfigFrame
 	local frame = configFrame.moverFrames[scrollArea]
@@ -1432,42 +1180,29 @@ local function RepositionScrollAreaMoverFrame(scrollArea)
 end
 
 
--- **********************************************************************************
--- Save the coordinates of a scroll area mover.
--- **********************************************************************************
 local function SaveScrollAreaMoverCoordinates(frame)
-	-- Get the UIParent center x and y coords.
 	local uiParentX, uiParentY = UIParent:GetCenter()
 	local xOffset = math.ceil(frame:GetLeft() - uiParentX)
 	local yOffset = math.ceil(frame:GetBottom() - uiParentY)
 
-	-- Save the x and y offsets.
 	local configFrame = popupFrames.scrollAreaConfigFrame
 	configFrame.previewSettings[frame.scrollArea].offsetX = xOffset
 	configFrame.previewSettings[frame.scrollArea].offsetY = yOffset
 
-	-- Populate the x and y offset editboxes if the moved frame is the selected one.
 	if (frame.scrollArea == configFrame.scrollAreaDropdown:GetSelectedID()) then
 		configFrame.xOffsetEditbox:SetText(xOffset)
 		configFrame.yOffsetEditbox:SetText(yOffset)
 	end
 
-	-- Reposition the scroll area mover frames to update the coordinates.
 	RepositionScrollAreaMoverFrame(frame.scrollArea)
 end
 
 
--- **********************************************************************************
--- Called when a mouse button is pressed on a mover frame.
--- **********************************************************************************
 local function MoverFrameOnMouseDown(this, button)
 	if (button == "LeftButton") then this:StartMoving() end
 end
 
 
--- **********************************************************************************
--- Called when a mouse button is released on a mover frame.
--- **********************************************************************************
 local function MoverFrameOnMouseUp(this)
 	this:StopMovingOrSizing()
 	SaveScrollAreaMoverCoordinates(this)
@@ -1480,10 +1215,6 @@ local function MoverFrameOnMouseUp(this)
 end
 
 
--- **********************************************************************************
--- This function creates a scroll area mover frame for the passed scroll area if
--- it hasn't already been
--- **********************************************************************************
 local function CreateScrollAreaMoverFrame(scrollArea)
 	local moverFrames = popupFrames.scrollAreaConfigFrame.moverFrames
 
@@ -1511,37 +1242,28 @@ local function CreateScrollAreaMoverFrame(scrollArea)
 end
 
 
--- **********************************************************************************
--- Save the passed table to the scroll area settings.
--- **********************************************************************************
 local function SaveScrollAreaSettings(settingsTable)
 	local frame = popupFrames.scrollAreaConfigFrame
 
-	-- Save the settings in the passed table to the current profile.
 	for saKey, saSettings in pairs(settingsTable) do
-		-- Normal.
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "animationStyle", saSettings.animationStyle, DEFAULT_ANIMATION_STYLE)
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "direction", saSettings.direction, "MSBT_NORMAL")
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "behavior", saSettings.behavior, "MSBT_NORMAL")
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "textAlignIndex", saSettings.textAlignIndex, DEFAULT_TEXT_ALIGN_INDEX)
 
-		-- Sticky.
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyAnimationStyle", saSettings.stickyAnimationStyle, DEFAULT_STICKY_ANIMATION_STYLE)
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyDirection", saSettings.stickyDirection, "MSBT_NORMAL")
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyBehavior", saSettings.stickyBehavior, "MSBT_NORMAL")
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyTextAlignIndex", saSettings.stickyTextAlignIndex, DEFAULT_TEXT_ALIGN_INDEX)
 
-		-- Position.
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "scrollHeight", saSettings.scrollHeight, DEFAULT_SCROLL_HEIGHT)
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "scrollWidth", saSettings.scrollWidth, DEFAULT_SCROLL_WIDTH)
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "offsetX", saSettings.offsetX)
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "offsetY", saSettings.offsetY)
 
-		-- Animation speed.
 		local animationSpeed = saSettings.animationSpeed
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "animationSpeed", animationSpeed, saSettings.inheritedAnimationSpeed)
 
-		-- Icon.
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "iconAlign", saSettings.iconAlign, DEFAULT_ICON_ALIGN)
 		MSBTProfiles.SetOption("scrollAreas." .. saKey, "skillIconsDisabled", saSettings.skillIconsDisabled)
 	end
@@ -1549,9 +1271,6 @@ local function SaveScrollAreaSettings(settingsTable)
 end
 
 
--- ****************************************************************************
--- Creates the popup scroll areas config frames.
--- ****************************************************************************
 local function CreateScrollAreaConfig()
 	local frame = CreatePopup()
 	frame:SetWidth(320)
@@ -1564,7 +1283,6 @@ local function CreateScrollAreaConfig()
 		MSBTOptions.Main.ShowMainFrame()
 	end)
 
-	-- Scroll area dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["scrollArea"]
 	dropdown:Configure(200, objLocale.label, objLocale.tooltip)
@@ -1575,7 +1293,6 @@ local function CreateScrollAreaConfig()
 	frame.scrollAreaDropdown = dropdown
 
 
-	-- Top horizontal bar.
 	local texture = frame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
@@ -1584,7 +1301,6 @@ local function CreateScrollAreaConfig()
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
 
-	-- Normal animation style dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["animationStyle"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1597,7 +1313,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.animationStyleDropdown = dropdown
 
-	-- Sticky animation style dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["stickyAnimationStyle"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1610,7 +1325,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.stickyAnimationStyleDropdown = dropdown
 
-	-- Normal direction dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["direction"]
 	dropdown:Configure(135,objLocale.label, objLocale.tooltip)
@@ -1620,7 +1334,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.directionDropdown = dropdown
 
-	-- Sticky direction dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["direction"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1630,7 +1343,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.stickyDirectionDropdown = dropdown
 
-	-- Normal behavior dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["behavior"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1640,7 +1352,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.behaviorDropdown = dropdown
 
-	-- Sticky behavior dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["behavior"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1650,7 +1361,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.stickyBehaviorDropdown = dropdown
 
-	-- Normal text align dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["textAlign"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1663,7 +1373,6 @@ local function CreateScrollAreaConfig()
 	end
 	frame.textAlignDropdown = dropdown
 
-	-- Sticky text align dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["textAlign"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1677,7 +1386,6 @@ local function CreateScrollAreaConfig()
 	frame.stickyTextAlignDropdown = dropdown
 
 
-	-- Middle horizontal bar.
 	texture = frame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
@@ -1686,7 +1394,6 @@ local function CreateScrollAreaConfig()
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
 
-	-- Scroll height slider.
 	local slider = MSBTControls.CreateSlider(frame)
 	objLocale = L.SLIDERS["scrollHeight"]
 	slider:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1699,7 +1406,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.scrollHeightSlider = slider
 
-	-- Scroll width slider.
 	slider = MSBTControls.CreateSlider(frame)
 	objLocale = L.SLIDERS["scrollWidth"]
 	slider:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1712,7 +1418,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.scrollWidthSlider = slider
 
-	-- Animation speed slider.
 	slider = MSBTControls.CreateSlider(frame)
 	objLocale = L.SLIDERS["scrollAnimationSpeed"]
 	slider:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1724,7 +1429,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.animationSpeedSlider = slider
 
-	-- Inherit animation speed checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	objLocale = L.CHECKBOXES["inheritField"]
 	checkbox:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1735,7 +1439,6 @@ local function CreateScrollAreaConfig()
 	frame.animationSpeedCheckbox = checkbox
 
 
-	-- X offset editbox.
 	local editbox = MSBTControls.CreateEditbox(frame)
 	objLocale = L.EDITBOXES["xOffset"]
 	editbox:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1750,7 +1453,6 @@ local function CreateScrollAreaConfig()
 	frame.xOffsetEditbox = editbox
 
 
-	-- Y offset editbox.
 	editbox = MSBTControls.CreateEditbox(frame)
 	objLocale = L.EDITBOXES["yOffset"]
 	editbox:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1765,7 +1467,6 @@ local function CreateScrollAreaConfig()
 	frame.yOffsetEditbox = editbox
 
 
-	-- Icon align dropdown.
 	dropdown = MSBTControls.CreateDropdown(frame)
 	objLocale = L.DROPDOWNS["iconAlign"]
 	dropdown:Configure(135, objLocale.label, objLocale.tooltip)
@@ -1777,7 +1478,6 @@ local function CreateScrollAreaConfig()
 	dropdown:AddItem(L.TEXT_ALIGNS[3], "Right")
 	frame.iconAlignDropdown = dropdown
 
-	-- Icons disabled checkbox.
 	checkbox = MSBTControls.CreateCheckbox(frame)
 	objLocale = L.CHECKBOXES["hideSkillIcons"]
 	checkbox:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1787,7 +1487,6 @@ local function CreateScrollAreaConfig()
 	end)
 	frame.iconsDisabledCheckbox = checkbox
 
-	-- Bottom horizontal bar.
 	texture = frame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
@@ -1796,7 +1495,6 @@ local function CreateScrollAreaConfig()
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
 
-	-- Preview button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["scrollAreasPreview"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1812,7 +1510,6 @@ local function CreateScrollAreaConfig()
 		end
 	end)
 
-	-- Save button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1822,7 +1519,6 @@ local function CreateScrollAreaConfig()
 		frame:Hide()
 	end)
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1832,36 +1528,27 @@ local function CreateScrollAreaConfig()
 		frame:Hide()
 	end)
 
-	-- Track internal values.
 	frame.moverFrames = {}
 	frame.originalSettings = {}
 	frame.previewSettings = {}
 
-	-- Give the frame a global name.
 	_G["MSBTScrollAreasConfigFrame"] = frame
 	return frame
 end
 
 
--- ****************************************************************************
--- Shows the popup scroll area config screen.
--- ****************************************************************************
 local function ShowScrollAreaConfig()
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.scrollAreaConfigFrame) then popupFrames.scrollAreaConfigFrame = CreateScrollAreaConfig() end
 
 	local frame = popupFrames.scrollAreaConfigFrame
 
-	-- Backup the original settings for previewing and cancelling.
 	CopyTempScrollAreaSettings(frame.originalSettings)
 	CopyTempScrollAreaSettings(frame.previewSettings)
 
-	-- Populate the scroll areas and setup the mover frames.
 	frame.scrollAreaDropdown:Clear()
 	for saKey, saSettings in pairs(MSBTAnimations.scrollAreas) do
 		frame.scrollAreaDropdown:AddItem(saSettings.name, saKey)
 
-		-- Create and reposition the scroll area mover frames.
 		CreateScrollAreaMoverFrame(saKey)
 		RepositionScrollAreaMoverFrame(saKey)
 	end
@@ -1874,25 +1561,17 @@ local function ShowScrollAreaConfig()
 end
 
 
--------------------------------------------------------------------------------
--- Scroll area selection frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Creates the popup scroll area selection frame.
--- ****************************************************************************
 local function CreateScrollAreaSelection()
 	local frame = CreatePopup()
 	frame:SetWidth(350)
 	frame:SetHeight(150)
 
-	-- Title text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
 	frame.titleFontString = fontString
 
 
-	-- Scroll area dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["outputScrollArea"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
@@ -1900,7 +1579,6 @@ local function CreateScrollAreaSelection()
 	frame.scrollAreaDropdown = dropdown
 
 
-	-- Okay button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["inputOkay"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1913,7 +1591,6 @@ local function CreateScrollAreaSelection()
 	end)
 	frame.okayButton = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["inputCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1926,24 +1603,16 @@ local function CreateScrollAreaSelection()
 end
 
 
--- ****************************************************************************
--- Shows the popup scroll area selection frame using the passed config.
--- ****************************************************************************
 local function ShowScrollAreaSelection(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.scrollAreaSelectionFrame) then popupFrames.scrollAreaSelectionFrame = CreateScrollAreaSelection() end
 
-	-- Set parent.
 	local frame = popupFrames.scrollAreaSelectionFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	frame.titleFontString:SetText(configTable.title)
 
-	-- Scroll areas.
 	frame.scrollAreaDropdown:Clear()
 	for saKey, saSettings in pairs(MSBTAnimations.scrollAreas) do
 		frame.scrollAreaDropdown:AddItem(saSettings.name, saKey)
@@ -1952,7 +1621,6 @@ local function ShowScrollAreaSelection(configTable)
 	frame.scrollAreaDropdown:SetSelectedID("Incoming")
 
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -1963,13 +1631,7 @@ local function ShowScrollAreaSelection(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Event frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Enables the controls on the event popup.
--- ****************************************************************************
 local function EnableEventControls()
 	for name, frame in pairs(popupFrames.eventFrame.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -1977,9 +1639,6 @@ local function EnableEventControls()
 end
 
 
--- ****************************************************************************
--- Creates the popup event settings frame.
--- ****************************************************************************
 local function CreateEvent()
 	local frame = CreatePopup()
 	frame:SetWidth(320)
@@ -1987,19 +1646,16 @@ local function CreateEvent()
 	frame.controls = {}
 	local controls = frame.controls
 
-	-- Title text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
 	frame.titleFontString = fontString
 
-	-- Scroll area dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["outputScrollArea"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
 	dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -60)
 	controls.scrollAreaDropdown = dropdown
 
-	-- Output message editbox.
 	local editbox = MSBTControls.CreateEditbox(frame)
 	local objLocale = L.EDITBOXES["eventMessage"]
 	editbox:Configure(250, objLocale.label, nil)
@@ -2008,7 +1664,6 @@ local function CreateEvent()
 
 	MSBTOptions.Sounds.CreateEventControls(frame, EnableEventControls)
 
-	-- Always sticky checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	objLocale = L.CHECKBOXES["stickyEvent"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -2016,7 +1671,6 @@ local function CreateEvent()
 	controls.stickyCheckbox = checkbox
 
 
-	-- Icon skill editbox.
 	editbox = MSBTControls.CreateEditbox(frame)
 	local objLocale = L.EDITBOXES["iconSkill"]
 	editbox:Configure(250, objLocale.label, objLocale.tooltip)
@@ -2025,7 +1679,6 @@ local function CreateEvent()
 
 
 
-	-- Save button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2044,7 +1697,6 @@ local function CreateEvent()
 	end)
 	controls[#controls + 1] = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2058,21 +1710,14 @@ local function CreateEvent()
 end
 
 
--- ****************************************************************************
--- Shows the popup event settings frame using the passed config.
--- ****************************************************************************
 local function ShowEvent(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.eventFrame) then popupFrames.eventFrame = CreateEvent() end
 
-	-- Set parent.
 	local frame = popupFrames.eventFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	frame.titleFontString:SetText(configTable.title)
 
 	local controls = frame.controls
@@ -2091,10 +1736,8 @@ local function ShowEvent(configTable)
 	controls.iconSkillEditbox:SetText(configTable.iconSkill)
 
 
-	-- Show / hide always sticky checkbox depending on if the event is a crit or not.
 	if (configTable.isCrit) then controls.stickyCheckbox:Hide() else controls.stickyCheckbox:Show() end
 
-	-- Show / hide icon skill editbox.
 	if (configTable.showIconSkillEditbox) then
 		frame:SetHeight(400)
 		controls.iconSkillEditbox:Show()
@@ -2103,7 +1746,6 @@ local function ShowEvent(configTable)
 		frame:SetHeight(340)
 	end
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -2114,13 +1756,7 @@ local function ShowEvent(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Trigger classes frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Creates the popup classes frame.
--- ****************************************************************************
 local function CreateClasses()
 	local frame = CreatePopup()
 	frame:SetWidth(270)
@@ -2128,11 +1764,9 @@ local function CreateClasses()
 	frame.classCheckboxes = {}
 	local classCheckboxes = frame.classCheckboxes
 
-	-- Close button.
 	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
 
-	-- All classes checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["allClasses"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -2176,21 +1810,14 @@ local function CreateClasses()
 end
 
 
--- ****************************************************************************
--- Shows the popup classes frame.
--- ****************************************************************************
 local function ShowClasses(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame or not configTable.classes) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.classesFrame) then popupFrames.classesFrame = CreateClasses() end
 
-	-- Set parent.
 	local frame = popupFrames.classesFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	if (configTable.classes["ALL"]) then
 		frame.allClassesCheckbox:SetChecked(true)
 		for name, checkFrame in pairs(frame.classCheckboxes) do
@@ -2206,7 +1833,6 @@ local function ShowClasses(configTable)
 	end
 
 
-	-- Configure the frame.
 	frame.classes = configTable.classes
 	frame.updateHandler = configTable.updateHandler
 	frame.hideHandler = configTable.hideHandler
@@ -2217,13 +1843,7 @@ local function ShowClasses(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Trigger condition frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Called when one of the condition dropdowns are changed.
--- ****************************************************************************
 local function ConditionDropdownOnChange(this, id)
 	local frame = popupFrames.triggerConditionFrame
 	local conditionData = popupFrames.triggerFrame.conditionData[id]
@@ -2267,15 +1887,11 @@ local function ConditionDropdownOnChange(this, id)
 end
 
 
--- ****************************************************************************
--- Creates the trigger condition frame.
--- ****************************************************************************
 local function CreateTriggerCondition()
 	local frame = CreatePopup()
 	frame:SetWidth(350)
 	frame:SetHeight(240)
 
-	-- Condition dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["triggerCondition"]
 	dropdown:Configure(200, objLocale.label, objLocale.tooltip)
@@ -2285,7 +1901,6 @@ local function CreateTriggerCondition()
 	dropdown:SetChangeHandler(ConditionDropdownOnChange)
 	frame.conditionDropdown = dropdown
 
-	-- Relation dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["triggerRelation"]
 	dropdown:Configure(120, objLocale.label, objLocale.tooltip)
@@ -2293,7 +1908,6 @@ local function CreateTriggerCondition()
 	dropdown:SetPoint("TOPLEFT", frame.conditionDropdown, "BOTTOMLEFT", 0, -20)
 	frame.relationDropdown = dropdown
 
-	-- Parameter editbox.
 	local editbox = MSBTControls.CreateEditbox(frame)
 	local objLocale = L.DROPDOWNS["triggerParameter"]
 	editbox:Configure(0, objLocale.label, objLocale.tooltip)
@@ -2301,14 +1915,12 @@ local function CreateTriggerCondition()
 	editbox:SetPoint("RIGHT", frame, "RIGHT", -35, 0)
 	frame.parameterEditbox = editbox
 
-	-- Parameter slider.
 	local slider = MSBTControls.CreateSlider(frame)
 	local objLocale = L.DROPDOWNS["triggerParameter"]
 	slider:Configure(180, objLocale.label, objLocale.tooltip)
 	slider:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -30)
 	frame.parameterSlider = slider
 
-	-- Parameter dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["triggerParameter"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
@@ -2316,7 +1928,6 @@ local function CreateTriggerCondition()
 	dropdown:SetPoint("TOPLEFT", frame.relationDropdown, "BOTTOMLEFT", 0, -20)
 	frame.parameterDropdown = dropdown
 
-	-- Save button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2338,7 +1949,6 @@ local function CreateTriggerCondition()
 		end
 	end)
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2351,21 +1961,14 @@ local function CreateTriggerCondition()
 end
 
 
--- ****************************************************************************
--- Shows the popup trigger condition frame.
--- ****************************************************************************
 local function ShowTriggerCondition(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.triggerConditionFrame) then popupFrames.triggerConditionFrame = CreateTriggerCondition() end
 
-	-- Set parent.
 	local frame = popupFrames.triggerConditionFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate condition type.
 	frame.conditionDropdown:Clear()
 	for conditionType in string.gmatch(configTable.availableConditions, "[^%s]+") do
 		frame.conditionDropdown:AddItem(L.TRIGGER_DATA[conditionType] or conditionType, conditionType)
@@ -2374,10 +1977,8 @@ local function ShowTriggerCondition(configTable)
 	frame.conditionDropdown:SetSelectedID(configTable.conditionType)
 	ConditionDropdownOnChange(frame.conditionDropdown, configTable.conditionType)
 
-	-- Populate the condition relation.
 	frame.relationDropdown:SetSelectedID(configTable.conditionRelation)
 
-	-- Populate the condition value.
 	local conditionData = popupFrames.triggerFrame.conditionData[configTable.conditionType]
 	local conditionValue = configTable.conditionValue
 	if (type(conditionValue) == "boolean") then conditionValue = tostring(conditionValue) end
@@ -2390,7 +1991,6 @@ local function ShowTriggerCondition(configTable)
 	end
 
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -2401,13 +2001,7 @@ local function ShowTriggerCondition(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Trigger main event frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Enables the controls on the trigger popup.
--- ****************************************************************************
 local function EnableMainEventControls()
 	for name, frame in pairs(popupFrames.mainEventFrame.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -2415,9 +2009,6 @@ local function EnableMainEventControls()
 end
 
 
--- ****************************************************************************
--- Updates the main event conditions listbox.
--- ****************************************************************************
 local function UpdateMainEventConditions()
 	local frame = popupFrames.mainEventFrame
 	frame.conditionsListbox:Clear()
@@ -2427,9 +2018,6 @@ local function UpdateMainEventConditions()
 end
 
 
--- ****************************************************************************
--- Saves the condition the user entered.
--- ****************************************************************************
 local function SaveMainEventCondition(settings, conditionNum)
 	local frame = popupFrames.mainEventFrame
 	frame.eventConditions[conditionNum] = settings.conditionType
@@ -2439,9 +2027,6 @@ local function SaveMainEventCondition(settings, conditionNum)
 end
 
 
--- ****************************************************************************
--- Called when one of the exception delete buttons is clicked.
--- ****************************************************************************
 local function DeleteConditionButtonOnClick(this)
 	local frame = popupFrames.mainEventFrame
 	local line = this:GetParent()
@@ -2452,9 +2037,6 @@ local function DeleteConditionButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called when one of the main event edit buttons is clicked.
--- ****************************************************************************
 local function EditConditionButtonOnClick(this)
 	local frame = popupFrames.mainEventFrame
 	local line = this:GetParent()
@@ -2478,15 +2060,11 @@ local function EditConditionButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for main event conditions.
--- ****************************************************************************
 local function CreateMainEventConditionsLine(this)
 	local controls = popupFrames.mainEventFrame.controls
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Edit condition button.
 	local button = MSBTControls.CreateIconButton(frame, "Configure")
 	local objLocale = L.BUTTONS["editCondition"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2495,7 +2073,6 @@ local function CreateMainEventConditionsLine(this)
 	frame.editConditionButton = button
 	controls[#controls + 1] = button
 
-	-- Delete condition button.
 	button = MSBTControls.CreateIconButton(frame, "Delete")
 	objLocale = L.BUTTONS["deleteCondition"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2503,7 +2080,6 @@ local function CreateMainEventConditionsLine(this)
 	button:SetClickHandler(DeleteConditionButtonOnClick)
 	controls[#controls + 1] = button
 
-	-- Condition text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", frame.editConditionButton, "RIGHT", 5, 0)
 	fontString:SetPoint("RIGHT", controls[#controls], "LEFT", -10, 0)
@@ -2515,9 +2091,6 @@ local function CreateMainEventConditionsLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display an exception line.
--- ****************************************************************************
 local function DisplayMainEventConditionsLine(this, line, key, isSelected)
 	line.conditionNum = key
 
@@ -2526,7 +2099,6 @@ local function DisplayMainEventConditionsLine(this, line, key, isSelected)
 	local conditionData = popupFrames.triggerFrame.conditionData[conditionType]
 	local relation = conditionData and conditionData.relations[frame.eventConditions[key + 1]]
 
-	-- Get the localized parameter.
 	local parameter = frame.eventConditions[key + 2]
 	if (type(parameter) == "boolean") then parameter = tostring(parameter) end
 	if (conditionData and conditionData.controlType == "dropdown") then parameter = conditionData.items[parameter] end
@@ -2540,9 +2112,6 @@ end
 
 
 
--- ****************************************************************************
--- Creates the popup main event frame.
--- ****************************************************************************
 local function CreateMainEvent()
 	local frame = CreatePopup()
 	frame:SetWidth(450)
@@ -2551,7 +2120,6 @@ local function CreateMainEvent()
 	local controls = frame.controls
 
 
-	-- Main event dropdown.
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["mainEvent"]
 	dropdown:Configure(200, objLocale.label, nil)
@@ -2577,13 +2145,11 @@ local function CreateMainEvent()
 	controls[#controls + 1] = dropdown
 
 
-	-- Trigger conditions label.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOPLEFT", frame.mainEventDropdown, "BOTTOMLEFT", 0, -30)
 	fontString:SetText(L.MSG_EVENT_CONDITIONS .. ":")
 	frame.triggerConditionsLabel = fontString
 
-	-- Add event condition button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["addEventCondition"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2616,7 +2182,6 @@ local function CreateMainEvent()
 	end)
 	controls[#controls + 1] = button
 
-	-- Main event conditions listbox.
 	local listbox = MSBTControls.CreateListbox(frame)
 	listbox:Configure(400, 100, 25)
 	listbox:SetPoint("TOPLEFT", frame.triggerConditionsLabel, "BOTTOMLEFT", 10, -10)
@@ -2627,7 +2192,6 @@ local function CreateMainEvent()
 
 
 
-	-- Save button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2646,7 +2210,6 @@ local function CreateMainEvent()
 	end)
 	controls[#controls + 1] = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2662,21 +2225,14 @@ local function CreateMainEvent()
 end
 
 
--- ****************************************************************************
--- Shows the popup main event frame.
--- ****************************************************************************
 local function ShowMainEvent(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.mainEventFrame) then popupFrames.mainEventFrame = CreateMainEvent() end
 
-	-- Set parent.
 	local frame = popupFrames.mainEventFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
-	-- Populate data.
 	local selectedEventType = configTable.eventType
 	if MSBTTriggers.IsCLEUTriggerMainEvent(selectedEventType) then
 		selectedEventType = "UNIT_HEALTH"
@@ -2689,7 +2245,6 @@ local function ShowMainEvent(configTable)
 	end
 	UpdateMainEventConditions()
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -2700,17 +2255,10 @@ local function ShowMainEvent(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Trigger frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Updates the classes font string based on what classes are selected.
--- ****************************************************************************
 local function UpdateClassesText()
 	local frame = popupFrames.triggerFrame
 
-	-- Get localized list of seleced classes.
 	local selectedClasses = ""
 	if (frame.classes["ALL"]) then
 		selectedClasses = L.CHECKBOXES["allClasses"].label
@@ -2719,7 +2267,6 @@ local function UpdateClassesText()
 			selectedClasses = selectedClasses .. CLASS_NAMES[className] .. ", "
 		end
 
-		-- Strip off the extra comma and space.
 		selectedClasses = string.sub(selectedClasses, 1, -3)
 	end
 
@@ -2727,9 +2274,6 @@ local function UpdateClassesText()
 end
 
 
--- ****************************************************************************
--- Updates the main events listbox.
--- ****************************************************************************
 local function UpdateMainEvents()
 	local frame = popupFrames.triggerFrame
 	frame.mainEventsListbox:Clear()
@@ -2739,9 +2283,6 @@ local function UpdateMainEvents()
 end
 
 
--- ****************************************************************************
--- Updates the exceptions listbox.
--- ****************************************************************************
 local function UpdateExceptions()
 	local frame = popupFrames.triggerFrame
 	frame.exceptionsListbox:Clear()
@@ -2751,9 +2292,6 @@ local function UpdateExceptions()
 end
 
 
--- ****************************************************************************
--- Enables the controls on the trigger popup.
--- ****************************************************************************
 local function EnableTriggerControls()
 	for name, frame in pairs(popupFrames.triggerFrame.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -2761,9 +2299,6 @@ local function EnableTriggerControls()
 end
 
 
--- ****************************************************************************
--- Saves the main event the user entered to the trigger main event frame.
--- ****************************************************************************
 local function SaveMainEvent(settings, eventNum)
 	local frame = popupFrames.triggerFrame
 	frame.mainEvents[eventNum] = settings.eventType
@@ -2772,9 +2307,6 @@ local function SaveMainEvent(settings, eventNum)
 end
 
 
--- ****************************************************************************
--- Saves the exception the user entered to the trigger exception frame.
--- ****************************************************************************
 local function SaveException(settings, exceptionNum)
 	local frame = popupFrames.triggerFrame
 	frame.exceptions[exceptionNum] = settings.conditionType
@@ -2784,9 +2316,6 @@ local function SaveException(settings, exceptionNum)
 end
 
 
--- ****************************************************************************
--- Called when one of the main event edit buttons is clicked.
--- ****************************************************************************
 local function EditMainEventButtonOnClick(this)
 	local frame = popupFrames.triggerFrame
 	local line = this:GetParent()
@@ -2804,9 +2333,6 @@ local function EditMainEventButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called when one of the main event edit buttons is clicked.
--- ****************************************************************************
 local function EditExceptionButtonOnClick(this)
 	local frame = popupFrames.triggerFrame
 	local line = this:GetParent()
@@ -2828,9 +2354,6 @@ local function EditExceptionButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called when one of the main event delete buttons is clicked.
--- ****************************************************************************
 local function DeleteMainEventButtonOnClick(this)
 	local frame = popupFrames.triggerFrame
 	local line = this:GetParent()
@@ -2840,9 +2363,6 @@ local function DeleteMainEventButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called when one of the exception delete buttons is clicked.
--- ****************************************************************************
 local function DeleteExceptionButtonOnClick(this)
 	local frame = popupFrames.triggerFrame
 	local line = this:GetParent()
@@ -2853,15 +2373,11 @@ local function DeleteExceptionButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for main events.
--- ****************************************************************************
 local function CreateMainEventsLine(this)
 	local controls = popupFrames.triggerFrame.controls
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Edit event button.
 	local button = MSBTControls.CreateIconButton(frame, "Configure")
 	local objLocale = L.BUTTONS["editEventConditions"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2871,7 +2387,6 @@ local function CreateMainEventsLine(this)
 	controls[#controls + 1] = button
 
 
-	-- Delete event button.
 	button = MSBTControls.CreateIconButton(frame, "Delete")
 	objLocale = L.BUTTONS["deleteMainEvent"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2879,7 +2394,6 @@ local function CreateMainEventsLine(this)
 	button:SetClickHandler(DeleteMainEventButtonOnClick)
 	controls[#controls + 1] = button
 
-	-- Event text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", frame.editEventButton, "RIGHT", 5, 0)
 	fontString:SetPoint("RIGHT", controls[#controls], "LEFT", -10, 0)
@@ -2891,15 +2405,11 @@ local function CreateMainEventsLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for main events.
--- ****************************************************************************
 local function CreateExceptionsLine(this)
 	local controls = popupFrames.triggerFrame.controls
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Edit exception button.
 	local button = MSBTControls.CreateIconButton(frame, "Configure")
 	local objLocale = L.BUTTONS["editCondition"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2908,7 +2418,6 @@ local function CreateExceptionsLine(this)
 	frame.editExceptionButton = button
 	controls[#controls + 1] = button
 
-	-- Delete exception button.
 	button = MSBTControls.CreateIconButton(frame, "Delete")
 	objLocale = L.BUTTONS["deleteCondition"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2916,7 +2425,6 @@ local function CreateExceptionsLine(this)
 	button:SetClickHandler(DeleteExceptionButtonOnClick)
 	controls[#controls + 1] = button
 
-	-- Exception text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", frame.editExceptionButton, "RIGHT", 5, 0)
 	fontString:SetPoint("RIGHT", controls[#controls], "LEFT", -10, 0)
@@ -2928,9 +2436,6 @@ local function CreateExceptionsLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display a main event line.
--- ****************************************************************************
 local function DisplayMainEventsLine(this, line, key, isSelected)
 	line.eventNum = key
 
@@ -2946,9 +2451,6 @@ local function DisplayMainEventsLine(this, line, key, isSelected)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display an exception line.
--- ****************************************************************************
 local function DisplayExceptionsLine(this, line, key, isSelected)
 	line.exceptionNum = key
 
@@ -2957,7 +2459,6 @@ local function DisplayExceptionsLine(this, line, key, isSelected)
 	local conditionData = frame.conditionData[exceptionType]
 	local relation = conditionData.relations[frame.exceptions[key + 1]]
 
-	-- Get the localized parameter.
 	local parameter = frame.exceptions[key + 2]
 	if (type(parameter) == "boolean") then parameter = tostring(parameter) end
 	if (conditionData.controlType == "dropdown") then parameter = conditionData.items[parameter] end
@@ -2970,9 +2471,6 @@ local function DisplayExceptionsLine(this, line, key, isSelected)
 end
 
 
--- ****************************************************************************
--- Creates the popup trigger settings frame.
--- ****************************************************************************
 local function CreateTriggerPopup()
 	local frame = CreatePopup()
 	frame:SetWidth(500)
@@ -2980,18 +2478,15 @@ local function CreateTriggerPopup()
 	frame.controls = {}
 	local controls = frame.controls
 
-	-- Title text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
 	frame.titleFontString = fontString
 
-	-- Trigger classes label.
 	fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -50)
 	fontString:SetText(L.MSG_TRIGGER_CLASSES .. ":")
 	frame.classesLabel = fontString
 
-	-- Edit trigger classes button.
 	local button = MSBTControls.CreateIconButton(frame, "Configure")
 	local objLocale = L.BUTTONS["editTriggerClasses"]
 	button:SetTooltip(objLocale.tooltip)
@@ -3008,7 +2503,6 @@ local function CreateTriggerPopup()
 	end)
 	controls[#controls + 1] = button
 
-	-- Classes text.
 	fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", controls[#controls], "RIGHT", 10, -5)
 	fontString:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
@@ -3018,13 +2512,11 @@ local function CreateTriggerPopup()
 	fontString:SetTextColor(1, 1, 1)
 	frame.classesFontString = fontString
 
-	-- Main events label.
 	fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOPLEFT", controls[#controls], "BOTTOMLEFT", -10, -15)
 	fontString:SetText(L.MSG_MAIN_EVENTS .. ":")
 	frame.mainEventsLabel = fontString
 
-	-- Add main events button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["addMainEvent"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3043,7 +2535,6 @@ local function CreateTriggerPopup()
 	end)
 	controls[#controls + 1] = button
 
-	-- Main events listbox.
 	local listbox = MSBTControls.CreateListbox(frame)
 	listbox:Configure(450, 100, 25)
 	listbox:SetPoint("TOPLEFT", frame.mainEventsLabel, "BOTTOMLEFT", 10, -10)
@@ -3053,13 +2544,11 @@ local function CreateTriggerPopup()
 	controls[#controls + 1] = listbox
 
 
-	-- Trigger exceptions label.
 	fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOPLEFT", frame.mainEventsListbox, "BOTTOMLEFT", -10, -15)
 	fontString:SetText(L.MSG_TRIGGER_EXCEPTIONS .. ":")
 	frame.triggerExceptionsLabel = fontString
 
-	-- Add trigger exceptions button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["addTriggerException"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3082,7 +2571,6 @@ local function CreateTriggerPopup()
 	end)
 	controls[#controls + 1] = button
 
-	-- Trigger exceptions listbox.
 	listbox = MSBTControls.CreateListbox(frame)
 	listbox:Configure(450, 100, 25)
 	listbox:SetPoint("TOPLEFT", frame.triggerExceptionsLabel, "BOTTOMLEFT", 10, -10)
@@ -3091,14 +2579,12 @@ local function CreateTriggerPopup()
 	frame.exceptionsListbox = listbox
 	controls[#controls + 1] = listbox
 
-	-- Save button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 20)
 	button:SetClickHandler(function(this)
 		EraseTable(returnSettings)
-		-- Make the classes string.
 		if not frame.classes["ALL"] then
 			local sortedClasses = frame.sortedClasses
 			EraseTable(sortedClasses)
@@ -3108,7 +2594,6 @@ local function CreateTriggerPopup()
 			table.sort(sortedClasses)
 			returnSettings.classes = table.concat(sortedClasses, ",")
 		end
-		-- Make the main events string.
 		if next(frame.mainEvents) then
 			local events = ""
 			for eventNum, eventType in ipairs(frame.mainEvents) do
@@ -3123,7 +2608,6 @@ local function CreateTriggerPopup()
 			end
 			returnSettings.mainEvents = string.sub(events, 1, -3)
 		end
-		-- Make the exceptions string.
 		if next(frame.exceptions) then
 			local exceptions = ""
 			for x = 1, #frame.exceptions, 3 do
@@ -3138,7 +2622,6 @@ local function CreateTriggerPopup()
 	end)
 	controls[#controls + 1] = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3155,7 +2638,6 @@ local function CreateTriggerPopup()
 	frame.exceptions = {}
 	frame.sortedKeys = {}
 
-	-- Relations.
 	local objLocale = L.TRIGGER_DATA
 	local equalityRelations = {eq = objLocale["eq"]}
 	local stringRelations = {eq = objLocale["eq"], ne = objLocale["ne"], like = objLocale["like"], unlike = objLocale["unlike"]}
@@ -3163,7 +2645,6 @@ local function CreateTriggerPopup()
 	local booleanRelations = {eq = objLocale["eq"], ne = objLocale["ne"]}
 	local lessThanRelations = {lt = objLocale["lt"]}
 
-	-- Localized affiliations.
 	local affiliationTypes = {
 		[MSBTParser.AFFILIATION_MINE] = objLocale["affiliationMine"],
 		[MSBTParser.AFFILIATION_PARTY] = objLocale["affiliationParty"],
@@ -3174,20 +2655,17 @@ local function CreateTriggerPopup()
 		[FLAG_YOU] = objLocale["affiliationYou"],
 	}
 
-	-- Localized reactions.
 	local reactionTypes = {
 		[MSBTParser.REACTION_FRIENDLY] = objLocale["reactionFriendly"],
 		[MSBTParser.REACTION_NEUTRAL] = objLocale["reactionNeutral"],
 		[MSBTParser.REACTION_HOSTILE] = objLocale["reactionHostile"],
 	}
 
-	-- Localized control types.
 	local controlTypes = {
 		[MSBTParser.CONTROL_HUMAN] = objLocale["controlHuman"],
 		[MSBTParser.CONTROL_SERVER] = objLocale["controlServer"],
 	}
 
-	-- Localized unit types.
 	local unitTypes = {
 		[MSBTParser.UNITTYPE_PLAYER] = objLocale["unitTypePlayer"],
 		[MSBTParser.UNITTYPE_NPC] = objLocale["unitTypeNPC"],
@@ -3196,7 +2674,6 @@ local function CreateTriggerPopup()
 		[MSBTParser.UNITTYPE_OBJECT] = objLocale["unitTypeObject"],
 	}
 
-	-- Miss types.
 	local missTypes = {
 		["MISS"] = MISS,
 		["DODGE"] = DODGE,
@@ -3210,7 +2687,6 @@ local function CreateTriggerPopup()
 		["REFLECT"] = REFLECT,
 	}
 
-	-- Hazard type.
 	local hazardTypes = {
 		["DROWNING"] = STRING_ENVIRONMENTAL_DAMAGE_DROWNING,
 		["FALLING"] = STRING_ENVIRONMENTAL_DAMAGE_FALLING,
@@ -3239,23 +2715,19 @@ local function CreateTriggerPopup()
 		raid = objLocale["affiliationRaid"],
 	}
 
-	-- Localized booleans.
 	local booleanItems = {["true"] = objLocale["booleanTrue"], ["false"] = objLocale["booleanFalse"]}
 
-	-- Localized power types.
 	local powerTypes = {}
 	for powerToken, powerType in pairs(MSBTTriggers.powerTypes) do
 		local localizedName = _G[powerToken]
 		if localizedName then powerTypes[powerType] = localizedName end
 	end
 
-	-- Localized talent specs.
 	local talentSpecs = {
 		[1] = TALENT_SPEC_PRIMARY,
 		[2] = TALENT_SPEC_SECONDARY,
 	}
 
-	-- Localized warrior stances.
 	local warriorStances
 	if not IsVanillaClassic then
 		warriorStances = {
@@ -3265,39 +2737,31 @@ local function CreateTriggerPopup()
 		}
 	end
 
-	-- Localized zone types.
 	local zoneTypes = {arena = objLocale["zoneTypeArena"], pvp = objLocale["zoneTypePvP"], party = objLocale["zoneTypeParty"], raid = objLocale["zoneTypeRaid"]}
 
 
 
-	-- Condition data.
 	frame.conditionData = {
-		-- Main event conditions.
-		-- Source unit.
 		sourceName = {controlType = "editbox", relations = stringRelations},
 		sourceAffiliation = {controlType = "dropdown", items = affiliationTypes, default = FLAG_YOU, relations = booleanRelations},
 		sourceReaction = {controlType = "dropdown", items = reactionTypes, default = MSBTParser.REACTION_HOSTILE, relations = booleanRelations},
 		sourceControl = {controlType = "dropdown", items = controlTypes, default = MSBTParser.CONTROL_HUMAN, relations = booleanRelations},
 		sourceUnitType = {controlType = "dropdown", items = unitTypes, default = MSBTParser.UNITTYPE_PLAYER, relations = booleanRelations},
 
-		-- Recipient unit.
 		recipientName = {controlType = "editbox", relations = stringRelations},
 		recipientAffiliation = {controlType = "dropdown", items = affiliationTypes, default = FLAG_YOU, relations = booleanRelations},
 		recipientReaction = {controlType = "dropdown", items = reactionTypes, default = MSBTParser.REACTION_HOSTILE, relations = booleanRelations},
 		recipientControl = {controlType = "dropdown", items = controlTypes, default = MSBTParser.CONTROL_HUMAN, relations = booleanRelations},
 		recipientUnitType = {controlType = "dropdown", items = unitTypes, default = MSBTParser.UNITTYPE_PLAYER, relations = booleanRelations},
 
-		-- Skill.
 		skillID = {controlType = "editbox", relations = booleanRelations},
 		skillName = {controlType = "editbox", relations = stringRelations},
 		skillSchool = {controlType = "dropdown", items = MSBTMain.damageTypeMap, default = 0x1, relations = booleanRelations},
 
-		-- Extra skill.
 		extraSkillID = {controlType = "editbox", relations = booleanRelations},
 		extraSkillName = {controlType = "editbox", relations = stringRelations},
 		extraSkillSchool = {controlType = "dropdown", items = MSBTMain.damageTypeMap, default = 0x1, relations = booleanRelations},
 
-		-- Damage/heal.
 		amount = {controlType = "editbox", relations = numberRelations},
 		overkillAmount = {controlType = "editbox", relations = numberRelations},
 		damageType = {controlType = "dropdown", items = MSBTMain.damageTypeMap, default = 0x1, relations = booleanRelations},
@@ -3308,25 +2772,20 @@ local function CreateTriggerPopup()
 		isGlancing = {controlType = "dropdown", items = booleanItems, default = "true", relations = booleanRelations},
 		isCrushing = {controlType = "dropdown", items = booleanItems, default = "true", relations = booleanRelations},
 
-		-- Miss/environmental/power.
 		missType = {controlType = "dropdown", items = missTypes, default = "MISS", relations = booleanRelations},
 		hazardType = {controlType = "dropdown", items = hazardTypes, default = "FALLING", relations = booleanRelations},
 		powerType = {controlType = "dropdown", items = powerTypes, default = 0, relations = booleanRelations},
 		extraAmount = {controlType = "editbox", relations = numberRelations},
 
-		-- Aura.
 		auraType = {controlType = "dropdown", items = auraTypes, default = "BUFF", relations = booleanRelations},
 
-		-- Health/power changes.
 		threshold = {controlType = "slider", minValue=1, maxValue=100, step=1, default = 40, relations=numberRelations, defaultRelation = "lt"},
 		unitID = {controlType = "dropdown", items = unitIDs, default = "player", relations = booleanRelations},
 		unitReaction = {controlType = "dropdown", items = reactionTypes, default = MSBTParser.REACTION_HOSTILE, relations = booleanRelations},
 
-		-- Items.
 		itemID = {controlType = "editbox", relations = booleanRelations},
 		itemName = {controlType = "editbox", relations = stringRelations},
 
-		-- Exception conditions.
 		activeTalents = {controlType = "dropdown", items = talentSpecs, default = 1, relations = booleanRelations},
 		buffActive = {controlType = "editbox", relations = equalityRelations},
 		buffInactive = {controlType = "editbox", relations = equalityRelations},
@@ -3344,7 +2803,6 @@ local function CreateTriggerPopup()
 		frame.conditionData["warriorStance"] = {controlType = "dropdown", items = warriorStances, default = 1, relations = booleanRelations}
 	end
 
-	-- Event condition data.
 	local commonSourceFields = "sourceName sourceAffiliation sourceReaction sourceControl sourceUnitType "
 	local commonRecipientFields = "recipientName recipientAffiliation recipientReaction recipientControl recipientUnitType "
 	local commonLogFields = commonSourceFields .. commonRecipientFields
@@ -3355,54 +2813,40 @@ local function CreateTriggerPopup()
 	local commonPowerFields = "amount powerType"
 	local commonHealthPowerFields = "unitID unitReaction amount threshold"
 	local eventConditionData = {
-		-- Damage events.
 		SWING_DAMAGE = {availableConditions = commonLogFields .. commonDamageFields, defaultConditions="sourceAffiliation;;eq;;" .. FLAG_YOU .. ";;isCrit;;eq;;true"},
 		SPELL_DAMAGE = {availableConditions = commonLogFields .. commonSkillFields .. commonDamageFields, defaultConditions="sourceAffiliation;;eq;;" .. FLAG_YOU .. ";;isCrit;;eq;;true;;skillName;;eq;;" .. UNKNOWN},
 
-		-- Miss events.
 		SWING_MISSED = {availableConditions = commonLogFields .. "missType", defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;missType;;eq;;BLOCK"},
 		SPELL_MISSED = {availableConditions = commonLogFields .. commonSkillFields .. "missType", defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;missType;;eq;;RESIST;;skillName;;eq;;" .. UNKNOWN},
 		SPELL_DISPEL_FAILED = {availableConditions = commonLogFields .. commonSkillFields .. commonExtraSkillFields .. "missType", defaultConditions="sourceAffiliation;;eq;;" .. FLAG_YOU .. ";;skillName;;eq;;" .. UNKNOWN},
 
-		-- Heal events.
 		SPELL_HEAL = {availableConditions = commonLogFields .. commonSkillFields .. commonHealFields, defaultConditions="recipientReaction;;eq;;" .. MSBTParser.REACTION_HOSTILE .. ";;isCrit;;eq;;true"},
 
-		-- Environmental events.
 		ENVIRONMENTAL_DAMAGE = {availableConditions = commonLogFields .. commonDamageFields .. " hazardType", defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;hazardType;;eq;;DROWNING"},
 
-		-- Power events.
 		SPELL_ENERGIZE = {availableConditions = commonLogFields .. commonSkillFields .. commonPowerFields, defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;powerType;;eq;;0"},
 		SPELL_DRAIN = {availableConditions = commonLogFields .. commonSkillFields .. commonPowerFields .. " extraAmount", defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;powerType;;eq;;0"},
 
-		-- Interrupt events.
 		SPELL_INTERRUPT = {availableConditions = commonLogFields .. commonSkillFields .. commonExtraSkillFields, defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU},
 
-		-- Aura events.
 		SPELL_AURA_APPLIED = {availableConditions = commonLogFields .. commonSkillFields .. "auraType amount", defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;skillName;;eq;;" .. UNKNOWN},
 		SPELL_AURA_BROKEN_SPELL = {availableConditions = commonLogFields .. commonSkillFields .. commonExtraSkillFields .. "auraType", defaultConditions="sourceAffiliation;;eq;;" .. FLAG_YOU .. ";;skillName;;eq;;" .. UNKNOWN},
 		SPELL_AURA_REFRESH = {availableConditions = commonLogFields .. commonSkillFields .. "auraType", defaultConditions="sourceAffiliation;;eq;;" .. FLAG_YOU .. ";;skillName;;eq;;" .. UNKNOWN},
 
-		-- Enchant events.
 		ENCHANT_APPLIED = {availableConditions = commonLogFields .. "skillName itemID itemName", defaultConditions="skillName;;eq;;" .. UNKNOWN},
 
-		-- Dispel events.
 		SPELL_DISPEL = {availableConditions = commonLogFields .. commonSkillFields .. commonExtraSkillFields .. " auraType", defaultConditions="recipientAffiliation;;eq;;" .. FLAG_YOU .. ";;skillName;;eq;;" .. UNKNOWN},
 
-		-- Cast events.
 		SPELL_CAST_START = {availableConditions = commonSourceFields .. commonSkillFields, defaultConditions="sourceReaction;;eq;;" .. MSBTParser.REACTION_HOSTILE .. ";;skillName;;eq;;" .. UNKNOWN},
 		SPELL_CAST_SUCCESS = {availableConditions = commonLogFields .. commonSkillFields, defaultConditions="sourceReaction;;eq;;" .. MSBTParser.REACTION_HOSTILE .. ";;skillName;;eq;;" .. UNKNOWN},
 
-		-- Kill events.
 		PARTY_KILL = {availableConditions = commonLogFields, defaultConditions="recipientName;;eq;;" .. UNKNOWN},
 
-		-- Extra Attack events.
 		SPELL_EXTRA_ATTACKS = {availableConditions = commonLogFields .. commonSkillFields .. "amount", defaultConditions="sourceAffiliation;;eq;;" .. FLAG_YOU .. ";;skillName;;eq;;" .. UNKNOWN},
 
-		-- Threshold events.
 		UNIT_HEALTH = {availableConditions = commonHealthPowerFields, defaultConditions="unitID;;eq;;player;;threshold;;lt;;20"},
 		UNIT_POWER = {availableConditions = commonHealthPowerFields .. " powerType", defaultConditions="powerType;;eq;;0;;unitID;;eq;;player;;threshold;;lt;;20"},
 
-		-- Cooldowns.
 	}
 	eventConditionData["RANGE_DAMAGE"] = eventConditionData["SPELL_DAMAGE"]
 	eventConditionData["GENERIC_DAMAGE"] = eventConditionData["SPELL_DAMAGE"]
@@ -3421,42 +2865,32 @@ local function CreateTriggerPopup()
 	eventConditionData["SPELL_AURA_REMOVED"] = eventConditionData["SPELL_AURA_APPLIED"]
 	eventConditionData["SPELL_STOLEN"] = eventConditionData["SPELL_DISPEL"]
 	eventConditionData["ENCHANT_REMOVED"] = eventConditionData["ENCHANT_APPLIED"]
-	eventConditionData["SPELL_CAST_FAILED"] = eventConditionData["SPELL_CAST_START"] -- Ignore failure reason.
+	eventConditionData["SPELL_CAST_FAILED"] = eventConditionData["SPELL_CAST_START"]
 	eventConditionData["SPELL_SUMMON"] = eventConditionData["SPELL_CAST_SUCCESS"]
 	eventConditionData["SPELL_CREATE"] = eventConditionData["SPELL_CAST_START"]
-	--eventConditionData["UNIT_DIED"] = eventConditionData["PARTY_KILL"]
 	eventConditionData["UNIT_DESTROYED"] = eventConditionData["PARTY_KILL"]
 
 	frame.eventConditionData = eventConditionData
 
-	-- Available exceptions.
 	frame.availableExceptions = "activeTalents buffActive buffInactive currentCP currentPower inCombat recentlyFired trivialTarget unavailableSkill warriorStance zoneName zoneType"
 
 	return frame
 end
 
 
--- ****************************************************************************
--- Shows the popup trigger settings frame using the passed config.
--- ****************************************************************************
 local function ShowTrigger(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.triggerFrame) then popupFrames.triggerFrame = CreateTriggerPopup() end
 
-	-- Set parent.
 	local frame = popupFrames.triggerFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
 
-	-- Populate data.
 	local triggerKey = configTable.triggerKey
 	local settings = MSBTProfiles.currentProfile.triggers[triggerKey]
 	frame.titleFontString:SetText(configTable.title)
 
-	-- Classes.
 	EraseTable(frame.classes)
 	if (settings.classes) then
 		for className in string.gmatch(settings.classes, "[^,]+") do
@@ -3467,7 +2901,6 @@ local function ShowTrigger(configTable)
 	end
 	UpdateClassesText()
 
-	-- Main events.
 	local conditions
 	EraseTable(frame.mainEvents)
 	EraseTable(frame.eventConditions)
@@ -3485,7 +2918,6 @@ local function ShowTrigger(configTable)
 	end
 	UpdateMainEvents()
 
-	-- Exceptions.
 	EraseTable(frame.exceptions)
 	if (settings.exceptions and settings.exceptions ~= "") then
 		for exceptionCondition in string.gmatch(settings.exceptions .. ";;", "(.-);;") do
@@ -3494,7 +2926,6 @@ local function ShowTrigger(configTable)
 	end
 	UpdateExceptions()
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -3505,13 +2936,7 @@ local function ShowTrigger(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Item list frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Enables the controls on the item list popup.
--- ****************************************************************************
 local function EnableItemListControls()
 	for name, frame in pairs(popupFrames.itemListFrame.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -3519,9 +2944,6 @@ local function EnableItemListControls()
 end
 
 
--- ****************************************************************************
--- Validates if the passed item name does not already exist and is valid.
--- ****************************************************************************
 local function ValidateItemListName(itemName)
 	if (not itemName or itemName == "") then
 		return L.MSG_INVALID_ITEM_NAME
@@ -3533,9 +2955,6 @@ local function ValidateItemListName(itemName)
 end
 
 
--- ****************************************************************************
--- Adds the passed item name to the list of items.
--- ****************************************************************************
 local function SaveItemListName(settings)
 	local itemName = settings.inputText
 	local frame = popupFrames.itemListFrame
@@ -3545,9 +2964,6 @@ local function SaveItemListName(settings)
 end
 
 
--- ****************************************************************************
--- Called when one of the delete item buttons is pressed.
--- ****************************************************************************
 local function DeleteItemButtonOnClick(this)
 	local line = this:GetParent()
 	popupFrames.itemListFrame.items[line.itemName] = false
@@ -3555,15 +2971,11 @@ local function DeleteItemButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for item list popup.
--- ****************************************************************************
 local function CreateItemListLine(this)
 	local controls = popupFrames.itemListFrame.controls
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Delete item button.
 	local button = MSBTControls.CreateIconButton(frame, "Delete")
 	local objLocale = L.BUTTONS["deleteItem"]
 	button:SetTooltip(objLocale.tooltip)
@@ -3572,7 +2984,6 @@ local function CreateItemListLine(this)
 	frame.deleteButton = button
 	controls[#controls + 1] = button
 
-	-- Item name text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", frame, "LEFT", 5, 0)
 	fontString:SetPoint("RIGHT", frame.deleteButton, "LEFT", -10, 0)
@@ -3584,9 +2995,6 @@ local function CreateItemListLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display a line.
--- ****************************************************************************
 local function DisplayItemListLine(this, line, key, isSelected)
 	local frame = popupFrames.itemListFrame
 	line.itemName = key
@@ -3595,9 +3003,6 @@ end
 
 
 
--- ****************************************************************************
--- Creates the popup item list frame.
--- ****************************************************************************
 local function CreateItemList()
 	local frame = CreatePopup()
 	frame:SetWidth(400)
@@ -3605,7 +3010,6 @@ local function CreateItemList()
 	frame.controls = {}
 	local controls = frame.controls
 
-	-- Title text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
 	frame.titleFontString = fontString
@@ -3615,7 +3019,6 @@ local function CreateItemList()
 	fontString:SetText(L.MSG_ITEMS .. ":")
 	frame.itemsFontString = fontString
 
-	-- Add item button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["addItem"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3636,7 +3039,6 @@ local function CreateItemList()
 	frame.addItemButton = button
 	controls[#controls + 1] = button
 
-	-- Items listbox.
 	local listbox = MSBTControls.CreateListbox(frame)
 	listbox:Configure(355, 180, 30)
 	listbox:SetPoint("TOPLEFT", frame.itemsFontString, "BOTTOMLEFT", 10, -10)
@@ -3645,7 +3047,6 @@ local function CreateItemList()
 	frame.itemsListbox = listbox
 	controls[#controls + 1] = listbox
 
-	-- Save button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3658,7 +3059,6 @@ local function CreateItemList()
 	end)
 	controls[#controls + 1] = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3672,32 +3072,23 @@ local function CreateItemList()
 end
 
 
--- ****************************************************************************
--- Shows the popup skill list frame using the passed config.
--- ****************************************************************************
 local function ShowItemList(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame or not configTable.items) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.itemListFrame) then popupFrames.itemListFrame = CreateItemList() end
 
-	-- Set parent.
 	local frame = popupFrames.itemListFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
 
-	-- Populate data.
 	frame.titleFontString:SetText(configTable.title)
 
-	-- Items.
 	frame.items = configTable.items
 	frame.itemsListbox:Clear()
 	for itemName, value in pairs(configTable.items) do
 		if (value) then frame.itemsListbox:AddItem(itemName) end
 	end
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -3708,13 +3099,7 @@ local function ShowItemList(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Skill list frame functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Enables the controls on the skill list popup.
--- ****************************************************************************
 local function EnableSkillListControls()
 	for name, frame in pairs(popupFrames.skillListFrame.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -3722,9 +3107,6 @@ local function EnableSkillListControls()
 end
 
 
--- ****************************************************************************
--- Validates if the passed skill name does not already exist and is valid.
--- ****************************************************************************
 local function ValidateSkillListName(skillName)
 	if (not skillName or skillName == "") then
 		return L.MSG_INVALID_SKILL_NAME
@@ -3736,9 +3118,6 @@ local function ValidateSkillListName(skillName)
 end
 
 
--- ****************************************************************************
--- Adds the passed skill name to the list of skills.
--- ****************************************************************************
 local function SaveSkillListName(settings)
 	local skillName = settings.inputText
 	local frame = popupFrames.skillListFrame
@@ -3754,9 +3133,6 @@ local function SaveSkillListName(settings)
 end
 
 
--- ****************************************************************************
--- Called when one of the delete skill buttons is pressed.
--- ****************************************************************************
 local function DeleteSkillButtonOnClick(this)
 	local line = this:GetParent()
 	popupFrames.skillListFrame.skills[line.skillName] = false
@@ -3764,24 +3140,17 @@ local function DeleteSkillButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called when one of the time slider changes.
--- ****************************************************************************
 local function TimeSliderOnValueChanged(this, value)
 	local line = this:GetParent()
 	popupFrames.skillListFrame.skills[line.skillName] = value
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for skill list popup.
--- ****************************************************************************
 local function CreateSkillListLine(this)
 	local controls = popupFrames.skillListFrame.controls
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Delete skill button.
 	local button = MSBTControls.CreateIconButton(frame, "Delete")
 	local objLocale = L.BUTTONS["deleteSkill"]
 	button:SetTooltip(objLocale.tooltip)
@@ -3790,7 +3159,6 @@ local function CreateSkillListLine(this)
 	frame.deleteButton = button
 	controls[#controls + 1] = button
 
-	-- Time slider.
 	local slider = MSBTControls.CreateSlider(frame)
 	objLocale = L.SLIDERS["skillThrottleTime"]
 	slider:Configure(120, objLocale.label, objLocale.tooltip)
@@ -3801,7 +3169,6 @@ local function CreateSkillListLine(this)
 	frame.timeSlider = slider
 	controls[#controls + 1] = slider
 
-	-- Skill name text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", frame, "LEFT", 5, 0)
 	fontString:SetPoint("RIGHT", frame.timeSlider, "LEFT", -10, 0)
@@ -3813,9 +3180,6 @@ local function CreateSkillListLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display a line.
--- ****************************************************************************
 local function DisplaySkillListLine(this, line, key, isSelected)
 	local frame = popupFrames.skillListFrame
 	line.skillName = key
@@ -3836,9 +3200,6 @@ local function DisplaySkillListLine(this, line, key, isSelected)
 end
 
 
--- ****************************************************************************
--- Creates the popup skill list frame.
--- ****************************************************************************
 local function CreateSkillList()
 	local frame = CreatePopup()
 	frame:SetWidth(400)
@@ -3846,7 +3207,6 @@ local function CreateSkillList()
 	frame.controls = {}
 	local controls = frame.controls
 
-	-- Title text.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
 	frame.titleFontString = fontString
@@ -3856,7 +3216,6 @@ local function CreateSkillList()
 	fontString:SetText(L.MSG_SKILLS .. ":")
 	frame.skillsFontString = fontString
 
-	-- Add skill button.
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["addSkill"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3883,7 +3242,6 @@ local function CreateSkillList()
 	frame.addSkillButton = button
 	controls[#controls + 1] = button
 
-	-- Skills listbox.
 	local listbox = MSBTControls.CreateListbox(frame)
 	listbox:Configure(355, 180, 30)
 	listbox:SetPoint("TOPLEFT", frame.skillsFontString, "BOTTOMLEFT", 10, -10)
@@ -3892,7 +3250,6 @@ local function CreateSkillList()
 	frame.skillsListbox = listbox
 	controls[#controls + 1] = listbox
 
-	-- Save button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3905,7 +3262,6 @@ local function CreateSkillList()
 	end)
 	controls[#controls + 1] = button
 
-	-- Cancel button.
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -3919,25 +3275,17 @@ local function CreateSkillList()
 end
 
 
--- ****************************************************************************
--- Shows the popup skill list frame using the passed config.
--- ****************************************************************************
 local function ShowSkillList(configTable)
-	-- Don't do anything if required parameters weren't passed.
 	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame or not configTable.skills) then return end
 
-	-- Create the frame if it hasn't already been.
 	if (not popupFrames.skillListFrame) then popupFrames.skillListFrame = CreateSkillList() end
 
-	-- Set parent.
 	local frame = popupFrames.skillListFrame
 	ChangePopupParent(frame, configTable.parentFrame)
 
 
-	-- Populate data.
 	frame.titleFontString:SetText(configTable.title)
 
-	-- Skills.
 	frame.listType = configTable.listType
 	frame.skills = configTable.skills
 	frame.skillsListbox:Clear()
@@ -3945,7 +3293,6 @@ local function ShowSkillList(configTable)
 		if (value) then frame.skillsListbox:AddItem(skillName) end
 	end
 
-	-- Configure the frame.
 	frame.saveHandler = configTable.saveHandler
 	frame.saveArg1 = configTable.saveArg1
 	frame.hideHandler = configTable.hideHandler
@@ -3956,9 +3303,6 @@ local function ShowSkillList(configTable)
 end
 
 
--------------------------------------------------------------------------------
--- Initialization.
--------------------------------------------------------------------------------
 
 if type(FillLocalizedClassList) == "function" then
 	FillLocalizedClassList(CLASS_NAMES)
@@ -3969,11 +3313,7 @@ end
 
 
 
--------------------------------------------------------------------------------
--- Module interface.
--------------------------------------------------------------------------------
 
--- Protected Functions.
 module.DisableControls				= DisableControls
 module.ShowInput					= ShowInput
 module.ShowAcknowledge				= ShowAcknowledge

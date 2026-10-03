@@ -38,7 +38,8 @@ class RemovedDeadOptionsCodeTests(unittest.TestCase):
 
         # When
         commented_statement = re.compile(
-            r"^\s*--(?:\[\[)?\s*(?:local\s+\w+\s*=|\w+:Set)",
+            r"^\s*--(?:\[\[)?\s*(?:local\s+\w+\s*=|\w+:Set|"
+            r"\w+\[[^]]+\]\s*=)",
             re.MULTILINE,
         )
 

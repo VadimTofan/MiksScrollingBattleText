@@ -1,24 +1,11 @@
--------------------------------------------------------------------------------
--- Title: MSBT Options Korean Localization
--- Author: Mikord
--- Korean Translation by: Slowhand, Fenlis, chkid
--------------------------------------------------------------------------------
 
--- Don't do anything if the locale isn't Korean.
 if (GetLocale() ~= "koKR") then return end
 
--- Local reference for faster access.
 local L = MikSBT.translations
 
 
--------------------------------------------------------------------------------
--- Korean Localization
--------------------------------------------------------------------------------
 
 
-------------------------------
--- Interface messages
-------------------------------
 L.MSG_NEW_PROFILE					= "새로운 프로필"
 L.MSG_PROFILE_ALREADY_EXISTS		= "프로필이 이미 존재합니다."
 L.MSG_INVALID_PROFILE_NAME			= "허용되지 않는 프로필 이름입니다."
@@ -46,9 +33,6 @@ L.MSG_ITEM_ALREADY_EXISTS			= "아이템 이름이 이미 존재합니다."
 L.MSG_INVALID_ITEM_NAME				= "잘못된 아이템 이름."
 
 
-------------------------------
--- Interface tabs
-------------------------------
 
 obj = L.TABS
 obj["general"] = { label="일반", tooltip="전반적인 설정을 표시합니다."}
@@ -57,9 +41,6 @@ obj["events"] = { label="이벤트", tooltip="이벤트에 관한 설정을 표�
 obj["lootAlerts"]	= { label="획득 알림", tooltip="전리품 획득 안내에 대한 설정을 표시합니다."}
 
 
-------------------------------
--- Interface checkboxes
-------------------------------
 
 obj = L.CHECKBOXES
 
@@ -100,9 +81,6 @@ obj["alwaysShowQuestItems"]		= { label="퀘스트 아이템 항상 표시", tool
 obj["enableIcons"]				= { label="기술 아이콘 사용", tooltip="이벤트에 사용 가능한 기술 아이콘이 있을때 아이콘을 표시합니다."}
 
 
-------------------------------
--- Interface dropdowns
-------------------------------
 
 obj = L.DROPDOWNS
 obj["profile"]				= { label="현재 프로필:", tooltip="현재 프로필을 설정합니다."}
@@ -125,9 +103,6 @@ obj["triggerRelation"]		= { label="관계:"}
 obj["triggerParameter"]		= { label="매개변수 (parameter):"}
 
 
-------------------------------
--- Interface buttons
-------------------------------
 
 obj = L.BUTTONS
 obj["copyProfile"]				= { label="프로필 복사", tooltip="명시된 이름의 새 프로필로 프로필을 복사합니다."}
@@ -174,9 +149,6 @@ obj["addItem"]					= { label="아이템 추가", tooltip="목록에 새로운 �
 obj["deleteItem"]				= { tooltip="클릭하여 아이템을 삭제합니다."}
 
 
-------------------------------
--- Interface editboxes
-------------------------------
 
 obj = L.EDITBOXES
 obj["copyProfile"]		= { label="새 프로필 이름 입력:", tooltip="선택된 프로필로부터 복사될 새로운 프로필의 이름."}
@@ -191,9 +163,6 @@ obj["substitutionText"]	= { label="대체 텍스트:", tooltip="기술 이름을
 obj["itemName"]			= { label="아이템 이름:", tooltip="추가시킬 아이템의 이름."}
 
 
-------------------------------
--- Interface sliders
-------------------------------
 
 obj = L.SLIDERS
 obj["animationSpeed"]		= { label="애니메이션 속도", tooltip="기본 애니메이션 속도를 설정합니다..\n\n각 스크롤 영역은 각기 다른 속도로 설정될수도 있습니다.."}
@@ -213,9 +182,6 @@ obj["powerThrottleTime"]	= { label="마력 변화 출력시간", tooltip="마력
 obj["skillThrottleTime"]	= { label="출력시간 (초)", tooltip="기술을 출력하는 단위시간 (초)."}
 
 
-------------------------------
--- Event categories
-------------------------------
 obj = L.EVENT_CATEGORIES
 obj[1] = "자신이 받은 메시지"
 obj[2] = "자신이 받은 메시지 [소환수]"
@@ -224,9 +190,6 @@ obj[4] = "대상이 받은 메시지 [소환수]"
 obj[5] = "알림 메시지"
 
 
-------------------------------
--- Event codes
-------------------------------
 
 obj = L.EVENT_CODES
 obj["DAMAGE_TAKEN"]			= "%a - 받은 피해량.\n"
@@ -269,9 +232,6 @@ obj["POWER_TYPE"]			= "%p - 마력의 유형 (마나, 분노, 기력, 룬마력)
 obj["TOTAL_ITEMS"]			= "%t - 소지품 속 획득한 아이템의 합계."
 
 
-------------------------------
--- Incoming events
-------------------------------
 
 obj = L.INCOMING_PLAYER_EVENTS
 obj["INCOMING_DAMAGE"]						= { label="근접 평타", tooltip="자신이 받은 근접 평타를 활성화합니다."}
@@ -335,9 +295,6 @@ obj["PET_INCOMING_HOT"]							= { label="주기적 치유", tooltip="소환수�
 obj["PET_INCOMING_HOT_CRIT"]					= { label="주기적 치유 극대화", tooltip="소환수가 받은 받은 주기적 치유 극대화를 활성화합니다."}
 
 
-------------------------------
--- Outgoing events
-------------------------------
 
 obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="근접 평타", tooltip="대상이 받은 근접 평타를 활성화합니다."}
@@ -406,9 +363,6 @@ obj["PET_OUTGOING_HOT_CRIT"]					= { label="주기적 치유 극대화", tooltip
 obj["PET_OUTGOING_DISPEL"]						= { label="해제", tooltip="소환수의 해제를 활성화합니다."}
 
 
-------------------------------
--- Notification events
-------------------------------
 
 obj = L.NOTIFICATION_EVENTS
 obj["NOTIFICATION_DEBUFF"]				= { label="디버프", tooltip="당신이 걸린 디버프를 알려줍니다."}
@@ -443,11 +397,7 @@ obj["NOTIFICATION_ENEMY_BUFF"]			= { label="적의 버프 획득", tooltip="당�
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="몬스터 감정표현", tooltip="당신의 대상 몬스터의 감정 표현을 알려줍니다."}
 
 
-------------------------------
--- Trigger info
-------------------------------
 
--- Main events.
 obj = L.TRIGGER_DATA
 obj["SWING_DAMAGE"]				= "근접 피해"
 obj["RANGE_DAMAGE"]				= "원거리 피해"
@@ -492,7 +442,6 @@ obj["SPELL_EXTRA_ATTACKS"]		= "추가 공격"
 obj["UNIT_HEALTH"]				= "생명력 변화"
 obj["UNIT_POWER"]				= "마력 변화"
 
--- Main event conditions.
 obj["sourceName"]				= "이벤트를 제공한 유닛의 이름"
 obj["sourceAffiliation"]		= "이벤트를 제공한 유닛의 소속"
 obj["sourceReaction"]			= "이벤트를 제공한 유닛과의 관계"
@@ -527,7 +476,6 @@ obj["threshold"]				= "기준 (양/시간)"
 obj["unitID"]					= "유닛 ID"
 obj["unitReaction"]				= "유닛 반응"
 
--- Exception conditions.
 obj["activeTalents"]			= "활성된 특성"
 obj["buffActive"]				= "활성된 버프"
 obj["buffInactive"]				= "비활성된 버프"
@@ -541,7 +489,6 @@ obj["warriorStance"]			= "전사 태세"
 obj["zoneName"]					= "지역 이름"
 obj["zoneType"]					= "지역 유형"
 
--- Relationships.
 obj["eq"]						= "일치함 ( = )"
 obj["ne"]						= "일치하지 않음 ( ≠ )"
 obj["like"]						= "유사함"
@@ -549,7 +496,6 @@ obj["unlike"]					= "유사하지 않음"
 obj["lt"]						= "보다 작음 ( < )"
 obj["gt"]						= "보다 큼 ( > )"
 
--- Affiliations.
 obj["affiliationMine"]			= "자신의 것"
 obj["affiliationParty"]			= "파티원"
 obj["affiliationRaid"]			= "공격대원"
@@ -558,65 +504,47 @@ obj["affiliationTarget"]		= TARGET
 obj["affiliationFocus"]			= "주시 대상"
 obj["affiliationYou"]			= YOU
 
--- Reactions.
 obj["reactionFriendly"]			= "우호적인"
 obj["reactionNeutral"]			= "중립적인"
 obj["reactionHostile"]			= "적대적인"
 
--- Control types.
 obj["controlServer"]			= "서버"
 obj["controlHuman"]				= "유저"
 
--- Unit types.
 obj["unitTypePlayer"]			= PLAYER
 obj["unitTypeNPC"]				= "NPC"
 obj["unitTypePet"]				= PET
 obj["unitTypeGuardian"]			= "수호물"
 obj["unitTypeObject"]			= "객체"
 
--- Aura types.
 obj["auraTypeBuff"]				= "버프"
 obj["auraTypeDebuff"]			= "디버프"
 
--- Zone types.
 obj["zoneTypeArena"]			= "투기장"
 obj["zoneTypePvP"]				= BATTLEGROUND
 obj["zoneTypeParty"]			= "5인 던전"
 obj["zoneTypeRaid"]				= "공격대 던전"
 
--- Booleans
 obj["booleanTrue"]				= "True"
 obj["booleanFalse"]				= "False"
 
 
-------------------------------
--- Font info
-------------------------------
 
--- Font outlines.
 obj = L.OUTLINES
 obj[1] = "없음"
 obj[2] = "얇게"
 obj[3] = "굵게"
 
--- Text aligns.
 obj = L.TEXT_ALIGNS
 obj[1] = "왼쪽"
 obj[2] = "가운데"
 obj[3] = "오른쪽"
 
 
-------------------------------
--- Sound info
-------------------------------
 
 
 
-------------------------------
--- Animation style info
-------------------------------
 
--- Animation styles
 obj = L.ANIMATION_STYLE_DATA
 obj["Angled"]		= "각도"
 obj["Horizontal"]	= "수평"
@@ -625,14 +553,12 @@ obj["Straight"]		= "직선"
 obj["Static"]		= "고정"
 obj["Pow"]			= "타격 효과"
 
--- Animation style directions.
 obj["Alternate"]	= "교차"
 obj["Left"]			= "좌로"
 obj["Right"]		= "우로"
 obj["Up"]			= "위로"
 obj["Down"]			= "아래로"
 
--- Animation style behaviors.
 obj["AngleUp"]			= "상향 각도로"
 obj["AngleDown"]		= "하향 각도로"
 obj["GrowUp"]			= "위로 확장"
@@ -642,7 +568,6 @@ obj["CurvedRight"]		= "우로 휘어짐"
 obj["Jiggle"]			= "흔들림"
 obj["Normal"]			= "효과 없음"
 
--- Custom event sounds.
 L.MSG_INVALID_CUSTOM_SOUND_NAME		= "잘못된 소리 이름."
 L.MSG_SOUND_NAME_ALREADY_EXISTS		= "소리 이름이 이미 존재합니다."
 L.MSG_INVALID_SOUND_FILE			= "효과음은 .ogg 파일이어야 합니다."

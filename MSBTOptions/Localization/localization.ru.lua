@@ -1,23 +1,10 @@
--------------------------------------------------------------------------------
--- Title: MSBT Options Russian Localization
--- Author: Mikord
--- Russain Translation by: Eritnull (StingerSoft)
--------------------------------------------------------------------------------
 
--- Don't do anything if the locale isn't Russian.
 if (GetLocale() ~= "ruRU") then return end
 
--- Local reference for faster access.
 local L = MikSBT.translations
 
--------------------------------------------------------------------------------
--- Russian Localization
--------------------------------------------------------------------------------
 
 
-------------------------------
--- Interface messages
-------------------------------
 L.MSG_NEW_PROFILE					= "Новый профиль"
 L.MSG_PROFILE_ALREADY_EXISTS		= "Профиль уже существует."
 L.MSG_INVALID_PROFILE_NAME			= "Неверное название профиля."
@@ -45,9 +32,6 @@ L.MSG_ITEM_ALREADY_EXISTS			= "Название предмета уже суще
 L.MSG_INVALID_ITEM_NAME				= "Неверное название предмета."
 
 
-------------------------------
--- Interface tabs
-------------------------------
 
 obj = L.TABS
 obj["general"]		= { label="Основной", tooltip="Основные настройки."}
@@ -56,9 +40,6 @@ obj["events"]		= { label="События", tooltip="Настройки вход�
 obj["lootAlerts"]	= { label="Оповещения добычи", tooltip="Настройки отображения оповещений о добыче."}
 
 
-------------------------------
--- Interface checkboxes
-------------------------------
 
 obj = L.CHECKBOXES
 
@@ -99,9 +80,6 @@ obj["alwaysShowQuestItems"]		= { label="Предметы заданий", toolti
 obj["enableIcons"]				= { label="Вкл/Выкл иконки навыков", tooltip="Отображение иконок для событий если это возможно и они существуют."}
 
 
-------------------------------
--- Interface dropdowns
-------------------------------
 
 obj = L.DROPDOWNS
 obj["profile"]				= { label="Текущий профиль:", tooltip="Установить текущий профиль."}
@@ -124,9 +102,6 @@ obj["triggerRelation"]		= { label="Отношение:"}
 obj["triggerParameter"]		= { label="Параметр:"}
 
 
-------------------------------
--- Interface buttons
-------------------------------
 
 obj = L.BUTTONS
 obj["copyProfile"]				= { label="Скопировать", tooltip="Скопировать профиль в новый профиль с вами установленным названием."}
@@ -173,9 +148,6 @@ obj["addItem"]					= { label="Добавить предмет", tooltip="Доб�
 obj["deleteItem"]				= { tooltip="Нажмите чтобы удалить предмет."}
 
 
-------------------------------
--- Interface editboxes
-------------------------------
 
 obj = L.EDITBOXES
 obj["copyProfile"]		= { label="Новое название профиля:", tooltip="Название нового профиля в который будет скопирован выбранный профиль."}
@@ -190,9 +162,6 @@ obj["substitutionText"]	= { label="Текст замещения:", tooltip="Т�
 obj["itemName"]			= { label="Название предмета:", tooltip="Название добавляемого предмета."}
 
 
-------------------------------
--- Interface sliders
-------------------------------
 
 obj = L.SLIDERS
 obj["animationSpeed"]		= { label="Скорость анимации", tooltip="Установка основной скорости анимации.\n\nКаждая область прокрутки также может быть настроена в независимости от основной скорости."}
@@ -212,9 +181,6 @@ obj["powerThrottleTime"]	= { label="Регулятор времени энерг
 obj["skillThrottleTime"]	= { label="Регулятор время", tooltip="Число секунд, чтобы замедлить отображение навыков."}
 
 
-------------------------------
--- Event categories
-------------------------------
 obj = L.EVENT_CATEGORIES
 obj[1] = "Входящий - Игрок"
 obj[2] = "Входящий - Питомец"
@@ -223,9 +189,6 @@ obj[4] = "Исходящий - Питомец"
 obj[5] = "Извещения"
 
 
-------------------------------
--- Event codes
-------------------------------
 
 obj = L.EVENT_CODES
 obj["DAMAGE_TAKEN"]			= "%a - Значение получаемого урона.\n"
@@ -267,9 +230,6 @@ obj["POWER_TYPE"]			= "%p - Тип энергии (энергия, ярость,
 obj["TOTAL_ITEMS"]			= "%t - Общее количество добытых предметов в инвентаре."
 
 
-------------------------------
--- Incoming events
-------------------------------
 
 obj = L.INCOMING_PLAYER_EVENTS
 obj["INCOMING_DAMAGE"]						= { label="Ближний удар", tooltip="Вкл/Выкл входящие ближние удары."}
@@ -333,9 +293,6 @@ obj["PET_INCOMING_HOT"]							= { label="Исцеление за Время", to
 obj["PET_INCOMING_HOT_CRIT"]					= { label="Крит исцеление за время", tooltip="Вкл/Выкл вашего питомца входящий крит Исцеление за Время."}
 
 
-------------------------------
--- Outgoing events
-------------------------------
 
 obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="Ближний удар", tooltip="Вкл/Выкл исходящие ближние удары."}
@@ -404,9 +361,6 @@ obj["PET_OUTGOING_HOT_CRIT"]					= { label="Крит исцеление за в�
 obj["PET_OUTGOING_DISPEL"]						= { label="Рассеивания", tooltip="Вкл/Выкл исходящие рассеивания"}
 
 
-------------------------------
--- Notification events
-------------------------------
 
 obj = L.NOTIFICATION_EVENTS
 obj["NOTIFICATION_DEBUFF"]				= { label="Отриц. эффекты", tooltip="Вкл/Выкл оповещение о заражении отрицательными эффектами."}
@@ -437,11 +391,7 @@ obj["NOTIFICATION_ENEMY_BUFF"]			= { label="Получ. врагом полож.
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="Эмоции монстров", tooltip="Вкл/Выкл эмоции монстров которые в текущий момент в цели."}
 
 
-------------------------------
--- Trigger info
-------------------------------
 
--- Main events.
 obj = L.TRIGGER_DATA
 obj["SWING_DAMAGE"]				= "Обычный Урон"
 obj["RANGE_DAMAGE"]				= "Дальний урон"
@@ -486,7 +436,6 @@ obj["SPELL_EXTRA_ATTACKS"]		= "Экстра атаки"
 obj["UNIT_HEALTH"]				= "Изменение здоровья"
 obj["UNIT_POWER"]				= "Изменение энергии"
 
--- Main event conditions.
 obj["sourceName"]				= "Название источника"
 obj["sourceAffiliation"]		= "Источник принадлежности объекта"
 obj["sourceReaction"]			= "Источник реакции объекта"
@@ -521,7 +470,6 @@ obj["threshold"]				= "Порог"
 obj["unitID"]					= "ID объекта"
 obj["unitReaction"]				= "Реакция объекта"
 
--- Exception conditions.
 obj["activeTalents"]			= "Активный талант"
 obj["buffActive"]				= "Активность заклинания"
 obj["buffInactive"]				= "Бездействующий бафф"
@@ -535,7 +483,6 @@ obj["warriorStance"]			= "Стоики война"
 obj["zoneName"]					= "Название зоны"
 obj["zoneType"]					= "Тип зоны"
 
--- Relationships.
 obj["eq"]						= "Равен"
 obj["ne"]						= "Не равен"
 obj["like"]						= "Похожий"
@@ -543,7 +490,6 @@ obj["unlike"]					= "Не похожий"
 obj["lt"]						= "Меньше чем"
 obj["gt"]						= "Больше чем"
 
--- Affiliations.
 obj["affiliationMine"]			= "Моё"
 obj["affiliationParty"]			= "Участник группы"
 obj["affiliationRaid"]			= "Участник рейда"
@@ -552,65 +498,47 @@ obj["affiliationTarget"]		= TARGET
 obj["affiliationFocus"]			= "Фокус"
 obj["affiliationYou"]			= YOU
 
--- Reactions.
 obj["reactionFriendly"]			= "Дружелюбный"
 obj["reactionNeutral"]			= "Нейтральный"
 obj["reactionHostile"]			= HOSTILE
 
--- Control types.
 obj["controlServer"]			= "Сервер"
 obj["controlHuman"]				= "Человек"
 
--- Unit types.
 obj["unitTypePlayer"]			= PLAYER
 obj["unitTypeNPC"]				= "НИП"
 obj["unitTypePet"]				= PET
 obj["unitTypeGuardian"]			= "Страж"
 obj["unitTypeObject"]			= "Объект"
 
--- Aura types.
 obj["auraTypeBuff"]				= "Полож. эффект"
 obj["auraTypeDebuff"]			= "Отриц. эффект"
 
--- Zone types.
 obj["zoneTypeArena"]			= "Арена"
 obj["zoneTypePvP"]				= BATTLEGROUND
 obj["zoneTypeParty"]			= "Подземелье на 5-чел"
 obj["zoneTypeRaid"]				= "Рейдовое подземелье"
 
--- Booleans
 obj["booleanTrue"]				= "Верный"
 obj["booleanFalse"]				= "Неверный"
 
 
-------------------------------
--- Font info
-------------------------------
 
--- Font outlines.
 obj = L.OUTLINES
 obj[1] = "Нету"
 obj[2] = "Тонкий"
 obj[3] = "Жирный"
 
--- Text aligns.
 obj = L.TEXT_ALIGNS
 obj[1] = "Влево"
 obj[2] = "По центру"
 obj[3] = "Вправо"
 
 
-------------------------------
--- Sound info
-------------------------------
 
 
 
-------------------------------
--- Animation style info
-------------------------------
 
--- Animation styles
 obj = L.ANIMATION_STYLE_DATA
 obj["Angled"]		= "Угловой"
 obj["Horizontal"]	= "Горизонтальный"
@@ -619,14 +547,12 @@ obj["Straight"]		= "Прямой"
 obj["Static"]		= "Статика"
 obj["Pow"]			= "Ручеёк"
 
--- Animation style directions.
 obj["Alternate"]	= "Чередоваться"
 obj["Left"]			= "Влево"
 obj["Right"]		= "Вправо"
 obj["Up"]			= "Вверх"
 obj["Down"]			= "Вниз"
 
--- Animation style behaviors.
 obj["AngleUp"]			= "Угол вверх"
 obj["AngleDown"]		= "Угол вниз"
 obj["GrowUp"]			= "Увеличиваться"
@@ -636,7 +562,6 @@ obj["CurvedRight"]		= "Изогнутый вправо"
 obj["Jiggle"]			= "Тряска"
 obj["Normal"]			= "Нормальный"
 
--- Custom event sounds.
 L.MSG_INVALID_CUSTOM_SOUND_NAME		= "Неверное название звукового файла."
 L.MSG_SOUND_NAME_ALREADY_EXISTS		= "Название звукового файла уже существует."
 L.MSG_INVALID_SOUND_FILE			= "Звуки должны быть в .ogg формате."

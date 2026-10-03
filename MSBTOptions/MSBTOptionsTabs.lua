@@ -1,19 +1,10 @@
--------------------------------------------------------------------------------
--- Title: MSBT Options Tab Frames
--- Author: Mikord
--------------------------------------------------------------------------------
 
--- Create module and set its name.
 local module = {}
 local moduleName = "Tabs"
 MSBTOptions[moduleName] = module
 
 
--------------------------------------------------------------------------------
--- Imports.
--------------------------------------------------------------------------------
 
--- Local references to various modules for faster access.
 local MSBTOptMain = MSBTOptions.Main
 local MSBTControls = MSBTOptions.Controls
 local MSBTPopups = MSBTOptions.Popups
@@ -22,22 +13,16 @@ local MSBTAnimations = MikSBT.Animations
 local MSBTMedia = MikSBT.Media
 local L = MikSBT.translations
 
--- Local references to various functions for faster access.
 local EraseTable = MikSBT.EraseTable
 local Print = MikSBT.Print
 local DisableControls = MSBTPopups.DisableControls
 
--- Local references to various variables for faster access.
 local fonts = MSBTMedia.fonts
 
 local IsClassic = MikSBT.Compatibility.Client.isClassicContent
 
 
--------------------------------------------------------------------------------
--- Private constants.
--------------------------------------------------------------------------------
 
--- Prevent tainting global _.
 local _
 
 local DEFAULT_PROFILE_NAME = "Default"
@@ -51,31 +36,17 @@ local EVENT_CATEGORY_MAP = {
 	"NOTIFICATION_EVENTS"
 }
 
--------------------------------------------------------------------------------
--- Private variables.
--------------------------------------------------------------------------------
 
--- Various tab frames.
 local tabFrames = {}
 
--- Reusable table to configure popup frames.
 local configTable = {}
 
--- Reusable table for lists.
 local listTable = {}
 
--- Holds categorized events in the order to display them.
 local orderedEvents = {}
 
 
--------------------------------------------------------------------------------
--- Utility functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Returns a list of keys for the passed table sorted according to their
--- associated value.
--- ****************************************************************************
 local function SortKeysByValue(t)
 	local sortedKeys = {}
 	local sortedValues = {}
@@ -103,9 +74,6 @@ local function SortKeysByValue(t)
 end
 
 
--- ****************************************************************************
--- Populates the list table with the entries from the current/master profile.
--- ****************************************************************************
 local function PopulateList(listName)
 	EraseTable(listTable)
 	local currentProfileList = rawget(MSBTProfiles.currentProfile, listName)
@@ -115,16 +83,12 @@ local function PopulateList(listName)
 		end
 	end
 
-	-- Get skills available in the master profile that aren't in the current profile.
 	for name, value in pairs(MSBTProfiles.masterProfile[listName]) do
 		if (listTable[name] == nil) then listTable[name] = value end
 	end
 end
 
 
--- ****************************************************************************
--- Saves the modified list to the current profile.
--- ****************************************************************************
 local function SaveList(listName)
 	for skillName, value in pairs(listTable) do
 		MSBTProfiles.SetOption(listName, skillName, value)
@@ -132,9 +96,6 @@ local function SaveList(listName)
 end
 
 
--------------------------------------------------------------------------------
--- General tab functions.
--------------------------------------------------------------------------------
 
 local GeneralTab_Populate
 
@@ -144,9 +105,6 @@ local function RefreshGeneralTabIfCreated()
 	end
 end
 
--- ****************************************************************************
--- Toggle the enable state of the profile buttons appropriately.
--- ****************************************************************************
 local function ProfileTab_ToggleDeleteButton()
 	if not tabFrames.profile or not tabFrames.profile.controls then
 		return
@@ -186,9 +144,6 @@ local function GeneralTab_IsBlizzardCombatTextV2Enabled()
 end
 
 
--- ****************************************************************************
--- Enables the controls on the general tab.
--- ****************************************************************************
 local function GeneralTab_EnableControls()
 	for name, frame in pairs(tabFrames.general.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -196,9 +151,6 @@ local function GeneralTab_EnableControls()
 end
 
 
--- ****************************************************************************
--- Populate the controls with the profile settings.
--- ****************************************************************************
 GeneralTab_Populate = function()
 	local currentProfile = MSBTProfiles.currentProfile
 	local controls = tabFrames.general.controls
@@ -223,9 +175,6 @@ GeneralTab_Populate = function()
 end
 
 
--- ****************************************************************************
--- Validates if the passed profile name does not already exist and is valid.
--- ****************************************************************************
 local function GenerelTab_ValidateProfileName(profileName)
 	if (not profileName or profileName == "") then
 		return L.MSG_INVALID_PROFILE_NAME
@@ -237,9 +186,6 @@ local function GenerelTab_ValidateProfileName(profileName)
 end
 
 
--- ****************************************************************************
--- Copies the selected profile to the name entered.
--- ****************************************************************************
 local function GeneralTab_CopyProfile(settings)
 	local profileName = settings.inputText
 	local controls = tabFrames.profile.controls
@@ -256,9 +202,6 @@ local function GeneralTab_CopyProfile(settings)
 end
 
 
--- ****************************************************************************
--- Resets the selected profile.
--- ****************************************************************************
 local function GeneralTab_ResetProfile()
 	local controls = tabFrames.profile.controls
 
@@ -267,9 +210,6 @@ local function GeneralTab_ResetProfile()
 end
 
 
--- ****************************************************************************
--- Deletes the selected profile.
--- ****************************************************************************
 local function GeneralTab_DeleteProfile()
 	local controls = tabFrames.profile.controls
 
@@ -284,17 +224,12 @@ local function GeneralTab_DeleteProfile()
 end
 
 
--- ****************************************************************************
--- Saves the font settings selected by the user.
--- ****************************************************************************
 local function GeneralTab_SaveFontSettings(fontSettings)
-	-- Normal font settings.
 	MSBTProfiles.SetOption(nil, "normalFontName", fontSettings.normalFontName)
 	MSBTProfiles.SetOption(nil, "normalOutlineIndex", fontSettings.normalOutlineIndex)
 	MSBTProfiles.SetOption(nil, "normalFontSize", fontSettings.normalFontSize)
 	MSBTProfiles.SetOption(nil, "normalFontAlpha", fontSettings.normalFontAlpha)
 
-	-- Crit font settings.
 	MSBTProfiles.SetOption(nil, "critFontName", fontSettings.critFontName)
 	MSBTProfiles.SetOption(nil, "critOutlineIndex", fontSettings.critOutlineIndex)
 	MSBTProfiles.SetOption(nil, "critFontSize", fontSettings.critFontSize)
@@ -302,15 +237,11 @@ local function GeneralTab_SaveFontSettings(fontSettings)
 end
 
 
--- ****************************************************************************
--- Creates the general tab frame contents.
--- ****************************************************************************
 local function GeneralTab_Create()
 	local tabFrame = tabFrames.general
 	tabFrame.controls = {}
 	local controls = tabFrame.controls
 
-	-- Enable checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	local objLocale = L.CHECKBOXES["enableMSBT"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -322,7 +253,6 @@ local function GeneralTab_Create()
 	)
 	controls.enableCheckbox = checkbox
 
-	-- Disable outgoing in group checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["disableOutgoingInGroup"] or { label = "Disable Outgoing In Group", tooltip = "While in a party or raid, hide events assigned to the Outgoing scroll area." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -337,7 +267,6 @@ local function GeneralTab_Create()
 	)
 	controls.disableOutgoingInGroupCheckbox = checkbox
 
-	-- Disable incoming in group checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["disableIncomingInGroup"] or { label = "Disable Incoming In Group", tooltip = "While in a party or raid, hide events assigned to the Incoming scroll area." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -352,7 +281,6 @@ local function GeneralTab_Create()
 	)
 	controls.disableIncomingInGroupCheckbox = checkbox
 
-	-- Disable notification in group checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["disableNotificationInGroup"] or { label = "Disable Notification In Group", tooltip = "While in a party or raid, hide events assigned to the Notification scroll area." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -367,7 +295,6 @@ local function GeneralTab_Create()
 	)
 	controls.disableNotificationInGroupCheckbox = checkbox
 
-	-- Disable static in group checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["disableStaticInGroup"] or { label = "Disable Static In Group", tooltip = "While in a party or raid, hide events assigned to the Static scroll area." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -382,7 +309,6 @@ local function GeneralTab_Create()
 	)
 	controls.disableStaticInGroupCheckbox = checkbox
 
-	-- Blizzard floating combat text (v2) checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableBlizzardV2CombatText"] or { label = "Disable Blizzard CT While Solo", tooltip = "When checked, disables Blizzard floating combat text damage/healing while solo." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -397,7 +323,6 @@ local function GeneralTab_Create()
 	)
 	controls.blizzardCombatTextV2Checkbox = checkbox
 
-	-- Blizzard floating combat text (v2) in group only checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableBlizzardV2InGroup"] or { label = "Enable Blizzard CT In Group", tooltip = "Enable Blizzard Combat Text only while in a party or raid. This overrides Disable Blizzard CT While Solo while grouped." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -412,7 +337,6 @@ local function GeneralTab_Create()
 	)
 	controls.blizzardCombatTextV2InGroupCheckbox = checkbox
 
-	-- Enable custom event sounds.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableSounds"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -422,7 +346,6 @@ local function GeneralTab_Create()
 	end)
 	controls.enableSoundsCheckbox = checkbox
 
-	-- Shorten numbers checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["shortenNumbers"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -434,7 +357,6 @@ local function GeneralTab_Create()
 	)
 	controls.shortenNumbersCheckbox = checkbox
 
-	-- Stack similar hits checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["stackSimilarHits"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -446,7 +368,6 @@ local function GeneralTab_Create()
 	)
 	controls.stackSimilarHitsCheckbox = checkbox
 
-	-- Sticky crits checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["stickyCrits"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -458,7 +379,6 @@ local function GeneralTab_Create()
 	)
 	controls.stickyCritsCheckbox = checkbox
 
-	-- Enable skill icons checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableIcons"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
@@ -470,7 +390,6 @@ local function GeneralTab_Create()
 	)
 	controls.enableIconsCheckbox = checkbox
 
-	-- Animation speed slider.
 	local slider = MSBTControls.CreateSlider(tabFrame)
 	objLocale = L.SLIDERS["animationSpeed"]
 	slider:Configure(180, objLocale.label, objLocale.tooltip)
@@ -486,7 +405,6 @@ local function GeneralTab_Create()
 
 
 
-		-- Class colors button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["classColors"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -505,7 +423,6 @@ local function GeneralTab_Create()
 	)
 	controls.classColorsButton = button
 
-	-- Damage colors button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["damageColors"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -524,7 +441,6 @@ local function GeneralTab_Create()
 	)
 	controls.damageColorsButton = button
 
-	-- Partial effects button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["partialEffects"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -543,7 +459,6 @@ local function GeneralTab_Create()
 	)
 	controls.partialEffectsButton = button
 
-	-- Master font settings button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["masterFont"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -589,7 +504,6 @@ local function GeneralTab_Create()
 	end)
 	controls.addCustomSoundButton = button
 
-	-- Font path validation font string used by custom font validation.
 	local fontString = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	fontString:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", 0, 0)
 	fontString:SetText("Test")
@@ -601,20 +515,13 @@ local function GeneralTab_Create()
 end
 
 
--- ****************************************************************************
--- Called when the tab frame is shown.
--- ****************************************************************************
 local function GeneralTab_OnShow()
 	if (not tabFrames.general.created) then GeneralTab_Create() end
 
-		-- Set the frame up to populate the profile options when it is shown.
 	GeneralTab_Populate()
 end
 
 
--------------------------------------------------------------------------------
--- Profile tab functions.
--------------------------------------------------------------------------------
 
 local function ProfileTab_EnableControls()
 	for _, frame in pairs(tabFrames.profile.controls) do
@@ -780,26 +687,16 @@ local function ProfileTab_OnShow()
 end
 
 
--------------------------------------------------------------------------------
--- Scroll areas tab functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Enables the controls on the scroll areas tab.
--- ****************************************************************************
 local function ScrollAreasTab_EnableControls()
 	for name, frame in pairs(tabFrames.scrollAreas.controls) do
 		if (frame.Enable) then frame:Enable() end
 	end
 
-	-- Refresh listbox so the default scroll area delete buttons are disabled.
 	tabFrames.scrollAreas.controls.scrollAreasListbox:Refresh()
 end
 
 
--- ****************************************************************************
--- Validates if the passed scroll area does not already exist and is valid.
--- ****************************************************************************
 local function ScrollAreasTab_ValidateScrollAreaName(scrollAreaName)
 	if (not scrollAreaName or scrollAreaName == "") then
 		return L.MSG_INVALID_SCROLL_AREA_NAME
@@ -811,9 +708,6 @@ local function ScrollAreasTab_ValidateScrollAreaName(scrollAreaName)
 end
 
 
--- ****************************************************************************
--- Adds a new scroll area with the passed scroll area name.
--- ****************************************************************************
 local function ScrollAreasTab_AddScrollArea(settings)
 	local nextAvailable = 1
 	while (MSBTProfiles.currentProfile.scrollAreas["Custom" .. nextAvailable]) do
@@ -829,9 +723,6 @@ local function ScrollAreasTab_AddScrollArea(settings)
 end
 
 
--- ****************************************************************************
--- Called when one of the enable scroll area checkboxes is clicked.
--- ****************************************************************************
 local function ScrollAreasTab_EnableOnClick(this, isChecked)
 	local line = this:GetParent()
 	MSBTProfiles.SetOption("scrollAreas." .. line.scrollAreaKey, "disabled", not isChecked)
@@ -839,9 +730,6 @@ local function ScrollAreasTab_EnableOnClick(this, isChecked)
 end
 
 
--- ****************************************************************************
--- Changes the passed scroll area to the passed name.
--- ****************************************************************************
 local function ScrollAreasTab_ChangeScrollAreaName(settings)
 	MSBTProfiles.SetOption("scrollAreas." .. settings.saveArg1, "name", settings.inputText)
 	MSBTAnimations.UpdateScrollAreas()
@@ -849,9 +737,6 @@ local function ScrollAreasTab_ChangeScrollAreaName(settings)
 end
 
 
--- ****************************************************************************
--- Called when one of the edit scroll area name buttons is clicked.
--- ****************************************************************************
 local function ScrollAreasTab_EditNameButtonOnClick(this)
 	local saKey = this:GetParent().scrollAreaKey
 	local objLocale = L.EDITBOXES["scrollAreaName"]
@@ -872,9 +757,6 @@ local function ScrollAreasTab_EditNameButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Deletes the scroll area for the passed line and removes the line.
--- ****************************************************************************
 local function ScrollAreasTab_DeleteScrollArea(line)
 	MSBTProfiles.SetOption("scrollAreas", line.scrollAreaKey, nil)
 	tabFrames.scrollAreas.controls.scrollAreasListbox:RemoveItem(line.itemNumber)
@@ -882,9 +764,6 @@ local function ScrollAreasTab_DeleteScrollArea(line)
 end
 
 
--- ****************************************************************************
--- Called when one of the delete scroll area buttons is clicked.
--- ****************************************************************************
 local function ScrollAreasTab_DeleteButtonOnClick(this)
 	EraseTable(configTable)
 	configTable.parentFrame = tabFrames.scrollAreas
@@ -899,17 +778,12 @@ local function ScrollAreasTab_DeleteButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Saves the font settings selected by the user.
--- ****************************************************************************
 local function ScrollAreasTab_SaveFontSettings(fontSettings, scrollAreaKey)
-	-- Normal font settings.
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "normalFontName", fontSettings.normalFontName)
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "normalOutlineIndex", fontSettings.normalOutlineIndex)
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "normalFontSize", fontSettings.normalFontSize)
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "normalFontAlpha", fontSettings.normalFontAlpha)
 
-	-- Crit font settings.
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "critFontName", fontSettings.critFontName)
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "critOutlineIndex", fontSettings.critOutlineIndex)
 	MSBTProfiles.SetOption("scrollAreas." .. scrollAreaKey, "critFontSize", fontSettings.critFontSize)
@@ -919,9 +793,6 @@ local function ScrollAreasTab_SaveFontSettings(fontSettings, scrollAreaKey)
 end
 
 
--- ****************************************************************************
--- Called when one of the font settings buttons is clicked.
--- ****************************************************************************
 local function ScrollAreasTab_FontButtonOnClick(this)
 	local saKey = this:GetParent().scrollAreaKey
 	local saSettings = MSBTProfiles.currentProfile.scrollAreas[saKey]
@@ -969,16 +840,12 @@ local function ScrollAreasTab_FontButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for scroll areas.
--- ****************************************************************************
 local function ScrollAreasTab_CreateLine(this)
 	local controls = tabFrames.scrollAreas.controls
 
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Enable checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["enableScrollArea"]
 	checkbox:Configure(24, nil, objLocale.tooltip)
@@ -987,7 +854,6 @@ local function ScrollAreasTab_CreateLine(this)
 	frame.enableCheckbox = checkbox
 	controls[#controls+1] = checkbox
 
-	-- Delete scroll area button.
 	local button = MSBTControls.CreateIconButton(frame, "Delete")
 	objLocale = L.BUTTONS["deleteScrollArea"]
 	button:SetTooltip(objLocale.tooltip)
@@ -996,7 +862,6 @@ local function ScrollAreasTab_CreateLine(this)
 	frame.deleteButton = button
 	controls[#controls+1] = button
 
-	-- Edit scroll area name button.
 	local button = MSBTControls.CreateIconButton(frame, "Configure")
 	objLocale = L.BUTTONS["editScrollAreaName"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1005,7 +870,6 @@ local function ScrollAreasTab_CreateLine(this)
 	controls[#controls+1] = button
 
 
-	-- Scroll area font settings button.
 	button = MSBTControls.CreateIconButton(frame, "FontSettings")
 	objLocale = L.BUTTONS["scrollAreaFontSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1017,16 +881,12 @@ local function ScrollAreasTab_CreateLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display a line.
--- ****************************************************************************
 local function ScrollAreasTab_DisplayLine(this, line, key, isSelected)
 	local saSettings = MSBTProfiles.currentProfile.scrollAreas[key]
 	line.scrollAreaKey = key
 	line.enableCheckbox:SetLabel(saSettings.name)
 	line.enableCheckbox:SetChecked(not saSettings.disabled)
 
-	-- Disable the delete button for the default scroll areas.
 	if (MSBTProfiles.masterProfile.scrollAreas[key]) then
 		line.deleteButton:Disable()
 	else
@@ -1035,15 +895,11 @@ local function ScrollAreasTab_DisplayLine(this, line, key, isSelected)
 end
 
 
--- ****************************************************************************
--- Creates the scroll areas tab frame contents.
--- ****************************************************************************
 local function ScrollAreasTab_Create()
 	local tabFrame = tabFrames.scrollAreas
 	tabFrame.controls = {}
 	local controls = tabFrame.controls
 
-	-- Horizontal bar.
 	local texture = tabFrame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
@@ -1051,7 +907,6 @@ local function ScrollAreasTab_Create()
 	texture:SetPoint("TOPRIGHT", tabFrame, "TOPRIGHT", 0, -45)
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
-	-- Add scroll area button.
 	local button = MSBTControls.CreateOptionButton(tabFrame)
 	local objLocale = L.BUTTONS["addScrollArea"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1074,7 +929,6 @@ local function ScrollAreasTab_Create()
 	)
 	controls.addScrollAreaButton = button
 
-	-- Configure scroll areas button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["configScrollAreas"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -1087,7 +941,6 @@ local function ScrollAreasTab_Create()
 	)
 	controls.configScrollAreasButton = button
 
-	-- Scroll areas listbox.
 	local listbox = MSBTControls.CreateListbox(tabFrame)
 	listbox:Configure(400, 300, 25)
 	listbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 0, -50)
@@ -1095,20 +948,15 @@ local function ScrollAreasTab_Create()
 	listbox:SetDisplayHandler(ScrollAreasTab_DisplayLine)
 	controls.scrollAreasListbox = listbox
 
-	-- Reusable table for scroll areas.
 	tabFrame.scrollAreasTable = {}
 
 	tabFrame.created = true
 end
 
 
--- ****************************************************************************
--- Called when the tab frame is shown.
--- ****************************************************************************
 local function ScrollAreasTab_OnShow()
 	if (not tabFrames.scrollAreas.created) then ScrollAreasTab_Create() end
 
-	-- Set the frame up to populate the profile options when it is shown.
 	local listbox = tabFrames.scrollAreas.controls.scrollAreasListbox
 
 	local scrollAreasTable = tabFrames.scrollAreas.scrollAreasTable
@@ -1127,32 +975,18 @@ local function ScrollAreasTab_OnShow()
 end
 
 
--------------------------------------------------------------------------------
--- Events tab functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Adds an event type to a category using the localized data and event codes.
--- ****************************************************************************
 local function EventsTab_AddEvent(category, eventType, codes)
-	-- Get the localized event data and ignore it if it isn't found.
 	local event = L[category][eventType]
 	if (not event) then return end
 
-	-- Add the event to the ordered events table for the category and set it up
-	-- with event codes.
 	orderedEvents[category][#orderedEvents[category]+1] = event
 	event.eventType = eventType
 	event.codes = codes
 end
 
 
--- ****************************************************************************
--- Sets up the event category entries with their associated event types and
--- codes.
--- ****************************************************************************
 local function EventsTab_SetupEvents()
-	-- Create tables to hold categorized events.
 	for index, category in ipairs(EVENT_CATEGORY_MAP) do orderedEvents[category] = {} end
 
 	local c = L.EVENT_CODES
@@ -1326,9 +1160,6 @@ local function EventsTab_SetupEvents()
 end
 
 
--- ****************************************************************************
--- Changes the event category to the passed value.
--- ****************************************************************************
 local function EventsTab_ChangeEventCategory(category)
 	local controls = tabFrames.events.controls
 
@@ -1339,9 +1170,6 @@ local function EventsTab_ChangeEventCategory(category)
 end
 
 
--- ****************************************************************************
--- Enables the controls on the events tab.
--- ****************************************************************************
 local function EventsTab_EnableControls()
 	for name, frame in pairs(tabFrames.events.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -1349,9 +1177,6 @@ local function EventsTab_EnableControls()
 end
 
 
--- ****************************************************************************
--- Moves all the events in the selected category to the passed scroll area.
--- ****************************************************************************
 local function EventsTab_MoveAll(scrollArea)
 	local events = orderedEvents[tabFrames.events.controls.eventCategoryDropdown:GetSelectedID()]
 	for index, eventData in ipairs(events) do
@@ -1360,9 +1185,6 @@ local function EventsTab_MoveAll(scrollArea)
 end
 
 
--- ****************************************************************************
--- Called when one of the event color swatches is changed.
--- ****************************************************************************
 local function EventsTab_ColorswatchOnChanged(this)
 	local eventType = this:GetParent().eventType
 	MSBTProfiles.SetOption("events." .. eventType, "colorR", this.r, 1)
@@ -1371,18 +1193,12 @@ local function EventsTab_ColorswatchOnChanged(this)
 end
 
 
--- ****************************************************************************
--- Called when one of the event enable checkboxes is clicked.
--- ****************************************************************************
 local function EventsTab_EnableOnClick(this, isChecked)
 	local eventType = this:GetParent().eventType
 	MSBTProfiles.SetOption("events." .. eventType, "disabled", not isChecked)
 end
 
 
--- ****************************************************************************
--- Saves the additional event settings selected by the user.
--- ****************************************************************************
 local function EventsTab_SaveEventSettings(settings, eventType)
 	MSBTProfiles.SetOption("events." .. eventType, "soundFile", settings.soundFile)
 	MSBTProfiles.SetOption("events." .. eventType, "scrollArea", settings.scrollArea, DEFAULT_SCROLL_AREA)
@@ -1393,9 +1209,6 @@ local function EventsTab_SaveEventSettings(settings, eventType)
 end
 
 
--- ****************************************************************************
--- Called when one of the event settings buttons is clicked.
--- ****************************************************************************
 local function EventsTab_SettingsButtonOnClick(this)
 	local eventType = this:GetParent().eventType
 	local eventSettings = MSBTProfiles.currentProfile.events[eventType]
@@ -1421,9 +1234,6 @@ local function EventsTab_SettingsButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Saves the font settings selected by the user.
--- ****************************************************************************
 local function EventsTab_SaveFontSettings(settings, eventType)
 	local isCrit = MSBTProfiles.currentProfile.events[eventType].isCrit
 	MSBTProfiles.SetOption("events." .. eventType, "fontName", isCrit and settings.critFontName or settings.normalFontName)
@@ -1433,9 +1243,6 @@ local function EventsTab_SaveFontSettings(settings, eventType)
 end
 
 
--- ****************************************************************************
--- Called when one of the font settings buttons is clicked.
--- ****************************************************************************
 local function EventsTab_FontButtonOnClick(this)
 	local categoryText = tabFrames.events.controls.eventCategoryDropdown:GetSelectedText()
 	local eventType = this:GetParent().eventType
@@ -1450,7 +1257,6 @@ local function EventsTab_FontButtonOnClick(this)
 
 	local fontName
 	if (not eventSettings.isCrit) then
-		-- Inherit from the correct scroll area.
 		fontName = saSettings.normalFontName
 		if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.normalFontName end
 		if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
@@ -1468,7 +1274,6 @@ local function EventsTab_FontButtonOnClick(this)
 
 		configTable.hideCrit = true
 	else
-		-- Inherit from the correct scroll area.
 		fontName = saSettings.critFontName
 		if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.critFontName end
 		if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
@@ -1499,23 +1304,18 @@ local function EventsTab_FontButtonOnClick(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to create a line for events.
--- ****************************************************************************
 local function EventsTab_CreateLine(this)
 	local controls = tabFrames.events.controls
 
 	local frame = CreateFrame("Button", nil, this)
 	frame:EnableMouse(false)
 
-	-- Event colorswatch.
 	local colorswatch = MSBTControls.CreateColorswatch(frame)
 	colorswatch:SetPoint("LEFT", frame, "LEFT", 5, 0)
 	colorswatch:SetColorChangedHandler(EventsTab_ColorswatchOnChanged)
 	frame.colorSwatch = colorswatch
 	controls[#controls+1] = colorswatch
 
-	-- Enable checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	checkbox:Configure(24, nil, nil)
 	checkbox:SetPoint("LEFT", colorswatch, "RIGHT", 5, 0)
@@ -1524,7 +1324,6 @@ local function EventsTab_CreateLine(this)
 	frame.enableCheckbox = checkbox
 	controls[#controls+1] = checkbox
 
-	-- Event settings button.
 	local button = MSBTControls.CreateIconButton(frame, "Configure")
 	local objLocale = L.BUTTONS["eventSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1532,7 +1331,6 @@ local function EventsTab_CreateLine(this)
 	button:SetClickHandler(EventsTab_SettingsButtonOnClick)
 	controls[#controls+1] = button
 
-	-- Event font settings button.
 	button = MSBTControls.CreateIconButton(frame, "FontSettings")
 	objLocale = L.BUTTONS["eventFontSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1540,7 +1338,6 @@ local function EventsTab_CreateLine(this)
 	button:SetClickHandler(EventsTab_FontButtonOnClick)
 	controls[#controls+1] = button
 
-	-- Message font string.
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
 	fontString:SetPoint("RIGHT", button, "LEFT", -10, 0)
@@ -1551,9 +1348,6 @@ local function EventsTab_CreateLine(this)
 end
 
 
--- ****************************************************************************
--- Called by listbox to display a line.
--- ****************************************************************************
 local function EventsTab_DisplayLine(this, line, key, isSelected)
 	local events = orderedEvents[tabFrames.events.controls.eventCategoryDropdown:GetSelectedID()]
 	local eventType = events[key].eventType
@@ -1570,15 +1364,11 @@ local function EventsTab_DisplayLine(this, line, key, isSelected)
 end
 
 
--- ****************************************************************************
--- Creates the scroll areas tab frame contents.
--- ****************************************************************************
 local function EventsTab_Create()
 	local tabFrame = tabFrames.events
 	tabFrame.controls = {}
 	local controls = tabFrame.controls
 
-	-- Horizontal bar.
 	local texture = tabFrame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
@@ -1586,7 +1376,6 @@ local function EventsTab_Create()
 	texture:SetPoint("TOPRIGHT", tabFrame, "TOPRIGHT", 0, -45)
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
-	-- Move all button.
 	local button = MSBTControls.CreateOptionButton(tabFrame)
 	local objLocale = L.BUTTONS["moveAll"]
 	button:Configure(15, objLocale.label, objLocale.tooltip)
@@ -1605,7 +1394,6 @@ local function EventsTab_Create()
 	)
 	controls.moveButton = button
 
-	-- Toggle all button.
 	local button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["toggleAll"]
 	button:Configure(15, objLocale.label, objLocale.tooltip)
@@ -1621,7 +1409,6 @@ local function EventsTab_Create()
 	)
 	controls.toggleButton = button
 
-	-- Event category dropdown.
 	local dropdown = MSBTControls.CreateDropdown(tabFrame)
 	objLocale = L.DROPDOWNS["eventCategory"]
 	dropdown:Configure(180, objLocale.label, objLocale.tooltip)
@@ -1633,7 +1420,6 @@ local function EventsTab_Create()
 	)
 	controls.eventCategoryDropdown = dropdown
 
-	-- Events listbox.
 	local listbox = MSBTControls.CreateListbox(tabFrame)
 	listbox:Configure(400, 300, 25)
 	listbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 0, -50)
@@ -1642,10 +1428,8 @@ local function EventsTab_Create()
 	controls.eventsListbox = listbox
 
 
-	-- Setup the events for all categories.
 	EventsTab_SetupEvents()
 
-	-- Populate the available event categories and select incoming player by default.
 	for index, category in ipairs(L.EVENT_CATEGORIES) do
 		dropdown:AddItem(category, EVENT_CATEGORY_MAP[index])
 	end
@@ -1656,24 +1440,14 @@ local function EventsTab_Create()
 end
 
 
--- ****************************************************************************
--- Called when the tab frame is shown.
--- ****************************************************************************
 local function EventsTab_OnShow()
 	if (not tabFrames.events.created) then EventsTab_Create() end
 
-	-- Set the frame up to populate the profile options when it is shown.
 	tabFrames.events.controls.eventsListbox:Refresh()
 end
 
 
--------------------------------------------------------------------------------
--- Loot alerts tab functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Enables the controls on the loot alerts tab.
--- ****************************************************************************
 local function LootAlertsTab_EnableControls()
 	for name, frame in pairs(tabFrames.lootAlerts.controls) do
 		if (frame.Enable) then frame:Enable() end
@@ -1681,9 +1455,6 @@ local function LootAlertsTab_EnableControls()
 end
 
 
--- ****************************************************************************
--- Saves the event settings selected by the user.
--- ****************************************************************************
 local function LootAlertsTab_SaveEventSettings(settings, eventType)
 	MSBTProfiles.SetOption("events." .. eventType, "soundFile", settings.soundFile)
 	MSBTProfiles.SetOption("events." .. eventType, "scrollArea", settings.scrollArea, DEFAULT_SCROLL_AREA)
@@ -1697,9 +1468,6 @@ local function LootAlertsTab_SaveEventSettings(settings, eventType)
 end
 
 
--- ****************************************************************************
--- Saves the font settings selected by the user.
--- ****************************************************************************
 local function LootAlertsTab_SaveFontSettings(settings, eventType)
 	MSBTProfiles.SetOption("events." .. eventType, "fontName", settings.normalFontName)
 	MSBTProfiles.SetOption("events." .. eventType, "outlineIndex", settings.normalOutlineIndex)
@@ -1708,15 +1476,11 @@ local function LootAlertsTab_SaveFontSettings(settings, eventType)
 end
 
 
--- ****************************************************************************
--- Creates the loot alerts tab frame contents.
--- ****************************************************************************
 local function LootAlertsTab_Create()
 	local tabFrame = tabFrames.lootAlerts
 	tabFrame.controls = {}
 	local controls = tabFrame.controls
 
-	-- Loot colorswatch.
 	local colorswatch = MSBTControls.CreateColorswatch(tabFrame)
 	colorswatch:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -10)
 	colorswatch:SetColorChangedHandler(
@@ -1729,7 +1493,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.lootAlertsColorSwatch = colorswatch
 
-	-- Looted items enable checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	local objLocale = L.CHECKBOXES["lootedItems"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -1742,7 +1505,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.lootedItemsEnableCheckbox = checkbox
 
-	-- Loot alerts event settings button.
 	local button = MSBTControls.CreateIconButton(tabFrame, "Configure")
 	objLocale = L.BUTTONS["eventSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1772,7 +1534,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.lootAlertsEventSettingButton = button
 
-	-- Loot alerts font settings button.
 	button = MSBTControls.CreateIconButton(tabFrame, "FontSettings")
 	objLocale = L.BUTTONS["eventFontSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1787,7 +1548,6 @@ local function LootAlertsTab_Create()
 			EraseTable(configTable)
 			configTable.title = L.CHECKBOXES.lootedItems.label
 
-			-- Inherit from the correct scroll area.
 			local fontName = saSettings.normalFontName
 			if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.normalFontName end
 			if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
@@ -1817,7 +1577,6 @@ local function LootAlertsTab_Create()
 	)
 	controls[#controls+1] = button
 
-	-- Loot alerts message font string.
 	local fontString = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
 	fontString:SetPoint("RIGHT", button, "LEFT", -10, 0)
@@ -1825,7 +1584,6 @@ local function LootAlertsTab_Create()
 	tabFrame.lootedItemsFontString = fontString
 
 
-	-- Money gains colorswatch.
 	local colorswatch = MSBTControls.CreateColorswatch(tabFrame)
 	colorswatch:SetPoint("TOPLEFT", controls.lootAlertsColorSwatch, "BOTTOMLEFT", 0, -10)
 	colorswatch:SetColorChangedHandler(
@@ -1838,7 +1596,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.moneyGainsColorSwatch = colorswatch
 
-	-- Money gains enable checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	local objLocale = L.CHECKBOXES["moneyGains"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -1851,7 +1608,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.moneyGainsEnableCheckbox = checkbox
 
-	-- Money gains event settings button.
 	local button = MSBTControls.CreateIconButton(tabFrame, "Configure")
 	objLocale = L.BUTTONS["eventSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1881,7 +1637,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.moneyGainsEventSettingButton = button
 
-	-- Money gains font settings button.
 	button = MSBTControls.CreateIconButton(tabFrame, "FontSettings")
 	objLocale = L.BUTTONS["eventFontSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1896,7 +1651,6 @@ local function LootAlertsTab_Create()
 			EraseTable(configTable)
 			configTable.title = L.CHECKBOXES.moneyGains.label
 
-			-- Inherit from the correct scroll area.
 			local fontName = saSettings.normalFontName
 			if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.normalFontName end
 			if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
@@ -1926,7 +1680,6 @@ local function LootAlertsTab_Create()
 	)
 	controls[#controls+1] = button
 
-	-- Money gains message font string.
 	local fontString = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
 	fontString:SetPoint("RIGHT", button, "LEFT", -10, 0)
@@ -1934,7 +1687,6 @@ local function LootAlertsTab_Create()
 	tabFrame.moneyGainsFontString = fontString
 
 
-	-- Currency colorswatch.
 	local colorswatch = MSBTControls.CreateColorswatch(tabFrame)
 	colorswatch:SetPoint("TOPLEFT", controls.moneyGainsColorSwatch, "BOTTOMLEFT", 0, -10)
 	colorswatch:SetColorChangedHandler(
@@ -1947,7 +1699,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.currencyGainsColorSwatch = colorswatch
 
-	-- Currency gained enable checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	local objLocale = L.CHECKBOXES["currencyGains"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -1960,7 +1711,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.currencyGainsEnableCheckbox = checkbox
 
-	-- Currency alerts event settings button.
 	local button = MSBTControls.CreateIconButton(tabFrame, "Configure")
 	objLocale = L.BUTTONS["eventSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -1990,7 +1740,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.currencyGainsEventSettingButton = button
 
-	-- Currency alerts font settings button.
 	button = MSBTControls.CreateIconButton(tabFrame, "FontSettings")
 	objLocale = L.BUTTONS["eventFontSettings"]
 	button:SetTooltip(objLocale.tooltip)
@@ -2005,7 +1754,6 @@ local function LootAlertsTab_Create()
 			EraseTable(configTable)
 			configTable.title = L.CHECKBOXES.currencyGains.label
 
-			-- Inherit from the correct scroll area.
 			local fontName = saSettings.normalFontName
 			if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.normalFontName end
 			if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
@@ -2035,20 +1783,17 @@ local function LootAlertsTab_Create()
 	)
 	controls[#controls+1] = button
 
-	-- Currency alerts message font string.
 	local fontString = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
 	fontString:SetPoint("RIGHT", button, "LEFT", -10, 0)
 	fontString:SetJustifyH("LEFT")
 	tabFrame.currencyGainsFontString = fontString
 
-	-- Item qualities font string.
 	local fontString = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	fontString:SetPoint("TOPLEFT", controls.currencyGainsColorSwatch, "BOTTOMLEFT", 0, -30)
 	fontString:SetJustifyH("LEFT")
 	fontString:SetText(L.MSG_ITEM_QUALITIES .. ":")
 
-	-- Item quality checkboxes.
 	local anchor = fontString
 	for quality = LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor, LE_ITEM_QUALITY_EPIC or Enum.ItemQuality.Epic do
 		local checkbox = MSBTControls.CreateCheckbox(tabFrame)
@@ -2066,7 +1811,6 @@ local function LootAlertsTab_Create()
 		anchor = checkbox
 	end
 
-	-- Always show quest items checkbox.
 	local checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	local objLocale = L.CHECKBOXES["alwaysShowQuestItems"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
@@ -2078,7 +1822,6 @@ local function LootAlertsTab_Create()
 		)
 	controls.alwaysShowQuestItemsCheckbox = checkbox
 
-	-- Items allowed button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["itemsAllowed"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2103,7 +1846,6 @@ local function LootAlertsTab_Create()
 	)
 	controls.itemsAllowedButton = button
 
-	-- Item exclusions button.
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["itemExclusions"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -2132,9 +1874,6 @@ local function LootAlertsTab_Create()
 end
 
 
--- ****************************************************************************
--- Called when the tab frame is shown.
--- ****************************************************************************
 local function LootAlertsTab_OnShow()
 	if (not tabFrames.lootAlerts.created) then LootAlertsTab_Create() end
 
@@ -2142,42 +1881,31 @@ local function LootAlertsTab_OnShow()
 	local controls = tabFrame.controls
 	local currentProfile = MSBTProfiles.currentProfile
 
-	-- Looted items.
 	local eventSettings = currentProfile.events["NOTIFICATION_LOOT"]
 	controls.lootAlertsColorSwatch:SetColor(eventSettings.colorR or 1, eventSettings.colorG or 1, eventSettings.colorB or 1)
 	controls.lootedItemsEnableCheckbox:SetChecked(not eventSettings.disabled)
 	tabFrame.lootedItemsFontString:SetText(eventSettings.message)
 
-	-- Money gains.
 	local eventSettings = currentProfile.events["NOTIFICATION_MONEY"]
 	controls.moneyGainsColorSwatch:SetColor(eventSettings.colorR or 1, eventSettings.colorG or 1, eventSettings.colorB or 1)
 	controls.moneyGainsEnableCheckbox:SetChecked(not eventSettings.disabled)
 	tabFrame.moneyGainsFontString:SetText(eventSettings.message)
 
-	-- Currency gains.
 	local eventSettings = currentProfile.events["NOTIFICATION_CURRENCY"]
 	controls.currencyGainsColorSwatch:SetColor(eventSettings.colorR or 1, eventSettings.colorG or 1, eventSettings.colorB or 1)
 	controls.currencyGainsEnableCheckbox:SetChecked(not eventSettings.disabled)
 	tabFrame.currencyGainsFontString:SetText(eventSettings.message)
 
 
-	-- Item qualities.
 	for quality = LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor, LE_ITEM_QUALITY_EPIC or Enum.ItemQuality.Epic do
 		controls["quality" .. quality .. "Checkbox"]:SetChecked(not currentProfile.qualityExclusions[quality])
 	end
 
-	-- Quest items.
 	controls.alwaysShowQuestItemsCheckbox:SetChecked(currentProfile.alwaysShowQuestItems)
 end
 
 
--------------------------------------------------------------------------------
--- Language tab functions.
--------------------------------------------------------------------------------
 
--- ****************************************************************************
--- Creates the language tab frame contents.
--- ****************************************************************************
 local function LanguageTab_Create()
 	local tabFrame = tabFrames.language
 	tabFrame.controls = {}
@@ -2222,17 +1950,11 @@ local function LanguageTab_Create()
 end
 
 
--- ****************************************************************************
--- Called when the tab frame is shown.
--- ****************************************************************************
 local function LanguageTab_OnShow()
 	if (not tabFrames.language.created) then LanguageTab_Create() end
 end
 
 
--------------------------------------------------------------------------------
--- Reset Blizzard SCT tab functions.
--------------------------------------------------------------------------------
 
 local function ResetBlizzardSCTTab_EnableControls()
 	for _, frame in pairs(tabFrames.resetBlizzardSCT.controls) do
@@ -2297,11 +2019,7 @@ local function ResetBlizzardSCTTab_OnShow()
 end
 
 
--------------------------------------------------------------------------------
--- Initialization.
--------------------------------------------------------------------------------
 
--- Create an empty frame for the general tab that will be dynamically created when shown.
 local objLocale = L.TABS.general
 local tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2309,7 +2027,6 @@ tabFrame:SetScript("OnShow", GeneralTab_OnShow)
 tabFrames.general = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip)
 
--- Create an empty frame for the profile tab that will be dynamically created when shown.
 objLocale = L.TABS.profile or { label = "Profile", tooltip = "Manage profiles and profile switching." }
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2317,7 +2034,6 @@ tabFrame:SetScript("OnShow", ProfileTab_OnShow)
 tabFrames.profile = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 8999.5)
 
--- Create an empty frame for the scroll areas tab that will be dynamically created when shown.
 objLocale = L.TABS.scrollAreas
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2325,7 +2041,6 @@ tabFrame:SetScript("OnShow", ScrollAreasTab_OnShow)
 tabFrames.scrollAreas = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip)
 
--- Create an empty frame for the events tab that will be dynamically created when shown.
 objLocale = L.TABS.events
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2333,7 +2048,6 @@ tabFrame:SetScript("OnShow", EventsTab_OnShow)
 tabFrames.events = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip)
 
--- Create an empty frame for the loot alerts tab that will be dynamically created when shown.
 objLocale = L.TABS.lootAlerts
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2341,7 +2055,6 @@ tabFrame:SetScript("OnShow", LootAlertsTab_OnShow)
 tabFrames.lootAlerts = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip)
 
--- Create an empty frame for the language tab that will be dynamically created when shown.
 objLocale = L.TABS.language or { label = "Language", tooltip = "Shows the current locale and language behavior." }
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2349,7 +2062,6 @@ tabFrame:SetScript("OnShow", LanguageTab_OnShow)
 tabFrames.language = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9500)
 
--- Create an empty frame for the Reset Blizzard SCT tab that will be dynamically created when shown.
 objLocale = L.TABS.resetBlizzardSCT or { label = "Reset Blizzard SCT", tooltip = "Restore Blizzard scrolling combat text CVars and clear MSBT Blizzard CT overrides." }
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()

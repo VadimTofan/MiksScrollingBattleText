@@ -185,7 +185,6 @@ local function Display(message, saSettings, isSticky, colorR, colorG, colorB, fo
 	fontString:SetFont(fontPath, fontSize, fontOutline)
 	fontString:SetTextColor(colorR, colorG, colorB)
 	fontString:SetDrawLayer(isSticky and "OVERLAY" or "ARTWORK")
-	-- Text shadowing is always enabled.
 	fontString:SetShadowColor(0, 0, 0, 1)
 	fontString:SetShadowOffset(1, -1)
 	fontString:SetAlpha(0)

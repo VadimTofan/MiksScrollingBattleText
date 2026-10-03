@@ -147,13 +147,13 @@ local parserNotifications
 local utilityNotifications
 local IsOutgoingCombatGatedEvent
 local DOT_FALLBACK_SPELLS = {
-	[8921] = {8921}, -- Moonfire
-	[93402] = {93402}, -- Sunfire
-	[106830] = {106830, 405233}, -- Thrash (Cat) cast + periodic aura
-	[77758] = {77758, 405233}, -- Thrash (Bear) cast + periodic aura
+	[8921] = {8921},
+	[93402] = {93402},
+	[106830] = {106830, 405233},
+	[77758] = {77758, 405233},
 }
 local DOT_FALLBACK_TIMED_SPELLS = {
-	[202770] = 8, -- Fury of Elune: periodic area damage window
+	[202770] = 8,
 }
 
 local offHandTrailer
@@ -372,8 +372,6 @@ local function AuraHandler(parserEvent, currentProfile)
 			return
 		end
 
-		-- Show all player aura notifications even when a trigger exists for the
-		-- same aura name (for example proc triggers like Clearcasting).
 		if triggerSuppressions[effectName] and parserEvent.isFade then
 			return
 		end
@@ -478,8 +476,6 @@ local function ParserEventsHandler(parserEvent)
 		incomingCombat:RecordOutgoingSelfHeal(parserEvent.amount)
 	end
 
-	-- Keep outgoing-only output combat-gated while allowing incoming and
-	-- notification/static output to continue out of combat.
 	if not InCombatLockdown() then
 		if IsOutgoingCombatGatedEvent(eventTypeString) then
 			return
@@ -686,7 +682,6 @@ end
 local function IsLikelySpellSchool(schoolMask)
 	local maskType = type(schoolMask)
 	if maskType == "number" then
-		-- Combat school bitmask: 0x1 is physical.
 		return schoolMask ~= 0 and schoolMask ~= 1
 	elseif maskType == "string" then
 		if schoolMask == "" then
@@ -715,7 +710,6 @@ end
 local function CanUseAutoAttackFallback(now, lastAutoAttackTime)
 	local autoActive = false
 
-	-- API compatibility across client variants.
 	if type(IsCurrentSpell) == "function" then
 		local ok, result = pcall(IsCurrentSpell, AUTOSHOT_SPELL_ID)
 		if ok and result then
@@ -729,8 +723,6 @@ local function CanUseAutoAttackFallback(now, lastAutoAttackTime)
 		end
 	end
 	if (not autoActive) and C_Spell and type(C_Spell.IsAutoAttackSpell) == "function" then
-		-- If we can identify the spell as an auto-attack spell but cannot query
-		-- active state on this client, allow timing gate to decide.
 		local ok, result = pcall(C_Spell.IsAutoAttackSpell, AUTOSHOT_SPELL_ID)
 		if ok and result then
 			autoActive = true
@@ -748,14 +740,11 @@ local function CanUseAutoAttackFallback(now, lastAutoAttackTime)
 		swingSpeed = offSpeed
 	end
 
-	-- Prevent rapid false attribution from multiple UNIT_COMBAT target events.
 	local minGap = math.max(0.25, swingSpeed * 0.45)
 	return (now - (lastAutoAttackTime or 0)) >= minGap
 end
 
 local function IsOutgoingTargetContextValid()
-	-- UNIT_COMBAT("target") is ambiguous in group content; only accept it when
-	-- the live target unit is present and attackable by the player.
 	if not SafeUnitBoolean(UnitExists, "target") then
 		return false
 	end
@@ -834,7 +823,6 @@ IsOutgoingCombatGatedEvent = function(eventTypeString)
 		return false
 	end
 
-	-- Allow outgoing heals outside combat; only gate damage/miss-style outgoing.
 	if eventTypeString == "OUTGOING_HEAL"
 		or eventTypeString == "OUTGOING_HEAL_CRIT"
 		or eventTypeString == "OUTGOING_HOT"
@@ -874,12 +862,10 @@ local function BuildActionMessage(eventSettings, amount)
 		if not message then
 			return message
 		end
-		-- Remove unresolved placeholders that can still leak through.
 		message = string_gsub(message, "%%n", "")
 		message = string_gsub(message, "%%sl", "")
 		message = string_gsub(message, "%%s", "")
 		message = string_gsub(message, "%%e", "")
-		-- Remove dangling separators/wrappers from missing name/skill parts.
 		message = string_gsub(message, "%(%s*%-?%s*%)", "")
 		message = string_gsub(message, "%[%s*%-?%s*%]", "")
 		message = string_gsub(message, "%{%s*%-?%s*%}", "")
@@ -898,8 +884,6 @@ local function BuildActionMessage(eventSettings, amount)
 	local message = eventSettings.message
 	if amount and amount > 0 then
 		message = Formatter:FormatLegacyEvent(message, amount)
-		-- Incoming UNIT_COMBAT paths often lack reliable effect name data.
-		-- Remove unresolved skill placeholders to avoid showing raw %s/%sl/%e.
 		message = string_gsub(message, "<%%sl>%s*", "")
 		message = string_gsub(message, "<%%s>%s*", "")
 		message = string_gsub(message, "<%%e>%s*", "")

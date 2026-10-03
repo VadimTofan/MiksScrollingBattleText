@@ -58,8 +58,6 @@ local function IsFinite(value)
 	return value == value and value ~= math.huge and value ~= -math.huge
 end
 
--- Profile tables need distinct default mappings, so shared tables are invalid.
--- Also reject cycles, excessive nesting, and unsupported saved-variable types.
 local function IsPlainData(value, seen, budget, depth)
 	budget.count = budget.count + 1
 	if budget.count > MAX_NODES or depth > 12 then return false end
@@ -225,7 +223,6 @@ function ProfileTransfer:Export(name, profile, availableMedia)
 	if not self:Validate(payload) then return nil, "INVALID_DATA" end
 	local serialized = self.serializer:SerializeEx({ stable = true }, payload)
 	if #serialized > MAX_DATA then return nil, "TOO_LARGE" end
-	-- The zlib wrapper includes an Adler-32 checksum for clipboard corruption.
 	local compressed = self.deflate:CompressZlib(serialized)
 	local text = PREFIX .. self.deflate:EncodeForPrint(compressed)
 	if #text > MAX_TEXT then return nil, "TOO_LARGE" end

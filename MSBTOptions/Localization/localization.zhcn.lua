@@ -1,26 +1,10 @@
-----------------------------------------------------------------------------
--- Title: MSBT Options Simplified Chinese Localization
--- Author: Mikord
--- Simplified Chinese Translation by:
---	elafor
---	hscui
---	yaroot#gmail_com
--------------------------------------------------------------------------------
 
--- Don't do anything if the locale isn't Simplified Chinese.
 if (GetLocale() ~= "zhCN") then return end
 
--- Local reference for faster access.
 local L = MikSBT.translations
 
--------------------------------------------------------------------------------
--- Simplified Chinese localization
--------------------------------------------------------------------------------
 
 
-------------------------------
--- Interface messages
-------------------------------
 L.MSG_NEW_PROFILE					= "新建配置"
 L.MSG_PROFILE_ALREADY_EXISTS		= "此配置文件已存在"
 L.MSG_INVALID_PROFILE_NAME			= "无效的配置名字"
@@ -48,9 +32,6 @@ L.MSG_ITEM_ALREADY_EXISTS			= "物品名已经存在."
 L.MSG_INVALID_ITEM_NAME				= "无效物品名."
 
 
-------------------------------
--- Interface tabs
-------------------------------
 
 obj = L.TABS
 obj["general"]		= { label="常规", tooltip="常规设置"}
@@ -59,9 +40,6 @@ obj["events"]		= { label="事件", tooltip="设置承受伤害、输出伤害和
 obj["lootAlerts"]	= { label="拾取通告", tooltip="设置与拾取有关的通告"}
 
 
-------------------------------
--- Interface checkboxes
-------------------------------
 
 obj = L.CHECKBOXES
 
@@ -102,9 +80,6 @@ obj["alwaysShowQuestItems"]		= { label="总是显示任务物品", tooltip="总�
 obj["enableIcons"]				= { label="启用技能图标", tooltip="如果可能，在技能旁显示图标"}
 
 
-------------------------------
--- Interface dropdowns
-------------------------------
 
 obj = L.DROPDOWNS
 obj["profile"]				= { label="当前配置文件：", tooltip="设置当前配置文件"}
@@ -127,9 +102,6 @@ obj["triggerRelation"]		= { label="关系:"}
 obj["triggerParameter"]		= { label="参数:"}
 
 
-------------------------------
--- Interface buttons
-------------------------------
 
 obj = L.BUTTONS
 obj["copyProfile"]				= { label="复制配置", tooltip="复制配置文件到新建的配置中"}
@@ -176,9 +148,6 @@ obj["addItem"]					= { label="增加物品", tooltip="向列表中增加新的�
 obj["deleteItem"]				= { tooltip="点击删除物品."}
 
 
-------------------------------
--- Interface editboxes
-------------------------------
 
 obj = L.EDITBOXES
 obj["copyProfile"]		= { label="新建配置：", tooltip="输入新建配置的名称"}
@@ -193,9 +162,6 @@ obj["substitutionText"]	= { label="替代文本：", tooltip="用来代替技能
 obj["itemName"]			= { label="物品名称:", tooltip="要添加物品的名字."}
 
 
-------------------------------
--- Interface sliders
-------------------------------
 
 obj = L.SLIDERS
 obj["animationSpeed"]		= { label="动画速度", tooltip="设置主动画速度\n每个滚动区域也可以设置自身独有的速度"}
@@ -215,9 +181,6 @@ obj["powerThrottleTime"]	= { label="能量抑制显示", tooltip="在设定的�
 obj["skillThrottleTime"]	= { label="技能抑制显示", tooltip="在设定的秒数中持续使用的技能将只显示一次"}
 
 
-------------------------------
--- Event categories
-------------------------------
 obj = L.EVENT_CATEGORIES
 obj[1] = "玩家受到伤害"
 obj[2] = "宠物受到伤害"
@@ -226,9 +189,6 @@ obj[4] = "宠物输出伤害"
 obj[5] = "通告"
 
 
-------------------------------
--- Event codes
-------------------------------
 
 obj = L.EVENT_CODES
 obj["DAMAGE_TAKEN"]			= "%a - 受到伤害总数.\n"
@@ -270,9 +230,6 @@ obj["POWER_TYPE"]			= "%p - 能力类别 (能量, 怒气, 法力).\n"
 obj["TOTAL_ITEMS"]			= "%t - 拾取物品的总数."
 
 
-------------------------------
--- Incoming events
-------------------------------
 
 obj = L.INCOMING_PLAYER_EVENTS
 obj["INCOMING_DAMAGE"]						= { label="近战伤害", tooltip="显示被近战伤害"}
@@ -336,9 +293,6 @@ obj["PET_INCOMING_HOT"]							= { label="持续治疗", tooltip="显示宠物被
 obj["PET_INCOMING_HOT_CRIT"]					= { label="持续治疗暴击", tooltip="显示宠物持续治疗暴击"}
 
 
-------------------------------
--- Outgoing events
-------------------------------
 
 obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="近战伤害", tooltip="显示对敌近战伤害"}
@@ -407,9 +361,6 @@ obj["PET_OUTGOING_HOT_CRIT"]					= { label="持续治疗暴击", tooltip="显示
 obj["PET_OUTGOING_DISPEL"]						= { label="驱散", tooltip="显示宠物的驱散."}
 
 
-------------------------------
--- Notification events
-------------------------------
 
 obj = L.NOTIFICATION_EVENTS
 obj["NOTIFICATION_DEBUFF"]				= { label="Debuff", tooltip="显示你得到的Debuff"}
@@ -440,11 +391,7 @@ obj["NOTIFICATION_ENEMY_BUFF"]			= { label="敌人获得Buff", tooltip="显示�
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="怪物表情", tooltip="显示当前目标怪物表情"}
 
 
-------------------------------
--- Trigger info
-------------------------------
 
--- Main events.
 obj = L.TRIGGER_DATA
 obj["SWING_DAMAGE"]				= "平砍伤害"
 obj["RANGE_DAMAGE"]				= "远程伤害"
@@ -489,7 +436,6 @@ obj["SPELL_EXTRA_ATTACKS"]		= "额外攻击"
 obj["UNIT_HEALTH"]				= "生命值改变"
 obj["UNIT_POWER"]				= "法力值改变"
 
--- Main event conditions.
 obj["sourceName"]				= "来源玩家名字"
 obj["sourceAffiliation"]		= "来源玩家联系"
 obj["sourceReaction"]			= "来源玩家反应"
@@ -526,7 +472,6 @@ obj["unitReaction"]				= "玩家反应"
 obj["itemID"]					= "物品 ID"
 obj["itemName"]					= "物品名字"
 
--- Exception conditions.
 obj["activeTalents"]			= "启用天赋"
 obj["buffActive"]				= "BUFF生效"
 obj["buffInactive"]				= "Buff失效"
@@ -540,7 +485,6 @@ obj["warriorStance"]			= "战士姿态"
 obj["zoneName"]					= "地区名字"
 obj["zoneType"]					= "地区类型"
 
--- Relationships.
 obj["eq"]						= "相等"
 obj["ne"]						= "不相等"
 obj["like"]						= "像"
@@ -548,7 +492,6 @@ obj["unlike"]					= "不像"
 obj["lt"]						= "少于"
 obj["gt"]						= "多于"
 
--- Affiliations.
 obj["affiliationMine"]			= "我的"
 obj["affiliationParty"]			= "队友"
 obj["affiliationRaid"]			= "团队成员"
@@ -557,42 +500,32 @@ obj["affiliationTarget"]		= TARGET
 obj["affiliationFocus"]			= FOCUS
 obj["affiliationYou"]			= YOU
 
--- Reactions.
 obj["reactionFriendly"]			= "友善"
 obj["reactionNeutral"]			= "中立"
 obj["reactionHostile"]			= HOSTILE
 
--- Control types.
 obj["controlServer"]			= "服务器"
 obj["controlHuman"]				= "玩家"
 
--- Unit types.
 obj["unitTypePlayer"]			= PLAYER
 obj["unitTypeNPC"]				= "NPC"
 obj["unitTypePet"]				= PET
 obj["unitTypeGuardian"]			= "护卫"
 obj["unitTypeObject"]			= "物体"
 
--- Aura types.
 obj["auraTypeBuff"]				= "Buff"
 obj["auraTypeDebuff"]			= "Debuff"
 
--- Zone types.
 obj["zoneTypeArena"]			= "竞技场"
 obj["zoneTypePvP"]				= BATTLEGROUND
 obj["zoneTypeParty"]			= "小队副本"
 obj["zoneTypeRaid"]				= "团队副本"
 
--- Booleans
 obj["booleanTrue"]				= "True"
 obj["booleanFalse"]				= "False"
 
 
-------------------------------
--- Font info
-------------------------------
 
--- Font outlines.
 obj = L.OUTLINES
 obj[1] = "无"
 obj[2] = "细"
@@ -601,24 +534,16 @@ obj[4] = "单线"
 obj[5] = "单线 细"
 obj[6] = "单线 粗"
 
--- Text aligns.
 obj = L.TEXT_ALIGNS
 obj[1] = "左边"
 obj[2] = "中间"
 obj[3] = "右边"
 
 
-------------------------------
--- Sound info
-------------------------------
 
 
 
-------------------------------
--- Animation style info
-------------------------------
 
--- Animation styles
 obj = L.ANIMATION_STYLE_DATA
 obj["Angled"]		= "V型"
 obj["Horizontal"]	= "水平"
@@ -627,14 +552,12 @@ obj["Straight"]		= "直线"
 obj["Static"]		= "静止"
 obj["Pow"]			= "抖动"
 
--- Animation style directions.
 obj["Alternate"]	= "交替"
 obj["Left"]			= "左"
 obj["Right"]		= "右"
 obj["Up"]			= "上"
 obj["Down"]			= "下"
 
--- Animation style behaviors.
 obj["AngleUp"]			= "V型向上"
 obj["AngleDown"]		= "V型向下"
 obj["GrowUp"]			= "向上增长"
@@ -644,7 +567,6 @@ obj["CurvedRight"]		= "向右抛出"
 obj["Jiggle"]			= "摇动"
 obj["Normal"]			= "普通"
 
--- Custom event sounds.
 L.MSG_INVALID_CUSTOM_SOUND_NAME		= "无效声音名"
 L.MSG_SOUND_NAME_ALREADY_EXISTS		= "声音名已经存在"
 L.MSG_INVALID_SOUND_FILE			= "声音必须为OGG文件"

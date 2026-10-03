@@ -1,25 +1,10 @@
-----------------------------------------------------------------------------
--- Title: MSBT Options Traditional Chinese Localization
--- Author: Mikord
--- Credits:
---	Whitepaw @ 暗影之月(TW-Shadowmoon)
---	yaroot#gmail_com
--------------------------------------------------------------------------------
 
--- Don't do anything if the locale isn't Traditional Chinese.
 if (GetLocale() ~= "zhTW") then return end
 
--- Local reference for faster access.
 local L = MikSBT.translations
 
--------------------------------------------------------------------------------
--- Traditional Chinese localization
--------------------------------------------------------------------------------
 
 
-------------------------------
--- Interface messages
-------------------------------
 L.MSG_NEW_PROFILE					= "新建記錄檔"
 L.MSG_PROFILE_ALREADY_EXISTS		= "記錄檔已存在"
 L.MSG_INVALID_PROFILE_NAME			= "無效的記錄檔名稱"
@@ -47,9 +32,6 @@ L.MSG_ITEM_ALREADY_EXISTS			= "物品名已經存在."
 L.MSG_INVALID_ITEM_NAME				= "無效物品名."
 
 
-------------------------------
--- Interface tabs
-------------------------------
 
 obj = L.TABS
 obj["general"]		= { label="一般設定", tooltip="一般選項設定"}
@@ -58,9 +40,6 @@ obj["events"]		= { label="事件設定", tooltip="設定承受傷害、輸出傷
 obj["lootAlerts"]	= { label="拾取通告", tooltip="設置與拾取有關的通告"}
 
 
-------------------------------
--- Interface checkboxes
-------------------------------
 
 obj = L.CHECKBOXES
 
@@ -101,9 +80,6 @@ obj["alwaysShowQuestItems"]		= { label="總是顯示任務物品", tooltip="總�
 obj["enableIcons"]				= { label="啟用技能圖示", tooltip="顯示事件的技能圖示"}
 
 
-------------------------------
--- Interface dropdowns
-------------------------------
 
 obj = L.DROPDOWNS
 obj["profile"]				= { label="目前記錄檔：", tooltip="設定目前記錄檔"}
@@ -126,9 +102,6 @@ obj["triggerRelation"]		= { label="關系:"}
 obj["triggerParameter"]		= { label="參數:"}
 
 
-------------------------------
--- Interface buttons
-------------------------------
 
 obj = L.BUTTONS
 obj["copyProfile"]				= { label="複製記錄檔", tooltip="複製記錄檔到新增的記錄檔中"}
@@ -175,9 +148,6 @@ obj["addItem"]					= { label="增加物品", tooltip="向列表中增加新的�
 obj["deleteItem"]				= { tooltip="點擊刪除物品."}
 
 
-------------------------------
--- Interface editboxes
-------------------------------
 
 obj = L.EDITBOXES
 obj["copyProfile"]		= { label="新增記錄檔：", tooltip="輸入新增記錄檔的名稱"}
@@ -192,9 +162,6 @@ obj["substitutionText"]	= { label="替代文字：", tooltip="用來代替技能
 obj["itemName"]			= { label="物品名稱:", tooltip="要添加物品的名字."}
 
 
-------------------------------
--- Interface sliders
-------------------------------
 
 obj = L.SLIDERS
 obj["animationSpeed"]		= { label="動畫速度", tooltip="設定主動畫速度\n每個滾動區域也可以設定自身獨有的速度"}
@@ -214,9 +181,6 @@ obj["powerThrottleTime"]	= { label="能量抑制顯示", tooltip="在設定的�
 obj["skillThrottleTime"]	= { label="技能抑制顯示", tooltip="在設定的秒數中持續使用的技能將只顯示一次"}
 
 
-------------------------------
--- Event categories
-------------------------------
 obj = L.EVENT_CATEGORIES
 obj[1] = "玩家受到傷害"
 obj[2] = "寵物受到傷害"
@@ -225,9 +189,6 @@ obj[4] = "寵物輸出傷害"
 obj[5] = "訊息通知"
 
 
-------------------------------
--- Event codes
-------------------------------
 
 obj = L.EVENT_CODES
 obj["DAMAGE_TAKEN"]			= "%a - 受到傷害總數.\n"
@@ -269,9 +230,6 @@ obj["POWER_TYPE"]			= "%p - 能力類別 (能量, 怒氣, 法力).\n"
 obj["TOTAL_ITEMS"]			= "%t - 拾取物品的總數."
 
 
-------------------------------
--- Incoming events
-------------------------------
 
 obj = L.INCOMING_PLAYER_EVENTS
 obj["INCOMING_DAMAGE"]						= { label="近戰傷害", tooltip="顯示被近戰傷害"}
@@ -335,9 +293,6 @@ obj["PET_INCOMING_HOT"]							= { label="持續治療", tooltip="顯示寵物被
 obj["PET_INCOMING_HOT_CRIT"]					= { label="持續治療暴擊", tooltip="顯示寵物持續治療暴擊"}
 
 
-------------------------------
--- Outgoing events
-------------------------------
 
 obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="近戰傷害", tooltip="顯示對敵近戰傷害"}
@@ -406,9 +361,6 @@ obj["PET_OUTGOING_HOT_CRIT"]					= { label="持續治療暴擊", tooltip="顯示
 obj["PET_OUTGOING_DISPEL"]						= { label="淨化法術", tooltip="顯示寵物的淨化法術"}
 
 
-------------------------------
--- Notification events
-------------------------------
 
 obj = L.NOTIFICATION_EVENTS
 obj["NOTIFICATION_DEBUFF"]				= { label="Debuff", tooltip="顯示你遭受的Debuff"}
@@ -439,11 +391,7 @@ obj["NOTIFICATION_ENEMY_BUFF"]			= { label="敵人獲得Buff", tooltip="顯示�
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="怪物表情", tooltip="顯示目前目標怪物表情"}
 
 
-------------------------------
--- Trigger info
-------------------------------
 
--- Main events.
 obj = L.TRIGGER_DATA
 obj["SWING_DAMAGE"]				= "平砍傷害"
 obj["RANGE_DAMAGE"]				= "遠程傷害"
@@ -488,7 +436,6 @@ obj["SPELL_EXTRA_ATTACKS"]		= "額外攻擊"
 obj["UNIT_HEALTH"]				= "生命值改變"
 obj["UNIT_POWER"]				= "法力值改變"
 
--- Main event conditions.
 obj["sourceName"]				= "來源玩家名字"
 obj["sourceAffiliation"]		= "來源玩家聯系"
 obj["sourceReaction"]			= "來源玩家反應"
@@ -525,7 +472,6 @@ obj["unitReaction"]				= "玩家反應"
 obj["itemID"]					= "物品 ID"
 obj["itemName"]					= "物品名字"
 
--- Exception conditions.
 obj["activeTalents"]			= "啟用天賦"
 obj["buffActive"]				= "Buff生效"
 obj["buffInactive"]				= "Buff失效"
@@ -539,7 +485,6 @@ obj["warriorStance"]			= "戰士姿態"
 obj["zoneName"]					= "地區名字"
 obj["zoneType"]					= "地區類型"
 
--- Relationships.
 obj["eq"]						= "相等"
 obj["ne"]						= "不相等"
 obj["like"]						= "像"
@@ -547,7 +492,6 @@ obj["unlike"]					= "不像"
 obj["lt"]						= "少于"
 obj["gt"]						= "多于"
 
--- Affiliations.
 obj["affiliationMine"]			= "我的"
 obj["affiliationParty"]			= "隊友"
 obj["affiliationRaid"]			= "團隊成員r"
@@ -556,42 +500,32 @@ obj["affiliationTarget"]		= TARGET
 obj["affiliationFocus"]			= FOCUS
 obj["affiliationYou"]			= YOU
 
--- Reactions.
 obj["reactionFriendly"]			= "友善"
 obj["reactionNeutral"]			= "中立"
 obj["reactionHostile"]			= HOSTILE
 
--- Control types.
 obj["controlServer"]			= "服務器"
 obj["controlHuman"]				= "玩家"
 
--- Unit types.
 obj["unitTypePlayer"]			= PLAYER
 obj["unitTypeNPC"]				= "NPC"
 obj["unitTypePet"]				= PET
 obj["unitTypeGuardian"]			= "護衛"
 obj["unitTypeObject"]			= "物體"
 
--- Aura types.
 obj["auraTypeBuff"]				= "Buff"
 obj["auraTypeDebuff"]			= "Debuff"
 
--- Zone types.
 obj["zoneTypeArena"]			= "競技場"
 obj["zoneTypePvP"]				= BATTLEGROUND
 obj["zoneTypeParty"]			= "小隊副本"
 obj["zoneTypeRaid"]				= "團隊副本"
 
--- Booleans
 obj["booleanTrue"]				= "True"
 obj["booleanFalse"]				= "False"
 
 
-------------------------------
--- Font info
-------------------------------
 
--- Font outlines.
 obj = L.OUTLINES
 obj[1] = "無"
 obj[2] = "細"
@@ -600,24 +534,16 @@ obj[4] = "單線"
 obj[5] = "單線 細"
 obj[6] = "單線 粗"
 
--- Text aligns.
 obj = L.TEXT_ALIGNS
 obj[1] = "左邊"
 obj[2] = "中間"
 obj[3] = "右邊"
 
 
-------------------------------
--- Sound info
-------------------------------
 
 
 
-------------------------------
--- Animation style info
-------------------------------
 
--- Animation styles
 obj = L.ANIMATION_STYLE_DATA
 obj["Angled"]		= "V型"
 obj["Horizontal"]	= "水平"
@@ -626,14 +552,12 @@ obj["Straight"]		= "直線"
 obj["Static"]		= "靜止"
 obj["Pow"]			= "繃跳"
 
--- Animation style directions.
 obj["Alternate"]	= "交替"
 obj["Left"]			= "左"
 obj["Right"]		= "右"
 obj["Up"]			= "上"
 obj["Down"]			= "下"
 
--- Animation style behaviors.
 obj["AngleUp"]			= "V型向上"
 obj["AngleDown"]		= "V型向下"
 obj["GrowUp"]			= "漸漸向上"
@@ -643,7 +567,6 @@ obj["CurvedRight"]		= "弧形向右"
 obj["Jiggle"]			= "抖動"
 obj["Normal"]			= "一般"
 
--- Custom event sounds.
 L.MSG_INVALID_CUSTOM_SOUND_NAME		= "無效聲音名"
 L.MSG_SOUND_NAME_ALREADY_EXISTS		= "聲音名已經存在"
 L.MSG_INVALID_SOUND_FILE			= "音效必須為OGG格式。"

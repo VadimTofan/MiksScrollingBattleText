@@ -25,7 +25,6 @@ ignore:
   - Diagnostics
   - README.md
   - CHANGELOG.md
-  - API.html
   - Research.md
   - AGENTS.md
   - RTK.md

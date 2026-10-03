@@ -85,7 +85,8 @@ def assert_runtime_archive(test: unittest.TestCase, archive: ZipFile) -> set[str
             or path.name.lower().startswith((stem + ".", stem + "-"))
             for stem in ("license", "licence", "copying", "notice", "copyright", "ofl")
         )
-        test.assertTrue(is_font or is_artwork or is_sound or is_license,
+        is_credits = name == "credits.md"
+        test.assertTrue(is_font or is_artwork or is_sound or is_license or is_credits,
                         f"Unexpected packaged file: {name}")
     return files
 
@@ -113,6 +114,7 @@ class ReleasePackagingTests(unittest.TestCase):
             "Fonts/font.ttf": "Font bytes",
             "MSBTOptions/Artwork/ConfigureIcon.blp": "Texture bytes",
             "LICENSE": "Project license",
+            "credits.md": "Original author and translation credits",
             "Libs/LICENSE.txt": "Library license",
             "Fonts/OFL.txt": "Font license",
         }
@@ -138,7 +140,7 @@ class ReleasePackagingTests(unittest.TestCase):
         for excluded in (
             "tests", "scripts", ".github", ".vscode", ".agents", ".codex",
             ".release", "dist", "README.md", "CHANGELOG.md",
-            "API.html", "Research.md",
+            "Research.md",
             "MSBTOptions/Artwork/TriggerSettingsIcon*",
         ):
             self.assertIn(f"  - {excluded}\n", pkgmeta)
@@ -177,7 +179,7 @@ class ReleasePackagingTests(unittest.TestCase):
     def test_archive_gate_rejects_development_and_obsolete_files(self):
         # Given
         for unwanted in (
-            "README.md", "CHANGELOG.md", "API.html", "Research.md",
+            "README.md", "CHANGELOG.md", "API.html", "API.md", "Research.md",
             "tests/test.lua", "scripts/build.py", ".pkgmeta", ".git/config",
             ".github/workflows/release.yml", ".vscode/settings.json",
             "Main.lua.bak", "Unused.lua", "Sounds/personal.ogg",
@@ -212,6 +214,7 @@ class ReleasePackagingTests(unittest.TestCase):
 
             # Then: newly restored sounds and binary assets are retained.
             self.assertIn("API/Sounds.lua", files)
+            self.assertIn("credits.md", files)
             self.assertIn("MSBTOptions/MSBTOptionsSounds.lua", files)
             self.assertIn("Sounds/Cooldown.ogg", files)
             assets = list((REPOSITORY_ROOT / "Fonts").glob("*.ttf"))

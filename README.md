@@ -117,7 +117,7 @@ registrations must be repeated each session; registrations made through
 - [MSBTOptions](MSBTOptions): options UI
 - [Localization](Localization): base addon localization
 - [MSBTOptions/Localization](MSBTOptions/Localization): options localization
-- [API.html](API.html): public addon API reference
+- [credits.md](credits.md): addon author and translation credits
 - [CHANGELOG.md](CHANGELOG.md): current release notes
 
 ## Release Workflow
@@ -153,4 +153,3 @@ Manual dry run:
 ## Notes
 
 - Recent addon work has focused on safer handling of Blizzard restricted values, UI cleanup, localization cleanup, and General tab quality-of-life options.
-- Some legacy documentation still exists in `API.html` because it documents the public addon API separately from this repository overview.

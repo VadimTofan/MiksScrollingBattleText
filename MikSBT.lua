@@ -1,8 +1,4 @@
-﻿-- Mik's Scrolling Combat Text
--- Adapted to Midnight by MrGank
--- Credit: Original addon by Mikord
--- 
-local mod = {}
+﻿local mod = {}
 local modName = "MikSBT"
 _G[modName] = mod
 
