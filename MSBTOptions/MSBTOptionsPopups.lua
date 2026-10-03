@@ -39,12 +39,6 @@ local _
 
 local popupFrames = {}
 
-local popupBackdrop = {
-	bgFile = "Interface\\Addons\\MikScrollingBattleText\\MSBTOptions\\Artwork\\PlainBackdrop",
-	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	insets = {left = 6, right = 6, top = 6, bottom = 6},
-}
-
 local moverBackdrop = {
 	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 }
@@ -61,15 +55,92 @@ local function OnHidePopup(this)
 end
 
 
-local function CreatePopup()
+local function CreateMenuArtwork(frame, topHeight)
+	topHeight = topHeight or 128
+	local artworkPath = "Interface\\PaperDollInfoFrame\\UI-Character-General-"
+	local sections = {
+		{ texture = "TopLeft", x = 0, width = 256,
+			coords = { 0, 1, 0, topHeight / 256 } },
+		{ texture = "TopLeft", x = 256,
+			coords = { 0.45, 0.95, 0, topHeight / 256 } },
+		{ texture = "TopRight", width = 100,
+			coords = { 0, 0.78125, 0, topHeight / 256 } },
+		{ texture = "BottomLeft", x = 0, width = 256,
+			coords = { 0, 1, 0, 0.71875 } },
+		{ texture = "BottomLeft", x = 256,
+			coords = { 0.5, 1, 0, 0.71875 } },
+		{ texture = "BottomRight", width = 100,
+			coords = { 0, 0.78125, 0, 0.71875 } },
+	}
+	for index, section in ipairs(sections) do
+		local texture = frame:CreateTexture(nil, "BACKGROUND")
+		texture:SetTexture(artworkPath .. section.texture)
+		texture:SetTexCoord(unpack(section.coords))
+		local y = index <= 3 and 0 or -topHeight
+		if section.x then
+			texture:SetPoint("TOPLEFT", frame, "TOPLEFT", section.x, y)
+		end
+		if not section.x or not section.width then
+			local x = section.width and 0 or -100
+			texture:SetPoint("TOPRIGHT", frame, "TOPRIGHT", x, y)
+		end
+		if section.width then texture:SetWidth(section.width) end
+		if index <= 3 then
+			texture:SetHeight(topHeight)
+		else
+			local anchor = section.x and "BOTTOMLEFT" or "BOTTOMRIGHT"
+			texture:SetPoint(anchor, frame, anchor, section.x or 0, 0)
+		end
+	end
+	local icon = frame:CreateTexture(nil, "ARTWORK")
+	icon:SetTexture("Interface\\FriendsFrame\\FriendsFrameScrollIcon")
+	icon:SetSize(64, 64)
+	icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, 1)
+end
+
+
+local function CreatePopup(closeOnly)
 	local frame = CreateFrame("Frame", nil, UIParent, BackdropTemplateMixin and "BackdropTemplate")
 	frame:Hide()
 	frame:EnableMouse(true)
 	frame:SetMovable(true)
 	frame:RegisterForDrag("LeftButton")
-	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetFrameLevel(UIParent:GetFrameLevel() + 3)
 	frame:SetClampedToScreen(true)
-	frame:SetBackdrop(popupBackdrop)
+	CreateMenuArtwork(frame)
+
+	local panel = CreateFrame("Frame", nil, frame,
+		BackdropTemplateMixin and "BackdropTemplate")
+	panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -68)
+	panel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 58)
+	panel:SetFrameLevel(frame:GetFrameLevel())
+	panel:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	})
+	panel:SetBackdropColor(0.02, 0.02, 0.02, 0.9)
+	panel:SetBackdropBorderColor(0.6, 0.5, 0.3, 1)
+	frame.contentPanel = panel
+
+	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	title:SetPoint("TOPLEFT", frame, "TOPLEFT", 76, -18)
+	title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -40, -18)
+	title:SetJustifyH("CENTER")
+	frame.titleFontString = title
+
+	local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -12)
+	close:SetScript("OnClick", function() frame:Hide() end)
+	frame.headerCloseButton = close
+	if closeOnly then
+		local button = MSBTControls.CreateOptionButton(frame)
+		button:Configure(24, L.PROFILE_TRANSFER.close)
+		button:SetPoint("BOTTOM", frame, "BOTTOM", 0, 22)
+		button:SetClickHandler(function() frame:Hide() end)
+	end
 	frame:SetScript("OnHide", OnHidePopup)
 
 	frame:SetScript("OnShow", function(self)
@@ -90,7 +161,8 @@ local function ChangePopupParent(frame, parent)
 	local oldHandler = frame.hideHandler
 	frame.hideHandler = nil
 	frame:SetParent(parent or UIParent)
-	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetFrameLevel(frame:GetParent():GetFrameLevel() + 3)
 	frame.hideHandler = oldHandler
 end
 
@@ -175,12 +247,12 @@ end
 
 local function CreateInput()
 	local frame = CreatePopup()
-	frame:SetWidth(350)
-	frame:SetHeight(130)
+	frame:SetWidth(420)
+	frame:SetHeight(240)
 
 	local editbox = MSBTControls.CreateEditbox(frame)
-	editbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -25)
-	editbox:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -25)
+	editbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
+	editbox:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -44, -85)
 	editbox:SetEscapeHandler(function(this)
 		frame:Hide()
 	end)
@@ -201,22 +273,24 @@ local function CreateInput()
 
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["inputOkay"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 40)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(SaveInput)
 	frame.okayButton = button
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["inputCancel"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 40)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 	end)
 
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 30, 20)
-	fontString:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 20)
+	fontString:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 44, 68)
+	fontString:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -44, 68)
+	fontString:SetJustifyH("LEFT")
+	fontString:SetTextColor(1, 0.2, 0.2)
 	frame.validateFontString = fontString
 
 	return frame
@@ -230,6 +304,8 @@ local function ShowInput(configTable)
 
 	local frame = popupFrames.inputFrame
 	ChangePopupParent(frame, configTable.parentFrame)
+	frame.titleFontString:SetText(configTable.title
+		or (configTable.editboxLabel or ""):gsub(":%s*$", ""))
 
 	local editbox = frame.inputEditbox
 	editbox:SetLabel(configTable.editboxLabel)
@@ -243,11 +319,11 @@ local function ShowInput(configTable)
 		editbox:SetLabel(configTable.secondEditboxLabel)
 		editbox:SetTooltip(configTable.secondEditboxTooltip)
 		editbox:SetText(configTable.secondDefaultText)
-		frame:SetHeight(170)
+		frame:SetHeight(280)
 	else
 		editbox:SetText(nil)
 		editbox:Hide()
-		frame:SetHeight(130)
+		frame:SetHeight(240)
 	end
 
 
@@ -267,17 +343,18 @@ end
 
 local function CreateAcknowledge()
 	local frame = CreatePopup()
-	frame:SetWidth(350)
-	frame:SetHeight(90)
+	frame:SetWidth(380)
+	frame:SetHeight(220)
+	frame.titleFontString:SetText(L.POPUP_CONFIRM_TITLE)
 
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -20)
-	fontString:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -20)
+	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
+	fontString:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -44, -85)
 	fontString:SetText(L.MSG_ACKNOWLEDGE_TEXT)
 
 	local button = MSBTControls.CreateOptionButton(frame)
-	button:Configure(20, YES, nil)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 15)
+	button:Configure(24, YES, nil)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(function(this)
 		if (frame.acknowledgeHandler) then
 			frame.acknowledgeHandler(frame.saveArg1)
@@ -286,8 +363,8 @@ local function CreateAcknowledge()
 	end)
 
 	button = MSBTControls.CreateOptionButton(frame)
-	button:Configure(20, NO, nil)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 15)
+	button:Configure(24, NO, nil)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 	end)
@@ -368,18 +445,15 @@ end
 
 local function CreateFontPopup()
 	local frame = CreatePopup()
-	frame:SetWidth(450)
-	frame:SetHeight(380)
-
-	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
-	frame.titleFontString = fontString
+	frame:SetWidth(500)
+	frame:SetHeight(430)
+	local fontString
 
 
 	local normalFrame = CreateFrame("Frame", nil, frame)
 	normalFrame:SetWidth(195)
-	normalFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -60)
-	normalFrame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 20, 40)
+	normalFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -90)
+	normalFrame:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 44, 60)
 	frame.normalFrame = normalFrame
 
 
@@ -492,8 +566,8 @@ local function CreateFontPopup()
 
 	local critFrame = CreateFrame("Frame", nil, frame)
 	critFrame:SetWidth(195)
-	critFrame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -60)
-	critFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 40)
+	critFrame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -44, -90)
+	critFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -44, 60)
 	frame.critFrame = critFrame
 
 
@@ -604,8 +678,8 @@ local function CreateFontPopup()
 
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(function(this)
 		UpdateFontSettings()
 		frame:Hide()
@@ -616,8 +690,8 @@ local function CreateFontPopup()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 	end)
@@ -735,15 +809,13 @@ end
 
 
 local function CreatePartialEffects()
-	local frame = CreatePopup()
-
-	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+	local frame = CreatePopup(true)
+	frame.titleFontString:SetText(L.BUTTONS.partialEffects.label)
 
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["colorPartialEffects"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -20)
+	checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -80)
 	checkbox:SetClickHandler(function(this, isChecked)
 		MSBTProfiles.SetOption(nil, "partialColoringDisabled", not isChecked)
 	end)
@@ -776,7 +848,7 @@ local function CreatePartialEffects()
 		if (effectType ~= "crushing" and effectType ~= "glancing") then tooltip = tooltip .. "\n\n" .. L.EVENT_CODES["PARTIAL_AMOUNT"] end
 		editbox = MSBTControls.CreateEditbox(frame)
 		editbox:Configure(130, nil, tooltip)
-		editbox:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+		editbox:SetPoint("RIGHT", frame, "RIGHT", -44, 0)
 		editbox:SetPoint("TOP", checkbox, "TOP", 0, 10)
 		editbox:SetTextChangedHandler(function(this)
 			MSBTProfiles.SetOption(effectType, "trailer", this:GetText())
@@ -788,8 +860,8 @@ local function CreatePartialEffects()
 		anchor = colorswatch
 	end
 
-	frame:SetWidth(maxWidth + 230)
-	frame:SetHeight(260)
+	frame:SetWidth(math.max(440, maxWidth + 278))
+	frame:SetHeight(370)
 
 	return frame
 end
@@ -823,24 +895,22 @@ end
 
 
 local function CreateDamageColors()
-	local frame = CreatePopup()
-	frame:SetSize(300, 300)
+	local frame = CreatePopup(true)
+	frame:SetSize(380, 410)
+	frame.titleFontString:SetText(L.BUTTONS.damageColors.label)
 
 	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	scrollFrame:SetSize(230, 240)
-	scrollFrame:SetPoint("TOP", 0, -40)
+	scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -116)
+	scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -64, 68)
 
 	local content = CreateFrame("Frame", nil, scrollFrame)
-	content:SetSize(10, 5)
+	content:SetSize(270, 5)
 	scrollFrame:SetScrollChild(content)
-
-	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
 
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["colorDamageAmounts"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -20)
+	checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -80)
 	checkbox:SetClickHandler(function(this, isChecked)
 		MSBTProfiles.SetOption(nil, "damageColoringDisabled", not isChecked)
 	end)
@@ -871,6 +941,7 @@ local function CreateDamageColors()
 		anchor = colorswatch
 		globalStringSchoolIndex = globalStringSchoolIndex + 1
 	end
+	content:SetHeight(15 + globalStringSchoolIndex * 21)
 
 	return frame
 end
@@ -910,17 +981,15 @@ elseif IsVanillaClassic then
 end
 
 local function CreateClassColors()
-	local frame = CreatePopup()
-	frame:SetWidth(260)
-	frame:SetHeight(350)
-
-	local button = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-	button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+	local frame = CreatePopup(true)
+	frame:SetWidth(380)
+	frame:SetHeight(460)
+	frame.titleFontString:SetText(L.BUTTONS.classColors.label)
 
 	local checkbox = MSBTControls.CreateCheckbox(frame)
 	local objLocale = L.CHECKBOXES["colorUnitNames"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -20)
+	checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -80)
 	checkbox:SetClickHandler(function(this, isChecked)
 		MSBTProfiles.SetOption(nil, "classColoringDisabled", not isChecked)
 	end)
@@ -1249,9 +1318,14 @@ end
 
 local function CreateScrollAreaConfig()
 	local frame = CreatePopup()
-	frame:SetWidth(320)
-	frame:SetHeight(575)
+	frame:SetWidth(380)
+	frame:SetHeight(635)
+	frame.titleFontString:SetText(L.TABS.scrollAreas.label)
 	frame:SetPoint("RIGHT")
+	frame.headerCloseButton:SetScript("OnClick", function()
+		SaveScrollAreaSettings(frame.originalSettings)
+		frame:Hide()
+	end)
 	frame:SetScript("OnHide", function(this)
 		for _, moverFrame in pairs(this.moverFrames) do
 			moverFrame:Hide()
@@ -1262,7 +1336,7 @@ local function CreateScrollAreaConfig()
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["scrollArea"]
 	dropdown:Configure(200, objLocale.label, objLocale.tooltip)
-	dropdown:SetPoint("TOP", frame, "TOP", 0, -20)
+	dropdown:SetPoint("TOP", frame, "TOP", 0, -80)
 	dropdown:SetChangeHandler(function(this, id)
 		ChangeConfigScrollArea(id)
 	end)
@@ -1272,8 +1346,8 @@ local function CreateScrollAreaConfig()
 	local texture = frame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
-	texture:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -70)
-	texture:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -70)
+	texture:SetPoint("TOPLEFT", frame, "TOPLEFT", 39, -130)
+	texture:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -39, -130)
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
 
@@ -1365,8 +1439,8 @@ local function CreateScrollAreaConfig()
 	texture = frame:CreateTexture(nil, "ARTWORK")
 	texture:SetTexture("Interface\\PaperDollInfoFrame\\SkillFrame-BotLeft")
 	texture:SetHeight(4)
-	texture:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -295)
-	texture:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -295)
+	texture:SetPoint("TOPLEFT", frame, "TOPLEFT", 39, -355)
+	texture:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -39, -355)
 	texture:SetTexCoord(0.078125, 1, 0.59765625, 0.61328125)
 
 
@@ -1473,7 +1547,7 @@ local function CreateScrollAreaConfig()
 
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["scrollAreasPreview"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
 	button:SetPoint("BOTTOM", frame, "BOTTOM", 0, 50)
 	button:SetClickHandler(function(this)
 		SaveScrollAreaSettings(frame.previewSettings)
@@ -1488,8 +1562,8 @@ local function CreateScrollAreaConfig()
 
 	local button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(function(this)
 		SaveScrollAreaSettings(frame.previewSettings)
 		frame:Hide()
@@ -1497,8 +1571,8 @@ local function CreateScrollAreaConfig()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		SaveScrollAreaSettings(frame.originalSettings)
 		frame:Hide()
@@ -1540,25 +1614,21 @@ end
 
 local function CreateScrollAreaSelection()
 	local frame = CreatePopup()
-	frame:SetWidth(350)
-	frame:SetHeight(150)
-
-	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
-	frame.titleFontString = fontString
+	frame:SetWidth(380)
+	frame:SetHeight(220)
 
 
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["outputScrollArea"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
-	dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -45)
+	dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
 	frame.scrollAreaDropdown = dropdown
 
 
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["inputOkay"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 		if frame.saveHandler then
@@ -1569,8 +1639,8 @@ local function CreateScrollAreaSelection()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["inputCancel"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 	end)
@@ -1617,19 +1687,15 @@ end
 
 local function CreateEvent()
 	local frame = CreatePopup()
-	frame:SetWidth(320)
-	frame:SetHeight(370)
+	frame:SetWidth(380)
+	frame:SetHeight(410)
 	frame.controls = {}
 	local controls = frame.controls
-
-	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
-	frame.titleFontString = fontString
 
 	local dropdown = MSBTControls.CreateDropdown(frame)
 	local objLocale = L.DROPDOWNS["outputScrollArea"]
 	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
-	dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -60)
+	dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
 	controls.scrollAreaDropdown = dropdown
 
 	local editbox = MSBTControls.CreateEditbox(frame)
@@ -1657,8 +1723,8 @@ local function CreateEvent()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(function(this)
 		EraseTable(returnSettings)
 		returnSettings.scrollArea = controls.scrollAreaDropdown:GetSelectedID()
@@ -1675,8 +1741,8 @@ local function CreateEvent()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 	end)
@@ -1715,11 +1781,11 @@ local function ShowEvent(configTable)
 	if (configTable.isCrit) then controls.stickyCheckbox:Hide() else controls.stickyCheckbox:Show() end
 
 	if (configTable.showIconSkillEditbox) then
-		frame:SetHeight(400)
+		frame:SetHeight(430)
 		controls.iconSkillEditbox:Show()
 	else
 		controls.iconSkillEditbox:Hide()
-		frame:SetHeight(340)
+		frame:SetHeight(370)
 	end
 
 	frame.saveHandler = configTable.saveHandler
@@ -1801,27 +1867,24 @@ end
 
 local function CreateItemList()
 	local frame = CreatePopup()
-	frame:SetWidth(400)
-	frame:SetHeight(300)
+	frame:SetWidth(440)
+	frame:SetHeight(360)
 	frame.controls = {}
 	local controls = frame.controls
 
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("TOP", frame, "TOP", 0, -20)
-	frame.titleFontString = fontString
-
-	fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -50)
+	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
 	fontString:SetText(L.MSG_ITEMS .. ":")
 	frame.itemsFontString = fontString
 
 	local button = MSBTControls.CreateOptionButton(frame)
 	local objLocale = L.BUTTONS["addItem"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
 	button:SetPoint("LEFT", frame.itemsFontString, "RIGHT", 10, 0)
 	button:SetClickHandler(function(this)
 		local objLocale = L.EDITBOXES["itemName"]
 		EraseTable(tempConfig)
+		tempConfig.title = L.BUTTONS.addItem.label
 		tempConfig.editboxLabel = objLocale.label
 		tempConfig.editboxTooltip = objLocale.tooltip
 		tempConfig.parentFrame = frame
@@ -1836,8 +1899,8 @@ local function CreateItemList()
 	controls[#controls + 1] = button
 
 	local listbox = MSBTControls.CreateListbox(frame)
-	listbox:Configure(355, 180, 30)
-	listbox:SetPoint("TOPLEFT", frame.itemsFontString, "BOTTOMLEFT", 10, -10)
+	listbox:Configure(352, 180, 30)
+	listbox:SetPoint("TOPLEFT", frame.itemsFontString, "BOTTOMLEFT", 0, -16)
 	listbox:SetCreateLineHandler(CreateItemListLine)
 	listbox:SetDisplayHandler(DisplayItemListLine)
 	frame.itemsListbox = listbox
@@ -1845,8 +1908,8 @@ local function CreateItemList()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericSave"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 		if frame.saveHandler then
@@ -1857,8 +1920,8 @@ local function CreateItemList()
 
 	button = MSBTControls.CreateOptionButton(frame)
 	objLocale = L.BUTTONS["genericCancel"]
-	button:Configure(20, objLocale.label, objLocale.tooltip)
-	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 20)
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 	button:SetClickHandler(function(this)
 		frame:Hide()
 	end)
@@ -1907,6 +1970,7 @@ end
 
 
 module.DisableControls				= DisableControls
+module.CreateMenuArtwork			= CreateMenuArtwork
 module.ShowInput					= ShowInput
 module.ShowAcknowledge				= ShowAcknowledge
 module.ShowFont						= ShowFont

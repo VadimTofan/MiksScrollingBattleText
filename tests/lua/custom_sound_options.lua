@@ -49,6 +49,13 @@ for _, name in ipairs({ "SetPoint", "ClearAllPoints", "EnableMouse", "SetMovable
 	"SetTextChangedHandler", "SetValueChangedHandler" }) do
 	Widget[name] = function() end
 end
+for _, name in ipairs({ "SetTexture", "SetTexCoord", "SetSize",
+	"SetBackdropColor", "SetBackdropBorderColor", "SetJustifyH",
+	"SetTextColor" }) do
+	Widget[name] = function() end
+end
+function Widget:GetFrameLevel() return self.level or 0 end
+function Widget:SetFrameLevel(value) self.level = value end
 function Widget:SetScript(name, handler) self.scripts[name] = handler end
 function Widget:Show()
 	self.shown = true
@@ -78,7 +85,9 @@ function Widget:Enable() self.enabled = true end
 function Widget:Disable() self.enabled = false end
 function Widget:IsEnabled() return self.enabled ~= false end
 Widget.CreateFontString = NewWidget
+Widget.CreateTexture = NewWidget
 CreateFrame = function(_, _, parent) return NewWidget(parent) end
+UIParent = NewWidget()
 local tabs = {}
 MSBTOptions = { Controls = {}, Main = {
 	RegisterPopupFrame = function() end,

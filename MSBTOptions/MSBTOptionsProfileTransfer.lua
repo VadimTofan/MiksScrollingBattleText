@@ -5,35 +5,6 @@ local Controls = MSBTOptions.Controls
 local L = MikSBT.translations.PROFILE_TRANSFER
 local popup
 
-local function CreateMenuArtwork(frame)
-	local artworkPath = "Interface\\PaperDollInfoFrame\\UI-Character-General-"
-	local sections = {
-		{ texture = "TopLeft", anchor = "TOPLEFT", x = 0,
-			width = 256, height = 256, coords = { 0, 1, 0, 1 } },
-		{ texture = "TopLeft", anchor = "TOPLEFT", x = 256,
-			width = 204, height = 256, coords = { 0.45, 0.95, 0, 1 } },
-		{ texture = "TopRight", anchor = "TOPRIGHT", x = 0,
-			width = 100, height = 256, coords = { 0, 0.78125, 0, 1 } },
-		{ texture = "BottomLeft", anchor = "BOTTOMLEFT", x = 0,
-			width = 256, height = 264, coords = { 0, 1, 0, 0.71875 } },
-		{ texture = "BottomLeft", anchor = "BOTTOMLEFT", x = 256,
-			width = 204, height = 264, coords = { 0.5, 1, 0, 0.71875 } },
-		{ texture = "BottomRight", anchor = "BOTTOMRIGHT", x = 0,
-			width = 100, height = 264, coords = { 0, 0.78125, 0, 0.71875 } },
-	}
-	for _, section in ipairs(sections) do
-		local texture = frame:CreateTexture(nil, "BACKGROUND")
-		texture:SetTexture(artworkPath .. section.texture)
-		texture:SetSize(section.width, section.height)
-		texture:SetPoint(section.anchor, frame, section.anchor, section.x, 0)
-		texture:SetTexCoord(unpack(section.coords))
-	end
-	local icon = frame:CreateTexture(nil, "ARTWORK")
-	icon:SetTexture("Interface\\FriendsFrame\\FriendsFrameScrollIcon")
-	icon:SetSize(64, 64)
-	icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, 1)
-end
-
 local function ClosePopup(frame)
 	local hideHandler = frame.hideHandler
 	frame.dataEditbox:ClearFocus()
@@ -81,7 +52,7 @@ local function CreatePopup()
 	frame:EnableMouse(true)
 	frame:SetMovable(true)
 	frame:RegisterForDrag("LeftButton")
-	CreateMenuArtwork(frame)
+	MSBTOptions.Popups.CreateMenuArtwork(frame, 256)
 	frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
 	frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 	frame:SetScript("OnHide", ClosePopup)

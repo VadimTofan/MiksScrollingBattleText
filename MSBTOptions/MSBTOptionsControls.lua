@@ -1334,6 +1334,8 @@ local function Colorswatch_OnClick(this)
 		info.cancelFunc = Colorswatch_ColorPickerOnCancel
 		ColorPickerFrame:SetupColorPickerAndShow(info)
 	end
+	ColorPickerFrame:SetFrameStrata("FULLSCREEN_DIALOG")
+	ColorPickerFrame:SetFrameLevel(this:GetFrameLevel() + 3)
 end
 
 
