@@ -1,5 +1,19 @@
 # Changelog
 
+## v12.030
+
+- Added profile import and export with validation, a Copy button, and dialogs
+  styled to match the options menu.
+- Fixed exports containing retired profile settings.
+- Restyled all options popups, including Add Sound, Master Fonts, color editors,
+  event settings, and scroll-area dialogs, with clearer spacing and layering.
+- Fixed stale combat timers, expired throttle windows, and completed animation
+  references; preserved cooldown tracking across combat transitions.
+- Fixed loot notifications for uncached items and vehicle damage-meter polling
+  when no pet is present.
+- Removed unreachable options, unused resources, and dormant runtime code while
+  preserving active addon behavior.
+
 ## v12.029
 
 - Prevented profile changes from calling Blizzard's combat-text message refresh
