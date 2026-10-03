@@ -5,6 +5,35 @@ local Controls = MSBTOptions.Controls
 local L = MikSBT.translations.PROFILE_TRANSFER
 local popup
 
+local function CreateMenuArtwork(frame)
+	local artworkPath = "Interface\\PaperDollInfoFrame\\UI-Character-General-"
+	local sections = {
+		{ texture = "TopLeft", anchor = "TOPLEFT", x = 0,
+			width = 256, height = 256, coords = { 0, 1, 0, 1 } },
+		{ texture = "TopLeft", anchor = "TOPLEFT", x = 256,
+			width = 204, height = 256, coords = { 0.45, 0.95, 0, 1 } },
+		{ texture = "TopRight", anchor = "TOPRIGHT", x = 0,
+			width = 100, height = 256, coords = { 0, 0.78125, 0, 1 } },
+		{ texture = "BottomLeft", anchor = "BOTTOMLEFT", x = 0,
+			width = 256, height = 264, coords = { 0, 1, 0, 0.71875 } },
+		{ texture = "BottomLeft", anchor = "BOTTOMLEFT", x = 256,
+			width = 204, height = 264, coords = { 0.5, 1, 0, 0.71875 } },
+		{ texture = "BottomRight", anchor = "BOTTOMRIGHT", x = 0,
+			width = 100, height = 264, coords = { 0, 0.78125, 0, 0.71875 } },
+	}
+	for _, section in ipairs(sections) do
+		local texture = frame:CreateTexture(nil, "BACKGROUND")
+		texture:SetTexture(artworkPath .. section.texture)
+		texture:SetSize(section.width, section.height)
+		texture:SetPoint(section.anchor, frame, section.anchor, section.x, 0)
+		texture:SetTexCoord(unpack(section.coords))
+	end
+	local icon = frame:CreateTexture(nil, "ARTWORK")
+	icon:SetTexture("Interface\\FriendsFrame\\FriendsFrameScrollIcon")
+	icon:SetSize(64, 64)
+	icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, 1)
+end
+
 local function ClosePopup(frame)
 	local hideHandler = frame.hideHandler
 	frame.dataEditbox:ClearFocus()
@@ -27,6 +56,13 @@ local function Submit(frame)
 	local name, details = frame.importHandler(
 		frame.dataEditbox:GetText(), frame.nameEditbox:GetText())
 	if not name then
+		local field = frame.dataPanel
+		if details == "INVALID_NAME" or details == "PROFILE_EXISTS"
+			or details == "IN_COMBAT" then
+			field = frame.nameEditbox
+		end
+		frame.statusText:ClearAllPoints()
+		frame.statusText:SetPoint("TOPLEFT", field, "BOTTOMLEFT", 0, -8)
 		frame.statusText:SetText(L.errors[details] or L.errors.INVALID_DATA)
 		return
 	end
@@ -39,61 +75,89 @@ local function CreatePopup()
 	local frame = CreateFrame("Frame", nil, UIParent,
 		BackdropTemplateMixin and "BackdropTemplate")
 	frame:Hide()
-	frame:SetSize(500, 400)
-	frame:SetFrameStrata("DIALOG")
+	frame:SetSize(560, 520)
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
 	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
 	frame:SetMovable(true)
 	frame:RegisterForDrag("LeftButton")
-	frame:SetBackdrop({
-		bgFile = "Interface\\Addons\\MikScrollingBattleText\\" ..
-			"MSBTOptions\\Artwork\\PlainBackdrop",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		insets = { left = 6, right = 6, top = 6, bottom = 6 },
-	})
+	CreateMenuArtwork(frame)
 	frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
 	frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 	frame:SetScript("OnHide", ClosePopup)
 	MSBTOptions.Main.RegisterPopupFrame(frame)
 
 	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	title:SetPoint("TOPLEFT", 20, -20)
+	title:SetPoint("TOP", frame, "TOP", 0, -18)
 	frame.titleText = title
+	local headerClose = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+	headerClose:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -12)
+	headerClose:SetScript("OnClick", function() frame:Hide() end)
 	local instructions = frame:CreateFontString(nil, "OVERLAY",
 		"GameFontHighlightSmall")
-	instructions:SetPoint("TOPLEFT", 20, -45)
-	instructions:SetWidth(450)
+	instructions:SetPoint("TOPLEFT", 30, -78)
+	instructions:SetWidth(500)
 	instructions:SetJustifyH("LEFT")
 	frame.instructionsText = instructions
 
 	local name = Controls.CreateEditbox(frame)
-	name:SetPoint("TOPLEFT", 20, -72)
-	name:SetPoint("TOPRIGHT", -20, -72)
+	name:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 30, 178)
+	name:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -30, 178)
 	name:SetLabel(L.name)
 	name.editboxFrame:SetMaxLetters(64)
 	name:SetEscapeHandler(function() frame:Hide() end)
+	name:SetEnterHandler(function() Submit(frame) end)
+	name:SetTextChangedHandler(function() frame.statusText:SetText("") end)
 	frame.nameEditbox = name
 
-	local scroll = CreateFrame("ScrollFrame", nil, frame,
+	local label = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	label:SetPoint("TOPLEFT", 30, -118)
+	frame.dataLabel = label
+	local panel = CreateFrame("Frame", nil, frame,
+		BackdropTemplateMixin and "BackdropTemplate")
+	panel:SetPoint("TOPLEFT", 30, -138)
+	panel:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	})
+	panel:SetBackdropColor(0.02, 0.02, 0.02, 1)
+	panel:SetBackdropBorderColor(0.6, 0.5, 0.3, 1)
+	frame.dataPanel = panel
+	local scroll = CreateFrame("ScrollFrame", nil, panel,
 		"UIPanelScrollFrameTemplate")
-	scroll:SetPoint("TOPLEFT", 24, -128)
-	scroll:SetPoint("BOTTOMRIGHT", -44, 112)
+	scroll:SetPoint("TOPLEFT", 12, -12)
+	scroll:SetPoint("BOTTOMRIGHT", -32, 12)
 	frame.scrollFrame = scroll
-	local background = scroll:CreateTexture(nil, "BACKGROUND")
-	background:SetAllPoints()
-	background:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
-	background:SetVertexColor(0, 0, 0, 0.6)
+	local hint = scroll:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetPoint("TOPLEFT")
+	hint:SetWidth(456)
+	hint:SetJustifyH("LEFT")
+	hint:SetText(L.pasteHint)
+	frame.dataHint = hint
 
 	local data = CreateFrame("EditBox", nil, scroll)
 	data:SetMultiLine(true)
 	data:SetAutoFocus(false)
 	data:SetFontObject(ChatFontNormal)
-	data:SetWidth(420)
+	data:SetWidth(456)
 	data:SetHeight(160)
 	data:SetMaxLetters(131072)
 	data:SetScript("OnEscapePressed", function() frame:Hide() end)
+	data:SetScript("OnTabPressed", function(self)
+		if not frame.exportText then
+			self:ClearFocus()
+			frame.nameEditbox.editboxFrame:SetFocus()
+		end
+	end)
 	data:SetScript("OnTextChanged", function(self)
 		frame.statusText:SetText("")
+		if not frame.exportText and self:GetText() == "" then
+			frame.dataHint:Show()
+		else
+			frame.dataHint:Hide()
+		end
 		if frame.exportText and self:GetText() ~= frame.exportText then
 			self:SetText(frame.exportText)
 			self:HighlightText()
@@ -101,6 +165,7 @@ local function CreatePopup()
 		scroll:UpdateScrollChildRect()
 	end)
 	data:SetScript("OnCursorChanged", function(_, _, y, _, height)
+		if frame.exportText then return end
 		local cursor = -y
 		local offset = scroll:GetVerticalScroll()
 		if cursor < offset then
@@ -113,13 +178,13 @@ local function CreatePopup()
 	frame.dataEditbox = data
 
 	local note = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	note:SetPoint("BOTTOMLEFT", 20, 70)
-	note:SetWidth(450)
+	note:SetPoint("BOTTOMLEFT", 30, 68)
+	note:SetWidth(500)
 	note:SetJustifyH("LEFT")
 	note:SetText(L.mediaNote)
 	local status = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	status:SetPoint("BOTTOMLEFT", 20, 45)
-	status:SetWidth(450)
+	status:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -8)
+	status:SetWidth(500)
 	status:SetJustifyH("LEFT")
 	status:SetTextColor(1, 0.3, 0.3)
 	frame.statusText = status
@@ -128,10 +193,16 @@ local function CreatePopup()
 	action:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 15)
 	action:SetClickHandler(function() Submit(frame) end)
 	frame.actionButton = action
+	local copy = Controls.CreateOptionButton(frame)
+	copy:Configure(24, L.copy, L.exportHelp)
+	copy:SetPoint("BOTTOM", frame, "BOTTOM", 0, 22)
+	copy:SetClickHandler(function() Submit(frame) end)
+	frame.copyButton = copy
 	local close = Controls.CreateOptionButton(frame)
-	close:Configure(20, L.close)
+	close:Configure(24, L.close)
 	close:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 15)
 	close:SetClickHandler(function() frame:Hide() end)
+	frame.closeButton = close
 	return frame
 end
 
@@ -140,7 +211,8 @@ local function Show(config, exportText)
 	local frame = popup
 	frame.hideHandler = nil
 	frame:SetParent(config.parentFrame)
-	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetFrameLevel(config.parentFrame:GetFrameLevel() + 3)
 	frame.exportText = exportText
 	frame.importHandler = config.importHandler
 	frame.successHandler = config.successHandler
@@ -149,18 +221,29 @@ local function Show(config, exportText)
 	frame:SetPoint("CENTER", config.parentFrame, "CENTER")
 	frame.titleText:SetText(exportText and L.exportTitle or L.importTitle)
 	frame.instructionsText:SetText(exportText and L.exportHelp or L.importHelp)
-	frame.actionButton:Configure(20, exportText and L.selectAll or L.import)
+	frame.actionButton:Configure(24,
+		exportText and L.selectAll or L.importAction)
+	frame.dataLabel:SetText(exportText and L.exportLabel or L.importLabel)
+	frame.actionButton:ClearAllPoints()
+	frame.closeButton:ClearAllPoints()
+	frame.dataPanel:ClearAllPoints()
+	frame.dataPanel:SetPoint("TOPLEFT", 30, -138)
 	if exportText then
+		frame.copyButton:Show()
+		frame.actionButton:SetPoint("BOTTOMRIGHT", frame.copyButton,
+			"BOTTOMLEFT", -10, 0)
+		frame.closeButton:SetPoint("BOTTOMLEFT", frame.copyButton,
+			"BOTTOMRIGHT", 10, 0)
 		frame.nameEditbox:Hide()
-		frame.scrollFrame:ClearAllPoints()
-		frame.scrollFrame:SetPoint("TOPLEFT", 24, -78)
+		frame.dataPanel:SetPoint("BOTTOMRIGHT", -30, 150)
 	else
+		frame.copyButton:Hide()
+		frame.actionButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
+		frame.closeButton:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
 		frame.nameEditbox:Show()
 		frame.nameEditbox:SetText("")
-		frame.scrollFrame:ClearAllPoints()
-		frame.scrollFrame:SetPoint("TOPLEFT", 24, -128)
+		frame.dataPanel:SetPoint("BOTTOMRIGHT", -30, 224)
 	end
-	frame.scrollFrame:SetPoint("BOTTOMRIGHT", -44, 112)
 	frame.dataEditbox:SetText(exportText or "")
 	frame.scrollFrame:SetVerticalScroll(0)
 	frame.statusText:SetText("")

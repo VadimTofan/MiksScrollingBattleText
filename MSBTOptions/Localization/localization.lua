@@ -55,9 +55,14 @@ L.MSG_INVALID_ITEM_NAME				= "Invalid item name."
 L.PROFILE_TRANSFER = {
 	exportTitle = "Export Profile", importTitle = "Import Profile",
 	export = "Export", import = "Import", close = "Close",
-	selectAll = "Select All", name = "New profile name:",
+	selectAll = "Select All", name = "2. Name your new profile",
+	copy = "Copy (Ctrl+C)",
+	exportLabel = "Profile string", importLabel = "1. Paste profile string",
+	importAction = "Import Profile",
+	pasteHint = "Click here and press Ctrl+V to paste your profile string.",
 	exportHelp = "Press Ctrl+C to copy the selected profile string.",
-	importHelp = "Paste a profile string below and enter a new profile name.",
+	importHelp = "Paste a profile string, then give it a new name.\n" ..
+		"Importing creates and selects the new profile.",
 	mediaNote = "Custom font and sound files must be installed separately. " ..
 		"Settings and spells may differ between game versions or languages.",
 	imported = "Profile imported: %s",
