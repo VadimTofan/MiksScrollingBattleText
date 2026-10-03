@@ -94,6 +94,51 @@ for _, classic in ipairs({ false, true }) do
 	exports[#exports + 1] = exported
 end
 
+-- Describe: profiles from older versions retain retired settings in storage.
+do
+	-- Given the retired options and event overrides found in a saved profile.
+	local profiles = MikSBT.Profiles
+	local profile = profiles.savedVariables.profiles.Default
+	profile.enableBlizzardDamage = true
+	profile.enableBlizzardHealing = true
+	profile.enableBlizzardV2GroupDamage = false
+	profile.enableBlizzardV2GroupHealing = false
+	profile.events.NOTIFICATION_COOLDOWN = { disabled = true }
+	profile.events.NOTIFICATION_PET_COOLDOWN = { disabled = true }
+	local retiredEvent = profile.events.NOTIFICATION_COOLDOWN
+	local transfer = MikSBT.Configuration.ProfileTransfer:New({
+		masterProfile = profiles.masterProfile,
+		version = "12.029.0", client = 120100, locale = "enUS",
+	})
+
+	-- When the legacy profile is exported and decoded.
+	local exported, errorCode = profiles.ExportProfile("Default")
+	assert(exported, "legacy profile export failed: " .. tostring(errorCode))
+	local payload = assert(transfer:Decode(exported))
+
+	-- Then only supported settings transfer, without changing saved data.
+	assert(payload.sections.General.enableBlizzardDamage == nil)
+	assert(payload.sections.General.enableBlizzardHealing == nil)
+	assert(payload.sections.General.enableBlizzardV2GroupDamage == nil)
+	assert(payload.sections.General.enableBlizzardV2GroupHealing == nil)
+	assert(payload.sections.Events.NOTIFICATION_COOLDOWN == nil)
+	assert(payload.sections.Events.NOTIFICATION_PET_COOLDOWN == nil)
+	assert(payload.sections.ScrollAreas.Incoming.offsetX == -320)
+	assert(payload.sections.Events.INCOMING_DAMAGE.soundFile == 5678901)
+	assert(profile.enableBlizzardDamage == true)
+	assert(profile.enableBlizzardV2GroupHealing == false)
+	assert(profile.events.NOTIFICATION_COOLDOWN == retiredEvent)
+	assert(retiredEvent.disabled == true)
+
+	-- When a supported setting in that profile has an invalid value.
+	profile.events.INCOMING_DAMAGE.fontSize = "large"
+	local invalid, invalidError = profiles.ExportProfile("Default")
+
+	-- Then validation still rejects malformed supported settings.
+	assert(not invalid and invalidError == "INVALID_DATA")
+	profile.events.INCOMING_DAMAGE.fontSize = nil
+end
+
 -- Given a valid export and the active default profile.
 local profiles = MikSBT.Profiles
 local original = profiles.currentProfile

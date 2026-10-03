@@ -5,6 +5,13 @@ local PREFIX = "!MSBT:1!"
 local MAX_TEXT = 65536
 local MAX_DATA = 262144
 local MAX_NODES = 20000
+local RETIRED_SETTINGS = {
+	enableBlizzardDamage = true, enableBlizzardHealing = true,
+	enableBlizzardV2GroupDamage = true, enableBlizzardV2GroupHealing = true,
+}
+local RETIRED_EVENTS = {
+	NOTIFICATION_COOLDOWN = true, NOTIFICATION_PET_COOLDOWN = true,
+}
 local SECTION_KEYS = {
 	scrollAreas = "ScrollAreas", events = "Events", triggers = "Triggers",
 	dotThrottleDuration = "SpamControl", hotThrottleDuration = "SpamControl",
@@ -199,6 +206,10 @@ function ProfileTransfer:Export(name, profile, availableMedia)
 		return nil, "INVALID_DATA"
 	end
 	local settings = Snapshot(profile, self.masterProfile)
+	for key in pairs(RETIRED_SETTINGS) do settings[key] = nil end
+	if type(settings.events) == "table" then
+		for key in pairs(RETIRED_EVENTS) do settings.events[key] = nil end
+	end
 	local sections = {
 		General = {}, ScrollAreas = {}, Events = {}, Triggers = {},
 		SpamControl = {}, LootAlerts = {}, Cooldowns = {},
