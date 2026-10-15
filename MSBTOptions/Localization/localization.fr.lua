@@ -383,3 +383,15 @@ L.BUTTONS["playSound"]				= { label="Jouer", tooltip="Cliquer pour jouer le son.
 L.EDITBOXES["customSoundName"]	= { label="Nom du Son:", tooltip="Le nom utilisé pour identifier le son.\n\nExemple: Mon Son"}
 L.EDITBOXES["customSoundPath"]	= { label="Chemin du Son:", tooltip="Le chemin qui pointe vers le fichier du son.\n\nNOTE: Si le fichier est situé dans le répertoire rcommandé MikScrollingBattleText\\Sounds, seul le nom de fichier doit être entré ici, au lieu du chemin complet.\n\nExemple: monSon.ogg"}
 L.EDITBOXES["soundFile"]		= { label="Nom du fichier son:", tooltip="le nom du fichier son à joueur quand l'évènement intervient."}
+L.MSG_SKILLS = "Compétences"
+L.MSG_SKILL_ALREADY_EXISTS = "Cette compétence existe déjà."
+L.MSG_INVALID_SKILL_NAME = "Nom de compétence invalide."
+L.BUTTONS["throttleList"] = { label="Commande de puissance", tooltip="Définit des durées personnalisées pour les compétences spécifiées."}
+L.BUTTONS["mergeExclusions"] = { label="Exclusions de la fusion", tooltip="Définit la liste des compétences qui ne seront pas fusionnées."}
+L.BUTTONS["skillSuppressions"] = { label="Compétences supprimées", tooltip="Supprime des compétences en fonction de leur nom."}
+L.BUTTONS["skillSubstitutions"] = { label="Compétences substituées", tooltip="Substitue les nom des compétences avec des valeurs personnalisées."}
+L.BUTTONS["addSkill"] = { label="Ajouter une compétence", tooltip="Ajoute une nouvelle compétence à la liste."}
+L.BUTTONS["deleteSkill"] = { tooltip="Cliquer pour supprimer cette compétence."}
+L.EDITBOXES["skillName"] = { label="Nom de la compétence:", tooltip="Le nom de la compétence à ajouter."}
+L.EDITBOXES["substitutionText"] = { label="Texte de substitution:", tooltip="Le texte à substituer pour le nom de la compétence."}
+L.SLIDERS["skillThrottleTime"] = { label="Contrôle du temps", tooltip="Le nombre de secondes à prendre en compte pour afficher la compétence."}

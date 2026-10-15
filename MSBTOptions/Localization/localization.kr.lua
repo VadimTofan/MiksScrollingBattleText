@@ -410,3 +410,15 @@ L.BUTTONS["playSound"]				= { label="재생", tooltip="선택된 효과음을 �
 L.EDITBOXES["customSoundName"]	= { label="소리 이름:", tooltip="이름은 소리를 식별하는데 사용합니다.\n\n사용예: 나의 소리"}
 L.EDITBOXES["customSoundPath"]	= { label="소리 경로:", tooltip="소리 파일이 있는 경로.\n\n노트: 만약 파일이 권장하는 MikScrollingBattleText\\Sounds 폴더 위치에 있으면, 여기엔 오로지 전체 경로 대신 파일 이름을 입력해야 됩니다.\n\n사용예: mySound.ogg "}
 L.EDITBOXES["soundFile"]		= { label="효과음 파일명:", tooltip="이벤트 발생시 재생할 효과음 파일."}
+L.MSG_SKILLS = "기술"
+L.MSG_SKILL_ALREADY_EXISTS = "기술 이름이 이미 존재합니다."
+L.MSG_INVALID_SKILL_NAME = "허용되지 않는 기술 이름입니다."
+L.BUTTONS["throttleList"] = { label="기술 출력시간", tooltip="명시한 기술을 출력하는 단위시간을 설정하십시오."}
+L.BUTTONS["mergeExclusions"] = { label="병합 제외", tooltip="명시한 기술을 병합에서 제외됩니다."}
+L.BUTTONS["skillSuppressions"] = { label="제외시킬 기술", tooltip="제외시킬 기술의 이름을 명시합니다."}
+L.BUTTONS["skillSubstitutions"] = { label="기술 이름 대체", tooltip="기술의 이름을 사용자가 입력한 글자로 대체합니다."}
+L.BUTTONS["addSkill"] = { label="기술 추가", tooltip="목록에 새로운 기술을 추가합니다."}
+L.BUTTONS["deleteSkill"] = { tooltip="기술을 삭제하려면 클릭하세요."}
+L.EDITBOXES["skillName"] = { label="기술 이름 입력:", tooltip="추가되는 기술의 이름."}
+L.EDITBOXES["substitutionText"] = { label="대체 텍스트:", tooltip="기술 이름을 대체할 텍스트."}
+L.SLIDERS["skillThrottleTime"] = { label="출력시간 (초)", tooltip="기술을 출력하는 단위시간 (초)."}

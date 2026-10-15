@@ -1959,6 +1959,205 @@ end
 
 
 
+local function EnableSkillListControls()
+	for name, frame in pairs(popupFrames.skillListFrame.controls) do
+		if (frame.Enable) then frame:Enable() end
+	end
+end
+
+
+local function ValidateSkillListName(skillName)
+	if (not skillName or skillName == "") then
+		return L.MSG_INVALID_SKILL_NAME
+	end
+
+	if (popupFrames.skillListFrame.skills[skillName]) then
+		return L.MSG_SKILL_ALREADY_EXISTS
+	end
+end
+
+
+local function SaveSkillListName(settings)
+	local skillName = settings.inputText
+	local frame = popupFrames.skillListFrame
+	if (frame.listType == "throttle") then
+		frame.skills[skillName] = 3
+	elseif (frame.listType == "substitution") then
+		frame.skills[skillName] = settings.secondInputText
+	else
+		frame.skills[skillName] = true
+	end
+
+	frame.skillsListbox:AddItem(skillName, true)
+end
+
+
+local function DeleteSkillButtonOnClick(this)
+	local line = this:GetParent()
+	popupFrames.skillListFrame.skills[line.skillName] = false
+	popupFrames.skillListFrame.skillsListbox:RemoveItem(line.itemNumber)
+end
+
+
+local function TimeSliderOnValueChanged(this, value)
+	local line = this:GetParent()
+	popupFrames.skillListFrame.skills[line.skillName] = value
+end
+
+
+local function CreateSkillListLine(this)
+	local controls = popupFrames.skillListFrame.controls
+	local frame = CreateFrame("Button", nil, this)
+	frame:EnableMouse(false)
+
+	local button = MSBTControls.CreateIconButton(frame, "Delete")
+	local objLocale = L.BUTTONS["deleteSkill"]
+	button:SetTooltip(objLocale.tooltip)
+	button:SetPoint("RIGHT", frame, "RIGHT", -10, 0)
+	button:SetClickHandler(DeleteSkillButtonOnClick)
+	frame.deleteButton = button
+	controls[#controls + 1] = button
+
+	local slider = MSBTControls.CreateSlider(frame)
+	objLocale = L.SLIDERS["skillThrottleTime"]
+	slider:Configure(120, objLocale.label, objLocale.tooltip)
+	slider:SetPoint("RIGHT", frame.deleteButton, "LEFT", -10, -5)
+	slider:SetMinMaxValues(1, 5)
+	slider:SetValueStep(1)
+	slider:SetValueChangedHandler(TimeSliderOnValueChanged)
+	frame.timeSlider = slider
+	controls[#controls + 1] = slider
+
+	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	fontString:SetPoint("LEFT", frame, "LEFT", 5, 0)
+	fontString:SetPoint("RIGHT", frame.timeSlider, "LEFT", -10, 0)
+	fontString:SetJustifyH("LEFT")
+	fontString:SetTextColor(1, 1, 1)
+	frame.skillFontString = fontString
+
+	return frame
+end
+
+
+local function DisplaySkillListLine(this, line, key, isSelected)
+	local frame = popupFrames.skillListFrame
+	line.skillName = key
+	if (frame.listType == "throttle") then
+		line.skillFontString:SetText(key)
+		line.skillFontString:SetPoint("RIGHT", line.timeSlider, "LEFT", -10, 0)
+		line.timeSlider:Show()
+		line.timeSlider:SetValue(frame.skills[key] or 3)
+	elseif (frame.listType == "substitution") then
+		line.skillFontString:SetText(key .. " - " .. tostring(frame.skills[key]))
+		line.skillFontString:SetPoint("RIGHT", line.deleteButton, "LEFT", -10, 0)
+		line.timeSlider:Hide()
+	else
+		line.skillFontString:SetText(key)
+		line.skillFontString:SetPoint("RIGHT", line.deleteButton, "LEFT", -10, 0)
+		line.timeSlider:Hide()
+	end
+end
+
+
+local function CreateSkillList()
+	local frame = CreatePopup()
+	frame:SetWidth(440)
+	frame:SetHeight(360)
+	frame.controls = {}
+	local controls = frame.controls
+
+	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
+	fontString:SetText(L.MSG_SKILLS .. ":")
+	frame.skillsFontString = fontString
+
+	local button = MSBTControls.CreateOptionButton(frame)
+	local objLocale = L.BUTTONS["addSkill"]
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("LEFT", frame.skillsFontString, "RIGHT", 10, 0)
+	button:SetClickHandler(function(this)
+		local objLocale = L.EDITBOXES["skillName"]
+		EraseTable(tempConfig)
+		tempConfig.editboxLabel = objLocale.label
+		tempConfig.editboxTooltip = objLocale.tooltip
+		tempConfig.parentFrame = frame
+		tempConfig.anchorFrame = this
+		tempConfig.validateHandler = ValidateSkillListName
+		tempConfig.saveHandler = SaveSkillListName
+		tempConfig.hideHandler = EnableSkillListControls
+		if (frame.listType == "substitution") then
+			objLocale = L.EDITBOXES["substitutionText"]
+			tempConfig.showSecondEditbox = true
+			tempConfig.secondEditboxLabel = objLocale.label
+			tempConfig.secondEditboxTooltip = objLocale.tooltip
+		end
+		DisableControls(controls)
+		ShowInput(tempConfig)
+	end)
+	frame.addSkillButton = button
+	controls[#controls + 1] = button
+
+	local listbox = MSBTControls.CreateListbox(frame)
+	listbox:Configure(355, 180, 30)
+	listbox:SetPoint("TOPLEFT", frame.skillsFontString, "BOTTOMLEFT", 10, -10)
+	listbox:SetCreateLineHandler(CreateSkillListLine)
+	listbox:SetDisplayHandler(DisplaySkillListLine)
+	frame.skillsListbox = listbox
+	controls[#controls + 1] = listbox
+
+	button = MSBTControls.CreateOptionButton(frame)
+	objLocale = L.BUTTONS["genericSave"]
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -10, 22)
+	button:SetClickHandler(function (this)
+		frame:Hide()
+		if frame.saveHandler then
+			frame.saveHandler(frame.saveArg1)
+		end
+	end)
+	controls[#controls + 1] = button
+
+	button = MSBTControls.CreateOptionButton(frame)
+	objLocale = L.BUTTONS["genericCancel"]
+	button:Configure(24, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 10, 22)
+	button:SetClickHandler(function(this)
+		frame:Hide()
+	end)
+	controls[#controls + 1] = button
+
+	return frame
+end
+
+
+local function ShowSkillList(configTable)
+	if (not configTable or not configTable.anchorFrame or not configTable.parentFrame or not configTable.skills) then return end
+
+	if (not popupFrames.skillListFrame) then popupFrames.skillListFrame = CreateSkillList() end
+
+	local frame = popupFrames.skillListFrame
+	ChangePopupParent(frame, configTable.parentFrame)
+
+	frame.titleFontString:SetText(configTable.title)
+
+	frame.listType = configTable.listType
+	frame.skills = configTable.skills
+	frame.skillsListbox:Clear()
+	for skillName, value in pairs(configTable.skills) do
+		if (value) then frame.skillsListbox:AddItem(skillName) end
+	end
+
+	frame.saveHandler = configTable.saveHandler
+	frame.saveArg1 = configTable.saveArg1
+	frame.hideHandler = configTable.hideHandler
+	frame:ClearAllPoints()
+	frame:SetPoint(configTable.anchorPoint or "TOPLEFT", configTable.anchorFrame, configTable.relativePoint or "BOTTOMLEFT")
+	frame:Show()
+	frame:Raise()
+end
+
+
+
 if type(FillLocalizedClassList) == "function" then
 	FillLocalizedClassList(CLASS_NAMES)
 else
@@ -1981,3 +2180,4 @@ module.ShowScrollAreaConfig			= ShowScrollAreaConfig
 module.ShowScrollAreaSelection		= ShowScrollAreaSelection
 module.ShowEvent					= ShowEvent
 module.ShowItemList					= ShowItemList
+module.ShowSkillList				= ShowSkillList

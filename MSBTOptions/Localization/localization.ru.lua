@@ -404,3 +404,15 @@ L.BUTTONS["playSound"]				= { label="Воспр.", tooltip="Нажмите дл�
 L.EDITBOXES["customSoundName"]	= { label="Звук:", tooltip="Название, используемое для определения звука.\n\nПример: Мой Звук"}
 L.EDITBOXES["customSoundPath"]	= { label="Путь к звуку:", tooltip="Путь к файлу звука.\n\nNOTE: Если файл находится в рекомендованном директории звуков\\MikScrollingBattleText, тогда впишите только названия файла, вместо полного пути.\n\nExample: мойЗвук.ogg "}
 L.EDITBOXES["soundFile"]		= { label="Звуковой файл:", tooltip="Название звукового файла который будет проигрываться при свершении события."}
+L.MSG_SKILLS = "Навыки"
+L.MSG_SKILL_ALREADY_EXISTS = "Название навыка уже существует."
+L.MSG_INVALID_SKILL_NAME = "Неверное название навыка."
+L.BUTTONS["throttleList"] = { label="Список регулировок", tooltip="Установка индивидуального времени для определённых навыков."}
+L.BUTTONS["mergeExclusions"] = { label="Слияние исключение", tooltip="Предотвращать слияние определённых навыков."}
+L.BUTTONS["skillSuppressions"] = { label="Блокир-ка навыков", tooltip="Скрывать навыки по их названиям."}
+L.BUTTONS["skillSubstitutions"] = { label="Замена навыков", tooltip="Заменить название навыка на пользовательское значение."}
+L.BUTTONS["addSkill"] = { label="Добавить навык", tooltip="Добавить новый навык в список."}
+L.BUTTONS["deleteSkill"] = { tooltip="Кликните для удаления навыка."}
+L.EDITBOXES["skillName"] = { label="Название навыка:", tooltip="Название навыка который будет добавлен."}
+L.EDITBOXES["substitutionText"] = { label="Текст замещения:", tooltip="Текст который будет заменять название навыка."}
+L.SLIDERS["skillThrottleTime"] = { label="Регулятор время", tooltip="Число секунд, чтобы замедлить отображение навыков."}

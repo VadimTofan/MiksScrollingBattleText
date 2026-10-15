@@ -407,3 +407,15 @@ L.BUTTONS["playSound"]				= { label="播放", tooltip="播放选定的声音."}
 L.EDITBOXES["customSoundName"]	= { label="音效名:", tooltip="用来确定音效的名字.\n\nExample: 我的音效"}
 L.EDITBOXES["customSoundPath"]	= { label="音效路径:", tooltip="音效文件的路径.\n\n注意: 如果文件在 MikScrollingBattleText\\Sounds 中的话, 只需要输入文件名就可以.\n\n例如: mySound.ogg "}
 L.EDITBOXES["soundFile"]		= { label="声音文件：", tooltip="事件发生时播放的声音"}
+L.MSG_SKILLS = "技能"
+L.MSG_SKILL_ALREADY_EXISTS = "技能名字已存在"
+L.MSG_INVALID_SKILL_NAME = "无效的技能名字"
+L.BUTTONS["throttleList"] = { label="抑制列表", tooltip="设置指定技能的自定义抑制时间"}
+L.BUTTONS["mergeExclusions"] = { label="防止合并", tooltip="防止指定技能的伤害数值合并"}
+L.BUTTONS["skillSuppressions"] = { label="技能缩写", tooltip="缩写技能名字"}
+L.BUTTONS["skillSubstitutions"] = { label="技能替换", tooltip="用自定义名称替换技能名字"}
+L.BUTTONS["addSkill"] = { label="增加技能", tooltip="增加新技能到列表中"}
+L.BUTTONS["deleteSkill"] = { tooltip="点击删除技能"}
+L.EDITBOXES["skillName"] = { label="技能名称：", tooltip="所增加的技能的名字"}
+L.EDITBOXES["substitutionText"] = { label="替代文本：", tooltip="用来代替技能名字的文本"}
+L.SLIDERS["skillThrottleTime"] = { label="技能抑制显示", tooltip="在设定的秒数中持续使用的技能将只显示一次"}

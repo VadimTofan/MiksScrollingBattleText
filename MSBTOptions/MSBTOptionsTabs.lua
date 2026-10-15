@@ -368,7 +368,7 @@ local function GeneralTab_Create()
 
 
 
-	button = MSBTControls.CreateOptionButton(tabFrame)
+	local button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["classColors"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("BOTTOMLEFT", tabFrame, "BOTTOMLEFT", 5, 15)
@@ -1982,6 +1982,174 @@ local function ResetBlizzardSCTTab_OnShow()
 end
 
 
+local function SpamTab_EnableControls()
+	local controls = tabFrames.spam.controls
+	for name, frame in pairs(controls) do
+		if (frame.Enable) then frame:Enable() end
+	end
+end
+
+
+local function SpamTab_Create()
+	local tabFrame = tabFrames.spam
+	tabFrame.controls = {}
+	local controls = tabFrame.controls
+
+	local checkbox, objLocale
+	local previous
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["hideSkills"]
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	if previous then
+		checkbox:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, 0)
+	else
+		checkbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -10)
+	end
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "hideSkills", isChecked)
+		end
+	)
+	controls.hideSkillsCheckbox = checkbox
+	previous = checkbox
+
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["hideNames"]
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	if previous then
+		checkbox:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, 0)
+	else
+		checkbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -10)
+	end
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "hideNames", isChecked)
+		end
+	)
+	controls.hideNamesCheckbox = checkbox
+	previous = checkbox
+
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["abbreviateSkills"]
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	if previous then
+		checkbox:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, 0)
+	else
+		checkbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -10)
+	end
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "abbreviateAbilities", isChecked)
+		end
+	)
+	controls.abbreviateCheckbox = checkbox
+	previous = checkbox
+
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["groupNumbers"]
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	if previous then
+		checkbox:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, 0)
+	else
+		checkbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -10)
+	end
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "groupNumbers", isChecked)
+		end
+	)
+	controls.groupNumbersCheckbox = checkbox
+	previous = checkbox
+
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["allPowerGains"]
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	if previous then
+		checkbox:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, 0)
+	else
+		checkbox:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -10)
+	end
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "showAllPowerGains", isChecked)
+		end
+	)
+	controls.allPowerCheckbox = checkbox
+	previous = checkbox
+
+	local button = MSBTControls.CreateOptionButton(tabFrame)
+	objLocale = L.BUTTONS["skillSubstitutions"]
+	button:Configure(20, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", -10, 15)
+	button:SetClickHandler(
+		function (this)
+			local listName = "abilitySubstitutions"
+			PopulateList(listName)
+			EraseTable(configTable)
+			configTable.title = this:GetText()
+			configTable.skills = listTable
+			configTable.listType = "substitution"
+			configTable.parentFrame = tabFrame
+			configTable.anchorFrame = this
+			configTable.anchorPoint = "BOTTOMRIGHT"
+			configTable.relativePoint = "TOPRIGHT"
+			configTable.saveHandler = SaveList
+			configTable.saveArg1 = listName
+			configTable.hideHandler = SpamTab_EnableControls
+			DisableControls(controls)
+			MSBTPopups.ShowSkillList(configTable)
+		end
+	)
+	controls.skillSubstitutionsButton = button
+
+	button = MSBTControls.CreateOptionButton(tabFrame)
+	objLocale = L.BUTTONS["skillSuppressions"]
+	button:Configure(20, objLocale.label, objLocale.tooltip)
+	button:SetPoint("BOTTOMLEFT", controls.skillSubstitutionsButton, "TOPLEFT", 0, 10)
+	button:SetClickHandler(
+		function (this)
+			local listName = "abilitySuppressions"
+			PopulateList(listName)
+			EraseTable(configTable)
+			configTable.title = this:GetText()
+			configTable.skills = listTable
+			configTable.parentFrame = tabFrame
+			configTable.anchorFrame = this
+			configTable.anchorPoint = "BOTTOMRIGHT"
+			configTable.relativePoint = "TOPRIGHT"
+			configTable.saveHandler = SaveList
+			configTable.saveArg1 = listName
+			configTable.hideHandler = SpamTab_EnableControls
+			DisableControls(controls)
+			MSBTPopups.ShowSkillList(configTable)
+		end
+	)
+	controls.skillSuppressionsButton = button
+
+	tabFrame.created = true
+end
+
+
+local function SpamTab_OnShow()
+	if (not tabFrames.spam.created) then SpamTab_Create() end
+
+	local currentProfile = MSBTProfiles.currentProfile
+	local controls = tabFrames.spam.controls
+
+	controls.hideSkillsCheckbox:SetChecked(currentProfile.hideSkills)
+	controls.hideNamesCheckbox:SetChecked(currentProfile.hideNames)
+	controls.abbreviateCheckbox:SetChecked(currentProfile.abbreviateAbilities)
+	controls.groupNumbersCheckbox:SetChecked(currentProfile.groupNumbers)
+	controls.allPowerCheckbox:SetChecked(currentProfile.showAllPowerGains)
+end
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Initialization.
 
 local objLocale = L.TABS.general
 local tabFrame = CreateFrame("Frame")
@@ -2011,6 +2179,13 @@ tabFrame:SetScript("OnShow", EventsTab_OnShow)
 tabFrames.events = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip)
 
+-- Create an empty frame for the spam tab that will be dynamically created when shown.
+objLocale = L.TABS.spamControl or { label = "Spam Control", tooltip = "Display options for controlling spam." }
+tabFrame = CreateFrame("Frame")
+tabFrame:Hide()
+tabFrame:SetScript("OnShow", SpamTab_OnShow)
+tabFrames.spam = tabFrame
+MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip)
 objLocale = L.TABS.lootAlerts
 tabFrame = CreateFrame("Frame")
 tabFrame:Hide()

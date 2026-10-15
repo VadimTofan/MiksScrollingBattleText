@@ -484,3 +484,15 @@ L.BUTTONS["playSound"]				= { label="Play", tooltip="Click to play the selected 
 L.EDITBOXES["customSoundName"]	= { label="Sound name:", tooltip="The name used to identify the sound.\n\nExample: My Sound"}
 L.EDITBOXES["customSoundPath"]	= { label="Sound path:", tooltip="The path to the sounds's file.\n\nNOTE: If the file is located in the recommended MikScrollingBattleText\\Sounds directory, only the filename needs to be entered here instead of th full path.\n\nExample: mySound.ogg "}
 L.EDITBOXES["soundFile"]		= { label="Sound filename:", tooltip="The name of the sound file to play when the event occurs."}
+L.MSG_SKILLS = "Skills"
+L.MSG_SKILL_ALREADY_EXISTS = "Skill name already exists."
+L.MSG_INVALID_SKILL_NAME = "Invalid skill name."
+L.BUTTONS["throttleList"] = { label="Throttle List", tooltip="Set custom throttle times for specified skills."}
+L.BUTTONS["mergeExclusions"] = { label="Merge Exclusions", tooltip="Prevent specified skills from being merged."}
+L.BUTTONS["skillSuppressions"] = { label="Skill Suppressions", tooltip="Suppress skills by their name."}
+L.BUTTONS["skillSubstitutions"] = { label="Skill Substitutions", tooltip="Substitute skill names with customized values."}
+L.BUTTONS["addSkill"] = { label="Add Skill", tooltip="Add a new skill to the list."}
+L.BUTTONS["deleteSkill"] = { tooltip="Click to delete the skill."}
+L.EDITBOXES["skillName"] = { label="Skill name:", tooltip="The name of the skill to add."}
+L.EDITBOXES["substitutionText"] = { label="Substition text:", tooltip="The text to be substituted for the skill name."}
+L.SLIDERS["skillThrottleTime"] = { label="Throttle Time", tooltip="The number of seconds to throttle the skill."}

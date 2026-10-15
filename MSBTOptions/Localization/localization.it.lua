@@ -407,3 +407,15 @@ L.BUTTONS["playSound"]				= { label="Esegui", tooltip="Premere per eseguire il f
 L.EDITBOXES["customSoundName"]	= { label="Nome Suono:", tooltip="Il nome usato per identificare il suono"}
 L.EDITBOXES["customSoundPath"]	= { label="Percorso Suono:", tooltip="Il percorso al file del suono.\n\nNOTA: se il file e' nella cartella raccomandara MikScrollingBattleText\\Sounds, solo il nome del file necessita di essere inserito invece che l'intero percorso.\n\nEsempio: mySound.ogg"}
 L.EDITBOXES["soundFile"]		= { label="Nome del file sonoro:", tooltip="Il nome del file sonoro da eseguire quando avviene l'evento."}
+L.MSG_SKILLS = "Abilita'"
+L.MSG_SKILL_ALREADY_EXISTS = "Nome esistente per l'abilita'."
+L.MSG_INVALID_SKILL_NAME = "Nome per l'abilita' invalido."
+L.BUTTONS["throttleList"] = { label="Lista di Aggregazione", tooltip="Imposta un numero personalizzato di raggruppamento per i tick (ES: invece di avere Fontana di Mana ripetuto 5 volte con i 5 tick si avra' un solo avviso con il totale dei 5 tick)."}
+L.BUTTONS["mergeExclusions"] = { label="Unifica Esclusioni", tooltip="Previene che le abilita' specificate vengano unificate."}
+L.BUTTONS["skillSuppressions"] = { label="Soppressione Abilita'", tooltip="Sopprime le abilita' basato sui nomi."}
+L.BUTTONS["skillSubstitutions"] = { label="Sostituzione Abilita'", tooltip="Sostituisce i nomi delle abilita' con un valore personalizzato."}
+L.BUTTONS["addSkill"] = { label="Aggiungi Abilita'", tooltip="Aggiunge una nuova abilita'."}
+L.BUTTONS["deleteSkill"] = { tooltip="Premere per cancellare l'abilita'."}
+L.EDITBOXES["skillName"] = { label="Nome Abilita':", tooltip="Il nome dell'abilita' da aggiungere."}
+L.EDITBOXES["substitutionText"] = { label="Testo sostitutivo:", tooltip="Il testo da sostituire al nome dell'abilita'."}
+L.SLIDERS["skillThrottleTime"] = { label="Tempo Aggregazione", tooltip="Il numero di secondi per aggregare le abilita'."}

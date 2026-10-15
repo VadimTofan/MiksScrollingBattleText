@@ -405,3 +405,15 @@ L.BUTTONS["playSound"]				= { label="Abspielen", tooltip="Klicken, um den ausgew
 L.EDITBOXES["customSoundName"]	= { label="Sound Name:", tooltip="Der Name wird benutzt um den Sound zu identifizieren.\n\nBeispiel: Mein Sound"}
 L.EDITBOXES["customSoundPath"]	= { label="Sound Pfad:", tooltip="Der Pfad zu der Sound Datei.\n\nNOTIZ: Wenn die Datei in dem empfohlenen MikScrollingBattleText\\Sounds Ordner ist, muss nur der Dateiname hier eingegeben werden anstatt der ganze Pfad.\n\nBeispiel: mySound.ogg "}
 L.EDITBOXES["soundFile"]		= { label="Sound-Dateiname:", tooltip="Der Name der Sound Datei zum Abspielen wenn das Ereignis erscheint."}
+L.MSG_SKILLS = "Fähigkeiten"
+L.MSG_SKILL_ALREADY_EXISTS = "Fähigkeitsname existiert bereits."
+L.MSG_INVALID_SKILL_NAME = "Ungültiger Fähigkeitsname."
+L.BUTTONS["throttleList"] = { label="Unterdrückungs-Liste", tooltip="Benutzerdefinierte Unterdrückungszeit für festgelegte Fähigkeiten setzen."}
+L.BUTTONS["mergeExclusions"] = { label="Ausschlüsse zusammenfügen", tooltip="Verhindert, dass festgelegte Fähigkeiten zusammengefügt werden."}
+L.BUTTONS["skillSuppressions"] = { label="Fähigkeiten unterdrücken", tooltip="Unterdrückt Fähigkeiten durch ihren Namen."}
+L.BUTTONS["skillSubstitutions"] = { label="Fähigkeiten ersetzen", tooltip="Ersetzt Fähigkeitsnamen mit angepassten Werten."}
+L.BUTTONS["addSkill"] = { label="Fähigkeiten hinzufügen", tooltip="Neuen Fähigkeiten zur Liste hinzufügen."}
+L.BUTTONS["deleteSkill"] = { tooltip="Klicken, um Fähigkeiten zu entfernen."}
+L.EDITBOXES["skillName"] = { label="Fähigkeitsname:", tooltip="Name der Fähigkeit, die hinzugefügt werden soll."}
+L.EDITBOXES["substitutionText"] = { label="Text ersetzen:", tooltip="Der Text, der für den Fähigkeitsnamen ersetzt werden soll."}
+L.SLIDERS["skillThrottleTime"] = { label="Drosseln", tooltip="Die Nummer in Sekunden, um diese Fähigkeit zu drosseln."}
