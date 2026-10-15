@@ -1,4 +1,4 @@
-
+﻿
 local module = {}
 local moduleName = "Profiles"
 MikSBT[moduleName] = module
@@ -1270,7 +1270,7 @@ if IsClassic then
 		disableIncomingInGroup			= false,
 		disableNotificationInGroup		= false,
 		disableStaticInGroup			= false,
-		enableBlizzardV2CombatText		= false,
+		enableBlizzardV2CombatText		= true,
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
@@ -2566,7 +2566,7 @@ else
 		disableIncomingInGroup			= false,
 		disableNotificationInGroup		= false,
 		disableStaticInGroup			= false,
-		enableBlizzardV2CombatText		= false,
+		enableBlizzardV2CombatText		= true,
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
@@ -2712,23 +2712,25 @@ local function DisableBlizzardCombatText()
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 0)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", 0)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", 0)
-	SHOW_COMBAT_TEXT = "0"
-	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
+end
+
+local function SafeSetCVar(name, value)
+	-- Not every client build knows every one of these, and an unknown console
+	-- variable raises instead of returning false.
+	return pcall(SetCVar, name, value)
 end
 
 local function SetBlizzardCombatTextV2Enabled(isEnabled)
 	local value = isEnabled and 1 or 0
 	if not IsClassic then
-		SetCVar("floatingCombatTextCombatHealing", value)
+		SafeSetCVar("floatingCombatTextCombatHealing", value)
 	end
-	SetCVar("floatingCombatTextCombatDamage", value)
-	SetCVar("floatingCombatTextCombatHealing_v2", value)
-	SetCVar("floatingCombatTextCombatDamage_v2", value)
-	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
-	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
-	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
-	SHOW_COMBAT_TEXT = isEnabled and "1" or "0"
-	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
+	SafeSetCVar("floatingCombatTextCombatDamage", value)
+	SafeSetCVar("floatingCombatTextCombatHealing_v2", value)
+	SafeSetCVar("floatingCombatTextCombatDamage_v2", value)
+	SafeSetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
+	SafeSetCVar("floatingCombatTextPetMeleeDamage_v2", value)
+	SafeSetCVar("floatingCombatTextPetSpellDamage_v2", value)
 end
 
 local function IsInGroupContext()
@@ -2787,14 +2789,10 @@ local function ResetOfficialBlizzardCombatText()
 		savedVariables.userDisabled = true
 	end
 
-	SetCVar("floatingCombatTextCombatDamage_v2", 1)
-	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 1)
-	SetCVar("floatingCombatTextPetMeleeDamage_v2", 1)
-	SetCVar("floatingCombatTextPetSpellDamage_v2", 1)
-
-	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then
-		CombatText_UpdateDisplayedMessages()
-	end
+	SafeSetCVar("floatingCombatTextCombatDamage_v2", 1)
+	SafeSetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 1)
+	SafeSetCVar("floatingCombatTextPetMeleeDamage_v2", 1)
+	SafeSetCVar("floatingCombatTextPetSpellDamage_v2", 1)
 
 	module.ApplyContextOptions()
 end
