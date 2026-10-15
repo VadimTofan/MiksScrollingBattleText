@@ -22,6 +22,7 @@ local Client = MikSBT.Compatibility.Client
 
 local string_find = string.find
 local string_gsub = string.gsub
+local table_remove = table.remove
 local FormatLargeNumber = FormatLargeNumber
 local GetTime = GetTime
 
@@ -102,10 +103,12 @@ local OUTGOING_DELAYED_SPELL_ATTRIBUTION_WINDOW = 3.0
 local OUTGOING_SIGNAL_CONFIDENCE_WINDOW = 1.25
 local INCOMING_SELF_HEAL_ICON_ATTRIBUTION_WINDOW = 12.0
 local DAMAGE_METER_FALLBACK_STALE_TIME = 0.35
+local DAMAGE_METER_POLL_INTERVAL = 0.5
 local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
 local outgoingCombat
+local SafeUnitBoolean, NoteParserDamage
 local parserNotifications
 local utilityNotifications
 local DOT_FALLBACK_SPELLS = {
@@ -114,6 +117,8 @@ local DOT_FALLBACK_SPELLS = {
 	[106830] = {106830, 405233},
 	[77758] = {77758, 405233},
 }
+local CLIENT_TOC_VERSION = tonumber((select(4, GetBuildInfo()))) or 0
+local IS_FOREVER_CLIENT = CLIENT_TOC_VERSION >= 16000 and CLIENT_TOC_VERSION < 20000
 local DOT_FALLBACK_TIMED_SPELLS = {
 	[202770] = 8,
 }
@@ -229,12 +234,12 @@ end
 
 function eventFrame:PLAYER_REGEN_ENABLED()
 	incomingCombat:Reset()
-	outgoingCombat:ResetCombatState()
+	outgoingCombat:ResetCombatState(false)
 	utilityNotifications:HandleCombatLeave()
 end
 function eventFrame:PLAYER_REGEN_DISABLED()
 	incomingCombat:Reset()
-	outgoingCombat:ResetCombatState()
+	outgoingCombat:ResetCombatState(true)
 	utilityNotifications:HandleCombatEnter()
 end
 function eventFrame:CHAT_MSG_MONSTER_EMOTE(message, sourceName)
@@ -250,7 +255,7 @@ local function NormalizeNumber(value)
 	return nil
 end
 
-local function SafeUnitBoolean(func, ...)
+SafeUnitBoolean = function(func, ...)
 	if type(func) ~= "function" then
 		return false
 	end
@@ -495,32 +500,137 @@ local outgoingBatcher = OutgoingBatcher:New({
 	resolveBatchDisplaySettings = ResolveBatchDisplaySettings,
 })
 
+local function IsDamageMeterUsable()
+	-- WoW Forever hands addons the session data only once combat ends, so as a
+	-- live source it turns a whole fight into one late burst.
+	if IS_FOREVER_CLIENT then
+		return false
+	end
+	if not USE_DAMAGE_METER_OUTGOING or not HasModernAPI then
+		return false
+	end
+	if not C_DamageMeter or not C_DamageMeter.GetCombatSessionSourceFromType then
+		return false
+	end
+	if not Enum or not Enum.DamageMeterType or not Enum.DamageMeterSessionType then
+		return false
+	end
+	if C_DamageMeter.IsDamageMeterAvailable then
+		local ok, isAvailable = pcall(C_DamageMeter.IsDamageMeterAvailable)
+		if ok and isAvailable == false then
+			return false
+		end
+	end
+	return true
+end
+
+-- A source owns the damage stream only while it is demonstrably producing.
+-- Hard-switching on "the combat log is registered" went silent whenever the
+-- client accepted the registration but never delivered an event.
+local SOURCE_OWNERSHIP_WINDOW = 5
+local lastParserDamage = 0
+local lastMeterDamage = 0
+
+NoteParserDamage = function()
+	lastParserDamage = GetTime()
+end
+
+local function NoteMeterDamage()
+	lastMeterDamage = GetTime()
+end
+
+local function IsParserOwningDamage()
+	return lastParserDamage > 0
+		and (GetTime() - lastParserDamage) <= SOURCE_OWNERSHIP_WINDOW
+end
+
+local function IsMeterOwningDamage()
+	return lastMeterDamage > 0
+		and (GetTime() - lastMeterDamage) <= SOURCE_OWNERSHIP_WINDOW
+end
+
+local CRIT_MATCH_WINDOW = 1.5
+local pendingCrits = {}
+
+-- The damage meter knows which spell dealt the damage but not whether it
+-- critted, while UNIT_COMBAT knows the opposite. Amounts seen as a critical
+-- hit are parked here so the meter can upgrade a matching hit.
+local function RecordCritAmount(amount)
+	if not amount or amount <= 0 then
+		return
+	end
+
+	local now = GetTime()
+	for index = #pendingCrits, 1, -1 do
+		if now - pendingCrits[index].time > CRIT_MATCH_WINDOW then
+			table_remove(pendingCrits, index)
+		end
+	end
+
+	pendingCrits[#pendingCrits + 1] = { amount = amount, time = now }
+end
+
+local function ConsumeCritAmount(amount)
+	if not amount then
+		return false
+	end
+
+	local now = GetTime()
+	for index = 1, #pendingCrits do
+		local entry = pendingCrits[index]
+		if now - entry.time <= CRIT_MATCH_WINDOW and entry.amount == amount then
+			table_remove(pendingCrits, index)
+			return true
+		end
+	end
+
+	return false
+end
+
+local function IsSecretValue(value)
+	if type(issecretvalue) ~= "function" then
+		return false
+	end
+	local ok, isSecret = pcall(issecretvalue, value)
+	return ok and isSecret == true
+end
+
 local damageMeterSource = DamageMeterSource:New({
-	isAvailable = function()
-		return USE_DAMAGE_METER_OUTGOING and HasModernAPI and C_DamageMeter
-			and Enum and Enum.DamageMeterType
-	end,
-	inCombat = InCombatLockdown,
+	label = "damage",
+	isAvailable = IsDamageMeterUsable,
+	isSecret = IsSecretValue,
 	getTime = GetTime,
 	unitGUID = UnitGUID,
 	getPlayerGUID = function()
 		return playerGUID
 	end,
-	getSessionSource = function(sourceGUID, damageType)
+	extraUnits = { "pet", "vehicle" },
+	createFrame = function()
+		return CreateFrame("Frame")
+	end,
+	getSessionSource = function(sessionType, damageType, sourceGUID)
 		return C_DamageMeter.GetCombatSessionSourceFromType(
-			0,
+			sessionType,
 			damageType,
 			sourceGUID
 		)
 	end,
+	getSessionSourceByID = C_DamageMeter and C_DamageMeter.GetCombatSessionSourceFromID,
+	sessionType = function()
+		return Enum.DamageMeterSessionType.Current
+	end,
+	damageType = function()
+		return Enum.DamageMeterType.DamageDone
+	end,
 	normalizeNumber = NormalizeNumber,
+	consumeCrit = ConsumeCritAmount,
+	isSuppressed = IsParserOwningDamage,
 	queue = function(...)
+		NoteMeterDamage()
 		outgoingBatcher:Queue(...)
 	end,
 	newTicker = C_Timer.NewTicker,
-	damageType = Enum and Enum.DamageMeterType
-		and Enum.DamageMeterType.DamageDone,
-	pollInterval = 0.1,
+	pollInterval = DAMAGE_METER_POLL_INTERVAL,
 	freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
 })
 
@@ -536,6 +646,8 @@ outgoingCombat = OutgoingCombat:New({
 	getTime = GetTime,
 	inCombat = InCombatLockdown,
 	isTargetValid = IsOutgoingTargetContextValid,
+	isMeterOwning = IsMeterOwningDamage,
+	recordCrit = RecordCritAmount,
 	getSpellTexture = function(spellID)
 		local _, _, texture = GetSpellInfo(spellID)
 		return texture
@@ -602,6 +714,9 @@ function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask
 	)
 end
 
+local function UpdateFallbackSources()
+	outgoingCombat:Start()
+end
 local function Enable()
 	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -609,17 +724,19 @@ local function Enable()
 	eventFrame:RegisterEvent("CHAT_MSG_MONSTER_EMOTE")
 	eventFrame:RegisterEvent("UNIT_COMBAT")
 	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-	outgoingCombat:Start()
+	UpdateFallbackSources()
 
 	MSBTParser.RegisterHandler(ParserEventsHandler)
 end
+
+MSBTParser.OnCombatLogChanged = UpdateFallbackSources
 
 local function Disable()
 	eventFrame:Hide()
 	eventFrame:UnregisterAllEvents()
 	incomingCombat:Reset()
 	outgoingCombat:Reset()
-	outgoingCombat:Stop()
+	outgoingCombat:Stop(true)
 
 	MSBTParser.UnregisterHandler(ParserEventsHandler)
 end

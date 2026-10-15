@@ -23,14 +23,17 @@ function OutgoingCombat:Reset()
 	self.config.batcher:Reset()
 end
 
-function OutgoingCombat:ResetCombatState()
+function OutgoingCombat:ResetCombatState(isCombatStart)
 	self.dotSpellID = nil
 	self.dotAuraIDs = nil
 	self.dotRequiresAura = true
 	self.dotExpires = 0
 	self.lastAutoAttackTime = 0
 	if self.config.damageMeter then
-		self.config.damageMeter:Reset()
+		if isCombatStart == false then
+			self.config.damageMeter:Poll()
+		end
+		self.config.damageMeter:Reset(isCombatStart == true)
 	end
 end
 
@@ -40,9 +43,9 @@ function OutgoingCombat:Start()
 	end
 end
 
-function OutgoingCombat:Stop()
+function OutgoingCombat:Stop(isShutdown)
 	if self.config.damageMeter then
-		self.config.damageMeter:Stop()
+		self.config.damageMeter:Stop(isShutdown)
 	end
 end
 
@@ -207,6 +210,12 @@ function OutgoingCombat:HandleUnitCombat(
 		local message = self.config.buildActionMessage(settings, normalizedAmount)
 		if message and message ~= "" then
 			self.config.display(settings, message, texture)
+	if isCrit and self.config.recordCrit then
+		self.config.recordCrit(normalizedAmount)
+	end
+	if self.config.isMeterOwning and self.config.isMeterOwning() then
+		return true
+	end
 		end
 	end
 	return true
