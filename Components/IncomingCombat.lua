@@ -39,7 +39,7 @@ function IncomingCombat:Reset()
 end
 
 local function StripRealm(name, unknown)
-	if not name then
+	if not name or (issecretvalue and issecretvalue(name)) then
 		return unknown
 	end
 	if string.find(name, "-", 1, true) then
@@ -89,6 +89,10 @@ local function BuildDamageLine(self, settings, batch, amount, hits, crits)
 end
 
 local function BuildHealLine(self, settings, batch, amount, hits, crits)
+	if batch.sourceName and settings.message and string.find(settings.message, "%n", 1, true) then
+		local name = string.gsub(batch.sourceName, "%%", "%%%%")
+		settings = setmetatable({ message = string.gsub(settings.message, "%%n", name) }, { __index = settings })
+	end
 	local message = self.config.buildActionMessage(settings, amount)
 	if not message or message == "" then
 		return nil
@@ -233,6 +237,9 @@ local function DisplayHealBatch(self, batchKey)
 		return
 	end
 	self.healBatches[batchKey] = nil
+	if not batch.effectTexture and batch.resolveTexture then
+		batch.effectTexture = batch.resolveTexture()
+	end
 
 	local profile = self.config.getProfile()
 	local settings = profile.events[batch.baseEventKey]
@@ -319,11 +326,13 @@ function IncomingCombat:QueueHeal(
 	sourceName,
 	healSourceLabel,
 	baseEventKey,
-	critEventKey
+	critEventKey,
+	resolveTexture
 )
 	baseEventKey = baseEventKey or "INCOMING_HEAL"
 	critEventKey = critEventKey or baseEventKey .. "_CRIT"
-	local batchKey = "incoming_heal:" .. baseEventKey
+	local batchKey = "incoming_heal:" .. baseEventKey .. ":" .. tostring(sourceName)
+		.. (isCrit and ":crit" or "")
 	local batch = self.healBatches[batchKey]
 	if not batch then
 		batch = {
@@ -336,6 +345,7 @@ function IncomingCombat:QueueHeal(
 			healSourceLabel = healSourceLabel,
 			baseEventKey = baseEventKey,
 			critEventKey = critEventKey,
+			resolveTexture = resolveTexture,
 		}
 		self.healBatches[batchKey] = batch
 		self.config.after(self.config.groupDelay, function()
@@ -386,14 +396,37 @@ function IncomingCombat:HandleUnitCombat(
 	action,
 	flagText,
 	amount,
-	schoolMask
+	schoolMask,
+	isSelfHeal
 )
 	if unitTarget ~= "player" then
 		return false
 	end
 
+	local isCrit = not (issecretvalue and issecretvalue(flagText)) and flagText == "CRITICAL"
+	if (action == "WOUND" or action == "HEAL") and issecretvalue and issecretvalue(amount) then
+		if self.config.emit then
+			local event = {
+				eventType = action == "WOUND" and "damage" or "heal",
+				recipientUnit = "player",
+				amount = amount,
+				isCrit = isCrit,
+				damageType = self.config.normalizeNumber(schoolMask),
+			}
+			if action == "HEAL" and isSelfHeal then
+				local spellID = self.config.getHealSpell
+					and self.config.getHealSpell(self.config.getTime(), self.config.selfHealIconWindow)
+				event.isSelf = true
+				event.sourceName = self.config.unitName("player")
+				event.skillID = spellID
+				event.skillName = spellID and self.config.getSpellName and self.config.getSpellName(spellID) or nil
+			end
+			self.config.emit(event)
+		end
+		return true
+	end
+
 	local normalizedAmount = self.config.normalizeNumber(amount)
-	local isCrit = flagText == "CRITICAL"
 	local profile = self.config.getProfile()
 	if action == "WOUND" then
 		if not normalizedAmount or normalizedAmount <= 0 then
@@ -416,15 +449,31 @@ function IncomingCombat:HandleUnitCombat(
 			return true
 		end
 		local now = self.config.getTime()
-		local sourceName = StripRealm(
-			GetLikelyHealSource(self),
-			self.config.unknown
-		)
 		local playerName = StripRealm(
 			self.config.unitName("player"),
 			self.config.unknown
 		)
-		local isSelfHeal = sourceName == playerName
+		local sourceName
+		if isSelfHeal then
+			sourceName = playerName
+		else
+			sourceName = StripRealm(
+				GetLikelyHealSource(self),
+				self.config.unknown
+			)
+			if sourceName == self.config.unknown
+				or (isSelfHeal == false and sourceName == playerName) then
+				sourceName = nil
+			end
+			isSelfHeal = sourceName ~= nil and sourceName == playerName
+		end
+		local overheal = self.config.getOverheal and self.config.getOverheal("player", normalizedAmount)
+		if overheal then
+			normalizedAmount = normalizedAmount - overheal
+			if normalizedAmount <= 0 then
+				return true
+			end
+		end
 		local baseKey = isSelfHeal and "SELF_HEAL" or "INCOMING_HEAL"
 		local critKey = isSelfHeal and "SELF_HEAL_CRIT" or "INCOMING_HEAL_CRIT"
 		local settings = profile.events[baseKey]
@@ -438,12 +487,24 @@ function IncomingCombat:HandleUnitCombat(
 		local attributionWindow = isSelfHeal
 			and self.config.selfHealIconWindow
 			or 1.5
-		local spellID, spellTime = self.config.getLastPlayerSpell()
-		local texture
-		if spellID and not self.config.isAutoAttackSpellID(spellID)
-			and now - spellTime <= attributionWindow then
-			_, _, texture = self.config.getSpellInfo(spellID)
+		local config = self.config
+		local function ResolveTexture()
+			local resolveTime = config.getTime()
+			local spellID = config.getHealSpell
+				and config.getHealSpell(resolveTime, attributionWindow)
+			if not spellID then
+				local lastSpellID, spellTime = config.getLastPlayerSpell()
+				if lastSpellID and not config.isAutoAttackSpellID(lastSpellID)
+					and resolveTime - spellTime <= attributionWindow then
+					spellID = lastSpellID
+				end
+			end
+			if spellID then
+				local _, _, spellTexture = config.getSpellInfo(spellID)
+				return spellTexture
+			end
 		end
+		local texture = ResolveTexture()
 		self:QueueHeal(
 			normalizedAmount,
 			isCrit,
@@ -451,7 +512,8 @@ function IncomingCombat:HandleUnitCombat(
 			sourceName,
 			GetHealSourceLabel(flagText, schoolMask),
 			baseKey,
-			critKey
+			critKey,
+			ResolveTexture
 		)
 		return true
 	end

@@ -14,10 +14,16 @@ function OutgoingCombat:New(config)
 		lastAutoAttackTime = 0,
 		pendingShotTime = nil,
 		shotSchool = nil,
+		lastHealSpellID = nil,
+		lastHealTime = 0,
+		hotSpellID = nil,
+		hotExpires = 0,
 		activeDots = {},
 		pendingCastID = nil,
 		pendingCastTime = 0,
 		castTargets = {},
+		healTargetName = nil,
+		hotTargets = {},
 	}, self)
 end
 
@@ -51,6 +57,128 @@ function OutgoingCombat:HandleSpellcastSent(unitID, targetName, castGUID)
 		return
 	end
 	self.castTargets[castGUID] = NameKey(targetName) or false
+end
+
+local function GetPlayerHealChannel(now)
+	if not UnitChannelInfo then
+		return nil
+	end
+	local ok, name, _, _, _, endTimeMs, _, _, spellID = pcall(UnitChannelInfo, "player")
+	if not ok or name == nil or IsSecret(name) or IsSecret(spellID) or IsSecret(endTimeMs) then
+		return nil
+	end
+	if type(spellID) ~= "number" or type(endTimeMs) ~= "number" then
+		return nil
+	end
+	return spellID, math.max(endTimeMs / 1000, now)
+end
+
+function OutgoingCombat:IsNamedHot(spellID)
+	local name = self.config.getSpellName and self.config.getSpellName(spellID)
+	return name ~= nil and self.config.namedHots ~= nil and self.config.namedHots()[name] ~= nil
+end
+
+function OutgoingCombat:RefreshHealChannel(now)
+	local spellID, endTime = GetPlayerHealChannel(now)
+	if not spellID or not (self.config.isHelpfulSpell and self.config.isHelpfulSpell(spellID)) then
+		return
+	end
+	local channel = self.channelHeal
+	if not channel or channel.spellID ~= spellID or now > channel.expires then
+		channel = { spellID = spellID, target = self.healTargetName, start = now }
+		self.channelHeal = channel
+	end
+	channel.expires = endTime + 0.5
+end
+
+function OutgoingCombat:RecordHealTarget(spellID, castGUID, now)
+	local targetName
+	if castGUID ~= nil and not IsSecret(castGUID) then
+		targetName = self.castTargets[castGUID]
+		self.castTargets[castGUID] = nil
+	end
+	if not targetName then
+		targetName = NameKey(self.config.defaultHealTarget())
+	end
+	self.healTargetName = targetName
+	self.channelHeal = nil
+	MikSBT.Trace:Inc("heal:cast")
+	local name = self.config.getSpellName and self.config.getSpellName(spellID)
+	local hot = name and self.config.namedHots and self.config.namedHots()[name]
+	if hot then
+		if targetName then
+			self.hotTargets[targetName] = { spellID = spellID, expires = now + hot.duration }
+		end
+		self.pendingHealSpellID = nil
+		return
+	end
+	self.pendingHealSpellID = spellID
+	self.pendingHealTime = now
+	self:RefreshHealChannel(now)
+end
+
+function OutgoingCombat:ResolveHealSpell(unitName, now)
+	local window = self.config.healDirectWindow or 2
+	self:RefreshHealChannel(now)
+	local channel = self.channelHeal
+	if channel and now <= channel.expires then
+		if not channel.target or not unitName or channel.target == unitName then
+			self.pendingHealSpellID = nil
+			return channel.spellID, false
+		end
+	end
+	if self.lastHealSpellID and now - self.lastHealTime <= window then
+		local name = self.config.getSpellName and self.config.getSpellName(self.lastHealSpellID)
+		if name and self.config.aoeHeals and self.config.aoeHeals()[name] then
+			return self.lastHealSpellID, self:IsNamedHot(self.lastHealSpellID)
+		end
+	end
+	if self.pendingHealSpellID and now - self.pendingHealTime <= window then
+		if not unitName or not self.healTargetName or self.healTargetName == unitName then
+			local spellID = self.pendingHealSpellID
+			self.pendingHealSpellID = nil
+			return spellID, false
+		end
+		MikSBT.Trace:Error(self.hotTargets[unitName] and "heal:mismatch hot" or "heal:mismatch",
+			string.format("%s ~= %s, %s %.2fs after cast", tostring(self.healTargetName), unitName,
+				tostring(self.config.getSpellName(self.pendingHealSpellID)), now - self.pendingHealTime))
+	end
+	local hot = unitName and self.hotTargets[unitName]
+	if hot then
+		if now <= hot.expires + 1 then
+			return hot.spellID, true
+		end
+		self.hotTargets[unitName] = nil
+	end
+end
+
+function OutgoingCombat:TrackHealSpell(spellID, now)
+	if not self.config.isHelpfulSpell or not self.config.isHelpfulSpell(spellID) then
+		return
+	end
+	self.lastHealSpellID = spellID
+	self.lastHealTime = now
+
+	local name = self.config.getSpellName and self.config.getSpellName(spellID)
+	local hot = name and self.config.namedHots and self.config.namedHots()[name]
+	if hot then
+		self.hotSpellID = spellID
+		self.hotExpires = now + hot.duration
+	end
+end
+
+function OutgoingCombat:GetHealSpell(now, window)
+	local recent = self.lastHealSpellID
+		and now - self.lastHealTime <= (self.config.healDirectWindow or 2)
+	if recent then
+		return self.lastHealSpellID
+	end
+	if self.hotSpellID and now <= self.hotExpires then
+		return self.hotSpellID
+	end
+	if self.lastHealSpellID and now - self.lastHealTime <= window then
+		return self.lastHealSpellID
+	end
 end
 
 function OutgoingCombat:IsRepeatShot(spellID)
@@ -162,9 +290,15 @@ function OutgoingCombat:HandleSpellcastSucceeded(unitID, spellID, castGUID)
 
 	self.lastSpellID = spellID
 	self.lastSpellTime = self.config.getTime()
+	self:TrackHealSpell(spellID, self.lastSpellTime)
 	local castTarget
 	if castGUID ~= nil and not IsSecret(castGUID) then
 		castTarget = self.castTargets[castGUID] or nil
+	end
+	if self.config.isHelpfulSpell and self.config.isHelpfulSpell(spellID) then
+		self:RecordHealTarget(spellID, castGUID, self.lastSpellTime)
+	elseif castGUID ~= nil and not IsSecret(castGUID) then
+		self.castTargets[castGUID] = nil
 	end
 
 	if self:IsRepeatShot(spellID) then
@@ -214,6 +348,18 @@ function OutgoingCombat:IsDirectDamageCast(spellID)
 		return true
 	end
 	return self.pendingCastID == spellID and self.pendingCastTime == self.lastSpellTime
+end
+
+function OutgoingCombat:GetPendingHealCast(unitTarget, now)
+	local unitName = NameKey(self.config.unitName(unitTarget))
+	if unitName and self.pendingHealSpellID and self.healTargetName == unitName
+		and now - self.pendingHealTime <= (self.config.healDirectWindow or 2) then
+		return self.pendingHealTime
+	end
+	local channel = self.channelHeal
+	if unitName and channel and channel.target == unitName and now <= channel.expires then
+		return channel.start
+	end
 end
 
 function OutgoingCombat:IsDotFallbackActive(now)
@@ -461,6 +607,65 @@ function OutgoingCombat:HandleHostileUnitCombat(unitTarget, action, flagText, am
 	return true
 end
 
+function OutgoingCombat:ResolveOwnedHealSpell(unitName, now)
+	local spellID, isHoT = self:ResolveHealSpell(unitName, now)
+	if spellID then
+		return spellID, isHoT
+	end
+	if self.lastHealSpellID and now - self.lastHealTime <= (self.config.healDirectWindow or 2)
+		and not self:IsNamedHot(self.lastHealSpellID) then
+		return self.lastHealSpellID, false
+	end
+	for targetName, hot in pairs(self.hotTargets) do
+		if now <= hot.expires + 1 then
+			return hot.spellID, true
+		end
+		self.hotTargets[targetName] = nil
+	end
+	return self.lastHealSpellID, false
+end
+
+function OutgoingCombat:HandleFriendlyUnitCombat(unitTarget, action, flagText, amount, owned, eventTime)
+	if action ~= "HEAL" then
+		return true
+	end
+	local unitName = self.config.unitName(unitTarget)
+	local now = eventTime or self.config.getTime()
+	local spellID, isHoT
+	if owned then
+		spellID, isHoT = self:ResolveOwnedHealSpell(NameKey(unitName), now)
+	else
+		spellID, isHoT = self:ResolveHealSpell(NameKey(unitName), now)
+	end
+	if not spellID then
+		MikSBT.Trace:Inc("heal:noattrib")
+		return true
+	end
+
+	local overheal
+	if not IsSecret(amount) then
+		local plainAmount = self.config.normalizeNumber(amount)
+		if not plainAmount or plainAmount <= 0 then
+			return true
+		end
+		overheal = self.config.getOverheal and self.config.getOverheal(unitTarget, plainAmount)
+	end
+
+	self:Emit({
+		eventType = "heal",
+		sourceUnit = "player",
+		recipientName = unitName,
+		skillID = spellID,
+		skillName = self.config.getSpellName(spellID),
+		amount = amount,
+		overhealAmount = overheal,
+		isCrit = not IsSecret(flagText) and flagText == "CRITICAL",
+		isHoT = isHoT,
+		effectTexture = self.config.getSpellTexture(spellID),
+	})
+	return true
+end
+
 function OutgoingCombat:HandleUnitCombat(unitTarget, action, flagText, amount, schoolMask, owned, kind, eventTime)
 	kind = kind or self.config.classifyUnit(unitTarget)
 	if kind and self.config.isCombatLogOwning and self.config.isCombatLogOwning() then
@@ -469,6 +674,8 @@ function OutgoingCombat:HandleUnitCombat(unitTarget, action, flagText, amount, s
 	end
 	if kind == "hostile" then
 		return self:HandleHostileUnitCombat(unitTarget, action, flagText, amount, schoolMask, owned, eventTime)
+	elseif kind == "friendly" then
+		return self:HandleFriendlyUnitCombat(unitTarget, action, flagText, amount, owned, eventTime)
 	end
 	return false
 end
