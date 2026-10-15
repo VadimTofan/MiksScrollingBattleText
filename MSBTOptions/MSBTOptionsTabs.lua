@@ -134,6 +134,9 @@ GeneralTab_Populate = function()
 	controls.disableIncomingInGroupCheckbox:SetChecked(not not currentProfile.disableIncomingInGroup)
 	controls.disableNotificationInGroupCheckbox:SetChecked(not not currentProfile.disableNotificationInGroup)
 	controls.disableStaticInGroupCheckbox:SetChecked(not not currentProfile.disableStaticInGroup)
+	if controls.showGuessedOutgoingInGroupCheckbox then
+		controls.showGuessedOutgoingInGroupCheckbox:SetChecked(not not currentProfile.showGuessedOutgoingInGroup)
+	end
 	controls.stickyCritsCheckbox:SetChecked(not currentProfile.stickyCritsDisabled)
 	controls.shortenNumbersCheckbox:SetChecked(currentProfile.shortenNumbers)
 	controls.stackSimilarHitsCheckbox:SetChecked(currentProfile.stackSimilarHits)
@@ -272,6 +275,19 @@ local function GeneralTab_Create()
 	)
 	controls.disableStaticInGroupCheckbox = checkbox
 
+	-- Guessed outgoing damage in group checkbox.
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["showGuessedOutgoingInGroup"] or { label = "Outgoing Damage In Group", tooltip = "Without the combat log outgoing damage is attributed from UNIT_COMBAT, which also reports hits dealt by other players. In a party or raid only hits that match your own casts, damage-over-time ticks and auto attack swings are counted. Uncheck to hide outgoing damage while in a group." }
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	checkbox:SetPoint("TOPLEFT", controls.disableStaticInGroupCheckbox, "BOTTOMLEFT", 0, -5)
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "showGuessedOutgoingInGroup", isChecked)
+		end
+	)
+	controls.showGuessedOutgoingInGroupCheckbox = checkbox
+
+	-- Blizzard floating combat text (v2) checkbox.
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableBlizzardV2CombatText"] or { label = "Disable Blizzard CT While Solo", tooltip = "When checked, disables Blizzard floating combat text damage/healing while solo." }
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
