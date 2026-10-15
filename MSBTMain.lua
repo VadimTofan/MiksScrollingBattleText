@@ -111,6 +111,7 @@ local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
 local outgoingCombat
+local dispelMeterSource, interruptMeterSource
 local SafeUnitBoolean, NoteParserDamage
 local parserNotifications
 local utilityNotifications
@@ -139,6 +140,21 @@ local NAMED_DOT_SPELLS = {
 	[5570] = { duration = 12, school = 8, interval = 2 }, -- Insect Swarm
 	[1978] = { duration = 15, school = 8, interval = 3 }, -- Serpent Sting
 	[8050] = { duration = 12, school = 4, interval = 3 }, -- Flame Shock
+}
+local DISPEL_SPELLS = {
+	[527] = true, -- Dispel Magic
+	[528] = true, -- Cure Disease (priest)
+	[552] = true, -- Abolish Disease
+	[1152] = true, -- Purify
+	[4987] = true, -- Cleanse
+	[475] = true, -- Remove Lesser Curse
+	[2782] = true, -- Remove Curse
+	[8946] = true, -- Cure Poison (druid)
+	[2893] = true, -- Abolish Poison
+	[526] = true, -- Cure Poison (shaman)
+	[2870] = true, -- Cure Disease (shaman)
+	[370] = true, -- Purge
+	[19505] = true, -- Devour Magic
 }
 local CLIENT_TOC_VERSION = tonumber((select(4, GetBuildInfo()))) or 0
 local IS_FOREVER_CLIENT = CLIENT_TOC_VERSION >= 16000 and CLIENT_TOC_VERSION < 20000
@@ -328,11 +344,14 @@ end
 function eventFrame:PLAYER_REGEN_ENABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(false)
+	dispelMeterSource:Poll()
+	dispelMeterSource:Reset(false)
 	utilityNotifications:HandleCombatLeave()
 end
 function eventFrame:PLAYER_REGEN_DISABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(true)
+	dispelMeterSource:Reset(true)
 	utilityNotifications:HandleCombatEnter()
 end
 function eventFrame:CHAT_MSG_MONSTER_EMOTE(message, sourceName)
@@ -727,6 +746,102 @@ local damageMeterSource = DamageMeterSource:New({
 	freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
 })
 
+local MAX_METER_ACTIONS_PER_POLL = 5
+local CAST_DISPEL_CLAIM_WINDOW = 5
+local castDispelClaims = {}
+
+local function ClaimCastDispel()
+	castDispelClaims[#castDispelClaims + 1] = GetTime()
+end
+
+local function ConsumeCastDispelClaim()
+	local claims = castDispelClaims
+	local now = GetTime()
+	while claims[1] and now - claims[1] > CAST_DISPEL_CLAIM_WINDOW do
+		table.remove(claims, 1)
+	end
+	if not claims[1] then
+		return false
+	end
+	table.remove(claims, 1)
+	return true
+end
+
+local function GetMeterSpellName(spellID)
+	local name = GetSpellInfo(spellID)
+	if type(name) == "string" and not IsSecretValue(name) then
+		return name
+	end
+end
+
+local function GetMeterTargetName(meterSpell)
+	local details = type(meterSpell) == "table" and meterSpell.combatSpellDetails
+	local unitName = type(details) == "table" and details.unitName
+	if type(unitName) == "string" and not IsSecretValue(unitName) and unitName ~= "" then
+		return unitName
+	end
+end
+
+local function CreateActionMeterSource(meterType, eventType)
+	return DamageMeterSource:New({
+		label = meterType,
+		isAvailable = function()
+			return IsDamageMeterUsable() and Enum.DamageMeterType[meterType] ~= nil
+		end,
+		isSecret = IsSecretValue,
+		getTime = GetTime,
+		unitGUID = UnitGUID,
+		getPlayerGUID = function()
+			return playerGUID
+		end,
+		extraUnits = { "pet" },
+		createFrame = function()
+			return CreateFrame("Frame")
+		end,
+		getSessionSource = function(sessionType, damageType, sourceGUID)
+			return C_DamageMeter.GetCombatSessionSourceFromType(
+				sessionType,
+				damageType,
+				sourceGUID
+			)
+		end,
+		getSessionSourceByID = C_DamageMeter and C_DamageMeter.GetCombatSessionSourceFromID,
+		sessionType = function()
+			return Enum.DamageMeterSessionType.Current
+		end,
+		damageType = function()
+			return Enum.DamageMeterType[meterType]
+		end,
+		normalizeNumber = NormalizeNumber,
+		primeBaseline = true,
+		isSuppressed = function()
+			return MSBTParser.IsCombatLogActive and MSBTParser.IsCombatLogActive()
+		end,
+		queue = function(spellID, count, _, sourceKey, meterSpell)
+			local spellName = GetMeterSpellName(spellID)
+			local targetName = GetMeterTargetName(meterSpell)
+			local sourceUnit = sourceKey == "1" and "player" or "pet"
+			for _ = 1, math.min(count, MAX_METER_ACTIONS_PER_POLL) do
+				if eventType == "dispel" and sourceUnit == "player" and ConsumeCastDispelClaim() then
+					Trace:Inc("dispel:meterskip")
+				else
+				ParserEventsHandler({
+					eventType = eventType,
+					sourceUnit = sourceUnit,
+					recipientName = targetName,
+					extraSkillID = spellID,
+					extraSkillName = spellName,
+				})
+				end
+			end
+		end,
+		newTicker = C_Timer.NewTicker,
+		pollInterval = DAMAGE_METER_POLL_INTERVAL,
+		freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
+	})
+end
+
+dispelMeterSource = CreateActionMeterSource("Dispels", "dispel")
 
 local combatLogMessageSource = CombatLogMessageSource:New({
 	getProfile = function()
@@ -1006,10 +1121,490 @@ local combatTextSource = CombatTextSource:New({
 	end,
 })
 
-local spellTargetFrame = CreateFrame("Frame")
-spellTargetFrame:SetScript("OnEvent", function(_, _, unitID, targetName, castGUID)
-	outgoingCombat:HandleSpellcastSent(unitID, targetName, castGUID)
-end)
+local EnableActionCastSource, DisableActionCastSource
+do
+	local dispelSpellNames
+	local castTargets = {}
+
+	local function BuildNameSet(spellTable)
+		local names = {}
+		for spellID in pairs(spellTable) do
+			local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+			if type(name) == "string" and name ~= "" then
+				names[name] = true
+			end
+		end
+		return names
+	end
+
+	local function GetPlainSpellName(spellID)
+		if spellID == nil or IsSecretValue(spellID) then
+			return nil
+		end
+		local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+		if type(name) == "string" and not IsSecretValue(name) then
+			return name
+		end
+	end
+
+	local MAX_SCANNED_AURAS = 40
+	local dispelSnapshots = {}
+
+	local function IsPlainString(value)
+		return not IsSecretValue(value) and type(value) == "string" and value ~= ""
+	end
+
+	local function UnitMatchesName(unitID, targetName)
+		local name, surname = UnitName(unitID)
+		if not IsPlainString(name) then
+			return false
+		end
+		if name == targetName then
+			return true
+		end
+		return IsPlainString(surname) and (name .. " " .. surname == targetName
+			or name .. "-" .. surname == targetName)
+	end
+
+	local function FindUnitByName(targetName)
+		local candidates = { "target", "player", "focus", "mouseover", "pet" }
+		if IsInRaid() then
+			for index = 1, 40 do
+				candidates[#candidates + 1] = "raid" .. index
+			end
+		else
+			for index = 1, 4 do
+				candidates[#candidates + 1] = "party" .. index
+			end
+		end
+		for _, unitID in ipairs(candidates) do
+			if SafeUnitBoolean(UnitExists, unitID) and UnitMatchesName(unitID, targetName) then
+				return unitID
+			end
+		end
+	end
+
+	-- The aura name may be secret in combat: it is kept for display only. The
+	-- instance id stays readable, and it is all the before/after diff needs.
+	local function DescribeAura(aura)
+		local info = {}
+		if IsSecretValue(aura) or type(aura) ~= "table" then
+			return info
+		end
+		local name, spellID = aura.name, aura.spellId
+		if IsSecretValue(name) or IsPlainString(name) then
+			info.name = name
+			info.hasName = true
+		end
+		if not IsSecretValue(spellID) then
+			info.spellID = spellID
+		end
+		return info
+	end
+
+	local function CollectAuraList(auras, list)
+		for _, aura in ipairs(list) do
+			if IsSecretValue(aura) or type(aura) ~= "table" then
+				return "entry hidden"
+			end
+			local instanceID = aura.auraInstanceID
+			if IsSecretValue(instanceID) then
+				return "id secret"
+			end
+			if type(instanceID) ~= "number" then
+				return "id " .. type(instanceID)
+			end
+			auras[instanceID] = DescribeAura(aura)
+		end
+	end
+
+	local function ScanByInstanceIDs(unitID, filter, auras)
+		if type(C_UnitAuras.GetUnitAuraInstanceIDs) ~= "function"
+			or type(C_UnitAuras.GetAuraDataByAuraInstanceID) ~= "function" then
+			return "no api"
+		end
+		local ok, instanceIDs = pcall(C_UnitAuras.GetUnitAuraInstanceIDs, unitID, filter)
+		if not ok then
+			return "error " .. tostring(instanceIDs)
+		end
+		if IsSecretValue(instanceIDs) or type(instanceIDs) ~= "table" then
+			return "result hidden"
+		end
+		for _, instanceID in ipairs(instanceIDs) do
+			if IsSecretValue(instanceID) then
+				return "id secret"
+			end
+			local okAura, aura = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, unitID, instanceID)
+			if okAura then
+				auras[instanceID] = DescribeAura(aura)
+			else
+				auras[instanceID] = {}
+			end
+		end
+	end
+
+	local function ScanByList(unitID, filter, auras)
+		if type(C_UnitAuras.GetUnitAuras) ~= "function" then
+			return "no api"
+		end
+		local ok, list = pcall(C_UnitAuras.GetUnitAuras, unitID, filter, MAX_SCANNED_AURAS)
+		if not ok then
+			return "error " .. tostring(list)
+		end
+		if IsSecretValue(list) or type(list) ~= "table" then
+			return "result hidden"
+		end
+		return CollectAuraList(auras, list)
+	end
+
+	local function ScanByIndex(unitID, filter, auras)
+		if type(C_UnitAuras.GetAuraDataByIndex) ~= "function" then
+			return "no api"
+		end
+		local list = {}
+		for index = 1, MAX_SCANNED_AURAS do
+			local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unitID, index, filter)
+			if not ok then
+				return "error " .. tostring(aura)
+			end
+			if IsSecretValue(aura) then
+				return "entry hidden"
+			end
+			if type(aura) ~= "table" then
+				break
+			end
+			list[#list + 1] = aura
+		end
+		return CollectAuraList(auras, list)
+	end
+
+	local AURA_SCANNERS = {
+		{ name = "ids", scan = ScanByInstanceIDs },
+		{ name = "list", scan = ScanByList },
+		{ name = "index", scan = ScanByIndex },
+	}
+
+	-- Returns auraInstanceID -> { name, spellID } for the auras a dispel on this
+	-- unit can remove, or nil when the client does not expose them.
+	local function ScanUnitAuras(unitID, filter, auras, traceKey)
+		if not C_UnitAuras then
+			return nil
+		end
+		local failures = {}
+		for _, scanner in ipairs(AURA_SCANNERS) do
+			local failure = scanner.scan(unitID, filter, auras)
+			if not failure then
+				Trace:Inc(traceKey .. " " .. scanner.name)
+				return auras
+			end
+			failures[#failures + 1] = scanner.name .. ": " .. failure
+		end
+		Trace:Error(traceKey, unitID .. " " .. filter .. " - " .. table.concat(failures, "; "))
+		return nil
+	end
+
+	local function ScanDispellableAuras(unitID)
+		local filter = SafeUnitBoolean(UnitCanAttack, "player", unitID) and "HELPFUL" or "HARMFUL"
+		return ScanUnitAuras(unitID, filter, {}, "dispel:scan")
+	end
+
+	local function SnapshotDispelTarget(castGUID, targetName)
+		local unitID = IsPlainString(targetName) and FindUnitByName(targetName) or "target"
+		if not SafeUnitBoolean(UnitExists, unitID) then
+			Trace:Inc("dispel:nounit")
+			return
+		end
+		Trace:Inc("dispel:snap " .. unitID)
+		local auras = ScanDispellableAuras(unitID)
+		if not auras then
+			Trace:Inc("dispel:noscan")
+		end
+		dispelSnapshots[castGUID] = { unitID = unitID, auras = auras, time = GetTime() }
+	end
+
+	local PENDING_DISPEL_WINDOW = 1.2
+	local auraCache = {}
+	local pendingAuraDispels = {}
+
+	local function IsCachedUnit(unitID)
+		return unitID == "target" or unitID == "mouseover" or unitID == "focus"
+			or unitID == "player" or unitID == "pet"
+			or string.find(unitID, "^party%d$") ~= nil or string.find(unitID, "^raid%d+$") ~= nil
+	end
+
+	local function GetUnitKey(unitID)
+		local guid = UnitGUID(unitID)
+		if IsPlainString(guid) then
+			return guid
+		end
+		return unitID
+	end
+
+	local function AreAurasHidden()
+		if C_Secrets and type(C_Secrets.ShouldAurasBeSecret) == "function" then
+			local ok, hidden = pcall(C_Secrets.ShouldAurasBeSecret)
+			if ok and not IsSecretValue(hidden) then
+				return hidden == true
+			end
+		end
+		return InCombatLockdown()
+	end
+
+	local function HandleUnitAura(unitID, updateInfo)
+		if not IsPlainString(unitID) or not IsCachedUnit(unitID) then
+			return
+		end
+		if updateInfo == nil then
+			Trace:Inc("aura:noinfo")
+			return
+		end
+		if IsSecretValue(updateInfo) or type(updateInfo) ~= "table" then
+			Trace:Inc("aura:info secret")
+			return
+		end
+		if IsSecretValue(updateInfo.isFullUpdate) or IsSecretValue(updateInfo.addedAuras)
+			or IsSecretValue(updateInfo.removedAuraInstanceIDs) then
+			Trace:Inc("aura:info secret")
+			return
+		end
+		local key = GetUnitKey(unitID)
+		if updateInfo.isFullUpdate then
+			Trace:Inc("aura:full")
+			local cache = {}
+			if ScanUnitAuras(unitID, "HARMFUL", cache, "aura:fullscan")
+				and ScanUnitAuras(unitID, "HELPFUL", cache, "aura:fullscan") then
+				auraCache[key] = cache
+			else
+				auraCache[key] = nil
+			end
+			return
+		end
+		local cache = auraCache[key]
+		if not cache then
+			cache = {}
+			auraCache[key] = cache
+		end
+		local added = updateInfo.addedAuras
+		if type(added) == "table" and not IsSecretValue(added) then
+			for _, aura in ipairs(added) do
+				local info = DescribeAura(aura)
+				local instanceID = not IsSecretValue(aura) and type(aura) == "table" and aura.auraInstanceID or nil
+				if instanceID == nil then
+					Trace:Inc("aura:add noid")
+				elseif IsSecretValue(instanceID) then
+					Trace:Inc("aura:add id secret")
+				else
+					cache[instanceID] = info
+					if not info.hasName then
+						Trace:Inc("aura:add noname")
+					elseif IsSecretValue(info.name) then
+						Trace:Inc("aura:add name secret")
+					else
+						Trace:Inc("aura:add name plain")
+					end
+				end
+			end
+		elseif added ~= nil then
+			Trace:Inc("aura:added secret")
+		end
+		local removed = updateInfo.removedAuraInstanceIDs
+		if type(removed) == "table" and not IsSecretValue(removed) then
+			for _, instanceID in ipairs(removed) do
+				if IsSecretValue(instanceID) then
+					Trace:Inc("aura:rm id secret")
+				else
+					local info = cache[instanceID]
+					cache[instanceID] = nil
+					local pending = pendingAuraDispels[key]
+					if pending and GetTime() - pending.time <= PENDING_DISPEL_WINDOW then
+						pending.matched = (pending.matched or 0) + 1
+						Trace:Inc(info and "aura:rm dispel hit" or "aura:rm dispel nocache")
+						local effectName = pending.spellName
+						if info and info.hasName then
+							effectName = info.name
+						end
+						pending.emit((info and info.spellID) or pending.spellID, effectName)
+					else
+						Trace:Inc(info and "aura:rm cached" or "aura:rm unknown")
+					end
+				end
+			end
+		elseif removed ~= nil then
+			Trace:Inc("aura:removed secret")
+		end
+	end
+
+	local auraCacheFrame = CreateFrame("Frame")
+	auraCacheFrame:SetScript("OnEvent", function(_, _, unitID, updateInfo)
+		HandleUnitAura(unitID, updateInfo)
+	end)
+
+	local function TakeDispelSnapshot(castGUID)
+		if castGUID == nil or IsSecretValue(castGUID) then
+			return nil
+		end
+		local snapshot = dispelSnapshots[castGUID]
+		dispelSnapshots[castGUID] = nil
+		return snapshot
+	end
+
+	local function IsCastSourceOpen()
+		return not (MSBTParser.IsCombatLogActive and MSBTParser.IsCombatLogActive())
+			and not combatLogMessageSource:IsOwning()
+	end
+
+	local function IsDispelCastActive(unitID)
+		return IsCastSourceOpen() and (unitID == "player" or not dispelMeterSource:IsActive())
+	end
+
+	local function HandleActionCast(unitID, castGUID, spellID)
+		if unitID ~= "player" and unitID ~= "pet" then
+			return
+		end
+		local spellName = GetPlainSpellName(spellID)
+		if not spellName then
+			Trace:Inc("cast:noname")
+			return
+		end
+
+		dispelSpellNames = dispelSpellNames or BuildNameSet(DISPEL_SPELLS)
+
+		local isDispel = dispelSpellNames[spellName] == true
+		if isDispel then
+			Trace:Inc("dispel:cast " .. unitID)
+			if castGUID == nil or IsSecretValue(castGUID) then
+				Trace:Inc("dispel:cast guid " .. (castGUID == nil and "nil" or "secret"))
+			end
+			if not IsDispelCastActive(unitID) then
+				Trace:Inc("dispel:cast gated")
+				return
+			end
+		end
+
+		local targetName
+		if castGUID and not IsSecretValue(castGUID) then
+			targetName = castTargets[castGUID]
+			castTargets[castGUID] = nil
+		end
+
+		if isDispel then
+			if unitID == "player" then
+				ClaimCastDispel()
+			end
+			local function Emit(effectID, effectName)
+				ParserEventsHandler({
+					eventType = "dispel",
+					sourceUnit = unitID,
+					recipientName = targetName,
+					extraSkillID = effectID,
+					extraSkillName = effectName,
+				})
+			end
+
+			local snapshot = TakeDispelSnapshot(castGUID)
+			local targetUnit = snapshot and snapshot.unitID
+				or (IsPlainString(targetName) and FindUnitByName(targetName)) or "target"
+			if not SafeUnitBoolean(UnitExists, targetUnit) then
+				Trace:Inc("dispel:nosnapshot")
+				Emit(spellID, "")
+				return
+			end
+
+			if not (snapshot and snapshot.auras) and AreAurasHidden() then
+				Trace:Inc("dispel:blind")
+				Emit(spellID, "")
+				return
+			end
+
+			Trace:Inc("dispel:pending")
+			local key = GetUnitKey(targetUnit)
+			local pending = { time = GetTime(), spellID = spellID, spellName = spellName, emit = Emit }
+			pendingAuraDispels[key] = pending
+			C_Timer.After(PENDING_DISPEL_WINDOW, function()
+				if pendingAuraDispels[key] == pending then
+					pendingAuraDispels[key] = nil
+				end
+				if pending.matched then
+					Trace:Inc("dispel:aura")
+					return
+				end
+				if snapshot and snapshot.auras then
+					local current = ScanDispellableAuras(snapshot.unitID)
+					if current then
+						local removed = 0
+						for instanceID, aura in pairs(snapshot.auras) do
+							if not current[instanceID] then
+								removed = removed + 1
+								local effectName = spellName
+								if aura.hasName then
+									effectName = aura.name
+								end
+								Emit(aura.spellID or spellID, effectName)
+							end
+						end
+						Trace:Inc(removed > 0 and "dispel:snapshot diff" or "dispel:nothing")
+						return
+					end
+					Trace:Inc("dispel:norescan")
+				end
+				Trace:Inc("dispel:pending miss")
+				Emit(spellID, "")
+			end)
+		end
+	end
+
+	local actionCastFrame = CreateFrame("Frame")
+	actionCastFrame:SetScript("OnEvent", function(_, event, unitID, arg1, arg2, arg3, arg4)
+		if event == "UNIT_SPELLCAST_SENT" then
+			local targetName, castGUID, spellID = arg1, arg2, arg3
+			if castGUID == nil or IsSecretValue(castGUID) then
+				Trace:Inc("sent:guid " .. (castGUID == nil and "nil" or "secret"))
+				return
+			end
+			Trace:Inc("sent:target " .. (IsPlainString(targetName) and "plain" or (IsSecretValue(targetName) and "secret" or "none")))
+			outgoingCombat:HandleSpellcastSent(unitID, targetName, castGUID)
+			if IsPlainString(targetName) then
+				castTargets[castGUID] = targetName
+			end
+			local spellName = GetPlainSpellName(spellID)
+			dispelSpellNames = dispelSpellNames or BuildNameSet(DISPEL_SPELLS)
+			if spellName and dispelSpellNames[spellName] then
+				if IsDispelCastActive(unitID) then
+					SnapshotDispelTarget(castGUID, targetName)
+				else
+					Trace:Inc("dispel:sent gated")
+				end
+			elseif not spellName then
+				Trace:Inc("sent:noname")
+			end
+			return
+		end
+
+		if event == "UNIT_SPELLCAST_SUCCEEDED" then
+			HandleActionCast(unitID, arg1, arg2)
+			return
+		end
+
+
+	end)
+
+	EnableActionCastSource = function()
+		actionCastFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", "player", "pet")
+		actionCastFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player", "pet")
+		pcall(auraCacheFrame.RegisterEvent, auraCacheFrame, "UNIT_AURA")
+	end
+
+	DisableActionCastSource = function()
+		actionCastFrame:UnregisterAllEvents()
+		auraCacheFrame:UnregisterAllEvents()
+		for key in pairs(auraCache) do
+			auraCache[key] = nil
+		end
+		for castGUID in pairs(castTargets) do
+			castTargets[castGUID] = nil
+		end
+	end
+end
 
 function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
 	if not outgoingCombat:HandleSpellcastSucceeded(unitID, spellID, lineID) then
@@ -1268,16 +1863,17 @@ end
 
 local function UpdateFallbackSources()
 	outgoingCombat:Start()
+	dispelMeterSource:Start()
 end
 
 local function Enable()
-	spellTargetFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", "player", "pet")
 	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	eventFrame:RegisterEvent("CHAT_MSG_MONSTER_EMOTE")
 	eventFrame:RegisterEvent("UNIT_COMBAT")
 	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+	EnableActionCastSource()
 	combatTextSource:Start()
 	combatLogMessageSource:Start()
 	combatLogMessageSource.filterButton:Start()
@@ -1289,12 +1885,13 @@ end
 MSBTParser.OnCombatLogChanged = UpdateFallbackSources
 
 local function Disable()
-	spellTargetFrame:UnregisterAllEvents()
 	eventFrame:Hide()
 	eventFrame:UnregisterAllEvents()
 	incomingCombat:Reset()
 	outgoingCombat:Reset()
 	outgoingCombat:Stop(true)
+	dispelMeterSource:Stop(true)
+	DisableActionCastSource()
 	combatTextSource:Stop()
 	combatLogMessageSource:Stop()
 	combatLogMessageSource.filterButton:Stop()
@@ -1396,8 +1993,8 @@ module.GetSourceStatus				= function()
 		meterAvailable = damageMeterSource:IsAvailable(),
 		meterActive = damageMeterSource:IsActive(),
 		meterBlind = damageMeterSource.isBlind == true,
-		dispelMeterActive = (dispelMeterSource and dispelMeterSource:IsActive() or false),
-		dispelMeterBlind = (dispelMeterSource and dispelMeterSource.isBlind == true or false),
+		dispelMeterActive = dispelMeterSource:IsActive(),
+		dispelMeterBlind = dispelMeterSource.isBlind == true,
 		interruptMeterActive = (interruptMeterSource and interruptMeterSource:IsActive() or false),
 		interruptMeterBlind = (interruptMeterSource and interruptMeterSource.isBlind == true or false),
 		clmEnabled = combatLogMessageSource:IsEnabled(),
