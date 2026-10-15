@@ -11,6 +11,7 @@ local MSBTProfiles = MikSBT.Profiles
 local L = MikSBT.translations
 local Formatter = MikSBT.Services.Formatter
 local EventRouter = MikSBT.Services.EventRouter
+local Trace = MikSBT.Trace
 local IncomingCombat = MikSBT.Components.IncomingCombat
 local OutgoingBatcher = MikSBT.Components.OutgoingBatcher
 local DamageMeterSource = MikSBT.Components.DamageMeterSource
@@ -191,19 +192,24 @@ end
 
 local function ParserEventsHandler(parserEvent)
 	local currentProfile = MSBTProfiles.currentProfile
+	Trace:Inc("emit:" .. tostring(parserEvent.eventType))
 	local eventTypeString, effectName, affectedUnitName, affectedUnitClass =
 		eventRouter:Resolve(parserEvent, currentProfile)
 	if not eventTypeString then
+		Trace:Inc("route:none")
 		return
 	end
 	if effectName and currentProfile.abilitySuppressions[effectName] then
+		Trace:Inc("route:suppressed")
 		return
 	end
 	local eventSettings = currentProfile.events[eventTypeString]
 	if not eventSettings or eventSettings.disabled
 		or not IsScrollAreaActive(eventSettings.scrollArea) then
+		Trace:Inc("route:off " .. eventTypeString)
 		return
 	end
+	Trace:Inc("route:ok")
 	local effectTexture
 	if not currentProfile.skillIconsDisabled
 		and IsScrollAreaIconShown(eventSettings.scrollArea) and effectName then
@@ -576,6 +582,7 @@ function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
 end
 
 function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask)
+	Trace:Inc("unit_combat")
 	if incomingCombat:HandleUnitCombat(
 		unitTarget,
 		action,
@@ -690,6 +697,9 @@ module.damageTypeMap				= damageTypeMap
 module.damageColorProfileEntries	= damageColorProfileEntries
 
 module.Enable						= Enable
+module.IsCombatEventRegistered		= function()
+	return eventFrame:IsEventRegistered("UNIT_COMBAT")
+end
 module.Disable						= Disable
 
 MikSBT.DISPLAYTYPE_INCOMING			= "Incoming"

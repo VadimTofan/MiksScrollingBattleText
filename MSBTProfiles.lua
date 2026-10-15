@@ -2999,6 +2999,162 @@ local function GetNextParameter(paramString)
 	return currentParam, remainingParams
 end
 
+local function PrintDiagnostics()
+	local parser = MikSBT.Parser
+	local function YesNo(value)
+		return value and "yes" or "no"
+	end
+
+	Print(MikSBT.VERSION_STRING .. " diagnostics", 1, 1, 1)
+
+	local isRestricted = "n/a"
+	if C_CombatLog and C_CombatLog.IsCombatLogRestricted then
+		local ok, restricted = pcall(C_CombatLog.IsCombatLogRestricted)
+		isRestricted = ok and YesNo(restricted) or "error"
+	end
+	Print("combat log restricted: " .. isRestricted
+		.. ", usable: " .. YesNo(parser.IsCombatLogUsable and parser.IsCombatLogUsable())
+		.. ", active: " .. YesNo(parser.IsCombatLogActive and parser.IsCombatLogActive()), 1, 1, 1)
+
+	local meterState = "missing"
+	if C_DamageMeter then
+		meterState = "present"
+		if C_DamageMeter.IsDamageMeterAvailable then
+			local ok, isAvailable, reason = pcall(C_DamageMeter.IsDamageMeterAvailable)
+			if ok then
+				meterState = "available: " .. YesNo(isAvailable)
+				if isAvailable == false and reason then
+					meterState = meterState .. " (" .. tostring(reason) .. ")"
+				end
+			end
+		end
+	end
+	Print("damage meter: " .. meterState, 1, 1, 1)
+
+	if MikSBT.Main and MikSBT.Main.GetSourceStatus then
+		local ok, status = pcall(MikSBT.Main.GetSourceStatus)
+		if ok and status then
+			Print("sources: combat log " .. YesNo(status.combatLog)
+				.. ", meter available " .. YesNo(status.meterAvailable)
+				.. ", meter active " .. YesNo(status.meterActive)
+				.. ", meter blind " .. YesNo(status.meterBlind), 1, 1, 1)
+			Print(string.format(
+				"owning: parser %s (%.1fs ago), meter %s (%.1fs ago)",
+				YesNo(status.parserOwning), status.parserAge or -1,
+				YesNo(status.meterOwning), status.meterAge or -1), 1, 1, 1)
+			Print("action meters: dispels active " .. YesNo(status.dispelMeterActive)
+				.. ", blind " .. YesNo(status.dispelMeterBlind)
+				.. "; interrupts active " .. YesNo(status.interruptMeterActive)
+				.. ", blind " .. YesNo(status.interruptMeterBlind), 1, 1, 1)
+			local filteredEvents = "?"
+			if C_CombatLog and C_CombatLog.AreFilteredEventsEnabled then
+				local okEvents, eventsEnabled = pcall(C_CombatLog.AreFilteredEventsEnabled)
+				filteredEvents = okEvents and YesNo(eventsEnabled) or "error"
+			end
+			local filterName = "?"
+			local filters = Blizzard_CombatLog_Filters
+			if type(filters) == "table" and type(filters.filters) == "table" then
+				local filter = filters.filters[filters.currentFilter]
+				filterName = tostring(filters.currentFilter) .. ":" .. tostring(filter and filter.name)
+			end
+			Print(string.format(
+				"log lines: enabled %s, client sends %s, live %s, suspect %s, missed casts %d, filter %s, shows my actions %s",
+				YesNo(status.clmEnabled), filteredEvents, YesNo(status.clmLive),
+				YesNo(status.clmSuspect), status.clmMissedCasts or -1, filterName,
+				YesNo(status.clmCoversOwn)), 1, 1, 1)
+		end
+	end
+
+	if C_DamageMeter and C_DamageMeter.GetCombatSessionSourceFromType and Enum.DamageMeterType then
+		if C_DamageMeter.GetAvailableCombatSessions then
+			local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
+			if ok and type(sessions) == "table" then
+				local names = {}
+				for _, session in ipairs(sessions) do
+					names[#names + 1] = tostring(session.sessionID) .. ":" .. tostring(session.name)
+				end
+				Print("meter sessions: " .. #sessions .. " " .. table.concat(names, ", "), 1, 1, 1)
+			end
+		end
+		for _, sessionType in ipairs({ "Current", "Overall" }) do
+		for _, meterType in ipairs({ "Dispels", "Interrupts", "DamageDone" }) do
+			local ok, source = pcall(C_DamageMeter.GetCombatSessionSourceFromType,
+				Enum.DamageMeterSessionType[sessionType], Enum.DamageMeterType[meterType], UnitGUID("player"))
+			local spells = ok and type(source) == "table" and source.combatSpells
+			local label = meterType .. " (" .. sessionType .. ")"
+			if type(spells) ~= "table" then
+				Print(label .. ": " .. (ok and "no data" or "error"), 1, 1, 1)
+			elseif meterType == "DamageDone" then
+				Print(label .. ": " .. #spells .. " spell(s)", 1, 1, 1)
+			else
+				Print(label .. ": " .. #spells .. " spell(s)", 1, 1, 1)
+				for _, entry in ipairs(spells) do
+					local spellID, amount = entry.spellID, entry.totalAmount
+					local isSecret = issecretvalue and (issecretvalue(spellID) or issecretvalue(amount))
+					local name = not isSecret and C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+					local details = entry.combatSpellDetails
+					local target = type(details) == "table" and details.unitName
+					Print(string.format("  %s %s x%s -> %s", isSecret and "<secret>" or tostring(spellID),
+						tostring(name), isSecret and "?" or tostring(amount),
+						(issecretvalue and issecretvalue(target)) and "<secret>" or tostring(target)), 1, 1, 1)
+				end
+			end
+		end
+		end
+	end
+
+	if C_Secrets then
+		local function Ask(name)
+			local func = C_Secrets[name]
+			if type(func) ~= "function" then
+				return "n/a"
+			end
+			local ok, value = pcall(func)
+			return ok and YesNo(value) or "error"
+		end
+		Print("secrets: restrictions " .. Ask("HasSecretRestrictions")
+			.. ", auras " .. Ask("ShouldAurasBeSecret")
+			.. ", cooldowns " .. Ask("ShouldCooldownsBeSecret"), 1, 1, 1)
+	end
+
+	local blizzardState = {}
+	for _, cvarName in ipairs({
+		"floatingCombatTextCombatDamage_v2",
+		"floatingCombatTextCombatHealing_v2",
+		"floatingCombatTextCombatLogPeriodicSpells_v2",
+	}) do
+		blizzardState[#blizzardState + 1] = cvarName .. "=" .. tostring(GetCVar(cvarName))
+	end
+	Print("blizzard combat text: " .. table.concat(blizzardState, ", "), 1, 1, 1)
+	Print("in group: " .. YesNo(IsInGroup() or IsInRaid()), 1, 1, 1)
+
+	local trace = MikSBT.Trace
+	if not trace then
+		return
+	end
+	local mainFrameEvents = MikSBT.Main and MikSBT.Main.IsCombatEventRegistered
+		and MikSBT.Main.IsCombatEventRegistered()
+	local anim = MikSBT.Animations.GetTraceState and MikSBT.Animations.GetTraceState() or {}
+	Print(string.format("state: mod disabled %s, UNIT_COMBAT registered %s, in combat %s, anim frame shown %s visible %s, active %d, cached %d",
+		YesNo(IsModDisabled()), YesNo(mainFrameEvents), YesNo(InCombatLockdown()),
+		YesNo(anim.frameShown), YesNo(anim.frameVisible), anim.active or -1, anim.cached or -1), 1, 1, 1)
+	local keys = {}
+	for key in pairs(trace.counts) do
+		keys[#keys + 1] = key
+	end
+	table.sort(keys)
+	local now = GetTime()
+	for _, key in ipairs(keys) do
+		Print(string.format("  %s = %d (%.0fs ago)", key, trace.counts[key], now - (trace.lastTime[key] or now)), 0.8, 0.8, 0.8)
+	end
+	for key, entry in pairs(trace.notes or {}) do
+		Print(string.format("  last %s (%.0fs ago): %s", key, now - entry.time, entry.text), 0.8, 0.8, 0.8)
+	end
+	for where, entry in pairs(trace.errors) do
+		Print(string.format("  last error %s (%.0fs ago): %s", where, now - entry.time, entry.text), 1, 0.4, 0.4)
+	end
+end
+
 local function CommandHandler(params)
 
 	local currentParam, remainingParams
@@ -3039,6 +3195,28 @@ local function CommandHandler(params)
 	elseif (currentParam == L.COMMAND_SHOWVER) then
 
 		Print(MikSBT.VERSION_STRING, 1, 1, 1)
+
+		showUsage = false
+
+	elseif (currentParam == "meterlog") then
+
+		MikSBT.meterLog = not MikSBT.meterLog
+		Print("meter log " .. (MikSBT.meterLog and "on" or "off"), 1, 1, 1)
+
+		showUsage = false
+
+	elseif (currentParam == "diag") then
+
+		PrintDiagnostics()
+
+		showUsage = false
+
+	elseif (currentParam == "diagreset") then
+
+		if MikSBT.Trace then
+			MikSBT.Trace:Reset()
+		end
+		Print("trace counters reset", 1, 1, 1)
 
 		showUsage = false
 

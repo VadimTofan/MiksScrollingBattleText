@@ -68,7 +68,9 @@ function OutgoingBatcher:Flush(batchKey)
 	self.batches[batchKey] = nil
 
 	local eventKey, settings = self:ResolveSettings(batch.isSpell)
+	MikSBT.Trace:Inc("batch:flush")
 	if not settings then
+		MikSBT.Trace:Inc("batch:nosettings")
 		return
 	end
 	local profile = self.config.getProfile()

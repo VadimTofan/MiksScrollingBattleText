@@ -354,6 +354,20 @@ module.IterateScrollAreas			= function()
 	return ScrollAreas:Iterate()
 end
 module.LoadFont						= LoadFont
+module.GetTraceState				= function()
+	local active = 0
+	for _, areas in pairs(animationData) do
+		for _, events in pairs(areas) do
+			active = active + #events
+		end
+	end
+	return {
+		frameShown = animationFrame:IsShown(),
+		frameVisible = animationFrame:IsVisible(),
+		active = active,
+		cached = #displayEventCache,
+	}
+end
 module.DisplayMessage				= function(...)
 	return DisplayService:DisplayMessage(...)
 end
