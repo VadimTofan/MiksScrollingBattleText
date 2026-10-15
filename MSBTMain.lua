@@ -156,6 +156,16 @@ local DISPEL_SPELLS = {
 	[370] = true, -- Purge
 	[19505] = true, -- Devour Magic
 }
+local INTERRUPT_SPELLS = {
+	[1766] = true, -- Kick
+	[6552] = true, -- Pummel
+	[72] = true, -- Shield Bash
+	[2139] = true, -- Counterspell
+	[8042] = true, -- Earth Shock
+	[15487] = true, -- Silence
+	[19244] = true, -- Spell Lock
+}
+local INTERRUPT_MATCH_WINDOW = 0.6
 local CLIENT_TOC_VERSION = tonumber((select(4, GetBuildInfo()))) or 0
 local IS_FOREVER_CLIENT = CLIENT_TOC_VERSION >= 16000 and CLIENT_TOC_VERSION < 20000
 local NAMED_HOT_SPELLS = {
@@ -345,13 +355,16 @@ function eventFrame:PLAYER_REGEN_ENABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(false)
 	dispelMeterSource:Poll()
+	interruptMeterSource:Poll()
 	dispelMeterSource:Reset(false)
+	interruptMeterSource:Reset(false)
 	utilityNotifications:HandleCombatLeave()
 end
 function eventFrame:PLAYER_REGEN_DISABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(true)
 	dispelMeterSource:Reset(true)
+	interruptMeterSource:Reset(true)
 	utilityNotifications:HandleCombatEnter()
 end
 function eventFrame:CHAT_MSG_MONSTER_EMOTE(message, sourceName)
@@ -842,6 +855,7 @@ local function CreateActionMeterSource(meterType, eventType)
 end
 
 dispelMeterSource = CreateActionMeterSource("Dispels", "dispel")
+interruptMeterSource = CreateActionMeterSource("Interrupts", "interrupt")
 
 local combatLogMessageSource = CombatLogMessageSource:New({
 	getProfile = function()
@@ -1123,8 +1137,9 @@ local combatTextSource = CombatTextSource:New({
 
 local EnableActionCastSource, DisableActionCastSource
 do
-	local dispelSpellNames
+	local dispelSpellNames, interruptSpellNames
 	local castTargets = {}
+	local pendingInterrupt
 
 	local function BuildNameSet(spellTable)
 		local names = {}
@@ -1453,6 +1468,10 @@ do
 			and not combatLogMessageSource:IsOwning()
 	end
 
+	local function IsCastActionSourceActive()
+		return IsCastSourceOpen() and not dispelMeterSource:IsActive()
+	end
+
 	local function IsDispelCastActive(unitID)
 		return IsCastSourceOpen() and (unitID == "player" or not dispelMeterSource:IsActive())
 	end
@@ -1468,6 +1487,7 @@ do
 		end
 
 		dispelSpellNames = dispelSpellNames or BuildNameSet(DISPEL_SPELLS)
+		interruptSpellNames = interruptSpellNames or BuildNameSet(INTERRUPT_SPELLS)
 
 		local isDispel = dispelSpellNames[spellName] == true
 		if isDispel then
@@ -1479,6 +1499,8 @@ do
 				Trace:Inc("dispel:cast gated")
 				return
 			end
+		elseif not IsCastActionSourceActive() then
+			return
 		end
 
 		local targetName
@@ -1550,6 +1572,13 @@ do
 				Trace:Inc("dispel:pending miss")
 				Emit(spellID, "")
 			end)
+		elseif interruptSpellNames[spellName] then
+			pendingInterrupt = {
+				time = GetTime(),
+				sourceUnit = unitID,
+				spellID = spellID,
+				spellName = spellName,
+			}
 		end
 	end
 
@@ -1585,12 +1614,42 @@ do
 			return
 		end
 
+		-- UNIT_SPELLCAST_INTERRUPTED on the target/focus: castGUID, spellID, interruptedBy
+		local interruptedSpellID, interruptedBy = arg2, arg3
+		local source = pendingInterrupt
+		if not source or not IsCastActionSourceActive() then
+			return
+		end
 
+		local byPlayer
+		if interruptedBy ~= nil and not IsSecretValue(interruptedBy) then
+			byPlayer = interruptedBy == UnitGUID(source.sourceUnit)
+		else
+			byPlayer = GetTime() - source.time <= INTERRUPT_MATCH_WINDOW
+		end
+		if not byPlayer then
+			return
+		end
+		pendingInterrupt = nil
+
+		local recipientName = UnitName(unitID)
+		if recipientName ~= nil and IsSecretValue(recipientName) then
+			recipientName = nil
+		end
+		ParserEventsHandler({
+			eventType = "interrupt",
+			sourceUnit = source.sourceUnit,
+			recipientName = recipientName,
+			extraSkillID = interruptedSpellID ~= nil and not IsSecretValue(interruptedSpellID)
+				and interruptedSpellID or source.spellID,
+			extraSkillName = GetPlainSpellName(interruptedSpellID) or source.spellName,
+		})
 	end)
 
 	EnableActionCastSource = function()
 		actionCastFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", "player", "pet")
 		actionCastFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player", "pet")
+		actionCastFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "target", "focus")
 		pcall(auraCacheFrame.RegisterEvent, auraCacheFrame, "UNIT_AURA")
 	end
 
@@ -1600,6 +1659,7 @@ do
 		for key in pairs(auraCache) do
 			auraCache[key] = nil
 		end
+		pendingInterrupt = nil
 		for castGUID in pairs(castTargets) do
 			castTargets[castGUID] = nil
 		end
@@ -1864,6 +1924,7 @@ end
 local function UpdateFallbackSources()
 	outgoingCombat:Start()
 	dispelMeterSource:Start()
+	interruptMeterSource:Start()
 end
 
 local function Enable()
@@ -1891,6 +1952,7 @@ local function Disable()
 	outgoingCombat:Reset()
 	outgoingCombat:Stop(true)
 	dispelMeterSource:Stop(true)
+	interruptMeterSource:Stop(true)
 	DisableActionCastSource()
 	combatTextSource:Stop()
 	combatLogMessageSource:Stop()
@@ -1995,8 +2057,8 @@ module.GetSourceStatus				= function()
 		meterBlind = damageMeterSource.isBlind == true,
 		dispelMeterActive = dispelMeterSource:IsActive(),
 		dispelMeterBlind = dispelMeterSource.isBlind == true,
-		interruptMeterActive = (interruptMeterSource and interruptMeterSource:IsActive() or false),
-		interruptMeterBlind = (interruptMeterSource and interruptMeterSource.isBlind == true or false),
+		interruptMeterActive = interruptMeterSource:IsActive(),
+		interruptMeterBlind = interruptMeterSource.isBlind == true,
 		clmEnabled = combatLogMessageSource:IsEnabled(),
 		clmLive = combatLogMessageSource:IsLive(),
 		clmSuspect = combatLogMessageSource:IsSuspect(),
