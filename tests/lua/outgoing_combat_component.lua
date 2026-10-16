@@ -161,3 +161,23 @@ component:HandleUnitCombat("target", "WOUND", nil, 20, 4)
 assert(queued == nil, "periodic damage matched the wrong full target name")
 assert(component.castTargets["dot-cast"] == nil,
     "successful damage cast retained its target record")
+
+-- Given a successful helpful cast at a known friendly target.
+component.config.isHelpfulSpell = function(id) return id == 7777 end
+component.config.defaultHealTarget = function() return "Friendly One" end
+component.config.namedHots = function() return {} end
+component.config.classifyUnit = function() return "friendly" end
+component.config.unitName = function() return "Friendly One" end
+component:HandleSpellcastSent("player", "Friendly One", "heal-cast")
+component:HandleSpellcastSucceeded("player", 7777, "heal-cast")
+
+-- When that target receives a heal.
+component:HandleUnitCombat("target", "HEAL", nil, 60, nil, true)
+
+-- Then it routes the heal with its spell and recipient.
+local heal = emitted[#emitted]
+assert(heal.eventType == "heal" and heal.skillID == 7777,
+    "helpful cast was not attributed to outgoing healing")
+assert(heal.recipientName == "Friendly One", "heal recipient changed")
+assert(component.castTargets["heal-cast"] == nil,
+    "helpful cast retained its target record")

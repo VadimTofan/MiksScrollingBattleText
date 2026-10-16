@@ -201,6 +201,10 @@ parserFrame.scripts.OnEvent(parserFrame, cases[1][1], cases[1][2])
 -- Then parser callbacks stop and the main frame unregisters its events.
 assert(#received == count, "disabled parser delivered a message")
 assert(next(frames[2].events) == nil, "disabled main kept events registered")
+for _, frame in ipairs(frames) do
+    assert(not frame.events.UNIT_HEALTH,
+        "disabled healing attribution kept health tracking active")
+end
 
 -- Describe: health and power triggers keep their existing registration and output.
 local health, power = 60, 60

@@ -140,7 +140,13 @@ local NAMED_DOT_SPELLS = {
 }
 local CLIENT_TOC_VERSION = tonumber((select(4, GetBuildInfo()))) or 0
 local IS_FOREVER_CLIENT = CLIENT_TOC_VERSION >= 16000 and CLIENT_TOC_VERSION < 20000
+local NAMED_HOT_SPELLS = {
+	[139] = { duration = 15 }, -- Renew
+	[774] = { duration = 12 }, -- Rejuvenation
+	[8936] = { duration = 21 }, -- Regrowth
+}
 local namedDotsByName
+local namedHotsByName
 
 local function BuildSpellNameMap(spellTable)
 	local byName, complete = {}, true
@@ -153,6 +159,17 @@ local function BuildSpellNameMap(spellTable)
 		end
 	end
 	return byName, complete
+end
+
+local function GetNamedHots()
+	if namedHotsByName then
+		return namedHotsByName
+	end
+	local byName, complete = BuildSpellNameMap(NAMED_HOT_SPELLS)
+	if complete then
+		namedHotsByName = byName
+	end
+	return byName
 end
 
 local function GetNamedDots()
@@ -705,8 +722,108 @@ local damageMeterSource = DamageMeterSource:New({
 
 
 local ClassifyCombatUnit, GetOverheal, GetDefaultHealTarget, GetAoeHeals
+local StartHealthTracking, StopHealthTracking
 do
+	local AOE_HEAL_SPELLS = {
+		[596] = true, -- Prayer of Healing
+		[1064] = true, -- Chain Heal
+		[15237] = true, -- Holy Nova
+		[740] = true, -- Tranquility
+		[34861] = true, -- Circle of Healing
+	}
+	local aoeHealsByName
 	local sawNameplateCombat = false
+	local healthCache = {}
+	local HEALTH_UNIT_PAIRS = {
+		{ "player", "target" },
+		{ "party1", "party2" },
+		{ "party3", "party4" },
+	}
+
+	GetAoeHeals = function()
+		if aoeHealsByName then
+			return aoeHealsByName
+		end
+		local byName, complete = BuildSpellNameMap(AOE_HEAL_SPELLS)
+		if complete then
+			aoeHealsByName = byName
+		end
+		return byName
+	end
+
+	local function PlainNumber(value)
+		if value == nil or (issecretvalue and issecretvalue(value)) then
+			return nil
+		end
+		return NormalizeNumber(value)
+	end
+
+	local function OnHealthEvent(_, _, unitID)
+		local health = PlainNumber(UnitHealth(unitID))
+		if not health then
+			healthCache[unitID] = nil
+			return
+		end
+		local record = healthCache[unitID]
+		if not record then
+			record = {}
+			healthCache[unitID] = record
+		end
+		record.prev = record.cur or health
+		record.cur = health
+		record.time = GetTime()
+	end
+
+	local healthFrames = {}
+	StartHealthTracking = function()
+		for index, units in ipairs(HEALTH_UNIT_PAIRS) do
+			local frame = healthFrames[index]
+			if not frame then
+				frame = CreateFrame("Frame")
+				frame:SetScript("OnEvent", OnHealthEvent)
+				healthFrames[index] = frame
+			end
+			frame:RegisterUnitEvent("UNIT_HEALTH", units[1], units[2])
+		end
+	end
+	StopHealthTracking = function()
+		for _, frame in ipairs(healthFrames) do
+			frame:UnregisterAllEvents()
+		end
+		for unitID in pairs(healthCache) do healthCache[unitID] = nil end
+	end
+
+	GetOverheal = function(unitID, amount)
+		local health = PlainNumber(UnitHealth(unitID))
+		local maxHealth = PlainNumber(UnitHealthMax(unitID))
+		if not health or not maxHealth or maxHealth <= 0 then
+			return nil
+		end
+		local record = healthCache[unitID]
+		if not record or record.time ~= GetTime() or record.cur ~= health then
+			return nil
+		end
+		local before = record.prev
+		local effective = math.max(0, math.min(amount, maxHealth - before))
+		local overheal = amount - effective
+		if overheal > 0 then
+			return overheal
+		end
+	end
+
+	GetDefaultHealTarget = function()
+		if SafeUnitBoolean(UnitExists, "target") and SafeUnitBoolean(UnitCanAssist, "player", "target") then
+			local name = UnitName("target")
+			if IsPlainValue(name) then
+				return name
+			end
+		end
+		local name = UnitName("player")
+		if IsPlainValue(name) then
+			return name
+		end
+	end
+
 	local function HasNameplate(unitID)
 		if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then
 			return false
@@ -768,7 +885,10 @@ outgoingCombat = OutgoingCombat:New({
 		local name = UnitName(unitID)
 		return name
 	end,
+	defaultHealTarget = GetDefaultHealTarget,
 	ownedSpellWindow = 5,
+	aoeHeals = GetAoeHeals,
+	getOverheal = GetOverheal,
 	damageMeter = damageMeterSource,
 	getProfile = function()
 		return MSBTProfiles.currentProfile
@@ -804,6 +924,15 @@ outgoingCombat = OutgoingCombat:New({
 	isChanneling = function()
 		return select("#", UnitChannelInfo("player")) > 0
 	end,
+	namedHots = GetNamedHots,
+	healDirectWindow = 2,
+	isHelpfulSpell = function(spellID)
+		if C_Spell and C_Spell.IsSpellHelpful then
+			local ok, isHelpful = pcall(C_Spell.IsSpellHelpful, spellID)
+			return ok and isHelpful == true
+		end
+		return false
+	end,
 	getSpellName = function(spellID)
 		local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
 		if type(name) == "string" and not IsSecretValue(name) then
@@ -832,11 +961,20 @@ incomingCombat = IncomingCombat:New({
 	unknown = UNKNOWN,
 	groupDelay = INCOMING_GROUP_DELAY,
 	selfHealIconWindow = INCOMING_SELF_HEAL_ICON_ATTRIBUTION_WINDOW,
+	getSpellName = function(spellID)
+		return (GetSpellInfo(spellID))
+	end,
 	getLastPlayerSpell = function()
 		return outgoingCombat:GetLastSpell()
 	end,
+	getHealSpell = function(now, window)
+		return outgoingCombat:GetHealSpell(now, window)
+	end,
 	emit = function(parserEvent)
 		ParserEventsHandler(parserEvent)
+	end,
+	getOverheal = function(unitID, amount)
+		return GetOverheal(unitID, amount)
 	end,
 })
 
@@ -880,6 +1018,7 @@ local function UpdateFallbackSources()
 end
 
 local function Enable()
+	StartHealthTracking()
 	spellTargetFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", "player", "pet")
 	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -895,6 +1034,7 @@ end
 
 
 local function Disable()
+	StopHealthTracking()
 	spellTargetFrame:UnregisterAllEvents()
 	eventFrame:Hide()
 	eventFrame:UnregisterAllEvents()
