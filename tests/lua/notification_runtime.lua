@@ -126,6 +126,7 @@ local function LoadAddonFile(path)
 end
 LoadAddonFile("MSBTParser.lua")
 dofile("Components/CombatTextSource.lua")
+dofile("Components/ActionNotifications.lua")
 LoadAddonFile("MSBTMain.lua")
 local parserFrame = frames[1]
 local parser = MikSBT.Parser

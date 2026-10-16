@@ -15,6 +15,7 @@ local CombatRoutes = MikSBT.Services.CombatRoutes
 local IncomingCombat = MikSBT.Components.IncomingCombat
 local OutgoingBatcher = MikSBT.Components.OutgoingBatcher
 local DamageMeterSource = MikSBT.Components.DamageMeterSource
+local ActionNotifications = MikSBT.Components.ActionNotifications
 local OutgoingCombat = MikSBT.Components.OutgoingCombat
 local CombatTextSource = MikSBT.Components.CombatTextSource
 local ParserNotifications = MikSBT.Components.ParserNotifications
@@ -108,6 +109,7 @@ local DAMAGE_METER_POLL_INTERVAL = 0.5
 local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
+local dispelMeterSource
 local outgoingCombat
 local SafeUnitBoolean, NoteParserDamage
 local parserNotifications
@@ -258,11 +260,14 @@ end
 function eventFrame:PLAYER_REGEN_ENABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(false)
+	dispelMeterSource:Poll()
+	dispelMeterSource:Reset(false)
 	utilityNotifications:HandleCombatLeave()
 end
 function eventFrame:PLAYER_REGEN_DISABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(true)
+	dispelMeterSource:Reset(true)
 	utilityNotifications:HandleCombatEnter()
 end
 function eventFrame:CHAT_MSG_MONSTER_EMOTE(message, sourceName)
@@ -657,6 +662,51 @@ local damageMeterSource = DamageMeterSource:New({
 	freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
 })
 
+local function CreateActionMeterSource(meterType, eventType)
+	local notifications = ActionNotifications:New({
+		eventType = eventType,
+		isSecret = IsSecretValue,
+		getSpellInfo = GetSpellInfo,
+		emit = ParserEventsHandler,
+	})
+	return DamageMeterSource:New({
+		isAvailable = function()
+			return IsDamageMeterUsable()
+				and Enum.DamageMeterType[meterType] ~= nil
+		end,
+		isSecret = IsSecretValue,
+		getTime = GetTime,
+		unitGUID = UnitGUID,
+		getPlayerGUID = function() return playerGUID end,
+		extraUnits = { "pet" },
+		createFrame = function() return CreateFrame("Frame") end,
+		getSessionSource = function(sessionType, damageType, sourceGUID)
+			return C_DamageMeter.GetCombatSessionSourceFromType(
+				sessionType, damageType, sourceGUID
+			)
+		end,
+		getSessionSourceByID = C_DamageMeter
+			and C_DamageMeter.GetCombatSessionSourceFromID,
+		sessionType = function()
+			return Enum.DamageMeterSessionType.Current
+		end,
+		damageType = function() return Enum.DamageMeterType[meterType] end,
+		normalizeNumber = NormalizeNumber,
+		primeBaseline = true,
+		isSuppressed = function()
+			return MSBTProfiles.currentProfile.combatLogMessagesRaw == true
+		end,
+		queue = function(...)
+			notifications:HandleDelta(...)
+		end,
+		newTicker = C_Timer.NewTicker,
+		pollInterval = DAMAGE_METER_POLL_INTERVAL,
+		freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
+	})
+end
+
+dispelMeterSource = CreateActionMeterSource("Dispels", "dispel")
+
 outgoingCombat = OutgoingCombat:New({
 	batcher = outgoingBatcher,
 	damageMeter = damageMeterSource,
@@ -747,6 +797,7 @@ end
 
 local function UpdateFallbackSources()
 	outgoingCombat:Start()
+	dispelMeterSource:Start()
 end
 local function Enable()
 	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
@@ -768,6 +819,7 @@ local function Disable()
 	incomingCombat:Reset()
 	outgoingCombat:Reset()
 	outgoingCombat:Stop(true)
+	dispelMeterSource:Stop(true)
 	combatTextSource:Stop()
 
 	MSBTParser.UnregisterHandler(ParserEventsHandler)

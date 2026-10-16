@@ -33,6 +33,7 @@ Components\OutgoingBatcher.lua
 Components\DamageMeterSource.lua
 Components\OutgoingCombat.lua
 Components\CombatTextSource.lua
+Components\ActionNotifications.lua
 Components\ParserNotifications.lua
 Components\UtilityNotifications.lua
 Components\ItemCooldownTracker.lua
