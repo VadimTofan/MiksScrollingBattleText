@@ -1,4 +1,5 @@
 MikSBT = {Components = {}}
+dofile("API/RestrictedValue.lua")
 local Incoming = dofile("Components/IncomingCombat.lua")
 local callbacks, displayed = {}, {}
 local profile = {events = {INCOMING_HEAL = {message = "%a"}}}
@@ -10,6 +11,8 @@ local incoming = Incoming:New({
 	resolveBatchDisplaySettings = function(settings) return settings end,
 	shouldSplitCritBatch = function() return false end,
 	display = function(_, message) displayed[#displayed + 1] = message end,
+	getTime = function() return 10 end,
+	getLastPlayerSpell = function() return nil end,
 })
 
 -- Given a scheduled heal batch replaced by another batch after reset.

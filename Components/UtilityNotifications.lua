@@ -1,6 +1,8 @@
 local UtilityNotifications = {}
 UtilityNotifications.__index = UtilityNotifications
 
+local RestrictedValue = MikSBT.API.RestrictedValue
+
 function UtilityNotifications:New(config)
 	return setmetatable({
 		config = config,
@@ -33,7 +35,10 @@ function UtilityNotifications:DisplayResource(
 	changeEvent,
 	fullEvent
 )
-	local eventKey = amount == self.config.unitPowerMax("player", powerType)
+	local maxAmount = RestrictedValue:Number(
+		self.config.unitPowerMax("player", powerType)
+	)
+	local eventKey = amount == maxAmount
 		and fullEvent
 		or changeEvent
 	self:DisplayAmount(eventKey, amount, powerType)
@@ -73,7 +78,12 @@ function UtilityNotifications:HandlePowerUpdate(unitID, powerToken)
 		return
 	end
 
-	local amount = self.config.unitPower("player", powerType)
+	local amount = RestrictedValue:Number(
+		self.config.unitPower("player", powerType)
+	)
+	if not amount then
+		return
+	end
 	local previousAmount = self.lastPowerAmounts[powerType]
 	local playerClass = self.config.getPlayerClass()
 	local handled = true
