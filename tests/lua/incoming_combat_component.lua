@@ -83,13 +83,16 @@ local firstHandled = component:HandleUnitCombat(
 )
 component:HandleUnitCombat("player", "WOUND", nil, 50, "FIRE")
 
--- When the batch timer expires
+-- When each independent batch timer expires.
+assert(#callbacks == 2, "normal and critical hits need separate timers")
 callbacks[1]()
+callbacks[2]()
 
 -- Then
 assert(firstHandled == true, "incoming damage was not handled")
-assert(#displayed == 1, "incoming damage batch displayed incorrectly")
-assert(displayed[1].message == "150 (2 hits, 1 Crit) - fire",
+assert(#displayed == 2, "incoming normal and critical hits were merged")
+assert(displayed[1].message == "100 - fire"
+	and displayed[2].message == "50 - fire",
 	"incoming damage summary changed")
 
 -- Given a UNIT_COMBAT self-heal with no combat-log producer.

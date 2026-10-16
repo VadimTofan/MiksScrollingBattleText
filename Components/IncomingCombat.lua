@@ -48,26 +48,10 @@ local function StripRealm(name, unknown)
 	return name
 end
 
-local function BuildHitSummary(hitCount, critCount)
-	if not hitCount or hitCount <= 0 then
-		return nil
-	end
-	if critCount and critCount > 0 then
-		if hitCount == 1 and critCount == 1 then
-			return " (Crit)"
-		end
-		local hitsWord = hitCount == 1 and "hit" or "hits"
-		local critWord = critCount == 1 and "Crit" or "Crits"
-		return string.format(
-			" (%d %s, %d %s)",
-			hitCount,
-			hitsWord,
-			critCount,
-			critWord
-		)
-	end
-	if hitCount > 1 then
-		return string.format(" (%d hits)", hitCount)
+local function BuildHitSummary(hitCount)
+	if hitCount and hitCount > 1 then
+		local translations = MikSBT.translations
+		return string.format(" [%d %s]", hitCount, translations and translations.MSG_HITS or "Hits")
 	end
 	return nil
 end
@@ -194,7 +178,7 @@ local function DisplayDamageBatch(self, batchKey)
 end
 
 function IncomingCombat:QueueDamage(amount, isCrit, damageSource)
-	local batchKey = "incoming_damage"
+	local batchKey = isCrit and "incoming_damage:crit" or "incoming_damage"
 	local batch = self.damageBatches[batchKey]
 	if not batch then
 		batch = {
