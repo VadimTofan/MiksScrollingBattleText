@@ -7,6 +7,7 @@
 - Added health-based incoming overheal estimates and a combat-text heal fallback.
 - Added pet spell/melee attribution and unnamed solo DoT tick output.
 - Guarded restricted damage-meter spell data before calculating deltas.
+- Embedded the options in Blizzard Settings with a subcategory per tab.
 
 ## v12.030
 
