@@ -140,3 +140,16 @@ source:Reset(true)
 assert(not source.isBlind and source.ticker, "meter did not recover")
 source:Stop(true)
 assert(not source.wantsRunning, "shutdown retained running intent")
+
+-- Given a combat boundary while the Current session still holds old totals.
+source.config.getSessionSource = function()
+    return { combatSpells = {{ spellID = 1234, totalAmount = 9999 }} }
+end
+local countBeforeBoundary = #queued
+source:Reset(true)
+
+-- When polling before the new live session ID arrives.
+source:Poll()
+
+-- Then the previous fight is baselined rather than shown as a new hit.
+assert(#queued == countBeforeBoundary, "combat boundary replayed the old session")

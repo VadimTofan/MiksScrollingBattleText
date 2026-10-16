@@ -51,11 +51,11 @@ function DamageMeterSource:Reset(isSessionBoundary)
 	self:ClearTotals()
 	self.sessionID = nil
 
-	-- At a combat boundary the current session starts from zero, so the first
-	-- total seen afterwards is a real hit rather than a running sum.
-	self.assumeZero = isSessionBoundary == true
+	-- Current may still refer to the previous fight at a combat boundary.
+	-- Only a new live session ID establishes a known zero baseline.
+	self.assumeZero = false
 
-	if self.assumeZero and self.isBlind and self.wantsRunning then
+	if isSessionBoundary == true and self.isBlind and self.wantsRunning then
 		self.isBlind = false
 		self:Start()
 	end
