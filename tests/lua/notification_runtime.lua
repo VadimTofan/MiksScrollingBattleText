@@ -102,6 +102,7 @@ MikSBT = {
 		end,
 	},
 }
+dofile("API/RestrictedValue.lua")
 local services = { "Formatter", "Batcher", "Throttler", "EventRouter", "EventPipeline" }
 for _, name in ipairs(services) do
 	local file = io.open("Services/" .. name .. ".lua")

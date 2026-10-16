@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Displayed protected (secret) combat amounts instead of dropping them, and
+  guarded damage-meter polling, power values, and text widths against them.
+- Fixed heal icons and spell names using the previous cast: UNIT_COMBAT arrives
+  before UNIT_SPELLCAST_SUCCEEDED in the same frame, so heals are now attributed
+  after their frame from the heal's own time.
+- Added overheal amounts to incoming heals.
+- Showed fully overhealed heals and HoT ticks from Blizzard's combat text feed,
+  which UNIT_COMBAT reports as zero, without duplicating heals it reports.
+- Attributed pet spell and melee hits on the target to Pet outgoing events.
+- Showed unexplained spell-school hits on the target as unnamed DoT ticks while
+  solo, since target auras can't be read in combat.
+- Embedded the options in the Blizzard Settings AddOns panel, scaled to fit, with
+  a subcategory per options tab.
+
 ## v12.030
 
 - Added profile import and export with validation, a Copy button, and dialogs
