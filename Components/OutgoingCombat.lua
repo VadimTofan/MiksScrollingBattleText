@@ -284,17 +284,17 @@ function OutgoingCombat:HandleSpellcastSucceeded(unitID, spellID, castGUID)
 		return false
 	end
 
+	local now = self.config.getTime()
+	if self.config.isHelpfulSpell and self.config.isHelpfulSpell(spellID) then
+		self:TrackHealSpell(spellID, now)
+		self:RecordHealTarget(spellID, castGUID, now)
+		return true
+	end
 	self.lastSpellID = spellID
-	self.lastSpellTime = self.config.getTime()
-	self:TrackHealSpell(spellID, self.lastSpellTime)
+	self.lastSpellTime = now
 	local castTarget
 	if castGUID ~= nil and not IsSecret(castGUID) then
 		castTarget = self.castTargets[castGUID] or nil
-		self.castTargets[castGUID] = nil
-	end
-	if self.config.isHelpfulSpell and self.config.isHelpfulSpell(spellID) then
-		self:RecordHealTarget(spellID, castGUID, self.lastSpellTime)
-	elseif castGUID ~= nil and not IsSecret(castGUID) then
 		self.castTargets[castGUID] = nil
 	end
 

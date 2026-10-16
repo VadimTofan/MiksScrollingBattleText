@@ -181,3 +181,19 @@ assert(heal.eventType == "heal" and heal.skillID == 7777,
 assert(heal.recipientName == "Friendly One", "heal recipient changed")
 assert(component.castTargets["heal-cast"] == nil,
     "helpful cast retained its target record")
+
+-- Given a helpful cast without a recent damaging cast.
+component:ResetCombatState()
+component.lastSpellID = nil
+component.lastSpellTime = 0
+component.config.classifyUnit = function() return "hostile" end
+component.config.isInGroup = function() return false end
+component:HandleSpellcastSent("player", "Friendly One", "another-heal")
+component:HandleSpellcastSucceeded("player", 7777, "another-heal")
+queued = nil
+
+-- When the enemy takes unrelated damage immediately afterwards.
+component:HandleUnitCombat("target", "WOUND", nil, 90, 4)
+
+-- Then a healing cast cannot supply damage attribution.
+assert(queued == nil, "helpful spell was used to attribute damage")
