@@ -18,6 +18,7 @@ local OutgoingCombat = MikSBT.Components.OutgoingCombat
 local ParserNotifications = MikSBT.Components.ParserNotifications
 local UtilityNotifications = MikSBT.Components.UtilityNotifications
 local Client = MikSBT.Compatibility.Client
+local RestrictedValue = MikSBT.API.RestrictedValue
 
 local string_find = string.find
 local string_gsub = string.gsub
@@ -417,33 +418,55 @@ local function ResolveBatchDisplaySettings(eventSettings, critSettings, hitCount
 	return eventSettings
 end
 
-local function BuildActionMessage(eventSettings, amount)
-	local function CleanupActionMessage(message)
-		if not message then
-			return message
-		end
-		message = string_gsub(message, "%%n", "")
-		message = string_gsub(message, "%%sl", "")
-		message = string_gsub(message, "%%s", "")
-		message = string_gsub(message, "%%e", "")
-		message = string_gsub(message, "%(%s*%-?%s*%)", "")
-		message = string_gsub(message, "%[%s*%-?%s*%]", "")
-		message = string_gsub(message, "%{%s*%-?%s*%}", "")
-		message = string_gsub(message, "%<%s*%-?%s*%>", "")
-		message = string_gsub(message, "^%s*%-%s*", "")
-		message = string_gsub(message, "%s*%-%s*$", "")
-		message = string_gsub(message, "%s%s+", " ")
-		message = string_gsub(message, "^%s+", "")
-		message = string_gsub(message, "%s+$", "")
+local function CleanupActionMessage(message)
+	if not message then
 		return message
 	end
+	message = string_gsub(message, "%%n", "")
+	message = string_gsub(message, "%%sl", "")
+	message = string_gsub(message, "%%s", "")
+	message = string_gsub(message, "%%e", "")
+	message = string_gsub(message, "%s+%-%s*([%)%]%}>])", "%1")
+	message = string_gsub(message, "([%(%[%{<])%s*%-%s+", "%1")
+	message = string_gsub(message, "%(%s*%-?%s*%)", "")
+	message = string_gsub(message, "%[%s*%-?%s*%]", "")
+	message = string_gsub(message, "%{%s*%-?%s*%}", "")
+	message = string_gsub(message, "%<%s*%-?%s*%>", "")
+	message = string_gsub(message, "^%s*%-%s*", "")
+	message = string_gsub(message, "%s*%-%s*$", "")
+	message = string_gsub(message, "%s%s+", " ")
+	message = string_gsub(message, "^%s+", "")
+	message = string_gsub(message, "%s+$", "")
+	return message
+end
 
+local function DisplayRestrictedAmount(eventSettings, amount, texturePath, message, suffix)
+	if not eventSettings or eventSettings.disabled then
+		return
+	end
+	local template = Formatter:BuildRestrictedTemplate(
+		CleanupActionMessage(message or eventSettings.message or "%a"),
+		suffix
+	)
+	DisplayEvent(
+		eventSettings,
+		template,
+		texturePath,
+		nil,
+		Formatter:FormatRestrictedAmount(amount, MSBTProfiles.currentProfile)
+	)
+end
+
+local function BuildActionMessage(eventSettings, amount, overhealAmount, effectName)
 	if not eventSettings or not eventSettings.message then
 		return nil
 	end
 	local message = eventSettings.message
 	if amount and amount > 0 then
-		message = Formatter:FormatLegacyEvent(message, amount)
+		message = Formatter:FormatLegacyEvent(
+			message, amount, nil, overhealAmount,
+			nil, nil, nil, nil, effectName
+		)
 		message = string_gsub(message, "<%%sl>%s*", "")
 		message = string_gsub(message, "<%%s>%s*", "")
 		message = string_gsub(message, "<%%e>%s*", "")

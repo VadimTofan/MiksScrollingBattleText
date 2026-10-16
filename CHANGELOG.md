@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added display support for protected combat amounts without inspecting them in Lua.
+
 ## v12.030
 
 - Added profile import and export with validation, a Copy button, and dialogs
