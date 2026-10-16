@@ -1272,6 +1272,7 @@ if IsClassic then
 		disableStaticInGroup			= false,
 		enableBlizzardV2CombatText		= false,
 		showGuessedOutgoingInGroup		= true,
+		useCombatLogMessages			= true,
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
@@ -2569,6 +2570,7 @@ else
 		disableStaticInGroup			= false,
 		enableBlizzardV2CombatText		= false,
 		showGuessedOutgoingInGroup		= true,
+		useCombatLogMessages			= true,
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
@@ -3027,6 +3029,26 @@ local function CommandHandler(params)
 		Print(MikSBT.VERSION_STRING, 1, 1, 1)
 
 		showUsage = false
+
+	elseif (currentParam == "clm") then
+
+		local enabled = currentProfile and currentProfile.useCombatLogMessages ~= false
+		SetOption(nil, "useCombatLogMessages", not enabled)
+		if MikSBT.Main and MikSBT.Main.ApplyCombatLogMessageOption then
+			MikSBT.Main.ApplyCombatLogMessageOption()
+		end
+		Print("combat log messages " .. (not enabled and "on" or "off"), 1, 1, 1)
+
+		showUsage = false
+
+	elseif (currentParam == "clmraw") then
+
+		local raw = currentProfile and currentProfile.combatLogMessagesRaw == true
+		SetOption(nil, "combatLogMessagesRaw", not raw)
+		Print("combat log raw lines " .. (not raw and "on" or "off"), 1, 1, 1)
+
+		showUsage = false
+
 
 	end
 

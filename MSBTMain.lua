@@ -17,6 +17,7 @@ local OutgoingBatcher = MikSBT.Components.OutgoingBatcher
 local DamageMeterSource = MikSBT.Components.DamageMeterSource
 local OutgoingCombat = MikSBT.Components.OutgoingCombat
 local CombatTextSource = MikSBT.Components.CombatTextSource
+local CombatLogMessageSource = MikSBT.Components.CombatLogMessageSource
 local ParserNotifications = MikSBT.Components.ParserNotifications
 local UtilityNotifications = MikSBT.Components.UtilityNotifications
 local Client = MikSBT.Compatibility.Client
@@ -721,6 +722,32 @@ local damageMeterSource = DamageMeterSource:New({
 })
 
 
+local combatLogMessageSource = CombatLogMessageSource:New({
+	getProfile = function()
+		return MSBTProfiles.currentProfile
+	end,
+	getTime = GetTime,
+	ownershipWindow = 8,
+	liveWindow = 600,
+	expectWindow = 2.5,
+	missLimit = 2,
+	warnFilter = function(filterName)
+		MikSBT.Print(string.format(L.MSG_CLM_FILTER, tostring(filterName),
+			tostring(QUICKBUTTON_NAME_MY_ACTIONS)), 1, 0.82, 0)
+	end,
+	display = function(message, scrollArea, colorR, colorG, colorB)
+		MSBTAnimations.DisplayMessage(message, scrollArea, false, colorR, colorG, colorB)
+	end,
+})
+combatLogMessageSource.filterButton = MikSBT.Components.CombatLogFilterButton:New({
+	label = function()
+		return string.format(L.BUTTON_CLM_FILTER, tostring(QUICKBUTTON_NAME_MY_ACTIONS))
+	end,
+	isWanted = function()
+		return combatLogMessageSource:IsEnabled() and combatLogMessageSource:GetFilterState() == false
+	end,
+})
+
 local ClassifyCombatUnit, GetOverheal, GetDefaultHealTarget, GetAoeHeals
 local StartHealthTracking, StopHealthTracking
 do
@@ -878,6 +905,9 @@ outgoingCombat = OutgoingCombat:New({
 		ParserEventsHandler(parserEvent)
 	end,
 	classifyUnit = ClassifyCombatUnit,
+	isCombatLogOwning = function()
+		return combatLogMessageSource:IsOwning()
+	end,
 	isHostileUnit = function(unitID)
 		return SafeUnitBoolean(UnitCanAttack, "player", unitID)
 	end,
@@ -990,10 +1020,233 @@ spellTargetFrame:SetScript("OnEvent", function(_, _, unitID, targetName, castGUI
 end)
 
 function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
-	outgoingCombat:HandleSpellcastSucceeded(unitID, spellID, lineID)
+	if not outgoingCombat:HandleSpellcastSucceeded(unitID, spellID, lineID) then
+		return
+	end
+	if combatLogMessageSource:IsLive() and not combatLogMessageSource:IsRawMode()
+		and outgoingCombat:IsDirectDamageCast(spellID)
+		and SafeUnitBoolean(UnitCanAttack, "player", "target") then
+		combatLogMessageSource:ExpectOwnLine(GetTime())
+	end
+end
+
+local QueueOwnershipCheck, NotePlayerCombatEvent, QueuePlayerHeal
+local ClearPendingOwnership
+do
+	local pendingFrames = {}
+	local resolveScheduled = false
+	ClearPendingOwnership = function()
+		for frameTime in pairs(pendingFrames) do
+			pendingFrames[frameTime] = nil
+		end
+	end
+
+	local function GetFrame(now)
+		local frame = pendingFrames[now]
+		if not frame then
+			frame = { time = now, playerHeals = 0, playerHealEvents = {}, events = {} }
+			pendingFrames[now] = frame
+		end
+		return frame
+	end
+
+	local function EventKey(event)
+		if IsSecretValue(event.action) or IsSecretValue(event.amount)
+			or IsSecretValue(event.school) or IsSecretValue(event.flag) then
+			return nil
+		end
+		return tostring(event.action) .. "|" .. tostring(event.amount) .. "|"
+			.. tostring(event.school) .. "|" .. tostring(event.flag)
+	end
+
+	local function SelectCandidates(frame)
+		local hasNameplate, hasOpaqueNameplate = false, false
+		local nameplateKeys = {}
+		for _, event in ipairs(frame.events) do
+			if string_find(event.unit, "^nameplate%d+$") then
+				hasNameplate = true
+				local eventKey = EventKey(event)
+				if eventKey then
+					nameplateKeys[eventKey] = true
+				else
+					hasOpaqueNameplate = true
+				end
+			end
+		end
+		local candidates, seenTarget = {}, {}
+		for _, event in ipairs(frame.events) do
+			local unit = event.unit
+			local kind
+			if string_find(unit, "^nameplate%d+$") then
+				kind = SafeUnitBoolean(UnitCanAttack, "player", unit) and "hostile" or nil
+			elseif unit == "target" then
+				local eventKey = EventKey(event)
+				local mirrored = hasNameplate
+					and (hasOpaqueNameplate or not eventKey or nameplateKeys[eventKey])
+				if not mirrored and SafeUnitBoolean(UnitCanAttack, "player", "target") then
+					kind = "hostile"
+				else
+					kind = ClassifyCombatUnit(unit)
+					if kind == "hostile" then
+						kind = nil
+					end
+				end
+			elseif string_find(unit, "^party%d$") or string_find(unit, "^raid%d+$") then
+				kind = ClassifyCombatUnit(unit)
+			end
+			if kind then
+				local eventKey = EventKey(event)
+				local key = eventKey and (unit .. "|" .. eventKey)
+				if not key or not seenTarget[key] then
+					if key then
+						seenTarget[key] = true
+					end
+					event.kind = kind
+					candidates[#candidates + 1] = event
+				end
+			end
+		end
+		return candidates
+	end
+
+	local SPELL_LOOKBACK = 0.12
+	local SWING_LOOKBACK = 1.2
+
+	local function CandidatePriority(event, frameTime)
+		if event.kind == "friendly" and event.action == "HEAL" then
+			return outgoingCombat:GetPendingHealCast(event.unit, frameTime) and 0 or 3
+		end
+		if event.kind == "hostile" and SafeUnitBoolean(UnitIsUnit, event.unit, "target") then
+			return 1
+		end
+		return 2
+	end
+
+	local function OrderCandidates(candidates, frameTime)
+		for index, event in ipairs(candidates) do
+			event.order = index
+			event.priority = CandidatePriority(event, frameTime)
+		end
+		table.sort(candidates, function(left, right)
+			if left.priority ~= right.priority then
+				return left.priority < right.priority
+			end
+			return left.order < right.order
+		end)
+	end
+
+	local function ResolveFrame(frame)
+		combatLogMessageSource:CheckExpectedCasts(GetTime())
+		for _ = 1, frame.playerHeals do
+			if not combatLogMessageSource:TakeMessage(frame.time, nil, "other") then
+				combatLogMessageSource:TakeMessage(frame.time)
+			end
+		end
+		for _, heal in ipairs(frame.playerHealEvents) do
+			local isSelf = false
+			if not combatLogMessageSource:TakeMessage(frame.time, nil, "other") then
+				isSelf = combatLogMessageSource:TakeMessage(frame.time, nil, "mine")
+			end
+			incomingCombat:HandleUnitCombat("player", "HEAL", heal.flag, heal.amount, heal.school, isSelf)
+		end
+		local candidates = SelectCandidates(frame)
+		OrderCandidates(candidates, frame.time)
+		for _, event in ipairs(candidates) do
+			event.mine = combatLogMessageSource:TakeMessage(frame.time, nil, "mine")
+		end
+		for _, event in ipairs(candidates) do
+			if not event.mine then
+				local school = NormalizeNumber(event.school)
+				local lookback = (school == nil or school == 1) and SWING_LOOKBACK or SPELL_LOOKBACK
+				event.mine = combatLogMessageSource:TakeMessage(frame.time, lookback, "mine")
+			end
+			if event.mine then
+				combatLogMessageSource:ConfirmOwnLine()
+				outgoingCombat:HandleUnitCombat(event.unit, event.action, event.flag,
+					event.amount, event.school, true, event.kind, frame.time)
+			else
+				if event.kind == "friendly" and event.action == "HEAL" then
+					local castTime = outgoingCombat:GetPendingHealCast(event.unit, frame.time)
+					if castTime then
+						combatLogMessageSource:NoteMissedCast(castTime)
+					end
+				end
+				if combatLogMessageSource:IsSuspect() then
+					outgoingCombat:HandleUnitCombat(event.unit, event.action, event.flag,
+						event.amount, event.school, false, event.kind, frame.time)
+				else
+				end
+			end
+		end
+	end
+
+	local function ResolvePending()
+		resolveScheduled = false
+		local now = GetTime()
+		for frameTime, frame in pairs(pendingFrames) do
+			if frameTime < now then
+				pendingFrames[frameTime] = nil
+				ResolveFrame(frame)
+			end
+		end
+		if next(pendingFrames) then
+			resolveScheduled = true
+			C_Timer.After(0, ResolvePending)
+		end
+	end
+
+	local function Schedule()
+		if not resolveScheduled then
+			resolveScheduled = true
+			C_Timer.After(0, ResolvePending)
+		end
+	end
+
+	NotePlayerCombatEvent = function(action)
+		if action == "HEAL" then
+			local frame = GetFrame(GetTime())
+			frame.playerHeals = frame.playerHeals + 1
+			Schedule()
+		end
+	end
+
+	QueuePlayerHeal = function(flagText, amount, schoolMask)
+		local frame = GetFrame(GetTime())
+		frame.playerHealEvents[#frame.playerHealEvents + 1] = {
+			flag = flagText, amount = amount, school = schoolMask,
+		}
+		Schedule()
+	end
+
+	QueueOwnershipCheck = function(unitTarget, action, flagText, amount, schoolMask)
+		local frame = GetFrame(GetTime())
+		frame.events[#frame.events + 1] = {
+			unit = unitTarget, action = action, flag = flagText,
+			amount = amount, school = schoolMask,
+		}
+		Schedule()
+	end
 end
 
 function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask)
+	-- UNIT_COMBAT carries no source or skill, so it can only ever be guessed
+	-- at. Stand aside only while a source with real attribution is delivering.
+	if IsParserOwningDamage() then
+		if unitTarget == "player" then
+			NotePlayerCombatEvent(action)
+		end
+		return
+	end
+
+	if unitTarget == "player" and action == "HEAL"
+		and combatLogMessageSource:IsLive() and not combatLogMessageSource:IsRawMode() then
+		QueuePlayerHeal(flagText, amount, schoolMask)
+		return
+	end
+	if unitTarget == "player" then
+		NotePlayerCombatEvent(action)
+	end
+
 	if incomingCombat:HandleUnitCombat(
 		unitTarget,
 		action,
@@ -1001,6 +1254,11 @@ function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask
 		amount,
 		schoolMask
 	) then
+		return
+	end
+
+	if combatLogMessageSource:IsLive() and not combatLogMessageSource:IsRawMode() then
+		QueueOwnershipCheck(unitTarget, action, flagText, amount, schoolMask)
 		return
 	end
 
@@ -1027,6 +1285,8 @@ local function Enable()
 	eventFrame:RegisterEvent("UNIT_COMBAT")
 	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 	combatTextSource:Start()
+	combatLogMessageSource:Start()
+	combatLogMessageSource.filterButton:Start()
 	UpdateFallbackSources()
 
 	MSBTParser.RegisterHandler(ParserEventsHandler)
@@ -1034,6 +1294,7 @@ end
 
 
 local function Disable()
+	ClearPendingOwnership()
 	StopHealthTracking()
 	spellTargetFrame:UnregisterAllEvents()
 	eventFrame:Hide()
@@ -1042,6 +1303,8 @@ local function Disable()
 	outgoingCombat:Reset()
 	outgoingCombat:Stop(true)
 	combatTextSource:Stop()
+	combatLogMessageSource:Stop()
+	combatLogMessageSource.filterButton:Stop()
 
 	MSBTParser.UnregisterHandler(ParserEventsHandler)
 end
@@ -1122,6 +1385,11 @@ module.damageTypeMap				= damageTypeMap
 module.damageColorProfileEntries	= damageColorProfileEntries
 
 module.Enable						= Enable
+module.ApplyCombatLogMessageOption	= function()
+	ClearPendingOwnership()
+	combatLogMessageSource:ApplyOption()
+	combatLogMessageSource.filterButton:Update()
+end
 module.Disable						= Disable
 
 MikSBT.DISPLAYTYPE_INCOMING			= "Incoming"
