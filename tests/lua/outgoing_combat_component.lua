@@ -1,6 +1,7 @@
 MikSBT = {
 	Components = {},
 }
+dofile("API/RestrictedValue.lua")
 
 local now = 10
 local queued
@@ -48,6 +49,15 @@ local component = OutgoingCombat:New({
 		return false
 	end,
 	hasPlayerDebuff = function()
+		return false
+	end,
+	isHelpfulSpell = function()
+		return false
+	end,
+	isPetEngaged = function()
+		return false
+	end,
+	isPlayerSolo = function()
 		return false
 	end,
 	isLikelySpellSchool = function(schoolMask)
