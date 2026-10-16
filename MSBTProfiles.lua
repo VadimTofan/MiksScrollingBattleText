@@ -1270,7 +1270,7 @@ if IsClassic then
 		disableIncomingInGroup			= false,
 		disableNotificationInGroup		= false,
 		disableStaticInGroup			= false,
-		enableBlizzardV2CombatText		= true,
+		enableBlizzardV2CombatText		= false,
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
@@ -2566,7 +2566,7 @@ else
 		disableIncomingInGroup			= false,
 		disableNotificationInGroup		= false,
 		disableStaticInGroup			= false,
-		enableBlizzardV2CombatText		= true,
+		enableBlizzardV2CombatText		= false,
 		enableBlizzardV2CombatTextInGroup = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
@@ -2703,10 +2703,6 @@ local function SetupBlizzardOptions()
 end
 
 local function DisableBlizzardCombatText()
-	if not IsClassic then
-		SetCVar("floatingCombatTextCombatHealing", 0)
-	end
-	SetCVar("floatingCombatTextCombatDamage", 0)
 	SetCVar("floatingCombatTextCombatHealing_v2", 0)
 	SetCVar("floatingCombatTextCombatDamage_v2", 0)
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 0)
@@ -2714,23 +2710,13 @@ local function DisableBlizzardCombatText()
 	SetCVar("floatingCombatTextPetSpellDamage_v2", 0)
 end
 
-local function SafeSetCVar(name, value)
-	-- Not every client build knows every one of these, and an unknown console
-	-- variable raises instead of returning false.
-	return pcall(SetCVar, name, value)
-end
-
 local function SetBlizzardCombatTextV2Enabled(isEnabled)
 	local value = isEnabled and 1 or 0
-	if not IsClassic then
-		SafeSetCVar("floatingCombatTextCombatHealing", value)
-	end
-	SafeSetCVar("floatingCombatTextCombatDamage", value)
-	SafeSetCVar("floatingCombatTextCombatHealing_v2", value)
-	SafeSetCVar("floatingCombatTextCombatDamage_v2", value)
-	SafeSetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
-	SafeSetCVar("floatingCombatTextPetMeleeDamage_v2", value)
-	SafeSetCVar("floatingCombatTextPetSpellDamage_v2", value)
+	SetCVar("floatingCombatTextCombatHealing_v2", value)
+	SetCVar("floatingCombatTextCombatDamage_v2", value)
+	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
+	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
+	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
 end
 
 local function IsInGroupContext()
@@ -2789,10 +2775,10 @@ local function ResetOfficialBlizzardCombatText()
 		savedVariables.userDisabled = true
 	end
 
-	SafeSetCVar("floatingCombatTextCombatDamage_v2", 1)
-	SafeSetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 1)
-	SafeSetCVar("floatingCombatTextPetMeleeDamage_v2", 1)
-	SafeSetCVar("floatingCombatTextPetSpellDamage_v2", 1)
+	SetCVar("floatingCombatTextCombatDamage_v2", 1)
+	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 1)
+	SetCVar("floatingCombatTextPetMeleeDamage_v2", 1)
+	SetCVar("floatingCombatTextPetSpellDamage_v2", 1)
 
 	module.ApplyContextOptions()
 end

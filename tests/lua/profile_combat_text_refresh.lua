@@ -2,7 +2,14 @@ local file = assert(io.open("MSBTProfiles.lua", "r"))
 local source = file:read("*a")
 file:close()
 
--- Describe: each profile action respects the client refresh boundary.
+-- Describe: profile actions use supported combat-text settings.
+local supportedSettings = {
+	floatingCombatTextCombatHealing_v2 = true,
+	floatingCombatTextCombatDamage_v2 = true,
+	floatingCombatTextCombatLogPeriodicSpells_v2 = true,
+	floatingCombatTextPetMeleeDamage_v2 = true,
+	floatingCombatTextPetSpellDamage_v2 = true,
+}
 local functionNames = {
 	"DisableBlizzardCombatText",
 	"SetBlizzardCombatTextV2Enabled",
@@ -12,15 +19,24 @@ local functionNames = {
 for _, functionName in ipairs(functionNames) do
 	local body = assert(source:match(
 		"local function " .. functionName .. "%b()%s*.-\nend"))
-	local action = assert(loadstring(body .. "\nreturn " .. functionName))()
+	local helper = source:match(
+		"local function SafeSetCVar%b()%s*.-\nend") or ""
+	local action = assert(loadstring(
+		helper .. "\n" .. body .. "\nreturn " .. functionName))()
 
 	for _, modern in ipairs({ true, false }) do
 		for _, available in ipairs({ true, false }) do
-			-- Given a client and an optional Blizzard refresh API.
+			-- Given supported V2 settings and an optional old refresh API.
 			local refreshCount = 0
+			local writes = {}
 			local environment = {
 				Client = { hasModernAPI = modern },
-				SetCVar = function() end,
+				IsClassic = not modern,
+				pcall = pcall,
+				SetCVar = function(name, value)
+					writes[#writes + 1] = { name = name, value = value }
+					assert(supportedSettings[name], "unsupported CVar: " .. name)
+				end,
 				module = { ApplyContextOptions = function() end },
 			}
 			if available then
@@ -33,11 +49,29 @@ for _, functionName in ipairs(functionNames) do
 			-- When a profile action changes Blizzard combat text.
 			action(true)
 
-			-- Then only legacy clients with the API refresh messages.
-			local expectedCount = not modern and available and 1 or 0
-			assert(refreshCount == expectedCount,
+			-- Then no old refresh API or unsupported setting is used.
+			assert(refreshCount == 0,
 				functionName .. ": unexpected refresh count on " ..
 				(modern and "modern" or "legacy") .. " client")
+			local expectedCount = functionName ==
+				"ResetOfficialBlizzardCombatText" and 4 or 5
+			assert(#writes == expectedCount, functionName .. ": wrong write count")
+			for _, write in ipairs(writes) do
+				assert(supportedSettings[write.name], write.name)
+				local expectedValue = functionName ==
+					"DisableBlizzardCombatText" and 0 or 1
+				assert(write.value == expectedValue, write.name .. ": wrong value")
+			end
+
+			-- Given a setting whose write fails.
+			environment.SetCVar = function() error("write failed") end
+
+			-- When the profile action runs again.
+			local success, message = pcall(action, true)
+
+			-- Then the error is visible to the caller.
+			assert(not success, functionName .. ": swallowed a write error")
+			assert(message:find("write failed", 1, true), message)
 		end
 	end
 end
