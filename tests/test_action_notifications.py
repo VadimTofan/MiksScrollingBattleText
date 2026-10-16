@@ -14,3 +14,13 @@ class ActionNotificationTests(unittest.TestCase):
 
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_interrupt_source_routes_confirmed_count_increases(self):
+        # Given
+        script = "interrupt_notifications.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)

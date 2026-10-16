@@ -109,7 +109,7 @@ local DAMAGE_METER_POLL_INTERVAL = 0.5
 local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
-local dispelMeterSource
+local dispelMeterSource, interruptMeterSource
 local outgoingCombat
 local SafeUnitBoolean, NoteParserDamage
 local parserNotifications
@@ -261,13 +261,16 @@ function eventFrame:PLAYER_REGEN_ENABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(false)
 	dispelMeterSource:Poll()
+	interruptMeterSource:Poll()
 	dispelMeterSource:Reset(false)
+	interruptMeterSource:Reset(false)
 	utilityNotifications:HandleCombatLeave()
 end
 function eventFrame:PLAYER_REGEN_DISABLED()
 	incomingCombat:Reset()
 	outgoingCombat:ResetCombatState(true)
 	dispelMeterSource:Reset(true)
+	interruptMeterSource:Reset(true)
 	utilityNotifications:HandleCombatEnter()
 end
 function eventFrame:CHAT_MSG_MONSTER_EMOTE(message, sourceName)
@@ -706,6 +709,7 @@ local function CreateActionMeterSource(meterType, eventType)
 end
 
 dispelMeterSource = CreateActionMeterSource("Dispels", "dispel")
+interruptMeterSource = CreateActionMeterSource("Interrupts", "interrupt")
 
 outgoingCombat = OutgoingCombat:New({
 	batcher = outgoingBatcher,
@@ -798,6 +802,7 @@ end
 local function UpdateFallbackSources()
 	outgoingCombat:Start()
 	dispelMeterSource:Start()
+	interruptMeterSource:Start()
 end
 local function Enable()
 	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
@@ -820,6 +825,7 @@ local function Disable()
 	outgoingCombat:Reset()
 	outgoingCombat:Stop(true)
 	dispelMeterSource:Stop(true)
+	interruptMeterSource:Stop(true)
 	combatTextSource:Stop()
 
 	MSBTParser.UnregisterHandler(ParserEventsHandler)

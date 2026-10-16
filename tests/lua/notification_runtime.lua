@@ -47,7 +47,7 @@ geterrorhandler = function()
 end
 FormatLargeNumber = tostring
 UNKNOWN = "Unknown"
-C_Timer = { After = function() end, NewTicker = function() end }
+C_Timer = C_Timer or { After = function() end, NewTicker = function() end }
 Enum = { PowerType = {
 	Mana = 0, Rage = 1, Focus = 2, Energy = 3, ComboPoints = 4,
 	Runes = 5, RunicPower = 6, SoulShards = 7, LunarPower = 8,
@@ -89,7 +89,7 @@ local profile = {
 }
 MikSBT = {
 	Services = {}, Components = {}, Media = {}, Profiles = { currentProfile = profile },
-	Compatibility = { Client = { isMainline = false, isClassicContent = true } },
+	Compatibility = { Client = { isMainline = false, isClassicContent = true, hasModernAPI = true } },
 	EraseTable = EraseTable, Print = function() end, ShortenNumber = tostring,
 	GetSpellInfo = function(id) return "Spell " .. tostring(id), nil, "icon" end,
 	GetSkillName = function(id) return "Spell " .. tostring(id) end,
