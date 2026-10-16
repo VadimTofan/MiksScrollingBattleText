@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Added display support for protected combat amounts without inspecting them in Lua.
+- Deferred incoming heal attribution until the display callback.
+- Added health-based incoming overheal estimates and a combat-text heal fallback.
 
 ## v12.030
 

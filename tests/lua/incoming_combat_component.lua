@@ -1,6 +1,7 @@
 MikSBT = {
 	Components = {},
 }
+dofile("API/RestrictedValue.lua")
 
 local profile = {
 	events = {
@@ -68,6 +69,18 @@ local component = IncomingCombat:New({
 	end,
 	isAutoAttackSpellID = function()
 		return false
+	end,
+	isHelpfulSpell = function()
+		return true
+	end,
+	playerHasAura = function()
+		return false
+	end,
+	unitHealth = function()
+		return 100
+	end,
+	unitHealthMax = function()
+		return 200
 	end,
 	unknown = "Unknown",
 	groupDelay = 0.12,
