@@ -103,3 +103,17 @@ component:HandleUnitCombat("target", "DODGE", nil, nil, nil)
 -- Then
 assert(displayCount == displaysBeforeUnattributedAction,
 	"unattributed outgoing action received an auto-attack fallback")
+
+-- Given a live meter which already owns outgoing damage.
+local critAmount
+component.config.isMeterOwning = function() return true end
+component.config.recordCrit = function(amount) critAmount = amount end
+component:HandleSpellcastSucceeded("player", 1234)
+queued = nil
+
+-- When UNIT_COMBAT reports a matching critical hit.
+component:HandleUnitCombat("target", "WOUND", "CRITICAL", 80, 4)
+
+-- Then it supplies a crit hint without displaying the hit twice.
+assert(critAmount == 80, "meter crit hint was not recorded")
+assert(queued == nil, "meter-owned damage was queued twice")

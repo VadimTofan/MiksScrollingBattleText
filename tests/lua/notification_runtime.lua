@@ -36,6 +36,7 @@ UnitName = function() return "Tester" end
 UnitGUID = function() return playerGUID end
 UnitClass = function() return "Warrior", "WARRIOR" end
 GetTime = function() return 10 end
+GetBuildInfo = function() return nil, nil, nil, 120100 end
 GetLocale = function() return "enUS" end
 InCombatLockdown = function() return false end
 IsInRaid = function() return false end
