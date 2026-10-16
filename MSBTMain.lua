@@ -1,4 +1,4 @@
-﻿
+
 local module = {}
 local moduleName = "Main"
 MikSBT[moduleName] = module
@@ -11,10 +11,12 @@ local MSBTProfiles = MikSBT.Profiles
 local L = MikSBT.translations
 local Formatter = MikSBT.Services.Formatter
 local EventRouter = MikSBT.Services.EventRouter
+local CombatRoutes = MikSBT.Services.CombatRoutes
 local IncomingCombat = MikSBT.Components.IncomingCombat
 local OutgoingBatcher = MikSBT.Components.OutgoingBatcher
 local DamageMeterSource = MikSBT.Components.DamageMeterSource
 local OutgoingCombat = MikSBT.Components.OutgoingCombat
+local CombatTextSource = MikSBT.Components.CombatTextSource
 local ParserNotifications = MikSBT.Components.ParserNotifications
 local UtilityNotifications = MikSBT.Components.UtilityNotifications
 local Client = MikSBT.Compatibility.Client
@@ -189,6 +191,13 @@ local function CreateDamageMaps()
 	damageColorProfileEntries[DAMAGETYPE_CHAOS] = "chaos"
 end
 
+local function IsPlainValue(value)
+	if issecretvalue and issecretvalue(value) then
+		return false
+	end
+	return value ~= nil
+end
+
 local function ParserEventsHandler(parserEvent)
 	local currentProfile = MSBTProfiles.currentProfile
 	local eventTypeString, effectName, affectedUnitName, affectedUnitClass =
@@ -196,23 +205,43 @@ local function ParserEventsHandler(parserEvent)
 	if not eventTypeString then
 		return
 	end
-	if effectName and currentProfile.abilitySuppressions[effectName] then
+	if IsPlainValue(effectName) and currentProfile.abilitySuppressions[effectName] then
 		return
 	end
-	local eventSettings = currentProfile.events[eventTypeString]
+	local eventSettings
+	if parserEvent.isCrit then
+		eventSettings = currentProfile.events[eventTypeString .. "_CRIT"]
+		if eventSettings and eventSettings.disabled then
+			eventSettings = nil
+		end
+	end
+	eventSettings = eventSettings or currentProfile.events[eventTypeString]
 	if not eventSettings or eventSettings.disabled
 		or not IsScrollAreaActive(eventSettings.scrollArea) then
 		return
 	end
 	local effectTexture
-	if not currentProfile.skillIconsDisabled
-		and IsScrollAreaIconShown(eventSettings.scrollArea) and effectName then
-		_, _, effectTexture = GetSpellInfo(effectName)
+	if not currentProfile.skillIconsDisabled and IsScrollAreaIconShown(eventSettings.scrollArea) then
+		effectTexture = parserEvent.effectTexture
+		local iconID = parserEvent.extraSkillID or parserEvent.skillID
+		if not effectTexture and IsPlainValue(iconID) and iconID ~= AUTOSHOT_SPELL_ID then
+			_, _, effectTexture = GetSpellInfo(iconID)
+		end
+		if not effectTexture and IsPlainValue(effectName) then
+			_, _, effectTexture = GetSpellInfo(effectName)
+		end
 	end
+	if parserEvent.skillID == AUTOSHOT_SPELL_ID then
+		effectName = nil
+	end
+	local damageType = IsPlainValue(parserEvent.damageType) and parserEvent.damageType or nil
 	local outputMessage = Formatter:FormatLegacyEvent(
-		eventSettings.message, parserEvent.amount, nil, nil, nil, nil,
+		eventSettings.message, parserEvent.amount, damageType,
+		parserEvent.overhealAmount, nil, parserEvent.powerType,
 		affectedUnitName, affectedUnitClass, effectName,
-		nil, nil, nil, nil, false, true
+		nil, nil, nil,
+		effectTexture and not currentProfile.exclusiveSkillsDisabled or currentProfile.hideSkills,
+		currentProfile.hideNames, true
 	)
 	DisplayEvent(eventSettings, outputMessage, effectTexture)
 end
@@ -569,6 +598,15 @@ incomingCombat = IncomingCombat:New({
 	getLastPlayerSpell = function()
 		return outgoingCombat:GetLastSpell()
 	end,
+	emit = function(parserEvent)
+		ParserEventsHandler(parserEvent)
+	end,
+})
+
+local combatTextSource = CombatTextSource:New({
+	emit = function(parserEvent)
+		ParserEventsHandler(parserEvent)
+	end,
 })
 
 function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
@@ -603,6 +641,7 @@ local function Enable()
 	eventFrame:RegisterEvent("UNIT_COMBAT")
 	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 	outgoingCombat:Start()
+	combatTextSource:Start()
 
 	MSBTParser.RegisterHandler(ParserEventsHandler)
 end
@@ -613,6 +652,7 @@ local function Disable()
 	incomingCombat:Reset()
 	outgoingCombat:Reset()
 	outgoingCombat:Stop()
+	combatTextSource:Stop()
 
 	MSBTParser.UnregisterHandler(ParserEventsHandler)
 end
@@ -650,6 +690,9 @@ utilityNotifications = UtilityNotifications:New({
 	emoteHoldTime = EMOTE_HOLD_TIME,
 })
 
+CombatRoutes:Register(eventRouter, {
+	autoAttackSpellID = AUTOSHOT_SPELL_ID,
+})
 eventRouter:Register("honor", function(...)
 	return parserNotifications:HandleHonor(...)
 end)

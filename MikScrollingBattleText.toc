@@ -27,10 +27,12 @@ API\Cooldowns.lua
 Compatibility\LegacyAPI.lua
 Services\Formatter.lua
 Services\EventRouter.lua
+Services\CombatRoutes.lua
 Components\IncomingCombat.lua
 Components\OutgoingBatcher.lua
 Components\DamageMeterSource.lua
 Components\OutgoingCombat.lua
+Components\CombatTextSource.lua
 Components\ParserNotifications.lua
 Components\UtilityNotifications.lua
 Components\ItemCooldownTracker.lua

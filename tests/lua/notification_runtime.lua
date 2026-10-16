@@ -102,7 +102,7 @@ MikSBT = {
 		end,
 	},
 }
-local services = { "Formatter", "Batcher", "Throttler", "EventRouter", "EventPipeline" }
+local services = { "Formatter", "Batcher", "Throttler", "EventRouter", "EventPipeline", "CombatRoutes" }
 for _, name in ipairs(services) do
 	local file = io.open("Services/" .. name .. ".lua")
 	if file then file:close(); dofile("Services/" .. name .. ".lua") end
@@ -124,6 +124,7 @@ local function LoadAddonFile(path)
 	return assert(loadstring(source, "@" .. path))()
 end
 LoadAddonFile("MSBTParser.lua")
+dofile("Components/CombatTextSource.lua")
 LoadAddonFile("MSBTMain.lua")
 local parserFrame = frames[1]
 local parser = MikSBT.Parser
