@@ -118,8 +118,54 @@ local DOT_FALLBACK_SPELLS = {
 	[106830] = {106830, 405233},
 	[77758] = {77758, 405233},
 }
+local REPEAT_SHOT_SPELLS = {
+	[75] = true, -- Auto Shot
+	[2764] = true, -- Throw
+	[3018] = true, -- Shoot (bow/gun/crossbow)
+	[5019] = true, -- Shoot (wand)
+}
+-- Classic periodic spells, matched by name so every rank is covered. Physical
+-- ones are left out: they would swallow melee swings.
+local NAMED_DOT_SPELLS = {
+	[589] = { duration = 18, school = 32, interval = 3 }, -- Shadow Word: Pain
+	[2944] = { duration = 24, school = 32, interval = 3 }, -- Devouring Plague
+	[172] = { duration = 18, school = 32, interval = 3 }, -- Corruption
+	[980] = { duration = 24, school = 32, interval = 2 }, -- Curse of Agony
+	[18265] = { duration = 30, school = 32, interval = 3 }, -- Siphon Life
+	[348] = { duration = 15, school = 4, interval = 3 }, -- Immolate
+	[8921] = { duration = 12, school = 64, interval = 3 }, -- Moonfire
+	[5570] = { duration = 12, school = 8, interval = 2 }, -- Insect Swarm
+	[1978] = { duration = 15, school = 8, interval = 3 }, -- Serpent Sting
+	[8050] = { duration = 12, school = 4, interval = 3 }, -- Flame Shock
+}
 local CLIENT_TOC_VERSION = tonumber((select(4, GetBuildInfo()))) or 0
 local IS_FOREVER_CLIENT = CLIENT_TOC_VERSION >= 16000 and CLIENT_TOC_VERSION < 20000
+local namedDotsByName
+
+local function BuildSpellNameMap(spellTable)
+	local byName, complete = {}, true
+	for spellID, info in pairs(spellTable) do
+		local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+		if type(name) == "string" and name ~= "" then
+			byName[name] = info
+		else
+			complete = false
+		end
+	end
+	return byName, complete
+end
+
+local function GetNamedDots()
+	if namedDotsByName then
+		return namedDotsByName
+	end
+	local byName, complete = BuildSpellNameMap(NAMED_DOT_SPELLS)
+	if complete then
+		namedDotsByName = byName
+	end
+	return byName
+end
+
 local DOT_FALLBACK_TIMED_SPELLS = {
 	[202770] = 8,
 }
@@ -480,7 +526,7 @@ local function BuildActionMessage(eventSettings, amount)
 	if not eventSettings or not eventSettings.message then
 		return nil
 	end
-	local message = eventSettings.message
+	local message = string_gsub(eventSettings.message, "%s?%-?%s?%%sl?%s?%-?%s?", "")
 	if amount and amount > 0 then
 		message = Formatter:FormatLegacyEvent(message, amount)
 		message = string_gsub(message, "<%%sl>%s*", "")
@@ -657,8 +703,72 @@ local damageMeterSource = DamageMeterSource:New({
 	freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
 })
 
+
+local ClassifyCombatUnit, GetOverheal, GetDefaultHealTarget, GetAoeHeals
+do
+	local sawNameplateCombat = false
+	local function HasNameplate(unitID)
+		if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then
+			return false
+		end
+		local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unitID)
+		return ok and plate ~= nil
+	end
+
+	ClassifyCombatUnit = function(unitID)
+		if type(unitID) ~= "string" then
+			return nil
+		end
+		if string_find(unitID, "^nameplate%d+$") then
+			if SafeUnitBoolean(UnitCanAttack, "player", unitID) then
+				sawNameplateCombat = true
+				return "hostile"
+			end
+			return nil
+		end
+		if unitID == "target" then
+			if SafeUnitBoolean(UnitIsUnit, "target", "player") then
+				return nil
+			end
+			if SafeUnitBoolean(UnitCanAttack, "player", "target") then
+				if sawNameplateCombat and HasNameplate("target") then
+					return nil
+				end
+				return "hostile"
+			end
+			if SafeUnitBoolean(UnitCanAssist, "player", "target") then
+				if (IsInGroup() or IsInRaid())
+					and (SafeUnitBoolean(UnitInParty, "target") or SafeUnitBoolean(UnitInRaid, "target")) then
+					return nil
+				end
+				return "friendly"
+			end
+			return nil
+		end
+		if string_find(unitID, "^raid%d+$") then
+			return "friendly"
+		end
+		if string_find(unitID, "^party%d$") and not IsInRaid() then
+			return "friendly"
+		end
+		return nil
+	end
+end
+
 outgoingCombat = OutgoingCombat:New({
 	batcher = outgoingBatcher,
+	emit = function(parserEvent)
+		ParserEventsHandler(parserEvent)
+	end,
+	classifyUnit = ClassifyCombatUnit,
+	isHostileUnit = function(unitID)
+		return SafeUnitBoolean(UnitCanAttack, "player", unitID)
+	end,
+	unitName = function(unitID)
+		local name = UnitName(unitID)
+		return name
+	end,
+	ownedSpellWindow = 5,
 	damageMeter = damageMeterSource,
 	getProfile = function()
 		return MSBTProfiles.currentProfile
@@ -669,6 +779,9 @@ outgoingCombat = OutgoingCombat:New({
 	getTime = GetTime,
 	inCombat = InCombatLockdown,
 	isTargetValid = IsOutgoingTargetContextValid,
+	isInGroup = function()
+		return IsInGroup() or IsInRaid()
+	end,
 	isMeterOwning = IsMeterOwningDamage,
 	recordCrit = RecordCritAmount,
 	getSpellTexture = function(spellID)
@@ -685,6 +798,18 @@ outgoingCombat = OutgoingCombat:New({
 	signalWindow = OUTGOING_SIGNAL_CONFIDENCE_WINDOW,
 	dotDuration = DOT_FALLBACK_DURATION,
 	dotSpells = DOT_FALLBACK_SPELLS,
+	repeatShotSpells = REPEAT_SHOT_SPELLS,
+	shotHitWindow = 1.5,
+	namedDots = GetNamedDots,
+	isChanneling = function()
+		return select("#", UnitChannelInfo("player")) > 0
+	end,
+	getSpellName = function(spellID)
+		local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+		if type(name) == "string" and not IsSecretValue(name) then
+			return name
+		end
+	end,
 	timedDotSpells = DOT_FALLBACK_TIMED_SPELLS,
 })
 incomingCombat = IncomingCombat:New({
@@ -721,8 +846,13 @@ local combatTextSource = CombatTextSource:New({
 	end,
 })
 
+local spellTargetFrame = CreateFrame("Frame")
+spellTargetFrame:SetScript("OnEvent", function(_, _, unitID, targetName, castGUID)
+	outgoingCombat:HandleSpellcastSent(unitID, targetName, castGUID)
+end)
+
 function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
-	outgoingCombat:HandleSpellcastSucceeded(unitID, spellID)
+	outgoingCombat:HandleSpellcastSucceeded(unitID, spellID, lineID)
 end
 
 function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask)
@@ -748,7 +878,9 @@ end
 local function UpdateFallbackSources()
 	outgoingCombat:Start()
 end
+
 local function Enable()
+	spellTargetFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", "player", "pet")
 	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -763,6 +895,7 @@ end
 
 
 local function Disable()
+	spellTargetFrame:UnregisterAllEvents()
 	eventFrame:Hide()
 	eventFrame:UnregisterAllEvents()
 	incomingCombat:Reset()
