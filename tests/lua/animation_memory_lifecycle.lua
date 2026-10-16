@@ -74,3 +74,45 @@ assert(next(weakAreas) ~= nil, "active animation lost its scroll area")
 animationFrame:OnUpdate(4)
 collectgarbage("collect")
 assert(next(weakAreas) == nil, "last completed animation retained its area")
+
+-- Given an animation style whose initialization fails.
+local reportedErrors = {}
+geterrorhandler = function()
+	return function(message)
+		reportedErrors[#reportedErrors + 1] = message
+	end
+end
+MikSBT.Animations.RegisterAnimationStyle(
+	"BrokenInit", function() error("initialization failed") end
+)
+local brokenArea = { animationStyle = "BrokenInit" }
+
+-- When displaying an event through that style.
+local succeeded = pcall(displayConfig.display, "broken", brokenArea,
+	false, 1, 1, 1, 18, "font", 1, 100)
+
+-- Then the failure is reported and does not escape display processing.
+assert(succeeded, "animation initialization error escaped")
+assert(#reportedErrors == 1, "initialization failure was not reported")
+
+-- Given an animation whose update handler fails.
+MikSBT.Animations.RegisterAnimationStyle(
+	"BrokenUpdate", function(event)
+		event.animationHandler = function() error("update failed") end
+	end
+)
+local updateArea = { animationStyle = "BrokenUpdate" }
+weakAreas[updateArea] = true
+displayConfig.display("broken", updateArea, false,
+	1, 1, 1, 18, "font", 1, 100)
+updateArea = nil
+
+-- When the animation frame updates.
+succeeded = pcall(animationFrame.OnUpdate, animationFrame, 0.1)
+animationFrame:OnUpdate(0.1)
+collectgarbage("collect")
+
+-- Then the failed event is released and the frame can become idle.
+assert(succeeded, "animation update error escaped")
+assert(#reportedErrors == 2, "update failure was not reported")
+assert(next(weakAreas) == nil, "failed animation retained its area")
