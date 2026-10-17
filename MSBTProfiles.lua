@@ -2533,20 +2533,34 @@ local function SetupBlizzardOptions()
 end
 
 local function DisableBlizzardCombatText()
+	SetCVar("enableFloatingCombatText", 0)
+	if not IsClassic then
+		SetCVar("floatingCombatTextCombatHealing", 0)
+	end
+	SetCVar("floatingCombatTextCombatDamage", 0)
 	SetCVar("floatingCombatTextCombatHealing_v2", 0)
 	SetCVar("floatingCombatTextCombatDamage_v2", 0)
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 0)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", 0)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", 0)
+	SHOW_COMBAT_TEXT = "0"
+	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
 end
 
 local function SetBlizzardCombatTextV2Enabled(isEnabled)
 	local value = isEnabled and 1 or 0
+	SetCVar("enableFloatingCombatText", value)
+	if not IsClassic then
+		SetCVar("floatingCombatTextCombatHealing", value)
+	end
+	SetCVar("floatingCombatTextCombatDamage", value)
 	SetCVar("floatingCombatTextCombatHealing_v2", value)
 	SetCVar("floatingCombatTextCombatDamage_v2", value)
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
+	SHOW_COMBAT_TEXT = isEnabled and "1" or "0"
+	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
 end
 
 local function IsInGroupContext()
@@ -2609,6 +2623,10 @@ local function ResetOfficialBlizzardCombatText()
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 1)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", 1)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", 1)
+
+	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then
+		CombatText_UpdateDisplayedMessages()
+	end
 
 	module.ApplyContextOptions()
 end
