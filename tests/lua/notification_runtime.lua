@@ -221,7 +221,7 @@ assert(#displayed == displaysBeforePower,
 	"obsolete saved settings enabled resource notifications")
 assert(#errors == 0, errors[1])
 
--- Describe: incoming damage batches use a 60 ms grouping window.
+-- Describe: incoming damage batches use a 120 ms grouping window.
 -- Given enabled normal and critical damage notifications.
 profile.events.INCOMING_DAMAGE = {
 	message = "Damage %a", scrollArea = "Incoming",
@@ -236,13 +236,13 @@ local displaysBeforeDamage = #displayed
 mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "player", "WOUND", nil, 50)
 mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "player", "WOUND", "CRITICAL", 100)
 
--- Then separate batches wait 60 ms before displaying their amounts.
+-- Then separate batches wait 120 ms before displaying their amounts.
 assert(#displayed == displaysBeforeDamage, "incoming damage bypassed grouping")
 assert(#scheduledTimers == timersBeforeDamage + 2,
 	"normal and critical damage did not get separate timers")
 for index = timersBeforeDamage + 1, #scheduledTimers do
 	local timer = scheduledTimers[index]
-	assert(timer.delay == 0.06, "incoming damage did not use a 60 ms timer")
+	assert(timer.delay == 0.12, "incoming damage did not use a 120 ms timer")
 	timer.callback()
 end
 assert(displayed[displaysBeforeDamage + 1][2] == "Damage 50",
