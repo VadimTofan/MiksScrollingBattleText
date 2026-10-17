@@ -288,6 +288,10 @@ function OutgoingCombat:HandleUnitCombat(
 
 	local spellID, texture, isDot = self:ResolveAttribution(now, isDamage, schoolMask)
 	if isDot then
+		if self.config.damageMeter and self.config.damageMeter:IsActive()
+			and self.config.damageMeter:IsDeltaFresh(now) then
+			return true
+		end
 		if RestrictedValue:IsRestricted(amount) then
 			self.config.batcher:DisplayRestricted(spellID, amount, isCrit, texture, true, nil, true)
 		elseif normalizedAmount and normalizedAmount > 0 then
