@@ -37,12 +37,6 @@ local batcher = OutgoingBatcher:New({
 	end,
 	autoAttackSpellID = 6603,
 	delay = 0.2,
-	shouldSplitCritBatch = function()
-		return false
-	end,
-	resolveBatchDisplaySettings = function(settings)
-		return settings
-	end,
 })
 
 -- Given
@@ -57,6 +51,9 @@ assert(displayed, "outgoing batch was not displayed")
 assert(#outputs == 2, "normal and critical hits were merged")
 assert(outputs[1][2] == "100" and outputs[2][2] == "50",
 	"normal and critical amounts changed")
+assert(outputs[1][1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
+	and outputs[2][1] == profile.events.OUTGOING_SPELL_DAMAGE,
+	"separate damage batches did not use their own event settings")
 assert(displayed[3] == "texture", "outgoing spell texture changed")
 
 -- Given a pending batch
@@ -94,3 +91,25 @@ callbacks[#callbacks]()
 
 -- Then the count describes that critical batch only.
 assert(displayed[2] == "70 [2 Hits]", "critical hit count changed")
+
+-- Given critical damage is assigned to another scroll area.
+profile.events.OUTGOING_SPELL_DAMAGE_CRIT.scrollArea = "Critical"
+batcher:Queue(1234, 80, true)
+
+-- When that independent critical batch expires.
+callbacks[#callbacks]()
+
+-- Then the full amount uses the critical event settings.
+assert(displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
+	and displayed[2] == "80", "critical scroll-area routing changed")
+
+-- Given critical event settings are disabled.
+profile.events.OUTGOING_SPELL_DAMAGE_CRIT.disabled = true
+batcher:Queue(1234, 90, true)
+
+-- When the critical batch expires.
+callbacks[#callbacks]()
+
+-- Then damage falls back to enabled normal event settings.
+assert(displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE
+	and displayed[2] == "90", "disabled critical event fallback changed")

@@ -56,13 +56,13 @@ local function BuildHitSummary(hitCount)
 	return nil
 end
 
-local function BuildDamageLine(self, settings, batch, amount, hits, crits)
-	local message = self.config.buildActionMessage(settings, amount)
+local function BuildDamageLine(self, settings, batch)
+	local message = self.config.buildActionMessage(settings, batch.totalAmount)
 	if not message or message == "" then
 		return nil
 	end
 
-	local summary = BuildHitSummary(hits, crits)
+	local summary = BuildHitSummary(batch.hitCount)
 	if summary then
 		message = message .. summary
 	end
@@ -142,48 +142,13 @@ local function DisplayDamageBatch(self, batchKey)
 		return
 	end
 	local critSettings = profile.events.INCOMING_DAMAGE_CRIT
-	local critCount = batch.critCount or 0
-	local critAmount = math.min(batch.critAmount or 0, batch.totalAmount)
-
+	local critCount = batch.isCrit and batch.hitCount or 0
+	local messageSettings = settings
 	if self.config.shouldSplitCritBatch(settings, critSettings, critCount) then
-		local normalCount = batch.hitCount - critCount
-		local normalAmount = batch.totalAmount - critAmount
-		if normalCount > 0 and normalAmount > 0 then
-			local message = BuildDamageLine(
-				self,
-				settings,
-				batch,
-				normalAmount,
-				normalCount,
-				0
-			)
-			if message then
-				self.config.display(settings, message)
-			end
-		end
-
-		local message = BuildDamageLine(
-			self,
-			critSettings,
-			batch,
-			critAmount,
-			critCount,
-			critCount
-		)
-		if message then
-			self.config.display(critSettings, message)
-		end
-		return
+		messageSettings = critSettings
 	end
 
-	local message = BuildDamageLine(
-		self,
-		settings,
-		batch,
-		batch.totalAmount,
-		batch.hitCount,
-		critCount
-	)
+	local message = BuildDamageLine(self, messageSettings, batch)
 	if message then
 		local displaySettings = self.config.resolveBatchDisplaySettings(
 			settings,
@@ -201,8 +166,7 @@ function IncomingCombat:QueueDamage(amount, isCrit, damageSource)
 	if not batch then
 		batch = {
 			hitCount = 0,
-			critCount = 0,
-			critAmount = 0,
+			isCrit = not not isCrit,
 			totalAmount = 0,
 			damageSource = damageSource,
 		}
@@ -216,10 +180,6 @@ function IncomingCombat:QueueDamage(amount, isCrit, damageSource)
 
 	batch.hitCount = batch.hitCount + 1
 	batch.totalAmount = batch.totalAmount + amount
-	if isCrit then
-		batch.critCount = batch.critCount + 1
-		batch.critAmount = batch.critAmount + amount
-	end
 	if damageSource and damageSource ~= "" then
 		if batch.damageSource and batch.damageSource ~= damageSource then
 			batch.damageSource = "mixed"

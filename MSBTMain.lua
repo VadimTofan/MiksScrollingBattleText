@@ -485,8 +485,6 @@ local outgoingBatcher = OutgoingBatcher:New({
 	isAutoAttack = IsAutoAttackSpellID,
 	autoAttackSpellID = AUTOSHOT_SPELL_ID,
 	delay = OUTGOING_GROUP_DELAY,
-	shouldSplitCritBatch = ShouldSplitCritBatch,
-	resolveBatchDisplaySettings = ResolveBatchDisplaySettings,
 })
 
 local damageMeterSource = DamageMeterSource:New({
