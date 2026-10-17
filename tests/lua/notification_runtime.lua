@@ -1,6 +1,10 @@
 -- Describe: real parser and main modules preserve chat notifications.
 local frames, displayed, received, errors = {}, {}, {}, {}
 local playerGUID
+local notificationPower = 100
+local secretPower = 99999
+canaccessvalue = function(value) return value ~= secretPower end
+UnitPower = function() return notificationPower end
 local function EraseTable(value)
 	for key in pairs(value) do value[key] = nil end
 end
@@ -92,7 +96,10 @@ MikSBT = {
 	EraseTable = EraseTable, Print = function() end, ShortenNumber = tostring,
 	GetSpellInfo = function(id) return "Spell " .. tostring(id), nil, "icon" end,
 	GetSkillName = function(id) return "Spell " .. tostring(id) end,
-	Triggers = { powerTypes = { ALTERNATE_POWER = 10 }, triggerSuppressions = {} },
+	Triggers = {
+		powerTypes = { MANA = 0, ALTERNATE_POWER = 10 },
+		triggerSuppressions = {},
+	},
 	translations = { MSG_HITS = "hits", MSG_CRIT = "crit", MSG_CRITS = "crits" },
 	Animations = {
 		IsScrollAreaActive = function(area) return area ~= "Hidden" end,
@@ -102,6 +109,7 @@ MikSBT = {
 		end,
 	},
 }
+dofile("API/RestrictedValue.lua")
 local services = { "Formatter", "Batcher", "Throttler", "EventRouter", "EventPipeline" }
 for _, name in ipairs(services) do
 	local file = io.open("Services/" .. name .. ".lua")
@@ -186,6 +194,31 @@ parserFrame.scripts.OnEvent(parserFrame, cases[1][1], {})
 
 -- Then no extra display or Lua error is produced.
 assert(#displayed == 5, "disabled or hidden notifications were displayed")
+assert(#errors == 0, errors[1])
+
+-- Describe: the real power event route guards inaccessible mana readings.
+-- Given an enabled power notification and a readable baseline.
+profile.showAllPowerGains = true
+profile.events.NOTIFICATION_POWER_GAIN = {
+	message = "+%a Power", scrollArea = "Static",
+}
+local mainFrame = frames[2]
+local displaysBeforePower = #displayed
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+
+-- When power becomes secret, becomes readable, and increases again.
+notificationPower = secretPower
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+notificationPower = 150
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+notificationPower = 175
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+
+-- Then only the gain between consecutive readable samples is displayed.
+assert(#displayed == displaysBeforePower + 1,
+	"power event route displayed an inaccessible or stale gain")
+assert(displayed[#displayed][2] == "+25 Power",
+	"power event route lost the readable gain")
 assert(#errors == 0, errors[1])
 
 -- Given disabled modules.

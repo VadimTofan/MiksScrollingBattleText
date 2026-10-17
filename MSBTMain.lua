@@ -639,6 +639,9 @@ utilityNotifications = UtilityNotifications:New({
 	powerTypes = powerTypes,
 	unitPower = UnitPower,
 	unitPowerMax = UnitPowerMax,
+	normalizeNumber = function(value)
+		return MikSBT.API.RestrictedValue:Number(value)
+	end,
 	getPlayerClass = function()
 		return playerClass
 	end,
