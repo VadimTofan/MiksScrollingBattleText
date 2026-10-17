@@ -30,6 +30,7 @@ MikSBT = {
 		Service = {Configure = function(_, config) displayConfig = config end},
 	},
 }
+dofile("API/RestrictedValue.lua")
 local file = assert(io.open("Display/AnimationEngine.lua", "rb"))
 local source = file:read("*a"):gsub("^\239\187\191", "")
 file:close()

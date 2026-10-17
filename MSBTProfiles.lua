@@ -2512,23 +2512,70 @@ end
 
 local function SetupBlizzardOptions()
 
+	local optionsMain = MSBTOptions and MSBTOptions.Main
+	if not optionsMain then
+		Print("MSBT options are unavailable. Ensure embedded options files "
+			.. "are enabled in MikScrollingBattleText.toc.")
+		return
+	end
+
 	local frame = CreateFrame("Frame")
+	frame:Hide()
 	frame.name = "MikScrollingBattleText"
 
-	local button = CreateFrame("Button", nil, frame, IsCataClassic and "OptionsButtonTemplate" or "UIPanelButtonTemplate")
-	button:SetSize(100, 24)
-	button:SetPoint("CENTER")
-	button:SetText(MikSBT.COMMAND)
-	button:SetScript("OnClick", function(this)
-		ShowOptions()
-	end)
+	local useSettings = Settings and Settings.RegisterCanvasLayoutCategory
+	local category
+	local function Register(panel, isSubcategory)
+		if useSettings then
+			local registered
+			if isSubcategory then
+				registered = Settings.RegisterCanvasLayoutSubcategory(category, panel, panel.name)
+			else
+				registered = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+				registered.ID = panel.name
+				Settings.RegisterAddOnCategory(registered)
+				category = registered
+			end
+			return function()
+				Settings.OpenToCategory(registered:GetID())
+			end
+		end
+		if isSubcategory then
+			panel.parent = frame.name
+		end
+		InterfaceOptions_AddCategory(panel)
+		return function()
+			InterfaceOptionsFrame_OpenToCategory(panel)
+		end
+	end
 
-	if Settings and Settings.RegisterCanvasLayoutCategory then
-		local category = Settings.RegisterCanvasLayoutCategory(frame, frame.name)
-		category.ID = frame.name
-		Settings.RegisterAddOnCategory(category)
-	else
-		InterfaceOptions_AddCategory(frame)
+	local function DockOnShow(panel, reopen, tabIndex)
+		panel:SetScript("OnShow", function(this)
+			optionsMain.DockMainFrame(this, reopen, tabIndex)
+		end)
+		panel:SetScript("OnHide", function(this)
+			optionsMain.UndockMainFrame(this)
+		end)
+	end
+
+	local reopen = Register(frame)
+
+	local tabs = optionsMain.GetTabs()
+	local generalIndex
+	for _, tab in ipairs(tabs) do
+		if tab.isGeneral then
+			generalIndex = tab.index
+		end
+	end
+	DockOnShow(frame, reopen, generalIndex)
+
+	for _, tab in ipairs(tabs) do
+		if tab.index ~= generalIndex then
+			local panel = CreateFrame("Frame")
+			panel:Hide()
+			panel.name = tab.text
+			DockOnShow(panel, Register(panel, true), tab.index)
+		end
 	end
 end
 

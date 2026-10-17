@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Added display support for protected combat amounts without inspecting them in Lua.
+- Deferred incoming heal attribution until the display callback.
+- Added health-based incoming overheal estimates and a combat-text heal fallback.
+- Added pet spell/melee attribution and unnamed solo DoT tick output.
+- Guarded restricted damage-meter spell data before calculating deltas.
+- Embedded the options in Blizzard Settings with a subcategory per tab.
+
 ## v12.030
 
 - Added profile import and export with validation, a Copy button, and dialogs

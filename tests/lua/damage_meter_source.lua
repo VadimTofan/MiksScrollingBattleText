@@ -1,6 +1,7 @@
 MikSBT = {
 	Components = {},
 }
+dofile("API/RestrictedValue.lua")
 
 local now = 10
 local total = 100
@@ -41,7 +42,6 @@ local source = DamageMeterSource:New({
 			},
 		}
 	end,
-	normalizeNumber = tonumber,
 	queue = function(spellID, amount, isCrit)
 		queued[#queued + 1] = { spellID, amount, isCrit }
 	end,
