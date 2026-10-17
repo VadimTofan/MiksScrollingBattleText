@@ -84,7 +84,7 @@ now = 30
 health = 100
 lastSpellID = nil
 incoming:HandleUnitCombat("player", "HEAL", nil, 0, nil)
-incoming:HandleCombatText("PERIODIC_HEAL", 2)
+incoming:HandleCombatText("PERIODIC_HEAL", "Player", 2)
 
 -- When the frame ends
 runCallbacks()
@@ -98,10 +98,79 @@ displayed = {}
 now = 40
 health = 50
 incoming:HandleUnitCombat("player", "HEAL", nil, 20, nil)
-incoming:HandleCombatText("HEAL", 20)
+incoming:HandleCombatText("HEAL", "Player", 20)
 
 -- When the frame ends and the heal batch is displayed
 runCallbacks()
 
 -- Then the combat text copy is skipped
 assert(#displayed == 1, "heal was displayed twice")
+
+local failures = {}
+
+-- Describe: combat-text fallback regression cases.
+local function check(name, test)
+	local ok, failure = pcall(test)
+	if not ok then
+		failures[#failures + 1] = name .. ": " .. tostring(failure)
+	end
+end
+
+check("restricted healer names preserve the amount", function()
+	-- Given a restricted healer name and a separate restricted heal amount.
+	local secretHealer, secretAmount = {}, {}
+	issecretvalue = function(value)
+		return value == secretHealer or value == secretAmount
+	end
+	local receivedAmount
+	incoming.config.displayRestricted = function(_, amount)
+		receivedAmount = amount
+	end
+	now = 50
+
+	-- When the combat-text fallback is displayed.
+	incoming:HandleCombatText("HEAL", secretHealer, secretAmount)
+	runCallbacks()
+	issecretvalue = nil
+
+	-- Then the display receives the amount, never the healer name.
+	assert(receivedAmount == secretAmount,
+		"restricted healer name was used as the heal amount")
+end)
+
+check("full overheals respect the profile filter", function()
+	-- Given full health with full overheals hidden.
+	displayed = {}
+	now = 60
+	health = maxHealth
+	profile.hideFullOverheals = true
+
+	-- When a fully overhealed periodic heal uses the fallback.
+	incoming:HandleCombatText("PERIODIC_HEAL", "Player", 20)
+	runCallbacks()
+	profile.hideFullOverheals = false
+
+	-- Then it does not produce a display event.
+	assert(#displayed == 0, "hidden full overheal was displayed")
+end)
+
+check("partial overheals remain visible with the filter enabled", function()
+	-- Given missing health with full overheals hidden.
+	displayed = {}
+	now = 70
+	health = 90
+	profile.hideFullOverheals = true
+
+	-- When a heal exceeds the missing health.
+	incoming:HandleCombatText("HEAL", "Player", 20)
+	runCallbacks()
+	profile.hideFullOverheals = false
+
+	-- Then the effective heal and overheal are still displayed.
+	assert(#displayed == 1 and displayed[1].message == "() +10 <10>",
+		"partial overheal was hidden or formatted incorrectly")
+end)
+
+if #failures > 0 then
+	error(table.concat(failures, "\n"))
+end

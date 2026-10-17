@@ -589,10 +589,14 @@ local function DisplayCombatTextHeal(self, isPeriodic, isCrit, amount, healerNam
 		)
 		return
 	end
+	local overheal = self:GetOverheal(amount)
+	if overheal >= amount and profile.hideFullOverheals then
+		return
+	end
 	local message = self.config.buildActionMessage(
 		settings,
 		amount,
-		self:GetOverheal(amount),
+		overheal,
 		spellName
 	)
 	if message and message ~= "" then
@@ -607,15 +611,12 @@ local COMBAT_TEXT_HEALS = {
 	PERIODIC_HEAL_CRIT = { isPeriodic = true, isCrit = true },
 }
 
-function IncomingCombat:HandleCombatText(eventType, arg1, arg2)
+function IncomingCombat:HandleCombatText(eventType, healerName, amount)
 	local healType = COMBAT_TEXT_HEALS[eventType]
 	if not healType then
 		return
 	end
-	local amount, healerName = arg1, RestrictedValue:String(arg2)
-	if RestrictedValue:String(arg1) then
-		amount, healerName = arg2, arg1
-	end
+	healerName = RestrictedValue:String(healerName)
 	if not RestrictedValue:IsRestricted(amount) then
 		amount = self.config.normalizeNumber(amount)
 		if not amount or amount <= 0 then
