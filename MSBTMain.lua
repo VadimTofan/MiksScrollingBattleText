@@ -94,6 +94,7 @@ local powerTokens = {}
 local isEnglish
 local playerGUID
 local AUTOSHOT_SPELL_ID = 6603
+local AUTO_REPEAT_SPELL_IDS = {75, 5019}
 local OUTGOING_GROUP_DELAY = 0.2
 local INCOMING_GROUP_DELAY = 0.12
 local OUTGOING_FALLBACK_ATTRIBUTION_WINDOW = 0.9
@@ -288,41 +289,53 @@ local function IsAutoAttackSpellID(spellID)
 	return spellID == AUTOSHOT_SPELL_ID
 end
 
-local function CanUseAutoAttackFallback(now, lastAutoAttackTime)
-	local autoActive = false
-
+local function IsPlayerAutoAttacking()
 	if type(IsCurrentSpell) == "function" then
 		local ok, result = pcall(IsCurrentSpell, AUTOSHOT_SPELL_ID)
-		if ok and result then
-			autoActive = true
+		if ok and RestrictedValue:Value(result) then
+			return true
 		end
 	end
-	if (not autoActive) and type(IsAutoRepeatSpell) == "function" then
-		local ok, result = pcall(IsAutoRepeatSpell)
-		if ok and result then
-			autoActive = true
+	if type(IsAutoRepeatSpell) == "function" then
+		for _, spellID in ipairs(AUTO_REPEAT_SPELL_IDS) do
+			local spellName = GetSpellInfo(spellID)
+			if spellName then
+				local ok, result = pcall(IsAutoRepeatSpell, spellName)
+				if ok and RestrictedValue:Value(result) then
+					return true
+				end
+			end
 		end
 	end
-	if (not autoActive) and C_Spell and type(C_Spell.IsAutoAttackSpell) == "function" then
-		local ok, result = pcall(C_Spell.IsAutoAttackSpell, AUTOSHOT_SPELL_ID)
-		if ok and result then
-			autoActive = true
-		end
-	end
-	if not autoActive then
-		return false
-	end
+	return false
+end
 
-	local okSpeed, mainSpeedRaw, offSpeedRaw = pcall(UnitAttackSpeed, "player")
+local function GetSwingSpeed(unit)
+	local okSpeed, mainSpeedRaw, offSpeedRaw = pcall(UnitAttackSpeed, unit)
 	local mainSpeed = okSpeed and NormalizeNumber(mainSpeedRaw) or nil
 	local offSpeed = okSpeed and NormalizeNumber(offSpeedRaw) or nil
 	local swingSpeed = mainSpeed or offSpeed or 2
-	if offSpeed and offSpeed < swingSpeed then
+	if offSpeed and offSpeed > 0 and offSpeed < swingSpeed then
 		swingSpeed = offSpeed
 	end
+	if swingSpeed <= 0 then
+		swingSpeed = 2
+	end
+	return swingSpeed
+end
 
-	local minGap = math.max(0.25, swingSpeed * 0.45)
+local function CanUseAutoAttackFallback(now, lastAutoAttackTime)
+	if not IsPlayerAutoAttacking() then
+		return false
+	end
+
+	local minGap = math.max(0.25, GetSwingSpeed("player") * 0.45)
 	return (now - (lastAutoAttackTime or 0)) >= minGap
+end
+
+local function IsPetEngaged()
+	return SafeUnitBoolean(UnitExists, "pet")
+		and SafeUnitBoolean(UnitIsUnit, "pettarget", "target")
 end
 
 local function IsOutgoingTargetContextValid()
@@ -435,6 +448,10 @@ local function PlayerHasAura(spellID)
 	return false
 end
 
+local function IsPlayerSolo()
+	return not ((IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid()))
+end
+
 local function HasPlayerAnyDebuffOnTarget(spellIDs)
 	if not spellIDs then
 		return false
@@ -542,7 +559,15 @@ local outgoingBatcher = OutgoingBatcher:New({
 	formatAmount = function(amount, profile)
 		return Formatter:FormatDisplayAmount(amount, profile)
 	end,
+	formatEventMessage = function(eventSettings, amount, spellID)
+		local spellName = spellID and not IsAutoAttackSpellID(spellID)
+			and GetSpellInfo(spellID) or nil
+		return CleanupActionMessage(Formatter:FormatLegacyEvent(
+			eventSettings.message, amount, nil, nil, nil, nil, nil, nil, spellName
+		))
+	end,
 	display = DisplayEvent,
+	displayRestricted = DisplayRestrictedAmount,
 	after = C_Timer.After,
 	getSpellTexture = function(spellID)
 		local _, _, texture = GetSpellInfo(spellID)
@@ -572,8 +597,8 @@ local damageMeterSource = DamageMeterSource:New({
 		)
 	end,
 	normalizeNumber = NormalizeNumber,
-	queue = function(...)
-		outgoingBatcher:Queue(...)
+	queue = function(spellID, amount, isPet)
+		outgoingBatcher:Queue(spellID, amount, false, nil, nil, isPet)
 	end,
 	newTicker = C_Timer.NewTicker,
 	damageType = Enum and Enum.DamageMeterType
@@ -599,8 +624,13 @@ outgoingCombat = OutgoingCombat:New({
 		return texture
 	end,
 	isAutoAttack = IsAutoAttackSpellID,
+	isHelpfulSpell = IsHelpfulSpellID,
 	canUseAutoAttackFallback = CanUseAutoAttackFallback,
+	isPlayerAutoAttacking = IsPlayerAutoAttacking,
+	isPetEngaged = IsPetEngaged,
+	getSwingSpeed = GetSwingSpeed,
 	hasPlayerDebuff = HasPlayerAnyDebuffOnTarget,
+	isPlayerSolo = IsPlayerSolo,
 	isLikelySpellSchool = IsLikelySpellSchool,
 	autoAttackSpellID = AUTOSHOT_SPELL_ID,
 	fallbackAttributionWindow = OUTGOING_FALLBACK_ATTRIBUTION_WINDOW,

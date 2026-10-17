@@ -1,6 +1,7 @@
 MikSBT = {
 	Components = {},
 }
+dofile("API/RestrictedValue.lua")
 
 local now = 10
 local total = 100
