@@ -2512,21 +2512,16 @@ end
 
 local function SetupBlizzardOptions()
 
+	local optionsMain = MSBTOptions and MSBTOptions.Main
+	if not optionsMain then
+		Print("MSBT options are unavailable. Ensure embedded options files "
+			.. "are enabled in MikScrollingBattleText.toc.")
+		return
+	end
+
 	local frame = CreateFrame("Frame")
 	frame:Hide()
 	frame.name = "MikScrollingBattleText"
-
-	local optionsMain = MSBTOptions and MSBTOptions.Main
-	local canDock = optionsMain and optionsMain.DockMainFrame
-	if not canDock then
-		local button = CreateFrame("Button", nil, frame, IsCataClassic and "OptionsButtonTemplate" or "UIPanelButtonTemplate")
-		button:SetSize(100, 24)
-		button:SetPoint("CENTER")
-		button:SetText(MikSBT.COMMAND)
-		button:SetScript("OnClick", function(this)
-			ShowOptions()
-		end)
-	end
 
 	local useSettings = Settings and Settings.RegisterCanvasLayoutCategory
 	local category
@@ -2561,17 +2556,9 @@ local function SetupBlizzardOptions()
 		panel:SetScript("OnHide", function(this)
 			optionsMain.UndockMainFrame(this)
 		end)
-		panel:SetScript("OnUpdate", function(this)
-			if not optionsMain.IsDockedTo(this) then
-				optionsMain.DockMainFrame(this, reopen, tabIndex)
-			end
-		end)
 	end
 
 	local reopen = Register(frame)
-	if not canDock then
-		return
-	end
 
 	local tabs = optionsMain.GetTabs()
 	local generalIndex

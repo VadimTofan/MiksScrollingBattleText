@@ -456,11 +456,6 @@ local function UndockMainFrame(parent)
 end
 
 
-local function IsDockedTo(parent)
-	return mainFrame ~= nil and dockedParent == parent and mainFrame:IsShown()
-end
-
-
 local function GetTabs()
 	local tabs = {}
 	for index, info in ipairs(tabData) do
@@ -538,7 +533,6 @@ module.ShowMainFrame		= ShowMainFrame
 module.HideMainFrame		= HideMainFrame
 module.DockMainFrame		= DockMainFrame
 module.UndockMainFrame		= UndockMainFrame
-module.IsDockedTo			= IsDockedTo
 module.GetTabs				= GetTabs
 module.RegisterPopupFrame	= RegisterPopupFrame
 module.AddTab				= AddTab
