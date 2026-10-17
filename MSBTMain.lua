@@ -95,7 +95,7 @@ local isEnglish
 local playerGUID
 local AUTOSHOT_SPELL_ID = 6603
 local OUTGOING_GROUP_DELAY = 0.2
-local INCOMING_GROUP_DELAY = 0.12
+local INCOMING_GROUP_DELAY = 0.06
 local OUTGOING_FALLBACK_ATTRIBUTION_WINDOW = 0.9
 local OUTGOING_DELAYED_SPELL_ATTRIBUTION_WINDOW = 3.0
 local OUTGOING_SIGNAL_CONFIDENCE_WINDOW = 1.25
@@ -485,8 +485,6 @@ local outgoingBatcher = OutgoingBatcher:New({
 	isAutoAttack = IsAutoAttackSpellID,
 	autoAttackSpellID = AUTOSHOT_SPELL_ID,
 	delay = OUTGOING_GROUP_DELAY,
-	shouldSplitCritBatch = ShouldSplitCritBatch,
-	resolveBatchDisplaySettings = ResolveBatchDisplaySettings,
 })
 
 local damageMeterSource = DamageMeterSource:New({
@@ -641,6 +639,9 @@ utilityNotifications = UtilityNotifications:New({
 	powerTypes = powerTypes,
 	unitPower = UnitPower,
 	unitPowerMax = UnitPowerMax,
+	normalizeNumber = function(value)
+		return MikSBT.API.RestrictedValue:Number(value)
+	end,
 	getPlayerClass = function()
 		return playerClass
 	end,

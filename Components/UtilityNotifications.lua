@@ -33,7 +33,13 @@ function UtilityNotifications:DisplayResource(
 	changeEvent,
 	fullEvent
 )
-	local eventKey = amount == self.config.unitPowerMax("player", powerType)
+	local maximumAmount = self.config.normalizeNumber(
+		self.config.unitPowerMax("player", powerType)
+	)
+	if maximumAmount == nil then
+		return
+	end
+	local eventKey = amount == maximumAmount
 		and fullEvent
 		or changeEvent
 	self:DisplayAmount(eventKey, amount, powerType)
@@ -73,7 +79,13 @@ function UtilityNotifications:HandlePowerUpdate(unitID, powerToken)
 		return
 	end
 
-	local amount = self.config.unitPower("player", powerType)
+	local amount = self.config.normalizeNumber(
+		self.config.unitPower("player", powerType)
+	)
+	if amount == nil then
+		self.lastPowerAmounts[powerType] = nil
+		return
+	end
 	local previousAmount = self.lastPowerAmounts[powerType]
 	local playerClass = self.config.getPlayerClass()
 	local handled = true

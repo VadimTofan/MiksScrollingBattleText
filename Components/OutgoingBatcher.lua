@@ -14,7 +14,7 @@ function OutgoingBatcher:Reset()
 	end
 end
 
-function OutgoingBatcher:BuildMessage(amount, hitCount, critCount)
+function OutgoingBatcher:BuildMessage(amount, hitCount)
 	local profile = self.config.getProfile()
 	local formattedAmount = self.config.formatAmount(amount, profile)
 	if not profile.stackSimilarHits then
@@ -24,20 +24,9 @@ function OutgoingBatcher:BuildMessage(amount, hitCount, critCount)
 		return formattedAmount
 	end
 
-	local hitsWord = hitCount == 1 and "hit" or "hits"
-	if critCount and critCount > 0 then
-		local critWord = critCount == 1 and "Crit" or "Crits"
-		return string.format(
-			"%s (%d %s, %d %s)",
-			formattedAmount,
-			hitCount,
-			hitsWord,
-			critCount,
-			critWord
-		)
-	end
-
-	return string.format("%s (%d %s)", formattedAmount, hitCount, hitsWord)
+	local translations = MikSBT.translations
+	return string.format("%s [%d %s]", formattedAmount, hitCount,
+		translations and translations.MSG_HITS or "Hits")
 end
 
 function OutgoingBatcher:ResolveSettings(isSpell)
@@ -73,40 +62,13 @@ function OutgoingBatcher:Flush(batchKey)
 	end
 	local profile = self.config.getProfile()
 	local critSettings = profile.events[eventKey .. "_CRIT"]
-	local critCount = batch.critCount or 0
-	local critAmount = math.min(batch.critAmount or 0, batch.totalAmount)
-
-	if self.config.shouldSplitCritBatch(
-		settings,
-		critSettings,
-		critCount
-	) then
-		local normalCount = batch.hitCount - critCount
-		local normalAmount = batch.totalAmount - critAmount
-		if normalCount > 0 and normalAmount > 0 then
-			self.config.display(
-				settings,
-				self:BuildMessage(normalAmount, normalCount, 0),
-				batch.effectTexture
-			)
-		end
-		self.config.display(
-			critSettings,
-			self:BuildMessage(critAmount, critCount, critCount),
-			batch.effectTexture
-		)
-		return
+	local displaySettings = settings
+	if batch.isCrit and critSettings and not critSettings.disabled then
+		displaySettings = critSettings
 	end
-
-	local displaySettings = self.config.resolveBatchDisplaySettings(
-		settings,
-		critSettings,
-		batch.hitCount,
-		critCount
-	)
 	self.config.display(
 		displaySettings,
-		self:BuildMessage(batch.totalAmount, batch.hitCount, critCount),
+		self:BuildMessage(batch.totalAmount, batch.hitCount),
 		batch.effectTexture
 	)
 end
@@ -132,13 +94,12 @@ function OutgoingBatcher:Queue(
 		effectTexture = self.config.getSpellTexture(spellID)
 	end
 
-	local batchKey = tostring(spellID or 0)
+	local batchKey = tostring(spellID or 0) .. (isCrit and ":crit" or "")
 	local batch = self.batches[batchKey]
 	if not batch then
 		batch = {
 			hitCount = 0,
-			critCount = 0,
-			critAmount = 0,
+			isCrit = not not isCrit,
 			totalAmount = 0,
 			isSpell = forceIsSpell ~= nil
 				and forceIsSpell
@@ -160,10 +121,6 @@ function OutgoingBatcher:Queue(
 	batch.totalAmount = batch.totalAmount + amount
 	if effectTexture and not batch.effectTexture then
 		batch.effectTexture = effectTexture
-	end
-	if isCrit then
-		batch.critCount = batch.critCount + 1
-		batch.critAmount = batch.critAmount + amount
 	end
 end
 

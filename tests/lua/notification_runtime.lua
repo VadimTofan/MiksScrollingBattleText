@@ -1,6 +1,10 @@
 -- Describe: real parser and main modules preserve chat notifications.
 local frames, displayed, received, errors = {}, {}, {}, {}
 local playerGUID
+local notificationPower = 100
+local secretPower = 99999
+canaccessvalue = function(value) return value ~= secretPower end
+UnitPower = function() return notificationPower end
 local function EraseTable(value)
 	for key in pairs(value) do value[key] = nil end
 end
@@ -46,7 +50,15 @@ geterrorhandler = function()
 end
 FormatLargeNumber = tostring
 UNKNOWN = "Unknown"
-C_Timer = { After = function() end, NewTicker = function() end }
+local scheduledTimers = {}
+C_Timer = {
+	After = function(delay, callback)
+		scheduledTimers[#scheduledTimers + 1] = {
+			delay = delay, callback = callback,
+		}
+	end,
+	NewTicker = function() end,
+}
 Enum = { PowerType = {
 	Mana = 0, Rage = 1, Focus = 2, Energy = 3, ComboPoints = 4,
 	Runes = 5, RunicPower = 6, SoulShards = 7, LunarPower = 8,
@@ -92,7 +104,10 @@ MikSBT = {
 	EraseTable = EraseTable, Print = function() end, ShortenNumber = tostring,
 	GetSpellInfo = function(id) return "Spell " .. tostring(id), nil, "icon" end,
 	GetSkillName = function(id) return "Spell " .. tostring(id) end,
-	Triggers = { powerTypes = { ALTERNATE_POWER = 10 }, triggerSuppressions = {} },
+	Triggers = {
+		powerTypes = { MANA = 0, ALTERNATE_POWER = 10 },
+		triggerSuppressions = {},
+	},
 	translations = { MSG_HITS = "hits", MSG_CRIT = "crit", MSG_CRITS = "crits" },
 	Animations = {
 		IsScrollAreaActive = function(area) return area ~= "Hidden" end,
@@ -102,6 +117,7 @@ MikSBT = {
 		end,
 	},
 }
+dofile("API/RestrictedValue.lua")
 local services = { "Formatter", "Batcher", "Throttler", "EventRouter", "EventPipeline" }
 for _, name in ipairs(services) do
 	local file = io.open("Services/" .. name .. ".lua")
@@ -187,6 +203,60 @@ parserFrame.scripts.OnEvent(parserFrame, cases[1][1], {})
 -- Then no extra display or Lua error is produced.
 assert(#displayed == 5, "disabled or hidden notifications were displayed")
 assert(#errors == 0, errors[1])
+
+-- Describe: the real power event route guards inaccessible mana readings.
+-- Given an enabled power notification and a readable baseline.
+profile.showAllPowerGains = true
+profile.events.NOTIFICATION_POWER_GAIN = {
+	message = "+%a Power", scrollArea = "Static",
+}
+local mainFrame = frames[2]
+local displaysBeforePower = #displayed
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+
+-- When power becomes secret, becomes readable, and increases again.
+notificationPower = secretPower
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+notificationPower = 150
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+notificationPower = 175
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+
+-- Then only the gain between consecutive readable samples is displayed.
+assert(#displayed == displaysBeforePower + 1,
+	"power event route displayed an inaccessible or stale gain")
+assert(displayed[#displayed][2] == "+25 Power",
+	"power event route lost the readable gain")
+assert(#errors == 0, errors[1])
+
+-- Describe: incoming damage batches use a 60 ms grouping window.
+-- Given enabled normal and critical damage notifications.
+profile.events.INCOMING_DAMAGE = {
+	message = "Damage %a", scrollArea = "Incoming",
+}
+profile.events.INCOMING_DAMAGE_CRIT = {
+	message = "Damage %a", scrollArea = "Incoming", isCrit = true,
+}
+local timersBeforeDamage = #scheduledTimers
+local displaysBeforeDamage = #displayed
+
+-- When normal and critical hits arrive through the real event route.
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "player", "WOUND", nil, 50)
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "player", "WOUND", "CRITICAL", 100)
+
+-- Then separate batches wait 60 ms before displaying their amounts.
+assert(#displayed == displaysBeforeDamage, "incoming damage bypassed grouping")
+assert(#scheduledTimers == timersBeforeDamage + 2,
+	"normal and critical damage did not get separate timers")
+for index = timersBeforeDamage + 1, #scheduledTimers do
+	local timer = scheduledTimers[index]
+	assert(timer.delay == 0.06, "incoming damage did not use a 60 ms timer")
+	timer.callback()
+end
+assert(displayed[displaysBeforeDamage + 1][2] == "Damage 50",
+	"normal damage amount changed")
+assert(displayed[displaysBeforeDamage + 2][2] == "Damage 100",
+	"critical damage amount changed")
 
 -- Given disabled modules.
 main.Disable()
