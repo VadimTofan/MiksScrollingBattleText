@@ -83,7 +83,6 @@ local _
 
 local eventFrame = CreateFrame("Frame")
 
-local playerClass
 
 local eventRouter = EventRouter:New()
 local damageTypeMap = {}
@@ -215,10 +214,6 @@ local function ParserEventsHandler(parserEvent)
 		nil, nil, nil, nil, false, true
 	)
 	DisplayEvent(eventSettings, outputMessage, effectTexture)
-end
-
-function eventFrame:UNIT_POWER_UPDATE(unitID, powerToken)
-	utilityNotifications:HandlePowerUpdate(unitID, powerToken)
 end
 
 function eventFrame:PLAYER_REGEN_ENABLED()
@@ -594,7 +589,6 @@ function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask
 end
 
 local function Enable()
-	eventFrame:RegisterEvent("UNIT_POWER_UPDATE")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	eventFrame:RegisterEvent("CHAT_MSG_MONSTER_EMOTE")
@@ -623,7 +617,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 end)
 
 
-_, playerClass = UnitClass("player")
 playerGUID = UnitGUID("player")
 
 parserNotifications = ParserNotifications:New()
@@ -636,18 +629,8 @@ utilityNotifications = UtilityNotifications:New({
 	format = function(...)
 		return Formatter:FormatLegacyEvent(...)
 	end,
-	powerTypes = powerTypes,
-	unitPower = UnitPower,
-	unitPowerMax = UnitPowerMax,
-	normalizeNumber = function(value)
-		return MikSBT.API.RestrictedValue:Number(value)
-	end,
-	getPlayerClass = function()
-		return playerClass
-	end,
 	unitName = UnitName,
 	getTime = GetTime,
-	unknown = UNKNOWN,
 	emoteHoldTime = EMOTE_HOLD_TIME,
 })
 

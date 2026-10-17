@@ -103,6 +103,9 @@ do
 	profile.enableBlizzardHealing = true
 	profile.enableBlizzardV2GroupDamage = false
 	profile.enableBlizzardV2GroupHealing = false
+	profile.showAllPowerGains = true
+	profile.events.NOTIFICATION_POWER_GAIN = { message = "+%a %p" }
+	profile.events.NOTIFICATION_CP_FULL = { message = "Full combo points" }
 	profile.events.NOTIFICATION_COOLDOWN = { disabled = true }
 	profile.events.NOTIFICATION_PET_COOLDOWN = { disabled = true }
 	local retiredEvent = profile.events.NOTIFICATION_COOLDOWN
@@ -121,6 +124,9 @@ do
 	assert(payload.sections.General.enableBlizzardHealing == nil)
 	assert(payload.sections.General.enableBlizzardV2GroupDamage == nil)
 	assert(payload.sections.General.enableBlizzardV2GroupHealing == nil)
+	assert(payload.sections.General.showAllPowerGains == nil)
+	assert(payload.sections.Events.NOTIFICATION_POWER_GAIN == nil)
+	assert(payload.sections.Events.NOTIFICATION_CP_FULL == nil)
 	assert(payload.sections.Events.NOTIFICATION_COOLDOWN == nil)
 	assert(payload.sections.Events.NOTIFICATION_PET_COOLDOWN == nil)
 	assert(payload.sections.ScrollAreas.Incoming.offsetX == -320)

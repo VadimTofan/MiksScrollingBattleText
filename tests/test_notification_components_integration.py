@@ -23,7 +23,8 @@ class NotificationComponentsIntegrationTests(unittest.TestCase):
             source,
         )
         self.assertIn("parserNotifications:HandleHonor(", source)
-        self.assertIn("utilityNotifications:HandlePowerUpdate(", source)
+        self.assertNotIn("utilityNotifications:HandlePowerUpdate(", source)
+        self.assertNotIn('RegisterEvent("UNIT_POWER_UPDATE")', source)
         self.assertIn("utilityNotifications:HandleCombatEnter()", source)
         self.assertIn("utilityNotifications:HandleCombatLeave()", source)
         self.assertIn("utilityNotifications:HandleMonsterEmote(", source)

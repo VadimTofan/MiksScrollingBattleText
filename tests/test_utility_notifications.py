@@ -5,7 +5,7 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: frame-driven utility notifications
 class UtilityNotificationsTests(unittest.TestCase):
-    def test_resource_combat_state_and_emote_notifications(self):
+    def test_combat_state_and_emote_notifications(self):
         # Given
         script_name = "utility_notifications.lua"
 

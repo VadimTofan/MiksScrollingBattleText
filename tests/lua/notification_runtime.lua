@@ -1,10 +1,8 @@
 -- Describe: real parser and main modules preserve chat notifications.
 local frames, displayed, received, errors = {}, {}, {}, {}
 local playerGUID
-local notificationPower = 100
-local secretPower = 99999
-canaccessvalue = function(value) return value ~= secretPower end
-UnitPower = function() return notificationPower end
+UnitPower = function() error("removed resource notifications read power") end
+UnitPowerMax = function() error("removed resource notifications read max power") end
 local function EraseTable(value)
 	for key in pairs(value) do value[key] = nil end
 end
@@ -117,7 +115,6 @@ MikSBT = {
 		end,
 	},
 }
-dofile("API/RestrictedValue.lua")
 local services = { "Formatter", "Batcher", "Throttler", "EventRouter", "EventPipeline" }
 for _, name in ipairs(services) do
 	local file = io.open("Services/" .. name .. ".lua")
@@ -204,29 +201,24 @@ parserFrame.scripts.OnEvent(parserFrame, cases[1][1], {})
 assert(#displayed == 5, "disabled or hidden notifications were displayed")
 assert(#errors == 0, errors[1])
 
--- Describe: the real power event route guards inaccessible mana readings.
--- Given an enabled power notification and a readable baseline.
+-- Describe: retired resource settings cannot reactivate notifications.
+-- Given an old profile still contains resource-notification settings.
 profile.showAllPowerGains = true
 profile.events.NOTIFICATION_POWER_GAIN = {
 	message = "+%a Power", scrollArea = "Static",
 }
 local mainFrame = frames[2]
 local displaysBeforePower = #displayed
-mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
 
--- When power becomes secret, becomes readable, and increases again.
-notificationPower = secretPower
+-- When obsolete power events are delivered to the real event dispatcher.
 mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
-notificationPower = 150
-mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
-notificationPower = 175
-mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "MANA")
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
 
--- Then only the gain between consecutive readable samples is displayed.
-assert(#displayed == displaysBeforePower + 1,
-	"power event route displayed an inaccessible or stale gain")
-assert(displayed[#displayed][2] == "+25 Power",
-	"power event route lost the readable gain")
+-- Then no resource event is registered, queried, or displayed.
+assert(not mainFrame.events.UNIT_POWER_UPDATE,
+	"main still subscribes to removed resource notifications")
+assert(#displayed == displaysBeforePower,
+	"obsolete saved settings enabled resource notifications")
 assert(#errors == 0, errors[1])
 
 -- Describe: incoming damage batches use a 60 ms grouping window.
