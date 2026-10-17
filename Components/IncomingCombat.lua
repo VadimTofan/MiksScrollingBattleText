@@ -72,13 +72,31 @@ local function BuildDamageLine(self, settings, batch, amount, hits, crits)
 	return message
 end
 
+local function BuildHealSummary(hitCount, critCount)
+	if critCount and critCount > 0 then
+		if hitCount == 1 and critCount == 1 then
+			return " (Crit)"
+		end
+		local hitsWord = hitCount == 1 and "hit" or "hits"
+		local critWord = critCount == 1 and "Crit" or "Crits"
+		return string.format(
+			" (%d %s, %d %s)",
+			hitCount,
+			hitsWord,
+			critCount,
+			critWord
+		)
+	end
+	return BuildHitSummary(hitCount)
+end
+
 local function BuildHealLine(self, settings, batch, amount, hits, crits)
 	local message = self.config.buildActionMessage(settings, amount)
 	if not message or message == "" then
 		return nil
 	end
 
-	local summary = BuildHitSummary(hits, crits)
+	local summary = BuildHealSummary(hits, crits)
 	if summary then
 		message = message .. summary
 	end
