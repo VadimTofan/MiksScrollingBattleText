@@ -33,8 +33,12 @@ local function ClearTable(target)
 	end
 end
 
-function IncomingCombat:Reset()
+function IncomingCombat:ResetDamage()
 	ClearTable(self.damageBatches)
+end
+
+function IncomingCombat:Reset()
+	self:ResetDamage()
 	ClearTable(self.healBatches)
 end
 

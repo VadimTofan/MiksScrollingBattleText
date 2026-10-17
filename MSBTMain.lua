@@ -217,12 +217,12 @@ local function ParserEventsHandler(parserEvent)
 end
 
 function eventFrame:PLAYER_REGEN_ENABLED()
-	incomingCombat:Reset()
+	incomingCombat:ResetDamage()
 	outgoingCombat:ResetCombatState()
 	utilityNotifications:HandleCombatLeave()
 end
 function eventFrame:PLAYER_REGEN_DISABLED()
-	incomingCombat:Reset()
+	incomingCombat:ResetDamage()
 	outgoingCombat:ResetCombatState()
 	utilityNotifications:HandleCombatEnter()
 end
