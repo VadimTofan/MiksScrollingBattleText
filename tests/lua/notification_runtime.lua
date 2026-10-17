@@ -50,7 +50,15 @@ geterrorhandler = function()
 end
 FormatLargeNumber = tostring
 UNKNOWN = "Unknown"
-C_Timer = { After = function() end, NewTicker = function() end }
+local scheduledTimers = {}
+C_Timer = {
+	After = function(delay, callback)
+		scheduledTimers[#scheduledTimers + 1] = {
+			delay = delay, callback = callback,
+		}
+	end,
+	NewTicker = function() end,
+}
 Enum = { PowerType = {
 	Mana = 0, Rage = 1, Focus = 2, Energy = 3, ComboPoints = 4,
 	Runes = 5, RunicPower = 6, SoulShards = 7, LunarPower = 8,
@@ -220,6 +228,35 @@ assert(#displayed == displaysBeforePower + 1,
 assert(displayed[#displayed][2] == "+25 Power",
 	"power event route lost the readable gain")
 assert(#errors == 0, errors[1])
+
+-- Describe: incoming damage batches use a 60 ms grouping window.
+-- Given enabled normal and critical damage notifications.
+profile.events.INCOMING_DAMAGE = {
+	message = "Damage %a", scrollArea = "Incoming",
+}
+profile.events.INCOMING_DAMAGE_CRIT = {
+	message = "Damage %a", scrollArea = "Incoming", isCrit = true,
+}
+local timersBeforeDamage = #scheduledTimers
+local displaysBeforeDamage = #displayed
+
+-- When normal and critical hits arrive through the real event route.
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "player", "WOUND", nil, 50)
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "player", "WOUND", "CRITICAL", 100)
+
+-- Then separate batches wait 60 ms before displaying their amounts.
+assert(#displayed == displaysBeforeDamage, "incoming damage bypassed grouping")
+assert(#scheduledTimers == timersBeforeDamage + 2,
+	"normal and critical damage did not get separate timers")
+for index = timersBeforeDamage + 1, #scheduledTimers do
+	local timer = scheduledTimers[index]
+	assert(timer.delay == 0.06, "incoming damage did not use a 60 ms timer")
+	timer.callback()
+end
+assert(displayed[displaysBeforeDamage + 1][2] == "Damage 50",
+	"normal damage amount changed")
+assert(displayed[displaysBeforeDamage + 2][2] == "Damage 100",
+	"critical damage amount changed")
 
 -- Given disabled modules.
 main.Disable()
