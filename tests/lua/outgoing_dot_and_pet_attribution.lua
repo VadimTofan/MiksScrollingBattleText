@@ -75,3 +75,30 @@ local petHit = hit(8, 45, 4)
 
 -- Then it is attributed to the pet
 assert(petHit.isPet == true and petHit.spellID == 3110, "pet spell hit was not attributed")
+
+local failures = {}
+
+-- Describe: player attribution and damage-meter fallback regression cases.
+local function check(name, test)
+	local ok, failure = pcall(test)
+	if not ok then
+		failures[#failures + 1] = name .. ": " .. tostring(failure)
+	end
+end
+
+check("pending player casts take priority over pet melee", function()
+	-- Given an engaged pet and a physical player cast without auto attack.
+	now = 20
+	component:HandleSpellcastSucceeded("player", 100)
+
+	-- When the player spell hits the target.
+	local playerHit = hit(20.1, 50, 1)
+
+	-- Then it keeps the player's spell and is not routed to pet output.
+	assert(playerHit.spellID == 100 and not playerHit.isPet,
+		"physical player spell was attributed to pet melee")
+end)
+
+if #failures > 0 then
+	error(table.concat(failures, "\n"))
+end

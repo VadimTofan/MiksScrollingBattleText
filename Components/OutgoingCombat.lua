@@ -190,10 +190,10 @@ function OutgoingCombat:ResolvePetAttribution(now, isDamage, schoolMask)
 	if petElapsed < petSpeed * PET_MIN_SWING_FRACTION then
 		return nil
 	end
+	if playerPending then
+		return nil
+	end
 	if self.config.isPlayerAutoAttacking() then
-		if playerPending then
-			return nil
-		end
 		local playerSpeed = self.config.getSwingSpeed("player")
 		if (now - self.lastAutoAttackTime) / playerSpeed > petElapsed / petSpeed then
 			return nil
