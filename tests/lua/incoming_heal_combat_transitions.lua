@@ -1,4 +1,5 @@
 MikSBT = { Components = {} }
+dofile("API/RestrictedValue.lua")
 local IncomingCombat = dofile("Components/IncomingCombat.lua")
 local file = assert(io.open("MSBTMain.lua", "r"))
 local mainSource = file:read("*a")
@@ -32,6 +33,8 @@ local incoming = IncomingCombat:New({
 		return unit == "player" and "Player" or "Healer"
 	end,
 	getLastPlayerSpell = function() return nil, 0 end,
+	unitHealth = function() return 50 end,
+	unitHealthMax = function() return 200 end,
 	selfHealIconWindow = 12,
 	unknown = "Unknown",
 })

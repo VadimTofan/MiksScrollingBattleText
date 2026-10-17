@@ -387,6 +387,54 @@ local function HasPlayerDebuffOnTarget(spellID)
 	return false
 end
 
+local function CallBoolean(func, ...)
+	if type(func) ~= "function" then
+		return nil
+	end
+	local ok, result = pcall(func, ...)
+	if not ok then
+		return nil
+	end
+	local boolean = RestrictedValue:Boolean(result)
+	if boolean ~= nil then
+		return boolean
+	end
+	local number = RestrictedValue:Number(result)
+	if number then
+		return number == 1
+	end
+end
+
+local function IsHelpfulSpellID(spellID)
+	local C_Spell = C_Spell
+	local helpful = CallBoolean(C_Spell and C_Spell.IsSpellHelpful, spellID)
+	if helpful ~= nil then
+		return helpful
+	end
+	local harmful = CallBoolean(C_Spell and C_Spell.IsSpellHarmful, spellID)
+	if harmful ~= nil then
+		return not harmful
+	end
+	local spellName = GetSpellInfo(spellID)
+	harmful = spellName and CallBoolean(IsHarmfulSpell, spellName)
+	if harmful ~= nil then
+		return not harmful
+	end
+	return true
+end
+
+local function PlayerHasAura(spellID)
+	if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
+		local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+		return ok and RestrictedValue:Table(aura) ~= nil
+	end
+	if AuraUtil and AuraUtil.FindAuraBySpellID then
+		local ok, aura = pcall(AuraUtil.FindAuraBySpellID, spellID, "player", "HELPFUL")
+		return ok and RestrictedValue:Value(aura) ~= nil
+	end
+	return false
+end
+
 local function HasPlayerAnyDebuffOnTarget(spellIDs)
 	if not spellIDs then
 		return false
@@ -571,6 +619,7 @@ incomingCombat = IncomingCombat:New({
 	shouldSplitCritBatch = ShouldSplitCritBatch,
 	resolveBatchDisplaySettings = ResolveBatchDisplaySettings,
 	display = DisplayEvent,
+	displayRestricted = DisplayRestrictedAmount,
 	after = C_Timer.After,
 	getTime = GetTime,
 	unitName = UnitName,
@@ -579,6 +628,10 @@ incomingCombat = IncomingCombat:New({
 	safeUnitBoolean = SafeUnitBoolean,
 	getSpellInfo = GetSpellInfo,
 	isAutoAttackSpellID = IsAutoAttackSpellID,
+	isHelpfulSpell = IsHelpfulSpellID,
+	playerHasAura = PlayerHasAura,
+	unitHealth = UnitHealth,
+	unitHealthMax = UnitHealthMax,
 	unknown = UNKNOWN,
 	groupDelay = INCOMING_GROUP_DELAY,
 	selfHealIconWindow = INCOMING_SELF_HEAL_ICON_ATTRIBUTION_WINDOW,
@@ -587,8 +640,20 @@ incomingCombat = IncomingCombat:New({
 	end,
 })
 
+function eventFrame:UNIT_HEALTH(unitID)
+	incomingCombat:HandleHealthUpdate(unitID)
+end
+
 function eventFrame:UNIT_SPELLCAST_SUCCEEDED(unitID, lineID, spellID)
 	outgoingCombat:HandleSpellcastSucceeded(unitID, spellID)
+end
+
+function eventFrame:COMBAT_TEXT_UPDATE(eventType)
+	eventType = RestrictedValue:String(eventType)
+	if not eventType then
+		return
+	end
+	incomingCombat:HandleCombatText(eventType, C_CombatText.GetCurrentEventInfo())
 end
 
 function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask)
@@ -616,7 +681,11 @@ local function Enable()
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	eventFrame:RegisterEvent("CHAT_MSG_MONSTER_EMOTE")
 	eventFrame:RegisterEvent("UNIT_COMBAT")
+	eventFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
 	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+	if C_CombatText and C_CombatText.GetCurrentEventInfo then
+		eventFrame:RegisterEvent("COMBAT_TEXT_UPDATE")
+	end
 	outgoingCombat:Start()
 
 	MSBTParser.RegisterHandler(ParserEventsHandler)
