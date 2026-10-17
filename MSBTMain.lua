@@ -596,7 +596,6 @@ local damageMeterSource = DamageMeterSource:New({
 			sourceGUID
 		)
 	end,
-	normalizeNumber = NormalizeNumber,
 	queue = function(spellID, amount, isPet)
 		outgoingBatcher:Queue(spellID, amount, false, nil, nil, isPet)
 	end,

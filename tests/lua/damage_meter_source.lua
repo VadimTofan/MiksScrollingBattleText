@@ -42,7 +42,6 @@ local source = DamageMeterSource:New({
 			},
 		}
 	end,
-	normalizeNumber = tonumber,
 	queue = function(spellID, amount, isCrit)
 		queued[#queued + 1] = { spellID, amount, isCrit }
 	end,
