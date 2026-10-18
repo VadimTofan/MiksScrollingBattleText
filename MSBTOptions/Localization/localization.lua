@@ -83,6 +83,7 @@ obj = L.CHECKBOXES
 obj["enableMSBT"]				= { label="Enable Mik's Scrolling Battle Text", tooltip="Enable MSBT."}
 obj["disableOutgoingInGroup"]	= { label="Disable Outgoing In Group", tooltip="While in a party or raid, hide events assigned to the Outgoing scroll area."}
 obj["disableIncomingInGroup"]	= { label="Disable Incoming In Group", tooltip="While in a party or raid, hide events assigned to the Incoming scroll area."}
+obj["disableBlizzardIncoming"] = { label="Disable Blizzard incoming", tooltip="Disable Blizzard incoming combat text while keeping Blizzard outgoing combat text controlled by the options above." }
 obj["disableNotificationInGroup"]= { label="Disable Notification In Group", tooltip="While in a party or raid, hide events assigned to the Notification scroll area."}
 obj["disableStaticInGroup"]		= { label="Disable Static In Group", tooltip="While in a party or raid, hide events assigned to the Static scroll area."}
 obj["enableBlizzardV2CombatText"]= { label="Disable Blizzard CT While Solo", tooltip="When checked, disables Blizzard floating combat text damage/healing while solo." }

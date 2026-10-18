@@ -132,6 +132,7 @@ GeneralTab_Populate = function()
 	controls.enableCheckbox:SetChecked(not MSBTProfiles.IsModDisabled())
 	controls.disableOutgoingInGroupCheckbox:SetChecked(not not currentProfile.disableOutgoingInGroup)
 	controls.disableIncomingInGroupCheckbox:SetChecked(not not currentProfile.disableIncomingInGroup)
+	controls.disableBlizzardIncomingCheckbox:SetChecked(not not currentProfile.disableBlizzardIncoming)
 	controls.disableNotificationInGroupCheckbox:SetChecked(not not currentProfile.disableNotificationInGroup)
 	controls.disableStaticInGroupCheckbox:SetChecked(not not currentProfile.disableStaticInGroup)
 	controls.stickyCritsCheckbox:SetChecked(not currentProfile.stickyCritsDisabled)
@@ -299,6 +300,20 @@ local function GeneralTab_Create()
 		end
 	)
 	controls.blizzardCombatTextV2InGroupCheckbox = checkbox
+
+	checkbox = MSBTControls.CreateCheckbox(tabFrame)
+	objLocale = L.CHECKBOXES["disableBlizzardIncoming"] or { label = "Disable Blizzard incoming", tooltip = "Disable Blizzard incoming combat text while keeping Blizzard outgoing combat text controlled by the options above." }
+	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+	checkbox:SetPoint("TOPLEFT", controls.blizzardCombatTextV2InGroupCheckbox, "BOTTOMLEFT", 0, -5)
+	checkbox:SetClickHandler(
+		function (this, isChecked)
+			MSBTProfiles.SetOption(nil, "disableBlizzardIncoming", isChecked)
+			if MSBTProfiles.ApplyContextOptions then
+				MSBTProfiles.ApplyContextOptions()
+			end
+		end
+	)
+	controls.disableBlizzardIncomingCheckbox = checkbox
 
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableSounds"]

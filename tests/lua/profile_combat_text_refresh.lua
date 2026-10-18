@@ -95,7 +95,49 @@ for _, functionName in ipairs(functionNames) do
 					end
 					assert(environment.SHOW_COMBAT_TEXT == "0",
 						"combat-text toggle is still enabled")
+
+					-- Given outgoing Blizzard CT with incoming disabled.
+					writes = {}
+
+					-- When the independent incoming policy is applied.
+					action(true, false)
+
+					-- Then only incoming CT is disabled.
+					assert(#writes == expectedCount, "missing outgoing writes")
+					for _, write in ipairs(writes) do
+						local expected = write.name ==
+							"enableFloatingCombatText" and 0 or 1
+						assert(write.value == expected,
+							write.name .. ": incoming policy changed outgoing CT")
+					end
+					assert(environment.SHOW_COMBAT_TEXT == "0",
+						"incoming combat-text global is still enabled")
 				end
+			end
+
+			if functionName == "SetBlizzardCombatTextV2Enabled" then
+				-- Given a setting change during combat.
+				environment.InCombatLockdown = function() return true end
+				writes = {}
+
+				-- When the incoming checkbox policy applies.
+				action(true, false)
+
+				-- Then CVar writes wait until combat ends.
+				assert(#writes == 0, "combat-text settings changed in combat")
+
+				-- Given combat has ended.
+				environment.InCombatLockdown = function() return false end
+
+				-- When the existing regen event reapplies the policy.
+				action(true, false)
+
+				-- Then the pending incoming preference is applied.
+				assert(#writes == expectedCount,
+					"combat-text settings were not applied after combat")
+				assert(writes[1].name == "enableFloatingCombatText"
+					and writes[1].value == 0,
+					"incoming setting was not applied after combat")
 			end
 
 			-- Given a setting whose write fails.

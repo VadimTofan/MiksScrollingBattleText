@@ -1187,6 +1187,7 @@ if IsClassic then
 		disableStaticInGroup			= false,
 		enableBlizzardV2CombatText		= false,
 		enableBlizzardV2CombatTextInGroup = false,
+		disableBlizzardIncoming = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
 
@@ -2398,6 +2399,7 @@ else
 		disableStaticInGroup			= false,
 		enableBlizzardV2CombatText		= false,
 		enableBlizzardV2CombatTextInGroup = false,
+		disableBlizzardIncoming = false,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
 
@@ -2594,9 +2596,18 @@ local function DisableBlizzardCombatText()
 	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
 end
 
-local function SetBlizzardCombatTextV2Enabled(isEnabled)
+local function SetBlizzardCombatTextV2Enabled(isEnabled, incomingEnabled)
+	-- PLAYER_REGEN_ENABLED reapplies the current profile after combat.
+	if InCombatLockdown and InCombatLockdown() then
+		return
+	end
+
+	if incomingEnabled == nil then
+		incomingEnabled = isEnabled
+	end
+	local incomingValue = incomingEnabled and 1 or 0
 	local value = isEnabled and 1 or 0
-	SetCVar("enableFloatingCombatText", value)
+	SetCVar("enableFloatingCombatText", incomingValue)
 	if not IsClassic then
 		SetCVar("floatingCombatTextCombatHealing", value)
 	end
@@ -2606,7 +2617,7 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled)
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
-	SHOW_COMBAT_TEXT = isEnabled and "1" or "0"
+	SHOW_COMBAT_TEXT = incomingEnabled and "1" or "0"
 	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
 end
 
@@ -2656,6 +2667,7 @@ local function ResetOfficialBlizzardCombatText()
 	if currentProfile then
 		SetOption(nil, "enableBlizzardV2CombatText", false)
 		SetOption(nil, "enableBlizzardV2CombatTextInGroup", false)
+		SetOption(nil, "disableBlizzardIncoming", false)
 		SetOption(nil, "disableOutgoingInGroup", false)
 		SetOption(nil, "disableIncomingInGroup", false)
 		SetOption(nil, "disableNotificationInGroup", false)
