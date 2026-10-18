@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v12.031
 
 - Added display support for protected combat amounts without inspecting them in Lua.
 - Deferred incoming heal attribution until the display callback.
@@ -8,6 +8,10 @@
 - Added pet spell/melee attribution and unnamed solo DoT tick output.
 - Guarded restricted damage-meter spell data before calculating deltas.
 - Embedded the options in Blizzard Settings with a subcategory per tab.
+- Kept MSBT incoming group filtering in the left General settings column and
+  added a separate Blizzard incoming toggle below its group combat-text option.
+- Preserved Blizzard outgoing combat text when incoming text is disabled and
+  deferred combat-text setting changes until combat ends.
 
 ## v12.030
 
