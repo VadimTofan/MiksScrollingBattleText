@@ -247,9 +247,6 @@ function OutgoingCombat:HandleUnitCombat(
 	if not RestrictedValue:Equals(unitTarget, "target") then
 		return false
 	end
-	if not self.config.inCombat() or not self.config.isTargetValid() then
-		return true
-	end
 
 	action = RestrictedValue:String(action)
 	if not action then

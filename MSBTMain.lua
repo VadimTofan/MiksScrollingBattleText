@@ -338,16 +338,6 @@ local function IsPetEngaged()
 		and SafeUnitBoolean(UnitIsUnit, "pettarget", "target")
 end
 
-local function IsOutgoingTargetContextValid()
-	if not SafeUnitBoolean(UnitExists, "target") then
-		return false
-	end
-	if not SafeUnitBoolean(UnitCanAttack, "player", "target") then
-		return false
-	end
-	return true
-end
-
 local function HasPlayerDebuffOnTarget(spellID)
 	if not spellID or not SafeUnitBoolean(UnitExists, "target") then
 		return false
@@ -589,8 +579,6 @@ outgoingCombat = OutgoingCombat:New({
 	buildActionMessage = BuildActionMessage,
 	display = DisplayEvent,
 	getTime = GetTime,
-	inCombat = InCombatLockdown,
-	isTargetValid = IsOutgoingTargetContextValid,
 	getSpellTexture = function(spellID)
 		local _, _, texture = GetSpellInfo(spellID)
 		return texture

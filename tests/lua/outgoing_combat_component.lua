@@ -112,3 +112,31 @@ component:HandleUnitCombat("target", "DODGE", nil, nil, nil)
 -- Then
 assert(displayCount == displaysBeforeUnattributedAction,
 	"unattributed outgoing action received an auto-attack fallback")
+
+-- Describe: final damage survives target death and combat-state changes.
+for _, state in ipairs({
+    { inCombat = false, targetValid = true },
+    { inCombat = true, targetValid = false },
+    { inCombat = false, targetValid = false },
+}) do
+    -- Given a recent cast whose target dies or whose combat has ended.
+    component.config.inCombat = function() return state.inCombat end
+    component.config.isTargetValid = function() return state.targetValid end
+    component:HandleSpellcastSucceeded("player", 5678)
+    queued = nil
+
+    -- When the final target damage event arrives.
+    component:HandleUnitCombat("target", "WOUND", nil, 75, 4)
+
+    -- Then its amount and spell are still queued for display.
+    assert(queued, "final damage was dropped after combat or target loss")
+    assert(queued[1] == 5678 and queued[2] == 75)
+end
+
+-- Given combat has ended and no recent cast can attribute the hit.
+now = 40
+queued = nil
+-- When another target damage event arrives.
+component:HandleUnitCombat("target", "WOUND", nil, 99, 4)
+-- Then uncertain damage is still rejected by the attribution checks.
+assert(queued == nil, "unattributed damage was accepted after combat")
