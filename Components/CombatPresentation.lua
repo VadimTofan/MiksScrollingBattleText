@@ -66,7 +66,11 @@ function Presentation:Queue(key, record)
 	batch.hitCount = 1
 	self.batches[batchKey] = batch
 	local generation = self.generation
-	self.config.after(self.config.delay or 0.12, function()
+	local delay = self.config.delay or 0.12
+	if record.event == "damage" then
+		delay = self.config.damageDelay or delay
+	end
+	self.config.after(delay, function()
 		if generation ~= self.generation then return end
 		self.batches[batchKey] = nil
 		self:Emit(key, batch)

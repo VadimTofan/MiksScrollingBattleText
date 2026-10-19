@@ -118,16 +118,23 @@ for _, forever in ipairs({ false, true }) do
 	assert(not mainFrame.events.UNIT_COMBAT, "legacy incoming reader remained active")
 	assert(meterReads == 0, "duplicate damage-meter source was queried")
 
-	-- Given incoming damage and combat exit through the same dispatcher.
+	-- Given similar incoming hits arriving 150 ms apart.
+	local beforeDamage = #displayed
 	Dispatch("UNIT_COMBAT", "player", "WOUND", "", 25, 1)
-	Advance(0.13)
+	-- When the second hit arrives within the 200 ms grouping window.
+	Advance(0.15)
+	assert(#displayed == beforeDamage, "incoming damage flushed before 200 ms")
+	Dispatch("UNIT_COMBAT", "player", "WOUND", "", 15, 1)
+	Advance(0.06)
+	-- Then one combined damage line is displayed after the window closes.
+	assert(#displayed == beforeDamage + 1)
 	Dispatch("PLAYER_REGEN_ENABLED")
 	-- Then the incoming window and combat notices retain their settings.
 	local taken, entered, left = 0, 0, 0
 	for _, record in ipairs(displayed) do
 		if record[1] == events.INCOMING_DAMAGE then
 			taken = taken + 1
-			assert(record[2] == "Taken 25")
+			assert(record[2] == "Taken 40")
 		end
 		if record[1] == events.NOTIFICATION_COMBAT_ENTER then entered = entered + 1 end
 		if record[1] == events.NOTIFICATION_COMBAT_LEAVE then left = left + 1 end

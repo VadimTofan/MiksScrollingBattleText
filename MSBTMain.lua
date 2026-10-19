@@ -99,6 +99,7 @@ local playerGUID
 local AUTOSHOT_SPELL_ID = 6603
 local AUTO_REPEAT_SPELL_IDS = {75, 5019}
 local OUTGOING_GROUP_DELAY = 0.2
+local INCOMING_DAMAGE_GROUP_DELAY = 0.2
 local INCOMING_GROUP_DELAY = 0.12
 local OUTGOING_FALLBACK_ATTRIBUTION_WINDOW = 0.9
 local OUTGOING_DELAYED_SPELL_ATTRIBUTION_WINDOW = 3.0
@@ -681,6 +682,7 @@ if Client.isMainline or Client.isForever then
 		batcher = outgoingBatcher,
 		after = C_Timer.After,
 		delay = INCOMING_GROUP_DELAY,
+		damageDelay = INCOMING_DAMAGE_GROUP_DELAY,
 		getSpellTexture = function(spellID)
 			local _, _, texture = GetSpellInfo(spellID)
 			return texture
