@@ -281,9 +281,6 @@ local function OnUnitCombat(unit, event, flag, amount, school)
         if record.event == "damage" or record.event == "heal" then
             record.tick = Beat((unit == "pet" and "pet" or "") .. record.event, record.school, now)
         end
-        if record.event == "heal" and ns.TagIncomingHeal then
-            ns.TagIncomingHeal(record, unit, now)
-        end
         -- 0.6.0, Bend 2: while lines done to you come, a hit on you takes
         -- the line of its frame (ns.DecideFrame), so the Combat Feed can show
         -- who hit you, and no line of yours is spent on it.
@@ -301,7 +298,17 @@ local function OnUnitCombat(unit, event, flag, amount, school)
             while reader.youRecent[1] and now - reader.youRecent[1].at > 1 do table.remove(reader.youRecent, 1) end
             if #reader.youFrame == 1 and #reader.frameHits == 0 then C_Timer.After(0, ns.DecideFrame) end
         end
-        router:In(record)
+        if record.event == "heal" then
+            -- A heal can arrive before its cast succeeds in the same frame.
+            -- Resolve the spell before presentation copies the record.
+            C_Timer.After(0, function()
+                ns.TagIncomingHeal(record, unit, now)
+                local live = Router()
+                if live then live:In(record) end
+            end)
+        else
+            router:In(record)
+        end
         return
     end
     if record.event == "energize" then return end

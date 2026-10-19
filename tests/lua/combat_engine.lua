@@ -129,6 +129,7 @@ assert(record.amount == 100 and record.crit)
 -- When the game reports them on the player and pet.
 Event("UNIT_COMBAT", "player", "WOUND", "", 50, 1)
 Event("UNIT_COMBAT", "player", "HEAL", "CRITICAL", 60, 2)
+Advance(0)
 Event("UNIT_COMBAT", "pet", "WOUND", "", 20, 1)
 -- Then the new reader owns all three with their original amounts.
 assert(#incoming == 3 and incoming[1].amount == 50)
@@ -182,9 +183,12 @@ Event("PLAYER_TARGET_CHANGED")
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 201)
 -- When its heal is reported on the player.
 Event("UNIT_COMBAT", "player", "HEAL", "CRITICAL", 91, 2)
--- Then the record retains self-heal attribution for the existing settings.
+Advance(0)
+-- Then the self heal keeps the player's spell and its real icon.
 record = incoming[#incoming]
-assert(record.selfHeal and record.spell == 201 and record.amount == 91)
+assert(record.event == "heal" and record.amount == 91 and record.crit)
+assert(record.selfHeal and record.spell == 201 and record.icon == "icon-201",
+    "self heal lost its cast's spell icon")
 targetIsPlayer = false
 Event("PLAYER_TARGET_CHANGED")
 

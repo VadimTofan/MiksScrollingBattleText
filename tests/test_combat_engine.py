@@ -5,6 +5,16 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: the adapted engine feeds MSBT without replacing its display.
 class CombatEngineTests(unittest.TestCase):
+    def test_incoming_healer_notices_pair_in_either_order_within_200_ms(self):
+        # Given
+        script = "incoming_healer_pairing.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_filter_changes_are_saved_only_for_the_next_session(self):
         # Given
         script = "combat_log_filter.lua"

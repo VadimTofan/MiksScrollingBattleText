@@ -2,6 +2,7 @@ local Presentation = {}
 Presentation.__index = Presentation
 
 local RestrictedValue = MikSBT.API.RestrictedValue
+local HEALER_PAIR_WINDOW = 0.2
 local MISS_TYPES = {
 	"MISS", "DODGE", "PARRY", "BLOCK", "RESIST", "EVADE",
 	"IMMUNE", "DEFLECT", "ABSORB", "REFLECT",
@@ -24,6 +25,8 @@ end
 function Presentation:Reset()
 	self.generation = self.generation + 1
 	self.batches = {}
+	self.lastIncomingHeal = nil
+	self.waitingHealer = nil
 end
 
 function Presentation:Settings(key, crit)
@@ -48,9 +51,41 @@ function Presentation:Emit(key, record, eventSettings)
 	end
 end
 
-function Presentation:Queue(key, record)
-	if not self.config.after or not RestrictedValue:Number(record.amount) then
+function Presentation:RememberIncomingHeal(record)
+	local now = self.config.getTime()
+	record.healerTime = now
+	self.lastIncomingHeal = record
+	local waiting = self.waitingHealer
+	self.waitingHealer = nil
+	if waiting and now - waiting.at <= HEALER_PAIR_WINDOW then
+		record.sourceName = waiting.name
+	end
+end
+
+function Presentation:EmitIncomingHeal(key, record)
+	local remaining = HEALER_PAIR_WINDOW
+		- (self.config.getTime() - record.healerTime)
+	local generation = self.generation
+	self.config.after(math.max(0, remaining), function()
+		if generation ~= self.generation then return end
 		self:Emit(key, record)
+	end)
+end
+
+function Presentation:Queue(key, record, incomingHeal)
+	if not self.config.after then
+		self:Emit(key, record)
+		return
+	end
+	if not RestrictedValue:Number(record.amount) then
+		if incomingHeal then
+			local pending = {}
+			for field, value in pairs(record) do pending[field] = value end
+			self:RememberIncomingHeal(pending)
+			self:EmitIncomingHeal(key, pending)
+		else
+			self:Emit(key, record)
+		end
 		return
 	end
 	local batchKey = key .. (record.crit and ":crit" or "")
@@ -59,11 +94,13 @@ function Presentation:Queue(key, record)
 	if batch then
 		batch.amount = batch.amount + record.amount
 		batch.hitCount = batch.hitCount + 1
+		if incomingHeal then self:RememberIncomingHeal(batch) end
 		return
 	end
 	batch = {}
 	for field, value in pairs(record) do batch[field] = value end
 	batch.hitCount = 1
+	if incomingHeal then self:RememberIncomingHeal(batch) end
 	self.batches[batchKey] = batch
 	local generation = self.generation
 	local delay = self.config.delay or 0.12
@@ -73,7 +110,11 @@ function Presentation:Queue(key, record)
 	self.config.after(delay, function()
 		if generation ~= self.generation then return end
 		self.batches[batchKey] = nil
-		self:Emit(key, batch)
+		if incomingHeal then
+			self:EmitIncomingHeal(key, batch)
+		else
+			self:Emit(key, batch)
+		end
 	end)
 end
 
@@ -127,7 +168,8 @@ end
 function Presentation:In(record)
 	if record.event ~= "damage" and record.event ~= "heal"
 		and record.event ~= "miss" then return end
-	self:Queue(EventKey("INCOMING", record), record)
+	self:Queue(EventKey("INCOMING", record), record,
+		record.event == "heal" and not record.pet)
 end
 
 function Presentation:Aura(gained, harmful, name, icon, spellID)
@@ -189,11 +231,16 @@ function Presentation:Gain() end
 function Presentation:Log() end
 function Presentation:FlushTotals() end
 
--- The reader attaches these notices after the hit in the same frame. Keep
--- them on the pending incoming record, without inspecting restricted data.
+-- Match the player's healer notice in either event order. Pet and outgoing
+-- heals never consume these notices; opaque names are retained as supplied.
 function Presentation:Healer(name)
-	for _, record in pairs(self.batches) do
-		if record.event == "heal" then record.sourceName = name end
+	if not self.config.getTime then return end
+	local now = self.config.getTime()
+	local record = self.lastIncomingHeal
+	if record and now - record.healerTime <= HEALER_PAIR_WINDOW then
+		record.sourceName = name
+	else
+		self.waitingHealer = { name = name, at = now }
 	end
 end
 function Presentation:HealAbsorbed(amount)

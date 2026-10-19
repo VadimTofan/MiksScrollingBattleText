@@ -66,13 +66,19 @@ local function Dispatch(event, ...)
 	end
 end
 local function Advance(seconds)
-	now = now + seconds
-	local pending = timers
-	timers = {}
-	for _, timer in ipairs(pending) do
-		if timer.at <= now then timer.callback()
-		else timers[#timers + 1] = timer end
+	local finish = now + seconds
+	while true do
+		local nextIndex
+		for index, timer in ipairs(timers) do
+			if timer.at <= finish and (not nextIndex
+				or timer.at < timers[nextIndex].at) then nextIndex = index end
+		end
+		if not nextIndex then break end
+		local timer = table.remove(timers, nextIndex)
+		now = timer.at
+		timer.callback()
 	end
+	now = finish
 end
 
 for _, forever in ipairs({ false, true }) do
@@ -182,10 +188,67 @@ for _, forever in ipairs({ false, true }) do
 	-- When a heal with a Holy school mask is reported.
 	Dispatch("UNIT_COMBAT", "player", "HEAL", "", 90, 2)
 	Advance(0.13)
+	Advance(0.08)
 	-- Then its amount retains heal styling instead of embedded damage colouring.
 	local heal = displayed[#displayed]
 	assert(heal[1] == events.INCOMING_HEAL)
 	assert(heal[2] == "+90", "incoming heal amount received damage-school colour")
+
+	-- Given a healer notice arriving before the UNIT_COMBAT amount.
+	events.INCOMING_HEAL.message = "+%a (%n)"
+	C_CombatText = { GetCurrentEventInfo = function()
+		return "Early healer", 41
+	end }
+	Dispatch("COMBAT_TEXT_UPDATE", "HEAL")
+	Advance(0.15)
+	-- When the matching heal arrives within 200 ms.
+	Dispatch("UNIT_COMBAT", "player", "HEAL", "", 41, 2)
+	Advance(0.13)
+	Advance(0.08)
+	-- Then the name reaches the real formatter without an invented icon.
+	heal = displayed[#displayed]
+	assert(heal[2] == "+41 (Early healer)" and heal[3] == nil)
+
+	-- Given a heal whose name arrives after its 120 ms grouping window.
+	Dispatch("UNIT_COMBAT", "player", "HEAL", "", 42, 2)
+	Advance(0.13)
+	Advance(0.02)
+	C_CombatText.GetCurrentEventInfo = function() return "Late healer", 42 end
+	-- When the notice arrives before the 200 ms pairing deadline.
+	Dispatch("COMBAT_TEXT_UPDATE", "HEAL")
+	Advance(0.06)
+	-- Then the same amount is displayed once with the late healer name.
+	heal = displayed[#displayed]
+	assert(heal[2] == "+42 (Late healer)" and heal[3] == nil)
+
+	-- Given a helpful spell cast while the player explicitly targets themselves.
+	local unitIsUnit = UnitIsUnit
+	UnitIsUnit = function(a, b)
+		return (a == "target" and b == "player") or unitIsUnit(a, b)
+	end
+	C_Spell.IsSpellHelpful = function(id) return id == 201 end
+	events.SELF_HEAL = { message = "Self %a", scrollArea = "Custom heals" }
+	for _, healFirst in ipairs({ true, false }) do
+		MikSBT.CombatEngine.ResetHealing()
+		local beforeHeal = #displayed
+		-- When the heal and cast success arrive in either order in one frame.
+		if healFirst then
+			Dispatch("UNIT_COMBAT", "player", "HEAL", "", 93, 2)
+		end
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 201)
+		if not healFirst then
+			Dispatch("UNIT_COMBAT", "player", "HEAL", "", 93, 2)
+		end
+		Advance(0.21)
+		-- Then exactly one self-heal keeps the actual spell's icon.
+		heal = displayed[#displayed]
+		assert(#displayed == beforeHeal + 1)
+		assert(heal[1] == events.SELF_HEAL)
+		assert(heal[2] == "Self 93" and heal[3] == "icon",
+			"self-target heal lost its spell icon")
+	end
+	UnitIsUnit = unitIsUnit
+	C_Spell.IsSpellHelpful = function() return false end
 
 	-- Given the active filter was changed to include another player's lines.
 	local before = #displayed

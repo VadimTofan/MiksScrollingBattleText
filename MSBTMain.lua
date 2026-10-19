@@ -679,6 +679,7 @@ incomingCombat = IncomingCombat:New({
 if Client.isMainline or Client.isForever then
 	local presentation = CombatPresentation:New({
 		getProfile = function() return MSBTProfiles.currentProfile end,
+		getTime = GetTime,
 		batcher = outgoingBatcher,
 		after = C_Timer.After,
 		delay = INCOMING_GROUP_DELAY,
