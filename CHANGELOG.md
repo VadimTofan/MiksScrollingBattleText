@@ -1,5 +1,14 @@
 # Changelog
 
+## v12.037
+
+- Added separate Incoming Pet and Outgoing Pet scroll areas, positioned
+  100 pixels left of their player counterparts by default.
+- Routed pet events to their own areas while preserving saved custom assignments
+  and the corresponding incoming/outgoing group visibility settings.
+- Stopped dropping attributed outgoing fallback damage when combat ends or
+  the target becomes invalid.
+
 ## v12.036
 
 - Removed the unused damage-meter source and disabled combat-reader features.
