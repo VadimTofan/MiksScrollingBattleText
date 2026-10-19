@@ -17,7 +17,6 @@ local presentation = Presentation:New({
 	getProfile = function() return profile end,
 	batcher = { Queue = function(_, ...) queued = { ... } end },
 	getSpellTexture = function(id) return "icon-" .. id end,
-	getSpellName = function(id) return "Spell " .. id end,
 	formatMessage = function(settings, record)
 		return (settings.message:gsub("%%a", tostring(record.amount or "")))
 	end,

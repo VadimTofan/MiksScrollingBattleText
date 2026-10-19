@@ -26,8 +26,7 @@ function Engine:CreateRouter()
 	local presentation = self.config.presentation
 	local router = {}
 	for _, name in ipairs({
-		"In", "Alert", "Aura", "Partial", "Healer", "HealAbsorbed",
-		"FlushTotals", "Gain", "Log",
+		"In", "Alert", "Aura", "Healer",
 	}) do
 		local method = name
 		router[method] = function(_, ...)
@@ -72,7 +71,7 @@ function Engine:HandleEvent(event, ...)
 		self:MaintainLog()
 		return
 	end
-	if not ns.ShouldReadEvent(event) or not ns.EventAvailable(event) then return end
+	if not ns.EventAvailable(event) then return end
 	if event == "COMBAT_LOG_MESSAGE" and not self.config.log:IsReady() then return end
 	ns.ReaderEvent(nil, event, ...)
 end

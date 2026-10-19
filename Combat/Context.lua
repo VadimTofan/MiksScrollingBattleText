@@ -66,21 +66,6 @@ function ns.EventAvailable(event)
 		and event ~= "SPELL_TEXT_UPDATE"
 end
 
-local RETAINED_SOURCES = {
-	CHAT_MSG_COMBAT_HONOR_GAIN = true, CHAT_MSG_COMBAT_FACTION_CHANGE = true,
-	CHAT_MSG_LOOT = true, PLAYER_XP_UPDATE = true, PLAYER_MONEY = true,
-	SPELL_UPDATE_COOLDOWN = true,
-}
-function ns.ShouldReadEvent(event) return not RETAINED_SOURCES[event] end
-
-function ns.Get(path)
-	if path == "log.confirm" then return true end
-	if path == "log.kills" or path == "alert.interrupts" then return true end
-	return false
-end
-
-function ns.FeedShown() return false end
-
 -- The imported reader schedules delayed matches. Generation guards stop a
 -- disabled or previous session from writing into a newly enabled session.
 ns.Timer = {}

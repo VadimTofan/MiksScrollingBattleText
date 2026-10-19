@@ -40,9 +40,9 @@ UnitIsUnit = function(a, b)
 end
 UnitGUID = function(unit) return unit == "player" and "Player-1" or nil end
 UnitName = function() return "Tester" end
-UnitXP = function() return 0 end
-UnitXPMax = function() return 100 end
-GetMoney = function() return 0 end
+UnitXP = function() error("combat reader queried the dedicated XP source") end
+UnitXPMax = function() error("combat reader queried the dedicated XP source") end
+GetMoney = function() error("combat reader queried the dedicated money source") end
 UnitHealthMax = function() return 1000 end
 GetLocale = function() return "enUS" end
 Enum = { CombatLogMessageOrder = { Oldest = 0, Newest = 1 } }
@@ -76,12 +76,7 @@ local engine = Engine:New({
 		In = function(_, record) incoming[#incoming + 1] = record end,
 		Alert = function(_, record) alerts[#alerts + 1] = record end,
 		Aura = function(_, ...) auras[#auras + 1] = {...} end,
-		Partial = function() end,
 		Healer = function() end,
-		HealAbsorbed = function() end,
-		FlushTotals = function() end,
-		Gain = function() error("duplicate gain reader was enabled") end,
-		Log = function() end,
 	},
 })
 local function Event(event, ...)
@@ -113,6 +108,7 @@ local frame = frames[#frames]
 assert(frame.events.UNIT_COMBAT and not frame.events.PLAYER_SWING)
 assert(not frame.events.CHAT_MSG_LOOT and not frame.events.PLAYER_MONEY)
 assert(not frame.events.COMBAT_LOG_EVENT_UNFILTERED)
+Event("PLAYER_ENTERING_WORLD")
 
 -- Given a successful damaging cast and its confirming line.
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)

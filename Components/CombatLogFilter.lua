@@ -203,7 +203,6 @@ function CombatLog:ConfigureNamespace(ns)
 		return ready, ready
 	end
 	ns.LineKindsReady = function() return self:IsReady() end
-	ns.DoneToMeActive = function() return false end
 end
 
 MikSBT.Components.CombatLogFilter = CombatLog

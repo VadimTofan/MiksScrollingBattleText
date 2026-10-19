@@ -226,11 +226,6 @@ function Presentation:Alert(record)
 	self:Emit(key, displayRecord)
 end
 
--- Loot, gains and cooldowns retain MSBT's existing dedicated sources.
-function Presentation:Gain() end
-function Presentation:Log() end
-function Presentation:FlushTotals() end
-
 -- Match the player's healer notice in either event order. Pet and outgoing
 -- heals never consume these notices; opaque names are retained as supplied.
 function Presentation:Healer(name)
@@ -241,18 +236,6 @@ function Presentation:Healer(name)
 		record.sourceName = name
 	else
 		self.waitingHealer = { name = name, at = now }
-	end
-end
-function Presentation:HealAbsorbed(amount)
-	for _, record in pairs(self.batches) do
-		if record.event == "heal" then record.absorbed = amount end
-	end
-end
-function Presentation:Partial(word, amount)
-	for _, record in pairs(self.batches) do
-		if record.event == "damage" then
-			record.partialWord, record.partialAmount = word, amount
-		end
 	end
 end
 

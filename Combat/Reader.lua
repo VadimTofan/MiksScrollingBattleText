@@ -3,39 +3,10 @@
 local ns = MikSBT.CombatEngine
 local C_Timer = ns.Timer
 
--- What the game tells the addon, read and handed to the router (Route.lua).
--- Every event name is a LiteralName in Blizzard_APIDocumentationGenerated,
--- read by its documented payload; every value is checked before it is
--- compared (ns.Public), and a secret one is only ever drawn.
---   UNIT_COMBAT (UnitDocumentation; no secrecy rule): hits, heals, power and
---     misses on you, your pet, your target and enemies' nameplates. The
---     event and flag names follow Blizzard's CombatFeedback.lua.
---   UNIT_SPELLCAST_SUCCEEDED for player and pet, and PLAYER_SWING
---     (SwingTimerDocumentation): what Mine.lua matches hits to.
---   UNIT_SPELLCAST_INTERRUPTED on your target, focus or an enemy's plate
---     (SecretWhenUnitSpellCastRestricted: the event still arrives): an
---     interrupt of yours when your or your pet's cast came just before it.
---   LOSS_OF_CONTROL_ADDED with C_LossOfControl.GetActiveLossOfControlData
---     (no secrecy rule for the player): crowd control on you.
---   SPELL_ACTIVATION_OVERLAY_GLOW_SHOW (spellID, no secrecy rule): procs.
---   SPELL_UPDATE_COOLDOWN with C_Spell.GetSpellCooldown, whose isActive and
---     isOnGCD are NeverSecret (SpellSharedDocumentation): a cooldown of
---     yours ending.
---   COMBAT_TEXT_UPDATE (the type is public; C_CombatText.GetCurrentEventInfo
---     is SecretReturns, in battlegrounds secret even out of combat on
---     1.60.1.70338, AGENTS.md): buffs and debuffs gained and lost, reactive
---     abilities and honor, drawn as the game hands them over. Whether these
---     notices still come with Blizzard's own combat text off is the open
---     check ws-combat-text-off.
---   CHAT_MSG_COMBAT_HONOR_GAIN, CHAT_MSG_COMBAT_FACTION_CHANGE, CHAT_MSG_LOOT,
---     PLAYER_XP_UPDATE and PLAYER_MONEY: gains, read when the text is
---     readable (chat text is secret during chat lockdown; then skipped).
---   C_DamageMeter (SecretWhenInCombat only): the fight summary, once combat
---     has ended.
---   UnitHealthPercent with a step curve: the low health warning's alpha
---     (Lanes.lua), never read.
+-- Read hits, casts, swings, auras, and combat-log timing. MSBT owns
+-- presentation and its dedicated loot, gain, and cooldown sources.
 
-local reader = { epoch = 0, plates = {}, held = {}, tracked = {}, fightStart = nil, lastGlow = {}, lastCC = {},
+local reader = { epoch = 0, plates = {}, held = {}, lastGlow = {}, lastCC = {},
     swingTimes = {} }
 ns.reader = reader
 
@@ -67,84 +38,6 @@ local function PetAttacking(token)
     local same = UnitIsUnit("pettarget", token)
     return ns.Bool(same) and same
 end
--- 0.3.15: no hit was ever seen with your pet attacking its unit in a
--- battleground. What the game answers, written to the recorder at most
--- once every five seconds: QP pet-exists pettarget-exists pettarget-is-target
--- pet-family (true, false, or s for a secret; 0.3.16 adds the family, the
--- user's pet being a Succubus).
-local lastPetNote = 0
-local function NotePet(trace)
-    local now = GetTime()
-    if now - lastPetNote < 5 then return end
-    lastPetNote = now
-    local function Word(value) if not ns.Public(value) then return "s" end return tostring(value) end
-    local family = UnitCreatureFamily and UnitCreatureFamily("pet")
-    trace("QP", Word(UnitExists("pet")), Word(UnitExists("pettarget")), Word(UnitIsUnit("pettarget", "target")),
-        ns.Text(family) and family:gsub("%s", "_") or Word(family))
-end
-
--- The fight recorder ----------------------------------------------------------------
--- 0.3.7 (the user, 14 October 2026: "keep watching and you should be able
--- a figure out a way to get this to all work"): what the reader saw and what
--- the engine made of it, in ForeverCombatTextTrace, so a session can be
--- replayed offline against the combat log's timing and the engine improved
--- from real fights. Plain values only (a secret is written "s"); a ring of
--- TRACE_MAX lines, written by the game at a reload or logout.
---   P version zone            a session (PLAYER_ENTERING_WORLD)
---   C unit spell key damages school direct ticks   a cast, with what its
---                             description says ("-" when unknown)
---   S hand key                a swing
---   H unit key event flag amount school who spell tick guess pet
---   Y key amount              a held hit confirmed by a line of yours
---   W key                     a held hit claimed by a late swing
---   L source                  a combat log line (mine, kill, other, unknown)
---   T key                     a target change
---   I unit event flag amount school   a hit, heal or power on you or your pet
---   N kind                    a combat text notice (0.3.17)
---   QP ...                    what the game says about your pet (below)
---   RK old new / FG key       the engine told a unit's key changed, or that
---                             a plate holding something of yours went
---   (0.3.7 to 0.3.9 also wrote PA token target / PR token target for every
---   plate that came or went.)
--- 0.3.41 (AGENTS.md, Diagnostics in released addons): it records only on our
--- development PCs, where Forever Diagnostics is loaded, asked at PLAYER_LOGIN
--- (Core.lua) because addons load roughly alphabetically and this one loads
--- before it. Nothing before that answer is recorded (the reader starts at
--- PLAYER_LOGIN too). For players it records nothing and the old copy goes.
--- Nothing the engine or the lanes do reads the recorder.
-local TRACE_MAX = 6000
-local recording = false
-function ns.DecideRecording()
-    local loaded = false
-    if C_AddOns and C_AddOns.IsAddOnLoaded then
-        local _, done = C_AddOns.IsAddOnLoaded("ForeverDiagnostics")
-        loaded = done == true
-    end
-    recording = loaded
-    if not loaded then _G.ForeverCombatTextTrace = nil end
-    return loaded
-end
-function ns.Recording() return recording end
-local function TraceAt(at, ...)
-    if not recording then return end
-    local trace = _G.ForeverCombatTextTrace
-    if type(trace) ~= "table" or type(trace.lines) ~= "table" or type(trace.i) ~= "number" then
-        trace = { v = 1, i = 0, lines = {} }
-        _G.ForeverCombatTextTrace = trace
-    end
-    local parts = { string.format("%.3f", at) }
-    for index = 1, select("#", ...) do
-        local value = select(index, ...)
-        if not ns.Public(value) then parts[#parts + 1] = "s"
-        elseif value == nil then parts[#parts + 1] = "-"
-        else parts[#parts + 1] = tostring(value) end
-    end
-    trace.i = (trace.i % TRACE_MAX) + 1
-    trace.lines[trace.i] = table.concat(parts, " ")
-end
-local function Trace(...) TraceAt(Now(), ...) end
-ns.Trace = Trace
-
 -- The router and engine -------------------------------------------------------------
 local function Router() return ns.liveRouter end
 
@@ -173,8 +66,8 @@ end
 
 -- A hit no cast or swing explains waits LATE_SWING for a swing reported
 -- after it; then it goes out as someone else's, unless a combat log line of
--- yours came with it (ConfirmByLog, below).
-local ConfirmByLog, LinesRunning, DecideGroup
+-- yours came with it.
+local LinesRunning, DecideGroup
 local function FlushHeld()
     local now = Now()
     local keep = {}
@@ -203,7 +96,6 @@ local function FlushHeld()
     if #keep > 0 then C_Timer.After(0.1, FlushHeld) end
 end
 
-local PART_FLAGS = { RESIST = "resisted", BLOCK_REDUCED = "blocked", BLOCK = "blocked", ABSORB = "absorbed" }
 local FEEDBACK = { MISS = true, DODGE = true, PARRY = true, BLOCK = true, RESIST = true, EVADE = true, IMMUNE = true,
     DEFLECT = true, ABSORB = true, REFLECT = true }
 
@@ -219,15 +111,12 @@ local function Describe(event, flag, amount, school)
             end
             return { event = "miss", missWord = ns.MissWord("MISS"), school = school }
         end
-        -- A flag naming what took part of a hit that landed (0.1.8): Blizzard's
-        -- CombatFeedback.lua knows BLOCK_REDUCED; whether the game sends a
-        -- resist or absorb flag with an amount is the check fct-hit-flags.
-        return { event = "damage", amount = amount, school = school, crit = flag == "CRITICAL",
-            crushing = flag == "CRUSHING", glancing = flag == "GLANCING", partWord = PART_FLAGS[flag] }
+        return {
+            event = "damage", amount = amount, school = school,
+            crit = flag == "CRITICAL",
+        }
     elseif event == "HEAL" then
         return { event = "heal", amount = amount, school = school, crit = flag == "CRITICAL" }
-    elseif event == "ENERGIZE" then
-        return { event = "energize", amount = amount, crit = flag == "CRITICAL" }
     elseif FEEDBACK[event] then
         return { event = "miss", missWord = ns.MissWord(event), school = school }
     end
@@ -258,9 +147,6 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     if not router then return end
     local now = Now()
     if unit == "player" or unit == "pet" then
-        -- 0.3.16 (the user: no text for Life Tap's health and mana): hits,
-        -- heals and power on you and your pet go to the recorder too.
-        Trace("I", unit, event, flag ~= "" and flag or nil, amount, school)
         if unit == "pet" then record.pet = true end
         -- 0.3.49: heals on you, so a hit that gave you its amount in the
         -- same moment reads as a drain (ns.DecideHit).
@@ -269,34 +155,8 @@ local function OnUnitCombat(unit, event, flag, amount, school)
             while heals[1] and (now - heals[1].at > 1 or #heals > 16) do table.remove(heals, 1) end
             heals[#heals + 1] = { at = now, amount = amount }
         end
-        -- A power gain's kind: your own power, by its game name (Mana).
-        if record.event == "energize" then
-            record.powerWord = ns.PlayerPowerWord()
-            if unit == "player" then
-                reader.energizeAt = now
-                record.icon = ns.CastIcon(now)
-                record.name = ns.SpellName(ns.CastSpell(now))
-            end
-        end
         if record.event == "damage" or record.event == "heal" then
             record.tick = Beat((unit == "pet" and "pet" or "") .. record.event, record.school, now)
-        end
-        -- 0.6.0, Bend 2: while lines done to you come, a hit on you takes
-        -- the line of its frame (ns.DecideFrame), so the Combat Feed can show
-        -- who hit you, and no line of yours is spent on it.
-        -- 0.6.6: what was reported on you, by frame (FrameRoles).
-        if unit == "player" and (record.event == "damage" or record.event == "miss") then
-            local reports = reader.youReports
-            reports[#reports + 1] = { at = now, class = record.event }
-            while reports[1] and (now - reports[1].at > 3 or #reports > 32) do table.remove(reports, 1) end
-        end
-        if unit == "player" and (record.event == "damage" or record.event == "miss" or record.event == "heal")
-            and ns.DoneToMeActive and ns.DoneToMeActive() then
-            local you = { at = now, record = record }
-            reader.youFrame[#reader.youFrame + 1] = you
-            reader.youRecent[#reader.youRecent + 1] = you
-            while reader.youRecent[1] and now - reader.youRecent[1].at > 1 do table.remove(reader.youRecent, 1) end
-            if #reader.youFrame == 1 and #reader.frameHits == 0 then C_Timer.After(0, ns.DecideFrame) end
         end
         if record.event == "heal" then
             -- A heal can arrive before its cast succeeds in the same frame.
@@ -311,7 +171,6 @@ local function OnUnitCombat(unit, event, flag, amount, school)
         end
         return
     end
-    if record.event == "energize" then return end
     local key, token
     if unit == "target" then
         key, token = ns.TargetKey(), "target"
@@ -327,9 +186,8 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     else
         return
     end
-    if recording and unit == "target" then NotePet(Trace) end
-    local hit = { record = record, key = key, token = token, at = now, unit = unit, event = event, flag = flag,
-        amount = amount, school = school, petOn = PetAttacking(token) }
+    local hit = { record = record, key = key, at = now, unit = unit,
+        petOn = PetAttacking(token) }
     -- 0.3.8: while lines of yours come, a hit is decided at the end of its
     -- frame, once every line of that frame has come (the game sends a hit
     -- and its line in the same frame, either one first; 1.60.1.70374).
@@ -393,9 +251,6 @@ function ns.DecideHit(hit, line, restrict)
     end
     if result.proc and not result.drain and not result.spell then result.procSpell = ProcSpell(hit.at, record.school) end
     record.result = result
-    TraceAt(hit.at, "H", hit.unit, hit.key, hit.event, hit.flag ~= "" and hit.flag or nil, hit.amount, hit.school, result.who,
-        result.spell, result.tick, result.guess and "g" or nil, hit.petOn and "p" or nil,
-        line == true and "l" or (line == false and "n" or nil), restrict, leech and "h" or nil)
     if result.hold then
         local entry = { record = record, held = result.held, at = hit.at, line = line }
         reader.held[#reader.held + 1] = entry
@@ -404,9 +259,6 @@ function ns.DecideHit(hit, line, restrict)
     end
     if ns.OnYourHit and (result.who == "you" or result.who == "pet") then ns.OnYourHit(record, hit.at) end
     router:Out(record)
-    -- 0.5.0: a hit or tick marked lower than usual, and by how much, for a
-    -- check against the /combatlog file afterwards.
-    if type(record.reduced) == "table" then TraceAt(hit.at, "RD", hit.key, record.reduced.amount, record.reduced.approx and "~" or nil) end
     return result
 end
 
@@ -436,17 +288,6 @@ reader.frameHits = {}
 -- How far a spare line of yours may be from a bolt's hit (ns.DecideLate).
 local EARLY_LINE, LATE_LINE = 0.35, 0.12
 local MISS_SETTLE = 0.03 -- a miss with its line waits this for its cast (DecideGroup)
--- 0.6.0, Bend 2 (the user, 18 October 2026: option 3, "show it, marked
--- unsure"): in a frame with hits on you, lines done to you come in the same
--- colours as yours. When there are lines enough for every hit of a class,
--- the hits on you take theirs (sealed for the feed's tooltip) and the rest
--- decide your hits as before. When there are fewer, nothing is taken from
--- your hits: they decide with every line as before, and each is marked
--- unsure, as its line may have been the one for the hit on you.
-local function LineOfClass(line, class)
-    if not line.kind then return true end
-    return LineClass(line) == class
-end
 -- Melee swing lines (0.6.1 to 0.6.3, 1.60.1.70450, 19 October 2026,
 -- laptop). A melee blow is reported a while after its combat log line, never
 -- in the line's frame: your swing's hit 0.45 s after it with a one-hander, a
@@ -454,58 +295,32 @@ end
 -- 1.5 s (an Ashenvale mob) after its line; a Succubus's 0.57 to 1.0 s. So no
 -- hit takes a melee line from its own frame (MeleeLine), and each melee line
 -- gets one role once its frame is over (Role):
---   "enemy"  a blow on you: a "you took damage" or "you avoided it" notice
---            (COMBAT_TEXT_UPDATE) came in its frame, one line per notice,
---            while lines done to you come (Bend 2);
 --   "swing"  your swing's: PLAYER_SWING came in its frame, one per swing
 --            (SwingLine);
 --   "orphan" neither: your pet's swing or an extra attack of yours, which
 --            send no PLAYER_SWING (OrphanSwingLine).
--- A frame holding your swing and an enemy's blow on you (a staff warlock's
--- dodged swing beside the mob's blow) sorts by class: the notice was damage,
--- so the damage line is the enemy's and the miss line yours.
 local SWING_FRAME = 0.001 -- one frame: its events share one GetTime
 local function MeleeLine(line)
     return line.kind ~= nil and LineRestrict(line) == "swing"
 end
-reader.notices, reader.youReports = {}, {}
-local NOTICE_CLASS = { DAMAGE = "damage", DAMAGE_CRIT = "damage", MISS = "miss", DODGE = "miss", PARRY = "miss",
-    BLOCK = "miss", EVADE = "miss", IMMUNE = "miss", DEFLECT = "miss", ABSORB = "miss", REFLECT = "miss" }
-ns.NOTICE_CLASS = NOTICE_CLASS
 local function FrameRoles(at)
-    local lines = {}
-    for _, line in ipairs(reader.logLines or {}) do
-        if MeleeLine(line) and math.abs(line.at - at) <= SWING_FRAME then lines[#lines + 1] = line end
-    end
-    local enemy = { damage = 0, miss = 0 }
-    if ns.DoneToMeActive and ns.DoneToMeActive() then
-        for _, notice in ipairs(reader.notices) do
-            if math.abs(notice.at - at) <= SWING_FRAME then enemy[notice.class] = enemy[notice.class] + 1 end
+    local swings = 0
+    for _, swing in ipairs(reader.swingTimes) do
+        if not swing.ranged and math.abs(swing.at - at) <= SWING_FRAME then
+            swings = swings + 1
         end
-        -- 0.6.6: a notice whose report on you came in the same frame is no
-        -- melee blow (a melee blow is reported later): a DoT tick on a rogue
-        -- had made her swing's line an enemy's, 3 times (1.60.1.70450).
-        for _, report in ipairs(reader.youReports) do
-            if math.abs(report.at - at) <= SWING_FRAME and (enemy[report.class] or 0) > 0 then
-                enemy[report.class] = enemy[report.class] - 1
+    end
+    for _, line in ipairs(reader.logLines or {}) do
+        if MeleeLine(line) and math.abs(line.at - at) <= SWING_FRAME then
+            if swings > 0 then
+                line.role, swings = "swing", swings - 1
+            else
+                line.role = "orphan"
             end
         end
     end
-    local swings = 0
-    for _, swing in ipairs(reader.swingTimes) do
-        if not swing.ranged and math.abs(swing.at - at) <= SWING_FRAME then swings = swings + 1 end
-    end
-    for _, line in ipairs(lines) do
-        local class = LineClass(line)
-        if (enemy[class] or 0) > 0 then
-            line.role, enemy[class] = "enemy", enemy[class] - 1
-        elseif swings > 0 then
-            line.role, swings = "swing", swings - 1
-        else
-            line.role = "orphan"
-        end
-    end
 end
+
 local function Role(line)
     if not line.role then FrameRoles(line.at) end
     return line.role
@@ -523,102 +338,9 @@ end
 -- the swing (a warlock's staff, 1.60.1.70450, laptop; both had been taken
 -- for someone else's).
 local PROC_FLIGHT = 0.5
--- A hit on you with no line in its frame takes the oldest enemy line of its
--- class from 0.1 to 2 s before it; when no notices came (Blizzard's combat
--- text silent), a spare line from 0.15 to 0.5 s before (the boar's timing).
-local YOU_LINE_EARLY, YOU_LINE_LATE = 0.1, 2.0
-local YOU_SPARE_EARLY, YOU_SPARE_LATE = 0.15, 0.5
-local function EarlierSwingLine(you, class, enemyOnly)
-    local spare
-    for _, line in ipairs(reader.logLines or {}) do
-        local gap = you.at - line.at
-        if not line.claimed and not line.hit and MeleeLine(line) and Pairs(line) and LineClass(line) == class then
-            local role = Role(line)
-            if role == "enemy" and gap >= YOU_LINE_EARLY and gap <= YOU_LINE_LATE then return line end
-            if not enemyOnly and role == "orphan" and not spare and gap >= YOU_SPARE_EARLY and gap <= YOU_SPARE_LATE then spare = line end
-        end
-    end
-    return spare
-end
-local function ShareWithYou(group, youGroup, at)
-    for _, class in ipairs({ "damage", "miss", "heal" }) do
-        local youOf, hitsOf = {}, {}
-        for _, you in ipairs(youGroup) do
-            if RecordClass(you.record) == class then
-                -- 0.6.8: a melee blow on you (physical, or a miss) takes the
-                -- enemy's line marked by its notice first: a slime's blow on a
-                -- warlock, reported in the frame of her wand bolt's line, had
-                -- taken that line, and the bolt was lost (its own line had
-                -- come 0.5 s before, 1.60.1.70450, laptop).
-                local melee = class == "miss" or (class == "damage" and you.record.school == ns.SCHOOL_PHYSICAL)
-                local line = melee and EarlierSwingLine(you, class, true)
-                if line then
-                    line.claimed, line.hit = true, { at = you.at, record = you.record, you = true }
-                    you.lined = true
-                    ns.SealLine(you.record, line)
-                else
-                    youOf[#youOf + 1] = you
-                end
-            end
-        end
-        if #youOf > 0 then
-            for _, hit in ipairs(group) do
-                if RecordClass(hit.record) == class then hitsOf[#hitsOf + 1] = hit end
-            end
-            -- 0.6.2: never a melee line (MeleeLine): a boar's blow on a
-            -- hunter reported in the frame of the hunter's swing had taken
-            -- the swing's line, and the hunter's hit was lost (1.60.1.70450).
-            local pool = {}
-            for _, line in ipairs(reader.logLines or {}) do
-                if line.at == at and Pairs(line) and not line.claimed and not line.hit and LineOfClass(line, class)
-                    and not MeleeLine(line) then
-                    pool[#pool + 1] = line
-                end
-            end
-            if #pool >= #hitsOf + #youOf then
-                for index, you in ipairs(youOf) do
-                    local line = pool[#pool - index + 1]
-                    line.claimed, line.hit = true, { at = you.at, record = you.record, you = true }
-                    you.lined = true
-                    ns.SealLine(you.record, line)
-                end
-            else
-                for _, hit in ipairs(hitsOf) do hit.record.unsure = true end
-            end
-            for _, you in ipairs(youOf) do
-                if not you.lined and (class == "damage" or class == "miss") then
-                    local line = EarlierSwingLine(you, class)
-                    if line then
-                        line.claimed, line.hit = true, { at = you.at, record = you.record, you = true }
-                        you.lined = true
-                        ns.SealLine(you.record, line)
-                    end
-                end
-            end
-        end
-    end
-end
--- A hit on you within a tenth of a second of a moment (Bend 2; LOG_PAIR,
--- below, is not yet defined here).
-local YOU_NEAR = 0.1
-local function YouNear(at)
-    for _, you in ipairs(reader.youRecent) do
-        if math.abs(you.at - at) <= YOU_NEAR then return true end
-    end
-    return false
-end
-ns.YouNear = YouNear
-
 function ns.DecideFrame()
     local hits = reader.frameHits
     reader.frameHits = {}
-    local youHits = reader.youFrame
-    reader.youFrame = {}
-    local youByTime = {}
-    for _, you in ipairs(youHits) do
-        youByTime[you.at] = youByTime[you.at] or {}
-        table.insert(youByTime[you.at], you)
-    end
     ns.mine.petLines = ns.PetLinesInFilter and ns.PetLinesInFilter()
     -- Out and attacking something (0.3.28): which unit it attacks is
     -- secret in battlegrounds, but whether it has a target is not, and a
@@ -630,13 +352,9 @@ function ns.DecideFrame()
         if not byTime[hit.at] then byTime[hit.at] = {}; order[#order + 1] = hit.at end
         table.insert(byTime[hit.at], hit)
     end
-    for at in pairs(youByTime) do
-        if not byTime[at] then byTime[at] = {}; order[#order + 1] = at end
-    end
     table.sort(order)
     for _, at in ipairs(order) do
         local group = byTime[at]
-        if youByTime[at] then ShareWithYou(group, youByTime[at], at) end
         local frameLines, kinded = {}, false
         for _, line in ipairs(reader.logLines or {}) do
             if line.at == at and Pairs(line) and not line.claimed and not MeleeLine(line) then
@@ -824,12 +542,12 @@ function DecideGroup(group, frameLines, decided)
             elseif swingLine then
                 -- Held on the hit's record for the Combat Feed (Bend 1).
                 swingLine.claimed, swingLine.hit = true, { at = hit.at, record = record }
-                ns.SealLine(record, swingLine)
+
                 ns.mine.pairedSwing = swing
                 Decide(hit, true, LineRestrict(swingLine))
             elseif orphan then
                 orphan.claimed, orphan.hit = true, { at = hit.at, record = record }
-                ns.SealLine(record, orphan)
+
                 ns.mine.orphanSwing = true
                 Decide(hit, true, LineRestrict(orphan))
             end
@@ -839,7 +557,7 @@ function DecideGroup(group, frameLines, decided)
             local procLine = ProcLine(hit)
             if procLine then
                 procLine.claimed, procLine.hit = true, { at = hit.at, record = record }
-                ns.SealLine(record, procLine)
+
                 ns.mine.procSwing = true
                 Decide(hit, true, LineRestrict(procLine))
             elseif record.event == "damage" and ns.mine:InFlight(hit.key, record.school, hit.at) then
@@ -847,7 +565,7 @@ function DecideGroup(group, frameLines, decided)
             elseif FlightProcLine(hit) then
                 local flight = FlightProcLine(hit)
                 flight.claimed, flight.hit = true, { at = hit.at, record = record }
-                ns.SealLine(record, flight)
+
                 ns.mine.procSwing = true
                 Decide(hit, true, LineRestrict(flight))
             elseif record.event == "miss" and ns.LineKindsActive and ns.LineKindsActive() then
@@ -954,10 +672,6 @@ local function OnCast(unit, spell)
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     -- Your pet's casts and your own with no target to hit (Life Tap) are
     -- written too (0.3.16).
-    if recording then
-        Trace("C", unit, spell, key, facts and tostring(facts.damages), facts and facts.school,
-            facts and tostring(facts.direct), facts and tostring(facts.ticks), facts and facts.total, facts and facts.duration)
-    end
     lastCast = { at = now, spell = spell, unit = unit }
     if unit == "player" and facts and facts.weaponProc then
         reader.procSources[facts.weaponProc] = { spell = spell, at = now, kind = facts.weaponProc, school = facts.procSchool }
@@ -971,7 +685,6 @@ local function OnCast(unit, spell)
         end
     end
     if unit == "player" and ns.OnBuffCast then ns.OnBuffCast(spell) end
-    if unit == "player" then ns.TrackCooldown(spell) end
 end
 
 local SWING_HANDS
@@ -988,7 +701,6 @@ local function OnSwing(swingType, swingDuration)
     if not ns.Number(swingType) then return end
     local hand = SWING_HANDS[swingType]
     if not hand then return end
-    if recording then Trace("S", hand, ns.TargetKey()) end
     local times = reader.swingTimes
     times[#times + 1] = { at = Now(), ranged = hand == "ranged" }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
@@ -997,7 +709,6 @@ local function OnSwing(swingType, swingDuration)
     for _, entry in ipairs(reader.held) do
         if entry.held == claimed then
             entry.record.result = { who = "you", melee = true, hand = hand, missed = entry.record.event == "miss" }
-            Trace("W", entry.held.key)
             if ns.OnYourHit then ns.OnYourHit(entry.record, entry.at) end
             local router = Router()
             if router then router:Out(entry.record) end
@@ -1060,46 +771,9 @@ local function OnLossOfControl(unit, index)
     local spell = ns.Number(data.spellID) and data.spellID or text
     if reader.lastCC[spell] and now - reader.lastCC[spell] < 0.3 then return end
     reader.lastCC[spell] = now
-    local length = ns.Number(data.duration, 0.1, 600) and data.duration
-        or (ns.Number(data.timeRemaining, 0.1, 600) and data.timeRemaining) or nil
     local icon = ns.Number(data.iconTexture) and data.iconTexture or ns.SpellIcon(data.spellID)
     local router = Router()
-    local line = router and router:Alert({ kind = "cc", icon = icon, text = text, timer = length, life = length or 2.5 })
-    if line then
-        reader.ccShown[spell] = { line = line, spec = line.spec }
-        -- 0.4.7 (the user, 16 October 2026): the sound Blizzard's alert plays
-        -- as it starts (LossOfControlMixin:SetUpDisplay).
-        if ns.Get("alert.ccSound") and SOUNDKIT and SOUNDKIT.UI_LOSS_OF_CONTROL_START then
-            PlaySound(SOUNDKIT.UI_LOSS_OF_CONTROL_START)
-        end
-    end
-end
-
--- Crowd control that ends early (a Sap broken by damage, a trinket) goes
--- from the lane at once (0.3.14, the user: "i was sapped and then i broke
--- free but the indicator was still there"). LOSS_OF_CONTROL_UPDATE says the
--- list changed, as Blizzard's LossOfControlFrame.lua reads it; what is no
--- longer in C_LossOfControl's list for the player is taken off.
-reader.ccShown = {}
-local function OnLossOfControlUpdate(unit)
-    if unit ~= "player" or not next(reader.ccShown) or not C_LossOfControl then return end
-    local active = {}
-    local count = C_LossOfControl.GetActiveLossOfControlDataCount and C_LossOfControl.GetActiveLossOfControlDataCount()
-    if not ns.Number(count) then return end
-    for index = 1, math.min(count, 20) do
-        local data = C_LossOfControl.GetActiveLossOfControlData(index)
-        if type(data) == "table" and ns.Public(data) then
-            local spell = ns.Number(data.spellID) and data.spellID or (ns.Text(data.displayText) and data.displayText)
-            if spell then active[spell] = true end
-        end
-    end
-    for spell, shown in pairs(reader.ccShown) do
-        if not active[spell] then
-            local line = shown.line
-            if line.spec == shown.spec and line.view and not line.dead then line.view:Remove(line) end
-            reader.ccShown[spell] = nil
-        end
-    end
+    if router then router:Alert({ kind = "cc", icon = icon, text = text }) end
 end
 
 -- Procs and reactive abilities ------------------------------------------------------------
@@ -1113,46 +787,6 @@ local function OnGlow(spell)
     if not ns.Text(name) then return end
     local router = Router()
     if router then router:Alert({ kind = "proc", icon = ns.SpellIcon(spell), text = name }) end
-end
-
--- Honor: the chat line names the enemy and the honor; the combat text
--- notice gives the honor only, drawn. Whichever comes, one line shows: a
--- notice waits a moment for its chat line.
-local honorWait
-local function Pattern(format)
-    if not ns.Text(format) then return nil end
-    local pattern = format:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
-    pattern = pattern:gsub("%%s", "(.+)")
-    pattern = pattern:gsub("%%d", "(%%d+)")
-    return "^" .. pattern .. "$"
-end
-local function ParseHonor(text)
-    if not ns.Text(text) then return nil end
-    local name, _, amount = text:match(Pattern(COMBAT_HONOR_GAIN) or "^$")
-    if name and amount then return tonumber(amount), name end
-    name, amount = text:match(Pattern(COMBAT_HONOR_GAIN_NO_RANK) or "^$")
-    if name and amount then return tonumber(amount), name end
-    amount = text:match(Pattern(COMBAT_HONOR_BONUS) or "^$")
-    if amount then return tonumber(amount), nil end
-end
-ns.ParseHonor = ParseHonor
-local function OnHonorChat(text)
-    local amount, name = ParseHonor(text)
-    if not amount then return end
-    if honorWait then honorWait.done = true end
-    reader.lastHonorChat = Now()
-    local router = Router()
-    if router then router:Gain({ kind = "honor", text = "+" .. amount .. " " .. (HONOR or "Honor"), sub = name }) end
-end
-local function OnHonorNotice(amount)
-    if reader.lastHonorChat and Now() - reader.lastHonorChat < 0.6 then return end
-    local wait = { amount = amount }
-    honorWait = wait
-    C_Timer.After(0.6, function()
-        if wait.done then return end
-        local router = Router()
-        if router then router:Gain({ kind = "honor", format = "+%s " .. (HONOR or "Honor"), args = { wait.amount } }) end
-    end)
 end
 
 -- Your own buffs and debuffs ------------------------------------------------------
@@ -1289,11 +923,6 @@ local function OnPlayerAura(info)
     if any then reader.auraReadAt = Now() end
 end
 
--- How much of a hit on you was resisted, blocked or absorbed: the notice's
--- second detail (Blizzard's CombatText.lua: "-data (arg3 resisted)").
-local PARTIAL = { RESIST = "resisted", SPELL_RESIST = "resisted", BLOCK = "blocked", SPELL_BLOCK = "blocked",
-    ABSORB = "absorbed", SPELL_ABSORB = "absorbed" }
-
 -- A spell of yours cast in the same frame as at, and its icon (0.3.19:
 -- Life Tap's mana with Life Tap's icon). 0.3.30: the window was 0.4 s; in
 -- the recorded battlegrounds Life Tap's mana notice and Demon Armor's buff
@@ -1302,10 +931,6 @@ local PARTIAL = { RESIST = "resisted", SPELL_RESIST = "resisted", BLOCK = "block
 local SAME_FRAME = 0.005
 function ns.CastSpell(at)
     if lastCast and lastCast.unit == "player" and math.abs(lastCast.at - at) <= SAME_FRAME then return lastCast.spell end
-end
-function ns.CastIcon(at)
-    local spell = ns.CastSpell(at)
-    if spell then return ns.SpellIcon(spell) end
 end
 
 -- Your wand's (or bow's, gun's) school, from its tooltip (0.3.21, the user:
@@ -1339,23 +964,8 @@ local function UpdateWand()
 end
 ns.UpdateWand = UpdateWand
 
--- Your own power's name in the game's words (Mana), lower case.
-function ns.PlayerPowerWord()
-    local _, token = UnitPowerType("player")
-    local word = ns.Text(token) and _G[token]
-    return ns.Text(word) and word:lower() or nil
-end
-
 local function OnCombatText(kind)
     if not ns.Text(kind) or not C_CombatText or not C_CombatText.GetCurrentEventInfo then return end
-    ns.Trace("N", kind)
-    -- 0.6.3: what marks an enemy's melee line (FrameRoles).
-    local class = ns.NOTICE_CLASS and ns.NOTICE_CLASS[kind]
-    if class then
-        local notices, now = reader.notices, Now()
-        notices[#notices + 1] = { at = now, class = class }
-        while notices[1] and (now - notices[1].at > 3 or #notices > 32) do table.remove(notices, 1) end
-    end
     local router = Router()
     if not router then return end
     if kind == "SPELL_AURA_START" or kind == "SPELL_AURA_START_HARMFUL" or kind == "SPELL_AURA_END"
@@ -1381,36 +991,10 @@ local function OnCombatText(kind)
             end
             live:Aura(kind:find("START") ~= nil, kind:find("HARMFUL") ~= nil, name, icon)
         end)
-    elseif kind == "ENERGIZE" or kind == "PERIODIC_ENERGIZE" then
-        -- 0.3.17 (the user, on Busy: "i still see nothing about lifetap"):
-        -- Life Tap's mana did not come as a hit report. Blizzard's
-        -- CombatText.lua shows it from this notice: data the amount, arg3 the
-        -- power (both secret in battlegrounds). Drawn as handed over, with
-        -- your own power's name, unless a hit report of the same gain came.
-        local amount = C_CombatText.GetCurrentEventInfo()
-        if ns.Public(amount) then
-            amount = tonumber(amount)
-            if not amount or amount <= 0 then return end
-        end
-        local at = Now()
-        C_Timer.After(0.1, function()
-            if reader.energizeAt and math.abs(reader.energizeAt - at) <= 0.2 then return end
-            local live = Router()
-            if live then
-                live:In({ event = "energize", amount = amount, powerWord = ns.PlayerPowerWord(), icon = ns.CastIcon(at),
-                    name = ns.SpellName(ns.CastSpell(at)) })
-            end
-        end)
-    elseif PARTIAL[kind] then
-        local _, part = C_CombatText.GetCurrentEventInfo()
-        if ns.Public(part) and part == nil then return end
-        router:Partial(PARTIAL[kind], part)
     elseif kind == "HEAL" or kind == "HEAL_CRIT" or kind == "HEAL_ABSORB" or kind == "HEAL_CRIT_ABSORB"
         or kind == "PERIODIC_HEAL_ABSORB" then
-        -- Blizzard's CombatText.lua: data the healer, arg3 the amount, arg4
-        -- (the _ABSORB kinds) how much was absorbed.
-        local name, _, absorbed = C_CombatText.GetCurrentEventInfo()
-        if kind:find("ABSORB") and not (ns.Public(absorbed) and absorbed == nil) then router:HealAbsorbed(absorbed) end
+        -- The first detail is the healer; the amount comes from UNIT_COMBAT.
+        local name = C_CombatText.GetCurrentEventInfo()
         if kind == "PERIODIC_HEAL_ABSORB" then return end
         if ns.Public(name) and name == nil then return end
         -- Your own heals carry your name: a heal right after a cast of yours
@@ -1425,191 +1009,13 @@ local function OnCombatText(kind)
         local name = C_CombatText.GetCurrentEventInfo()
         if ns.Public(name) and name == nil then return end
         router:Alert({ kind = "reactive", format = "<%s>", args = { name } })
-    elseif kind == "HONOR_GAINED" then
-        local amount = C_CombatText.GetCurrentEventInfo()
-        if not (ns.Public(amount) and amount == nil) then OnHonorNotice(amount) end
     end
 end
 
--- Reputation and loot from their chat lines.
-local function OnFaction(text)
-    if not ns.Text(text) then return end
-    local faction, amount = text:match(Pattern(FACTION_STANDING_INCREASED) or "^$")
-    if not faction or not amount then return end
-    local router = Router()
-    if router then router:Gain({ kind = "rep", text = "+" .. amount .. " " .. faction }) end
-end
-local LOOT_FORMATS = { "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_PUSHED_SELF_MULTIPLE", "LOOT_ITEM_SELF", "LOOT_ITEM_PUSHED_SELF",
-    "LOOT_ITEM_CREATED_SELF" }
-local POOR = "|cff9d9d9d"
-local function ParseLoot(text)
-    if not ns.Text(text) then return nil end
-    for _, global in ipairs(LOOT_FORMATS) do
-        local pattern = Pattern(_G[global])
-        if pattern then
-            local link, count = text:match(pattern)
-            if link then return link, tonumber(count) or 1 end
-        end
-    end
-end
-ns.ParseLoot = ParseLoot
-local function OnLoot(text)
-    local link, count = ParseLoot(text)
-    if not link or link:sub(1, #POOR) == POOR then return end
-    local id = tonumber(link:match("item:(%d+)"))
-    local icon = id and C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or nil
-    local router = Router()
-    if router then router:Gain({ kind = "loot", icon = ns.Public(icon) and icon or nil, text = link, count = count }) end
-end
-
--- Experience and money, by how much they went up.
-local function ReadXP()
-    local xp, max = UnitXP("player"), UnitXPMax("player")
-    if ns.Number(xp, 0) and ns.Number(max, 1) then return xp, max end
-end
-local function OnXP()
-    local xp, max = ReadXP()
-    if not xp then return end
-    local gained
-    if reader.xp then
-        gained = xp - reader.xp
-        if gained < 0 and reader.xpMax then gained = reader.xpMax - reader.xp + xp end
-    end
-    reader.xp, reader.xpMax = xp, max
-    if gained and gained > 0 then
-        local router = Router()
-        if router then router:Gain({ kind = "xp", amount = gained }) end
-    end
-end
-local MONEY_ICON = "Interface\\MoneyFrame\\UI-GoldIcon"
-local function OnMoney()
-    local money = GetMoney()
-    if not ns.Number(money, 0) then return end
-    local gained = reader.money and money - reader.money
-    reader.money = money
-    if gained and gained > 0 then
-        local router = Router()
-        if router then router:Gain({ kind = "money", amount = gained, icon = MONEY_ICON }) end
-    end
-end
-
--- Cooldowns ready ---------------------------------------------------------------------------
--- A spell you cast is followed while its own cooldown (not only the global
--- one) runs; when it ends, after at least the Ready alerts' minimum, it is
--- ready. At most 40 spells, each forgotten after ten idle minutes.
-local MAX_TRACKED = 40
-local polling = false
-local function CheckCooldown(spell, entry, now)
-    local info = C_Spell and C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(spell)
-    if type(info) ~= "table" then return end
-    local active, gcd = info.isActive, info.isOnGCD
-    if not ns.Bool(active) then return end
-    if active and gcd == false then
-        if not entry.active then entry.active, entry.since = true, now end
-    elseif not active and entry.active then
-        entry.active = false
-        local minimum = ns.Get("alert.readyMin") or 20
-        if now - entry.since >= minimum - 1 then
-            local name = C_Spell.GetSpellName and C_Spell.GetSpellName(spell)
-            local router = Router()
-            if router and ns.Text(name) then
-                router:Alert({ kind = "ready", icon = ns.SpellIcon(spell), text = name .. " " .. (READY or "ready"):lower() })
-            end
-        end
-    end
-    entry.seen = now
-end
-local function Poll()
-    local now = Now()
-    local any = false
-    for spell, entry in pairs(reader.tracked) do
-        CheckCooldown(spell, entry, now)
-        if entry.active then any = true
-        elseif now - (entry.seen or now) > 600 then reader.tracked[spell] = nil end
-    end
-    polling = any
-    if any then C_Timer.After(0.5, Poll) end
-end
-function ns.TrackCooldown(spell)
-    if not ns.Get("alert.ready") then return end
-    if not reader.tracked[spell] then
-        local count = 0
-        for _ in pairs(reader.tracked) do count = count + 1 end
-        if count >= MAX_TRACKED then return end
-        reader.tracked[spell] = { seen = Now() }
-    end
-    C_Timer.After(0.1, function()
-        local entry = reader.tracked[spell]
-        if entry then CheckCooldown(spell, entry, Now()) end
-        if not polling then
-            polling = true
-            C_Timer.After(0.5, Poll)
-        end
-    end)
-end
-
--- The fight summary -----------------------------------------------------------------------------
-local SUMMARY_MIN = 10
-local function TopIcons(source, count)
-    local spells = {}
-    if type(source) ~= "table" or type(source.combatSpells) ~= "table" then return spells end
-    for _, spell in ipairs(source.combatSpells) do
-        if type(spell) == "table" and ns.Number(spell.spellID, 1) and ns.Number(spell.totalAmount, 0) then
-            spells[#spells + 1] = spell
-        end
-    end
-    table.sort(spells, function(a, b) return a.totalAmount > b.totalAmount end)
-    local icons = {}
-    for index = 1, math.min(count, #spells) do
-        local icon = ns.SpellIcon(spells[index].spellID)
-        if icon then icons[#icons + 1] = icon end
-    end
-    return icons
-end
-local function Summary(length)
-    local meter = C_DamageMeter
-    if not meter or not meter.IsDamageMeterAvailable or not Enum.DamageMeterSessionType or not Enum.DamageMeterType then return end
-    local available = meter.IsDamageMeterAvailable()
-    if not (ns.Bool(available) and available) then return end
-    local guid = UnitGUID("player")
-    if not ns.Text(guid) then return end
-    local current = Enum.DamageMeterSessionType.Current
-    local done = meter.GetCombatSessionSourceFromType(current, Enum.DamageMeterType.DamageDone, guid)
-    local taken = meter.GetCombatSessionSourceFromType(current, Enum.DamageMeterType.DamageTaken, guid)
-    local router = Router()
-    if not router then return end
-    local minutes, seconds = math.floor(length / 60), math.floor(length % 60)
-    local fight = string.format("%d:%02d", minutes, seconds)
-    if type(taken) == "table" and ns.Number(taken.totalAmount, 1) then
-        router:Alert({ kind = "summary", icons = TopIcons(taken, 2), text = ns.FormatNumber(taken.totalAmount, ns.Get("numbers")),
-            sub = "taken", life = 5, scale = 0.8 })
-    end
-    if type(done) == "table" and ns.Number(done.totalAmount, 1) then
-        router:Alert({ kind = "summary", icons = TopIcons(done, 3), text = ns.FormatNumber(done.totalAmount, ns.Get("numbers")),
-            sub = "done in " .. fight, life = 5, scale = 0.8 })
-    end
-end
-ns.FightSummary = Summary
-
--- Combat state ------------------------------------------------------------------------------------
+-- Combat-state notifications use MSBT's configured events.
 local function OnCombat(entering)
     local router = Router()
-    local now = Now()
-    if entering then
-        reader.fightStart = now
-        if router then router:Alert({ kind = "combat", entering = true, text = (COMBAT or "Combat") }) end
-        return
-    end
-    if router then
-        router:FlushTotals()
-        router:Alert({ kind = "combat", entering = false, text = "Out of combat" })
-    end
-    local started = reader.fightStart
-    reader.fightStart = nil
-    if started and now - started >= SUMMARY_MIN and ns.Get("alert.summary") then
-        local length = now - started
-        C_Timer.After(0.5, function() Summary(length) end)
-    end
+    if router then router:Alert({ kind = "combat", entering = entering }) end
 end
 
 -- Blizzard's combat log lines --------------------------------------------------------------
@@ -1670,11 +1076,6 @@ local LOG_PAIR = 0.1  -- a line and a hit this close together may be one event
 local LOG_WAIT = 0.15 -- a line waits this long for its hit before it is drawn
 local LOG_KEEP = 2.5 -- 0.6.3: an enemy's blow on you came 1.5 s after its line
 reader.logLines, reader.yourHits = {}, {}
--- 0.6.0, Bend 2: hits on you waiting for the frame's end, the last second of
--- them, and when the game last showed something done to you.
-reader.youFrame, reader.youRecent = {}, {}
-reader.playerInterruptedAt, reader.playerAuraAt, reader.playerControlAt = -10, -10, -10
-
 -- Blizzard's combat log filter, from its own saved table (read only).
 -- True when the filter sends your own damage: Blizzard's My actions, or
 -- (0.3.20, the user: "we should have all of the settings on blizzard log and
@@ -1765,17 +1166,6 @@ local function Prune(list, now)
     end
     return keep
 end
--- 0.6.0, Bend 1 (the user, 18 October 2026, "Allow Bend 1? Yes"): while
--- the Combat Feed shows, a hit keeps the line that came with it, so the
--- feed's tooltip can draw the game's own sentence for it. Held for the
--- session only, on the hit's record, never saved, read, compared or taken
--- apart; a line the game hands over secret is not kept.
-local function Seal(record, line)
-    if not record or not line or not (ns.FeedShown and ns.FeedShown()) then return end
-    if ns.Text(line.text) then record.sealed = line.text end
-end
-ns.SealLine = Seal
-
 local function FreeLine(at, window, record)
     for _, line in ipairs(reader.logLines) do
         if not line.hit and not MeleeLine(line) and Pairs(line, record) and math.abs(line.at - at) <= (window or LOG_PAIR) then
@@ -1816,7 +1206,7 @@ local function Close(hit) return hit.line ~= nil and (hit.gap or 0) <= PairWindo
 -- Whether lines of yours are coming: confirming is on, the filter is My
 -- actions and grey lines have shown.
 function LinesRunning()
-    return ns.Get("log.confirm") and MyActionsFilter() and reader.sawGrey == true
+    return MyActionsFilter() and reader.sawGrey == true
 end
 
 -- A hit known to be yours (or your pet's) takes the line that came with it.
@@ -1832,35 +1222,17 @@ function ns.OnYourHit(record, at)
     if line then
         line.hit, hit.line, hit.gap = hit, line, math.abs(line.at - at)
         SampleGap(record, hit.gap)
-        Seal(record, line)
     end
     local guess = record.result and record.result.guess
     local mine = ns.mine
     if not guess or not mine then return end
     C_Timer.After(LOG_WAIT, function()
         if Close(hit) then
-            -- 0.6.0, Bend 2: not when a hit on you shared the moment.
-            if not (ns.DoneToMeActive and ns.DoneToMeActive() and YouNear(hit.at)) then mine:Trust(guess) end
+            mine:Trust(guess)
         elseif guess.caster == "you" and LinesRunning() then
             mine:Doubt(guess)
         end
     end)
-end
-
--- A hit no cast or swing explained: yours when a free line of yours came
--- with it. Asked LATE_SWING after the hit, when every line of that moment
--- has come and paired.
-function ConfirmByLog(entry)
-    if not ns.Get("log.confirm") or not MyActionsFilter() then return false end
-    if entry.record.event ~= "damage" and entry.record.event ~= "miss" then return false end
-    local line = FreeLine(entry.at, PairWindow(), entry.record)
-    if not line then return false end
-    local hit = { at = entry.at, record = entry.record, line = line, gap = math.abs(line.at - entry.at) }
-    line.hit = hit
-    Seal(entry.record, line)
-    reader.yourHits[#reader.yourHits + 1] = hit
-    reader.confirmed = (reader.confirmed or 0) + 1
-    return true
 end
 
 local function HitIcon(record)
@@ -1869,12 +1241,6 @@ local function HitIcon(record)
     local result = record.result or {}
     if result.spell then return ns.SpellIcon(result.spell) end
     if result.melee and ns.MeleeIcon then return ns.MeleeIcon(result.hand) end
-end
-local function LineIcon(line)
-    if line.hit then return HitIcon(line.hit.record) end
-    if lastCast and lastCast.unit == "player" and math.abs(lastCast.at - line.at) <= LOG_PAIR then
-        return ns.SpellIcon(lastCast.spell)
-    end
 end
 -- The killing blow's hit: the newest of yours up to half a second before.
 local function KillIcon(line)
@@ -1898,22 +1264,7 @@ local CAST_BEFORE = 1.0 -- a dispel's or interrupt's line comes within this of i
 local function CastIcon(at)
     if lastCast and lastCast.at <= at + LOG_PAIR and at - lastCast.at <= CAST_BEFORE then return ns.SpellIcon(lastCast.spell) end
 end
--- 0.6.0, Bend 2: with lines done to you coming, an alert line in the moment
--- the game shows the same thing happening to you is taken for that: your own
--- cast interrupted, an aura of yours changing, crowd control on you changing.
-local GUARD = 0.3
-local function DoneToYou(line)
-    if not (ns.DoneToMeActive and ns.DoneToMeActive()) then return false end
-    if line.kind == "interrupt" then return line.at - reader.playerInterruptedAt <= 0.5 end
-    if line.kind == "purge" or line.kind == "cleanse" or line.kind == "steal" or line.kind == "dispelFailed" then
-        return math.abs(line.at - reader.playerAuraAt) <= GUARD
-    end
-    if line.kind == "broke" then return math.abs(line.at - reader.playerControlAt) <= GUARD end
-    return false
-end
-ns.LineDoneToYou = DoneToYou
 local function KindAlert(router, line)
-    if DoneToYou(line) then return end
     local alert = line.source == "mine" and KIND_ALERTS[line.kind]
     if line.source == "mine" and line.kind == "interrupt" then
         -- Shown once: by UNIT_SPELLCAST_INTERRUPTED when the interrupter
@@ -1925,7 +1276,7 @@ local function KindAlert(router, line)
         lastInterrupt = Now()
         local record = { kind = "interrupt", icon = CastIcon(line.at), text = INTERRUPTED or "Interrupted",
             sub = held and held.name or nil }
-        Seal(record, line)
+
         router:Alert(record)
         return
     end
@@ -1933,7 +1284,7 @@ local function KindAlert(router, line)
     local icon
     if alert.kind == "broke" then icon = KillIcon(line) end
     local record = { kind = alert.kind, icon = icon or CastIcon(line.at), text = alert.text }
-    Seal(record, line)
+
     router:Alert(record)
 end
 
@@ -1941,16 +1292,12 @@ local function DrawLine(line)
     local router = Router()
     if not router then return end
     local mine = MyActionsFilter()
-    -- 0.6.0, Bend 2: a killing blow on you is your death, not yours.
-    local dead = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
-    local died = ns.DoneToMeActive and ns.DoneToMeActive() and ns.Bool(dead) and dead
-    if line.source == "kill" and mine and reader.sawGrey and ns.Get("log.kills") and not died then
+    if line.source == "kill" and mine and reader.sawGrey then
         local record = { kind = "kill", icon = KillIcon(line), text = "Killing blow" }
-        Seal(record, line)
+
         router:Alert(record)
     end
     if line.kind and mine then KindAlert(router, line) end
-    router:Log(line.text, line.r, line.g, line.b, mine and line.source ~= "other" and LineIcon(line) or nil, line.source)
 end
 
 -- 0.6.4 (the user, 19 October 2026, option B): a swing of yours that kills
@@ -1970,8 +1317,7 @@ function ns.WatchKillingSwing(at)
                 line.claimed = true
                 local record = { event = "killed", result = { who = "you", melee = true, hand = "main" } }
                 line.hit = { at = Now(), record = record }
-                ns.SealLine(record, line)
-                Trace("KS", string.format("%.3f", at))
+
                 local router = Router()
                 if router then router:Out(record) end
             end)
@@ -1986,14 +1332,8 @@ local function OnLogMessage(text, r, g, b, order)
     if ns.Public(text) and text == nil then return end
     local now = Now()
     local source, kind = LineSource(r, g, b)
-    local line = { at = now, text = text, r = r, g = g, b = b, source = source, kind = kind }
+    local line = { at = now, source = source, kind = kind }
     if line.source == "mine" then reader.sawGrey = true end
-    -- 0.3.48: the kind and the colour as it came (three decimals), so a
-    -- recording shows whether the colours arrive exactly as set.
-    if recording then
-        local function Part(value) return ns.Number(value) and string.format("%.3f", value) or nil end
-        Trace("L", line.source, kind or "-", Part(r), Part(g), Part(b))
-    end
     reader.logLines = Prune(reader.logLines, now)
     reader.logLines[#reader.logLines + 1] = line
     if Pairs(line) and not MeleeLine(line) then
@@ -2001,7 +1341,6 @@ local function OnLogMessage(text, r, g, b, order)
             if not hit.line and Pairs(line, hit.record) and math.abs(hit.at - now) <= LOG_PAIR then
                 line.hit, hit.line, hit.gap = hit, line, math.abs(hit.at - now)
                 SampleGap(hit.record, hit.gap)
-                Seal(hit.record, line)
                 break
             end
         end
@@ -2014,9 +1353,9 @@ end
 local EVENTS = {
     "UNIT_COMBAT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "PLAYER_SWING", "PLAYER_TARGET_CHANGED",
     "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOSS_OF_CONTROL_ADDED", "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",
-    "SPELL_UPDATE_COOLDOWN", "COMBAT_TEXT_UPDATE", "CHAT_MSG_COMBAT_HONOR_GAIN", "CHAT_MSG_COMBAT_FACTION_CHANGE",
-    "CHAT_MSG_LOOT", "PLAYER_XP_UPDATE", "PLAYER_MONEY", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
-    "PLAYER_ENTERING_WORLD", "UNIT_MAXHEALTH", "COMBAT_LOG_MESSAGE", "SPELL_TEXT_UPDATE", "LOSS_OF_CONTROL_UPDATE",
+    "COMBAT_TEXT_UPDATE",
+    "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
+    "PLAYER_ENTERING_WORLD", "COMBAT_LOG_MESSAGE", "SPELL_TEXT_UPDATE",
     "PLAYER_EQUIPMENT_CHANGED",
 }
 ns.READER_EVENTS = EVENTS
@@ -2029,16 +1368,13 @@ local function OnEvent(_, event, ...)
         if unit == "player" or unit == "pet" then OnCast(unit, spell) end
     elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
         local unit, _, _, interruptedBy = ...
-        if unit == "player" then reader.playerInterruptedAt = Now() end
-        if ns.Get("alert.interrupts") then OnInterrupted(unit, interruptedBy) end
+        OnInterrupted(unit, interruptedBy)
     elseif event == "PLAYER_SWING" then
         local swingDuration, swingType = ...
         OnSwing(swingType, swingDuration)
     elseif event == "PLAYER_TARGET_CHANGED" then
         reader.epoch = reader.epoch + 1
         FindTargetPlate()
-        if recording then Trace("T", ns.TargetKey()) end
-        if ns.OnTargetChanged then ns.OnTargetChanged() end
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         local token = ...
         if ns.Text(token) then
@@ -2048,10 +1384,8 @@ local function OnEvent(_, event, ...)
                 -- Casts made while your target had no plate follow it.
                 ns.mine:Rekey("target" .. reader.epoch, token)
                 ns.RekeyHealing("target" .. reader.epoch, token)
-                Trace("RK", "target" .. reader.epoch, token)
                 reader.targetPlate = token
             end
-            if ns.OnTargetChanged and reader.targetPlate == token then ns.OnTargetChanged() end
         end
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
         local token = ...
@@ -2063,34 +1397,21 @@ local function OnEvent(_, event, ...)
             if token == reader.targetPlate then
                 ns.mine:Rekey(token, "target" .. reader.epoch)
                 ns.RekeyHealing(token, "target" .. reader.epoch)
-                Trace("RK", token, "target" .. reader.epoch)
             else
-                -- Recorded only when it touched something of yours: a city
-                -- churns hundreds of plates (0.3.10).
-                if ns.mine:Forget(token) > 0 then Trace("FG", token) end
+                ns.mine:Forget(token)
                 ns.ForgetHealing(token)
             end
-            -- Released at once: the token can be another enemy's within the
-            -- frame (AGENTS.md).
-            if ns.ReleasePlate then ns.ReleasePlate(token) end
             if reader.targetPlate == token then
                 reader.targetPlate = nil
-                if ns.OnTargetChanged then ns.OnTargetChanged() end
             end
         end
     elseif event == "LOSS_OF_CONTROL_ADDED" then
         OnLossOfControl(...)
     elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
         OnGlow(...)
-    elseif event == "SPELL_UPDATE_COOLDOWN" then
-        local now = Now()
-        for spell, entry in pairs(reader.tracked) do CheckCooldown(spell, entry, now) end
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
         local slot = ...
         if ns.Number(slot) and slot == RANGED_SLOT then UpdateWand() end
-    elseif event == "LOSS_OF_CONTROL_UPDATE" then
-        if (...) == "player" then reader.playerControlAt = Now() end
-        OnLossOfControlUpdate(...)
     elseif event == "SPELL_TEXT_UPDATE" then
         local spell = ...
         if ns.Number(spell) then ns.ForgetSpellFacts(spell) end
@@ -2099,32 +1420,14 @@ local function OnEvent(_, event, ...)
     elseif event == "UNIT_AURA" then
         local unit, info = ...
         if unit == "player" then
-            reader.playerAuraAt = Now()
             OnPlayerAura(info)
         end
     elseif event == "COMBAT_TEXT_UPDATE" then
         OnCombatText(...)
-    elseif event == "CHAT_MSG_COMBAT_HONOR_GAIN" then
-        OnHonorChat(...)
-    elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
-        OnFaction(...)
-    elseif event == "CHAT_MSG_LOOT" then
-        OnLoot(...)
-    elseif event == "PLAYER_XP_UPDATE" then
-        local unit = ...
-        if unit == "player" then OnXP() end
-    elseif event == "PLAYER_MONEY" then
-        OnMoney()
     elseif event == "PLAYER_REGEN_DISABLED" then
         OnCombat(true)
     elseif event == "PLAYER_REGEN_ENABLED" then
         OnCombat(false)
-    elseif event == "UNIT_MAXHEALTH" then
-        local unit = ...
-        if unit == "player" and ns.liveRouter then
-            local max = UnitHealthMax("player")
-            ns.liveRouter.maxHealth = ns.Number(max, 1) and max or ns.liveRouter.maxHealth
-        end
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
@@ -2132,17 +1435,7 @@ local function OnEvent(_, event, ...)
         ns.mine = ns.NewMine(ns.Learned, ns.Learn, ns.SpellFacts)
         ns.ResetHealing()
         UpdateWand()
-        if recording then
-            local _, zone = IsInInstance()
-            Trace("P", C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("ForeverCombatText", "Version"), zone)
-        end
-        reader.xp, reader.xpMax = ReadXP()
-        local money = GetMoney()
-        reader.money = ns.Number(money, 0) and money or nil
-        local max = UnitHealthMax("player")
-        if ns.liveRouter and ns.Number(max, 1) then ns.liveRouter.maxHealth = max end
         FindTargetPlate()
-        if ns.OnTargetChanged then ns.OnTargetChanged() end
     end
 end
 ns.ReaderEvent = OnEvent
@@ -2158,13 +1451,13 @@ function ns.StartReader()
         reader[key] = type(value) == "table" and {} or value
     end
     reader.frame = frame
-    lastCast, honorWait, polling, lastInterrupt = nil, nil, false, 0
+    lastCast, lastInterrupt = nil, 0
     beats = {}
     ns.mine = ns.NewMine(ns.Learned, ns.Learn, ns.SpellFacts)
     local frame = reader.frame or CreateFrame("Frame")
     -- Event availability differs between Retail and Classic clients.
     for _, event in ipairs(EVENTS) do
-        if ns.ShouldReadEvent(event) and ns.EventAvailable(event) then
+        if ns.EventAvailable(event) then
             frame:RegisterEvent(event)
         end
     end
@@ -2176,9 +1469,6 @@ function ns.StartReader()
         ns.Dispatch(event, ...)
     end)
     reader.frame = frame
-    reader.xp, reader.xpMax = ReadXP()
-    local money = GetMoney()
-    reader.money = ns.Number(money, 0) and money or nil
 end
 
 -- MSBT owns enable/disable and invalidates all delayed work in Context.lua.
