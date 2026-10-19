@@ -1,5 +1,12 @@
 # Changelog
 
+## v12.036
+
+- Removed the unused damage-meter source and disabled combat-reader features.
+- Removed inactive tracing and unused combat helpers.
+- Retired unused spam settings from new profiles and exports while preserving
+  existing saved values and compatibility with older profile imports.
+
 ## v12.035
 
 - Increased incoming damage grouping to 200 ms on Retail and Forever.
