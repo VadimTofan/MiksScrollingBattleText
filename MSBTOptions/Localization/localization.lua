@@ -83,19 +83,19 @@ obj["scrollAreas"]	= { label="Scroll Areas", tooltip="Display options for creati
 obj["events"]		= { label="Events", tooltip="Display options for incoming, outgoing, and notification events.\n\nMouse over the icon buttons for more information."}
 obj["lootAlerts"]	= { label="Loot Alerts", tooltip="Display options for loot related notifications."}
 obj["language"]		= { label="Language", tooltip="Shows the current game locale and how language selection works for MSBT."}
-obj["resetBlizzardSCT"] = { label="Reset Blizzard SCT", tooltip="Restore Blizzard scrolling combat text CVars and clear MSBT Blizzard CT overrides."}
+obj["resetBlizzardSCT"] = { label="Reset Blizzard SCT", tooltip="Enable Blizzard damage and turn off MSBT."}
 
 
 
 obj = L.CHECKBOXES
-obj["enableMSBT"]				= { label="Enable Mik's Scrolling Battle Text", tooltip="Enable MSBT."}
-obj["disableOutgoingInGroup"]	= { label="Disable Outgoing In Group", tooltip="While in a party or raid, hide events assigned to the Outgoing scroll area."}
-obj["disableIncomingInGroup"]	= { label="Disable Incoming In Group", tooltip="While in a party or raid, hide events assigned to the Incoming scroll area."}
-obj["disableBlizzardIncoming"] = { label="Disable Blizzard incoming", tooltip="Disable Blizzard incoming combat text while keeping Blizzard outgoing combat text controlled by the options above." }
-obj["disableNotificationInGroup"]= { label="Disable Notification In Group", tooltip="While in a party or raid, hide events assigned to the Notification scroll area."}
-obj["disableStaticInGroup"]		= { label="Disable Static In Group", tooltip="While in a party or raid, hide events assigned to the Static scroll area."}
-obj["enableBlizzardV2CombatText"]= { label="Disable Blizzard CT While Solo", tooltip="When checked, disables Blizzard floating combat text damage/healing while solo." }
-obj["enableBlizzardV2InGroup"]	= { label="Enable Blizzard CT In Group", tooltip="Enable Blizzard Combat Text only while in a party or raid. This overrides Disable Blizzard CT While Solo while grouped." }
+obj["enableMSBT"] = {
+	label = "Enable Mik's Scrolling Battle Text",
+	tooltip = "Enable MSBT and turn off all Blizzard combat text.",
+}
+obj["enableBlizzardDamage"] = {
+	label = "Enable Blizzard Damage",
+	tooltip = "Show Blizzard damage numbers for the player and pet, both solo and in groups.",
+}
 obj["stickyCrits"]				= { label="Sticky Crits", tooltip="Display crits using the sticky style."}
 obj["colorPartialEffects"]		= { label="Color Partial Effects", tooltip="Apply specified colors to partial effects."}
 obj["crushing"]					= { label="Crushing Blows", tooltip="Display the crushing blows trailer."}

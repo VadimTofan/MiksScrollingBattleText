@@ -1,0 +1,100 @@
+-- Describe: the General controls bind the two independent combat-text toggles.
+local function Noop() end
+local function NewControl()
+	local control = setmetatable({}, {
+		__index = function() return Noop end,
+	})
+	function control:Configure(_, label) self.label = label end
+	function control:SetClickHandler(handler) self.click = handler end
+	function control:SetChecked(value) self.checked = value end
+	function control:SetValue(value) self.value = value end
+	return control
+end
+
+local file = assert(io.open("MSBTOptions/MSBTOptionsTabs.lua", "r"))
+local source = file:read("*a")
+file:close()
+local createSource = assert(source:match(
+	"local function GeneralTab_Create%b()%s*.-\nend"))
+local populateSource = assert(source:match(
+	"GeneralTab_Populate = function%b()%s*.-\nend"))
+local build = assert(loadstring(createSource .. "\n" .. populateSource ..
+	"\nreturn GeneralTab_Create, GeneralTab_Populate"))
+
+-- Given the existing appearance settings and the two enabled text systems.
+local disabled = false
+local profile = { blizzardDamageEnabled = true, animationSpeed = 100 }
+local frame = { CreateFontString = NewControl }
+local applied = 0
+local environment = {
+	tabFrames = { general = frame },
+	MSBTControls = {
+		CreateCheckbox = NewControl,
+		CreateSlider = NewControl,
+		CreateOptionButton = NewControl,
+	},
+	L = setmetatable({}, { __index = function()
+		return setmetatable({}, { __index = function(_, key)
+			return { label = key }
+		end })
+	end }),
+	MSBTProfiles = {
+		currentProfile = profile,
+		IsModDisabled = function() return disabled end,
+		SetOptionUserDisabled = function(value)
+			disabled = value
+			if not value then profile.blizzardDamageEnabled = false end
+		end,
+		SetOption = function(_, key, value) profile[key] = value end,
+		ApplyContextOptions = function() applied = applied + 1 end,
+	},
+}
+setfenv(build, environment)
+local create, populate = build()
+
+-- When General is opened.
+create()
+populate()
+local controls = frame.controls
+
+-- Then both toggles and all the existing appearance controls populate.
+assert(controls.enableCheckbox.checked == true)
+assert(controls.blizzardDamageCheckbox.checked == true)
+
+assert(controls.animationSpeedSlider.value == 100)
+assert(controls.enableSoundsCheckbox.checked == true)
+assert(controls.enableIconsCheckbox.checked == true)
+assert(controls.stickyCritsCheckbox.checked == true)
+assert(controls.shortenNumbersCheckbox ~= nil)
+assert(controls.stackSimilarHitsCheckbox ~= nil)
+assert(controls.masterFontButton ~= nil)
+assert(controls.addCustomSoundButton ~= nil)
+
+-- When Blizzard damage is unchecked while MSBT stays enabled.
+controls.blizzardDamageCheckbox.click(controls.blizzardDamageCheckbox, false)
+populate()
+
+-- Then the new saved preference changes and the MSBT checkbox stays checked.
+assert(profile.blizzardDamageEnabled == false and applied == 1)
+assert(controls.blizzardDamageCheckbox.checked == false)
+assert(controls.enableCheckbox.checked == true)
+
+-- When MSBT is unchecked and Blizzard damage is checked.
+controls.enableCheckbox.click(controls.enableCheckbox, false)
+controls.blizzardDamageCheckbox.click(controls.blizzardDamageCheckbox, true)
+populate()
+
+-- Then each checkbox shows its own preference.
+assert(disabled == true and profile.blizzardDamageEnabled == true)
+assert(controls.enableCheckbox.checked == false)
+assert(controls.blizzardDamageCheckbox.checked == true)
+
+-- Given MSBT is unchecked and Blizzard damage is checked.
+-- When the user checks Enable MSBT.
+controls.enableCheckbox.click(controls.enableCheckbox, true)
+
+-- Then both checkboxes immediately show the resulting preferences.
+assert(not disabled and profile.blizzardDamageEnabled == false)
+assert(controls.enableCheckbox.checked == true)
+assert(controls.blizzardDamageCheckbox.checked == false,
+	"enabling MSBT left the Blizzard damage checkbox checked")

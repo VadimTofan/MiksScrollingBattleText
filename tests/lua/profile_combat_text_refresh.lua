@@ -2,153 +2,146 @@ local file = assert(io.open("MSBTProfiles.lua", "r"))
 local source = file:read("*a")
 file:close()
 
--- Describe: profile actions preserve the pre-October 15 combat-text controls.
-local supportedSettings = {
-	enableFloatingCombatText = true,
-	floatingCombatTextCombatHealing = true,
+-- Describe: the checkbox only changes player and pet damage CVars.
+local damageSettings = {
 	floatingCombatTextCombatDamage = true,
-	floatingCombatTextCombatHealing_v2 = true,
 	floatingCombatTextCombatDamage_v2 = true,
 	floatingCombatTextCombatLogPeriodicSpells_v2 = true,
 	floatingCombatTextPetMeleeDamage_v2 = true,
 	floatingCombatTextPetSpellDamage_v2 = true,
 }
-local functionNames = {
-	"DisableBlizzardCombatText",
-	"SetBlizzardCombatTextV2Enabled",
-	"ResetOfficialBlizzardCombatText",
-}
+local body = assert(source:match(
+	"local function SetBlizzardCombatTextV2Enabled%b()%s*.-\nend"))
+local action = assert(loadstring(body ..
+	"\nreturn SetBlizzardCombatTextV2Enabled"))()
 
-for _, functionName in ipairs(functionNames) do
-	local body = assert(source:match(
-		"local function " .. functionName .. "%b()%s*.-\nend"))
-	local helper = source:match(
-		"local function SafeSetCVar%b()%s*.-\nend") or ""
-	local action = assert(loadstring(
-		helper .. "\n" .. body .. "\nreturn " .. functionName))()
+for _, modern in ipairs({ true, false }) do
+	for _, enabled in ipairs({ true, false }) do
+		-- Given unrelated incoming and healing text settings.
+		local writes, refreshes = {}, 0
+		local environment = {
+			Client = { hasModernAPI = modern },
+			IsClassic = not modern,
+			SHOW_COMBAT_TEXT = "unchanged",
+			SetCVar = function(name, value) writes[name] = value end,
+			CombatText_UpdateDisplayedMessages = function()
+				refreshes = refreshes + 1
+			end,
+		}
+		setfenv(action, environment)
 
-	for _, modern in ipairs({ true, false }) do
-		for _, available in ipairs({ true, false }) do
-			-- Given combat-text settings and an optional old refresh API.
-			local refreshCount = 0
-			local writes = {}
-			local environment = {
-				Client = { hasModernAPI = modern },
-				IsClassic = not modern,
-				pcall = pcall,
-				SetCVar = function(name, value)
-					writes[#writes + 1] = { name = name, value = value }
-					assert(supportedSettings[name], "unsupported CVar: " .. name)
-				end,
-				module = { ApplyContextOptions = function() end },
-			}
-			if available then
-				environment.CombatText_UpdateDisplayedMessages = function()
-					refreshCount = refreshCount + 1
-				end
-			end
-			setfenv(action, environment)
+		-- When damage is toggled.
+		action(enabled)
 
-			-- When a profile action changes Blizzard combat text.
-			action(true)
-
-			-- Then legacy clients refresh and all previous controls are set.
-			local expectedRefresh = not modern and available and 1 or 0
-			assert(refreshCount == expectedRefresh,
-				functionName .. ": unexpected refresh count on " ..
-				(modern and "modern" or "legacy") .. " client")
-			local expectedCount = functionName ==
-				"ResetOfficialBlizzardCombatText" and 4 or
-				(modern and 8 or 7)
-			assert(#writes == expectedCount, functionName .. ": wrong write count")
-			for _, write in ipairs(writes) do
-				assert(supportedSettings[write.name], write.name)
-				local expectedValue = functionName ==
-					"DisableBlizzardCombatText" and 0 or 1
-				assert(write.value == expectedValue, write.name .. ": wrong value")
-			end
-			if functionName ~= "ResetOfficialBlizzardCombatText" then
-				local incomingValue
-				for _, write in ipairs(writes) do
-					if write.name == "enableFloatingCombatText" then
-						incomingValue = write.value
-					end
-				end
-				local expectedIncoming = functionName ==
-					"DisableBlizzardCombatText" and 0 or 1
-				assert(incomingValue == expectedIncoming,
-					functionName .. ": incoming combat text was not toggled")
-				local expectedText = functionName ==
-					"DisableBlizzardCombatText" and "0" or "1"
-				assert(environment.SHOW_COMBAT_TEXT == expectedText,
-					functionName .. ": combat-text toggle was not restored")
-
-				if functionName == "SetBlizzardCombatTextV2Enabled" then
-					-- When the checkbox disables Blizzard combat text.
-					writes = {}
-					action(false)
-
-					-- Then every control, including the global toggle, is off.
-					assert(#writes == expectedCount, "missing disable writes")
-					for _, write in ipairs(writes) do
-						assert(write.value == 0, write.name .. ": still enabled")
-					end
-					assert(environment.SHOW_COMBAT_TEXT == "0",
-						"combat-text toggle is still enabled")
-
-					-- Given outgoing Blizzard CT with incoming disabled.
-					writes = {}
-
-					-- When the independent incoming policy is applied.
-					action(true, false)
-
-					-- Then only incoming CT is disabled.
-					assert(#writes == expectedCount, "missing outgoing writes")
-					for _, write in ipairs(writes) do
-						local expected = write.name ==
-							"enableFloatingCombatText" and 0 or 1
-						assert(write.value == expected,
-							write.name .. ": incoming policy changed outgoing CT")
-					end
-					assert(environment.SHOW_COMBAT_TEXT == "0",
-						"incoming combat-text global is still enabled")
-				end
-			end
-
-			if functionName == "SetBlizzardCombatTextV2Enabled" then
-				-- Given a setting change during combat.
-				environment.InCombatLockdown = function() return true end
-				writes = {}
-
-				-- When the incoming checkbox policy applies.
-				action(true, false)
-
-				-- Then CVar writes wait until combat ends.
-				assert(#writes == 0, "combat-text settings changed in combat")
-
-				-- Given combat has ended.
-				environment.InCombatLockdown = function() return false end
-
-				-- When the existing regen event reapplies the policy.
-				action(true, false)
-
-				-- Then the pending incoming preference is applied.
-				assert(#writes == expectedCount,
-					"combat-text settings were not applied after combat")
-				assert(writes[1].name == "enableFloatingCombatText"
-					and writes[1].value == 0,
-					"incoming setting was not applied after combat")
-			end
-
-			-- Given a setting whose write fails.
-			environment.SetCVar = function() error("write failed") end
-
-			-- When the profile action runs again.
-			local success, message = pcall(action, true)
-
-			-- Then the error is visible to the caller.
-			assert(not success, functionName .. ": swallowed a write error")
-			assert(message:find("write failed", 1, true), message)
+		-- Then only damage settings follow the checkbox.
+		for name in pairs(damageSettings) do
+			assert(writes[name] == (enabled and 1 or 0), name)
 		end
+		for name in pairs(writes) do
+			assert(damageSettings[name], "changed unrelated text: " .. name)
+		end
+		assert(environment.SHOW_COMBAT_TEXT == "unchanged")
+		assert(refreshes == (modern and 0 or 1))
+
+		-- Given a checkbox change during combat.
+		environment.InCombatLockdown = function() return true end
+		writes = {}
+
+		-- When the preference is applied.
+		action(enabled)
+
+		-- Then settings wait until combat ends.
+		assert(next(writes) == nil, "damage settings changed during combat")
+		environment.InCombatLockdown = function() return false end
+		action(enabled)
+		assert(writes.floatingCombatTextCombatDamage_v2 == (enabled and 1 or 0))
+
+		-- Given MSBT is enabled and all Blizzard combat text must be hidden.
+		writes = {}
+
+		-- When MSBT's suppression policy applies.
+		action(false, true)
+
+		-- Then damage, incoming, healing, and the legacy global are all off.
+		for name in pairs(damageSettings) do
+			assert(writes[name] == 0, name .. " was not disabled")
+		end
+		assert(writes.enableFloatingCombatText == 0,
+			"Blizzard incoming combat text was not disabled")
+		assert(writes.floatingCombatTextCombatHealing_v2 == 0,
+			"Blizzard healing text was not disabled")
+		assert(writes.floatingCombatTextCombatHealing == (modern and 0 or nil))
+		assert(environment.SHOW_COMBAT_TEXT == "0")
+
+		-- Given MSBT is enabled during combat.
+		environment.InCombatLockdown = function() return true end
+		writes = {}
+
+		-- When suppression is requested.
+		action(false, true)
+
+		-- Then suppression waits until the post-combat settings application.
+		assert(next(writes) == nil)
+		environment.InCombatLockdown = function() return false end
+		action(false, true)
+		assert(writes.enableFloatingCombatText == 0)
+		assert(writes.floatingCombatTextCombatDamage_v2 == 0)
+
+		-- Given a client without the optional legacy refresh function.
+		environment.CombatText_UpdateDisplayedMessages = nil
+
+		-- When the damage preference is applied.
+		action(enabled)
+
+		-- Then settings still apply without needing that API.
+		assert(writes.floatingCombatTextCombatDamage_v2 == (enabled and 1 or 0))
+
+		-- Given a CVar write fails.
+		environment.SetCVar = function() error("write failed") end
+
+		-- When the preference is applied.
+		local success, message = pcall(action, enabled)
+
+		-- Then the error remains visible to the caller.
+		assert(not success and message:find("write failed", 1, true))
 	end
+end
+
+-- Describe: obsolete overrides migrate when selecting a profile.
+local migrationBody = assert(source:match(
+	"local function MigrateCombatTextOptions%b()%s*.-\nend"))
+local migrate = assert(loadstring(migrationBody ..
+	"\nreturn MigrateCombatTextOptions"))()
+
+for _, oldSoloDisabled in ipairs({ true, false }) do
+	-- Given an old profile with every removed override.
+	local profile = {
+		enableBlizzardV2CombatText = oldSoloDisabled,
+		enableBlizzardV2CombatTextInGroup = true,
+		disableBlizzardIncoming = true,
+		disableOutgoingInGroup = true,
+		disableIncomingInGroup = true,
+		disableNotificationInGroup = true,
+		disableStaticInGroup = true,
+		normalFontSize = 24,
+	}
+
+	-- When the profile migrates.
+	migrate(profile)
+
+	-- Then solo preference remains and hidden overrides disappear.
+	assert(profile.blizzardDamageEnabled == not oldSoloDisabled)
+	assert(profile.normalFontSize == 24, "appearance setting changed")
+	for key in pairs(profile) do
+		assert(key == "blizzardDamageEnabled" or key == "normalFontSize", key)
+	end
+
+	-- Given the user changes the new checkbox.
+	profile.blizzardDamageEnabled = oldSoloDisabled
+
+	-- When selecting the profile again.
+	migrate(profile)
+
+	-- Then the new preference remains.
+	assert(profile.blizzardDamageEnabled == oldSoloDisabled)
 end

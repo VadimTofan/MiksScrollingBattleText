@@ -130,22 +130,12 @@ GeneralTab_Populate = function()
 	local controls = tabFrames.general.controls
 
 	controls.enableCheckbox:SetChecked(not MSBTProfiles.IsModDisabled())
-	controls.disableOutgoingInGroupCheckbox:SetChecked(not not currentProfile.disableOutgoingInGroup)
-	controls.disableIncomingInGroupCheckbox:SetChecked(not not currentProfile.disableIncomingInGroup)
-	controls.disableBlizzardIncomingCheckbox:SetChecked(not not currentProfile.disableBlizzardIncoming)
-	controls.disableNotificationInGroupCheckbox:SetChecked(not not currentProfile.disableNotificationInGroup)
-	controls.disableStaticInGroupCheckbox:SetChecked(not not currentProfile.disableStaticInGroup)
 	controls.stickyCritsCheckbox:SetChecked(not currentProfile.stickyCritsDisabled)
 	controls.shortenNumbersCheckbox:SetChecked(currentProfile.shortenNumbers)
 	controls.stackSimilarHitsCheckbox:SetChecked(currentProfile.stackSimilarHits)
 	controls.enableSoundsCheckbox:SetChecked(not currentProfile.soundsDisabled)
 	controls.enableIconsCheckbox:SetChecked(not currentProfile.skillIconsDisabled)
-	if controls.blizzardCombatTextV2Checkbox then
-		controls.blizzardCombatTextV2Checkbox:SetChecked(not not currentProfile.enableBlizzardV2CombatText)
-	end
-	if controls.blizzardCombatTextV2InGroupCheckbox then
-		controls.blizzardCombatTextV2InGroupCheckbox:SetChecked(not not currentProfile.enableBlizzardV2CombatTextInGroup)
-	end
+	controls.blizzardDamageCheckbox:SetChecked(currentProfile.blizzardDamageEnabled)
 	controls.animationSpeedSlider:SetValue(currentProfile.animationSpeed)
 end
 
@@ -213,107 +203,22 @@ local function GeneralTab_Create()
 	checkbox:SetClickHandler(
 		function (this, isChecked)
 			MSBTProfiles.SetOptionUserDisabled(not isChecked)
+			GeneralTab_Populate()
 		end
 	)
 	controls.enableCheckbox = checkbox
 
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["disableOutgoingInGroup"] or { label = "Disable Outgoing In Group", tooltip = "While in a party or raid, hide events assigned to the Outgoing scroll area." }
-	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", controls.enableCheckbox, "BOTTOMLEFT", 18, -5)
-	checkbox:SetClickHandler(
-		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "disableOutgoingInGroup", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
-		end
-	)
-	controls.disableOutgoingInGroupCheckbox = checkbox
-
-	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["disableIncomingInGroup"] or { label = "Disable Incoming In Group", tooltip = "While in a party or raid, hide events assigned to the Incoming scroll area." }
-	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", controls.disableOutgoingInGroupCheckbox, "BOTTOMLEFT", 0, -5)
-	checkbox:SetClickHandler(
-		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "disableIncomingInGroup", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
-		end
-	)
-	controls.disableIncomingInGroupCheckbox = checkbox
-
-	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["disableNotificationInGroup"] or { label = "Disable Notification In Group", tooltip = "While in a party or raid, hide events assigned to the Notification scroll area." }
-	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", controls.disableIncomingInGroupCheckbox, "BOTTOMLEFT", 0, -5)
-	checkbox:SetClickHandler(
-		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "disableNotificationInGroup", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
-		end
-	)
-	controls.disableNotificationInGroupCheckbox = checkbox
-
-	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["disableStaticInGroup"] or { label = "Disable Static In Group", tooltip = "While in a party or raid, hide events assigned to the Static scroll area." }
-	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", controls.disableNotificationInGroupCheckbox, "BOTTOMLEFT", 0, -5)
-	checkbox:SetClickHandler(
-		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "disableStaticInGroup", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
-		end
-	)
-	controls.disableStaticInGroupCheckbox = checkbox
-
-	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["enableBlizzardV2CombatText"] or { label = "Disable Blizzard CT While Solo", tooltip = "When checked, disables Blizzard floating combat text damage/healing while solo." }
+	objLocale = L.CHECKBOXES["enableBlizzardDamage"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
 	checkbox:SetPoint("TOPLEFT", controls.enableCheckbox, "TOPRIGHT", 30, 0)
 	checkbox:SetClickHandler(
 		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "enableBlizzardV2CombatText", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
+			MSBTProfiles.SetOption(nil, "blizzardDamageEnabled", isChecked)
+			MSBTProfiles.ApplyContextOptions()
 		end
 	)
-	controls.blizzardCombatTextV2Checkbox = checkbox
-
-	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["enableBlizzardV2InGroup"] or { label = "Enable Blizzard CT In Group", tooltip = "Enable Blizzard Combat Text only while in a party or raid. This overrides Disable Blizzard CT While Solo while grouped." }
-	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", controls.blizzardCombatTextV2Checkbox, "BOTTOMLEFT", 0, -5)
-	checkbox:SetClickHandler(
-		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "enableBlizzardV2CombatTextInGroup", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
-		end
-	)
-	controls.blizzardCombatTextV2InGroupCheckbox = checkbox
-
-	checkbox = MSBTControls.CreateCheckbox(tabFrame)
-	objLocale = L.CHECKBOXES["disableBlizzardIncoming"] or { label = "Disable Blizzard incoming", tooltip = "Disable Blizzard incoming combat text while keeping Blizzard outgoing combat text controlled by the options above." }
-	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("TOPLEFT", controls.blizzardCombatTextV2InGroupCheckbox, "BOTTOMLEFT", 0, -5)
-	checkbox:SetClickHandler(
-		function (this, isChecked)
-			MSBTProfiles.SetOption(nil, "disableBlizzardIncoming", isChecked)
-			if MSBTProfiles.ApplyContextOptions then
-				MSBTProfiles.ApplyContextOptions()
-			end
-		end
-	)
-	controls.disableBlizzardIncomingCheckbox = checkbox
+	controls.blizzardDamageCheckbox = checkbox
 
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["enableSounds"]
@@ -2031,14 +1936,14 @@ local function ResetBlizzardSCTTab_Create()
 	body:SetJustifyV("TOP")
 	body:SetText(
 		"Use this to restore Blizzard's scrolling combat text for damage, periodic damage, and pet damage.\n\n"
-		.. "This also clears MSBT's Blizzard combat text override checkboxes so MSBT stops changing those CVars."
+		.. "This enables Blizzard damage and turns off MSBT. You can change either toggle in General."
 	)
 	tabFrame.bodyFontString = body
 
 	local button = MSBTControls.CreateOptionButton(tabFrame)
 	local objLocale = L.BUTTONS["resetBlizzardSCT"] or {
 		label = "Reset Blizzard SCT",
-		tooltip = "Restore Blizzard scrolling combat text settings and stop MSBT from overriding them.",
+		tooltip = "Enable Blizzard damage and turn off MSBT.",
 	}
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("TOPLEFT", body, "BOTTOMLEFT", 0, -20)

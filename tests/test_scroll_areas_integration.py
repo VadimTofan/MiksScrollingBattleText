@@ -18,7 +18,7 @@ class ScrollAreasIntegrationTests(unittest.TestCase):
         # When / Then
         self.assertIn("local ScrollAreas = MikSBT.Display.ScrollAreas", source)
         self.assertIn("ScrollAreas:Configure({", source)
-        self.assertIn("scrollAreas:IsSuppressedInGroup(", display_source)
+        self.assertNotIn("scrollAreas:IsSuppressedInGroup(", display_source)
         self.assertNotIn("local externalScrollAreas", source)
         self.assertNotIn("local function UpdateScrollAreas", source)
         self.assertNotIn("local function IsScrollAreaSuppressedInGroup", source)

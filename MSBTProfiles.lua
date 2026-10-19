@@ -80,8 +80,6 @@ local runtimeController
 
 local pathTable = {}
 
-local isFirstLoad
-
 local function CreateClassSettingsTable(class)
 
 	if (not RAID_CLASS_COLORS[class]) then return { disabled = true, colorR = 1, colorG = 1, colorB = 1 } end
@@ -1172,13 +1170,7 @@ if IsClassic then
 		hideSkills = true,
 		shortenNumbers					= false,
 		stackSimilarHits				= false,
-		disableOutgoingInGroup			= false,
-		disableIncomingInGroup			= false,
-		disableNotificationInGroup		= false,
-		disableStaticInGroup			= false,
-		enableBlizzardV2CombatText		= false,
-		enableBlizzardV2CombatTextInGroup = false,
-		disableBlizzardIncoming = false,
+		blizzardDamageEnabled		= true,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
 
@@ -2379,13 +2371,7 @@ else
 		hideSkills = true,
 		shortenNumbers					= false,
 		stackSimilarHits				= false,
-		disableOutgoingInGroup			= false,
-		disableIncomingInGroup			= false,
-		disableNotificationInGroup		= false,
-		disableStaticInGroup			= false,
-		enableBlizzardV2CombatText		= false,
-		enableBlizzardV2CombatTextInGroup = false,
-		disableBlizzardIncoming = false,
+		blizzardDamageEnabled		= true,
 		shortenNumberPrecision			= 0,
 		groupNumbers					= false,
 
@@ -2590,48 +2576,28 @@ local function SetupBlizzardOptions()
 	end
 end
 
-local function DisableBlizzardCombatText()
-	SetCVar("enableFloatingCombatText", 0)
-	if not IsClassic then
-		SetCVar("floatingCombatTextCombatHealing", 0)
-	end
-	SetCVar("floatingCombatTextCombatDamage", 0)
-	SetCVar("floatingCombatTextCombatHealing_v2", 0)
-	SetCVar("floatingCombatTextCombatDamage_v2", 0)
-	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", 0)
-	SetCVar("floatingCombatTextPetMeleeDamage_v2", 0)
-	SetCVar("floatingCombatTextPetSpellDamage_v2", 0)
-	SHOW_COMBAT_TEXT = "0"
-	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
-end
-
-local function SetBlizzardCombatTextV2Enabled(isEnabled, incomingEnabled)
+local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText)
 	-- PLAYER_REGEN_ENABLED reapplies the current profile after combat.
 	if InCombatLockdown and InCombatLockdown() then
 		return
 	end
 
-	if incomingEnabled == nil then
-		incomingEnabled = isEnabled
-	end
-	local incomingValue = incomingEnabled and 1 or 0
 	local value = isEnabled and 1 or 0
-	SetCVar("enableFloatingCombatText", incomingValue)
-	if not IsClassic then
-		SetCVar("floatingCombatTextCombatHealing", value)
+	if suppressOtherText then
+		SetCVar("enableFloatingCombatText", 0)
+		if not IsClassic then
+			SetCVar("floatingCombatTextCombatHealing", 0)
+		end
+		SetCVar("floatingCombatTextCombatHealing_v2", 0)
+		SHOW_COMBAT_TEXT = "0"
 	end
+
 	SetCVar("floatingCombatTextCombatDamage", value)
-	SetCVar("floatingCombatTextCombatHealing_v2", value)
 	SetCVar("floatingCombatTextCombatDamage_v2", value)
 	SetCVar("floatingCombatTextCombatLogPeriodicSpells_v2", value)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
-	SHOW_COMBAT_TEXT = incomingEnabled and "1" or "0"
 	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
-end
-
-local function IsInGroupContext()
-	return IsInGroup() or IsInRaid()
 end
 
 local function SetAddonEnabled(isEnabled)
@@ -2654,7 +2620,6 @@ local function GetRuntimeController()
 	end
 
 	runtimeController = MikSBT.Configuration.RuntimeController:New({
-		isInGroup = IsInGroupContext,
 		isAddonDisabled = function()
 			return savedVariables and savedVariables.userDisabled
 		end,
@@ -2674,13 +2639,7 @@ end
 
 local function ResetOfficialBlizzardCombatText()
 	if currentProfile then
-		SetOption(nil, "enableBlizzardV2CombatText", false)
-		SetOption(nil, "enableBlizzardV2CombatTextInGroup", false)
-		SetOption(nil, "disableBlizzardIncoming", false)
-		SetOption(nil, "disableOutgoingInGroup", false)
-		SetOption(nil, "disableIncomingInGroup", false)
-		SetOption(nil, "disableNotificationInGroup", false)
-		SetOption(nil, "disableStaticInGroup", false)
+		SetOption(nil, "blizzardDamageEnabled", true)
 	end
 
 	if savedVariables then
@@ -2705,6 +2664,9 @@ end
 
 local function SetOptionUserDisabled(isDisabled)
 	savedVariables.userDisabled = isDisabled or nil
+	if not isDisabled and currentProfile then
+		SetOption(nil, "blizzardDamageEnabled", false)
+	end
 	ApplyContextOptions()
 end
 
@@ -2765,6 +2727,22 @@ local function UpdateProfiles(profiles)
 	end
 end
 
+local function MigrateCombatTextOptions(profile)
+	if profile.blizzardDamageEnabled == nil then
+		profile.blizzardDamageEnabled = not profile.enableBlizzardV2CombatText
+	end
+
+	local removedOptions = {
+		"disableOutgoingInGroup", "disableIncomingInGroup",
+		"disableNotificationInGroup", "disableStaticInGroup",
+		"enableBlizzardV2CombatText", "enableBlizzardV2CombatTextInGroup",
+		"disableBlizzardIncoming",
+	}
+	for _, option in ipairs(removedOptions) do
+		profile[option] = nil
+	end
+end
+
 local function SelectProfile(profileName)
 
 	if (savedVariables.profiles[profileName]) then
@@ -2772,6 +2750,7 @@ local function SelectProfile(profileName)
 		savedVariablesPerChar.currentProfileName = profileName
 
 		currentProfile = savedVariables.profiles[profileName]
+		MigrateCombatTextOptions(currentProfile)
 		module.currentProfile = currentProfile
 
 		EraseTable(differentialMap)
@@ -2877,7 +2856,6 @@ local function InitSavedVariables()
 	savedVariables = state.savedVariables
 	savedVariablesPerChar = state.savedVariablesPerChar
 	savedMedia = state.savedMedia
-	isFirstLoad = state.isFirstLoad
 
 	SelectProfile(state.currentProfileName)
 
@@ -2969,9 +2947,8 @@ local function OnEvent(this, event, arg1)
 		MikSBT.Media.OnVariablesInitialized()
 
 	elseif (event == "VARIABLES_LOADED") then
-		SetOptionUserDisabled(IsModDisabled())
+		ApplyContextOptions()
 
-		if (isFirstLoad) then DisableBlizzardCombatText() end
 		ApplyBlizzardCombatTextOptions()
 
 		if (CUSTOM_CLASS_COLORS) then
@@ -2979,7 +2956,7 @@ local function OnEvent(this, event, arg1)
 			if (CUSTOM_CLASS_COLORS.RegisterCallback) then CUSTOM_CLASS_COLORS:RegisterCallback(UpdateCustomClassColors) end
 		end
 		collectgarbage("collect")
-	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" or event == "GROUP_ROSTER_UPDATE" then
+	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
 		ApplyContextOptions()
 	end
 end
@@ -2996,7 +2973,6 @@ eventFrame:RegisterEvent("VARIABLES_LOADED")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 
 module.masterProfile = masterProfile
 

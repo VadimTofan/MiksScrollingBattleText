@@ -52,7 +52,6 @@ class RemovedFeatureLocalizationTests(unittest.TestCase):
             '["triggers"]',
             '["spamControl"]',
             '["skillIcons"]',
-            '["enableBlizzardDamage"]',
             '["enableBlizzardHealing"]',
             '["textShadowing"]',
             '["exclusiveSkills"]',

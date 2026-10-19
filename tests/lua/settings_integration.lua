@@ -94,7 +94,7 @@ local file = assert(io.open("MSBTProfiles.lua", "r"))
 local source = file:read("*a")
 file:close()
 local setupSource = assert(source:match(
-	"(local function SetupBlizzardOptions%(%)%s*.-)local function DisableBlizzardCombatText"
+	"(local function SetupBlizzardOptions%(%)%s*.-)local function SetBlizzardCombatTextV2Enabled"
 ))
 local setup = assert(loadstring(setupSource .. "\nreturn SetupBlizzardOptions"))()
 

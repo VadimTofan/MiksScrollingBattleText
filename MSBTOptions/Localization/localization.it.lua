@@ -32,8 +32,6 @@ obj["lootAlerts"]	= { label="Avvisi bottino", tooltip="Mostra le opzioni per le 
 obj = L.CHECKBOXES
 obj["enableMSBT"]				= { label="Abilita Mik's Scrolling Battle Text", tooltip="Abilita MSBT."}
 obj["disableMSBTInGroup"]		= { label="Disabilita MSBT in gruppo", tooltip="Disabilita automaticamente MSBT quando sei in gruppo o in incursione."}
-obj["enableBlizzardV2CombatText"]= { label="Abilita testo combattimento Blizzard", tooltip="Abilita il testo di combattimento Blizzard (v2) per giocatore e famiglio." }
-obj["enableBlizzardV2InGroup"]	= { label="Testo Blizzard in gruppo", tooltip="Abilita il testo di combattimento Blizzard solo in gruppo o incursione." }
 obj["stickyCrits"]				= { label="Critici Sticky", tooltip="Mostra i critici usando lo stile sticky."}
 obj["colorPartialEffects"]		= { label="Colore Effetti Parziali", tooltip="Applica i colori specificati agli effetti parziali."}
 obj["crushing"]					= { label="Colpi Devastanti", tooltip="Mostra la coda per i Colpi Devastanti."}

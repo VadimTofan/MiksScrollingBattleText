@@ -35,10 +35,15 @@ service:DisplayEvent(settings, "Legacy trigger", nil, true)
 -- Then the text still displays, without more event sounds.
 assert(#played == 1 and #displayed == 5)
 
--- Given hidden/disabled events or a disabled addon.
--- When they would otherwise display.
+-- Given a group context.
+-- When a combat event arrives.
 grouped = true
 service:DisplayEvent(settings, "Grouped")
+-- Then both text and its assigned sound still play.
+assert(#played == 2 and #displayed == 6)
+
+-- Given disabled events, areas, or the addon itself.
+-- When those events arrive.
 grouped = false
 area.disabled = true
 service:DisplayEvent(settings, "Area disabled")
@@ -49,11 +54,11 @@ settings.disabled = false
 disabled = true
 service:DisplayEvent(settings, "Addon disabled")
 -- Then both sound and text stay suppressed.
-assert(#played == 1 and #displayed == 5)
+assert(#played == 2 and #displayed == 6)
 
 -- Given a newly selected profile with sounds enabled.
 -- When an event arrives after re-enabling the addon.
 disabled = false
 service:DisplayEvent(settings, "Enabled")
 -- Then the current profile takes effect immediately.
-assert(#played == 2 and #displayed == 6)
+assert(#played == 3 and #displayed == 7)

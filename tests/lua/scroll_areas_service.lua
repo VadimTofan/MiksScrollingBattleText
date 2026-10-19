@@ -52,28 +52,34 @@ assert(ScrollAreas:IsActive("Outgoing") == true,
 	"enabled scroll area was reported inactive")
 assert(ScrollAreas:IsIconShown("Outgoing") == true,
 	"enabled area icon was reported hidden")
-assert(ScrollAreas:IsSuppressedInGroup("Outgoing") == false,
-	"solo area was suppressed")
 
--- Given group context
+-- Describe: removed group settings cannot suppress events or public messages.
+-- Given a grouped player with every old scroll-area restriction saved.
 inGroup = true
-
--- When / Then
-assert(ScrollAreas:IsSuppressedInGroup("Outgoing") == true,
-	"group suppression setting was ignored")
-
--- Describe: pet areas retain the matching outgoing/incoming group controls.
--- Given a group and outgoing suppression enabled.
-profile.disableIncomingInGroup = false
--- When checking both pet areas.
--- Then only outgoing pet text is suppressed.
-assert(ScrollAreas:IsSuppressedInGroup("OutgoingPet"))
-assert(not ScrollAreas:IsSuppressedInGroup("IncomingPet"))
-
--- Given incoming suppression enabled and outgoing suppression disabled.
 profile.disableIncomingInGroup = true
-profile.disableOutgoingInGroup = false
--- When checking both pet areas.
--- Then only incoming pet text is suppressed.
-assert(ScrollAreas:IsSuppressedInGroup("IncomingPet"))
-assert(not ScrollAreas:IsSuppressedInGroup("OutgoingPet"))
+profile.disableNotificationInGroup = true
+profile.disableStaticInGroup = true
+local displayed = 0
+local DisplayService = dofile("Display/DisplayService.lua")
+DisplayService:Configure({
+	scrollAreas = ScrollAreas,
+	getProfile = function() return profile end,
+	isModDisabled = function() return false end,
+	display = function() displayed = displayed + 1 end,
+	fonts = {},
+	outlineMap = {},
+	defaultArea = "Notification",
+})
+
+-- When combat events and public messages arrive in every area.
+local areaKeys = {
+	"Outgoing", "OutgoingPet", "Incoming", "IncomingPet",
+	"Notification", "Static",
+}
+for _, key in ipairs(areaKeys) do
+	DisplayService:DisplayEvent({ scrollArea = key }, "Event")
+	DisplayService:DisplayMessage("Public message", key)
+end
+
+-- Then every enabled message displays regardless of the old restrictions.
+assert(displayed == 12, "legacy group restrictions still hide MSBT messages")

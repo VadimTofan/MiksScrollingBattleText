@@ -32,8 +32,6 @@ obj["lootAlerts"]	= { label="Plündernachrichten", tooltip="Optionen für die Pl
 obj = L.CHECKBOXES
 obj["enableMSBT"]				= { label="Mik's Scrolling Battle Text aktivieren", tooltip="MSBT aktivieren."}
 obj["disableMSBTInGroup"]		= { label="MSBT in Gruppen deaktivieren", tooltip="MSBT automatisch in Gruppe oder Schlachtzug deaktivieren."}
-obj["enableBlizzardV2CombatText"]= { label="Blizzard-Kampftext aktivieren", tooltip="Blizzard Kampftext (v2) fuer Spieler und Begleiter aktivieren." }
-obj["enableBlizzardV2InGroup"]	= { label="Blizzard-Kampftext in Gruppen", tooltip="Blizzard Kampftext nur in Gruppe oder Schlachtzug aktivieren." }
 obj["stickyCrits"]				= { label="Sticky-Krits", tooltip="Bei kritischen Treffern den 'Sticky'-Stil verwenden."}
 obj["colorPartialEffects"]		= { label="Teileffekte einfärben", tooltip="Fügt den Teileffekten festgelegte Farben hinzu."}
 obj["crushing"]					= { label="Schmetternde Stöße", tooltip="Zeigt den Anhang bei schmetternden Treffern an."}

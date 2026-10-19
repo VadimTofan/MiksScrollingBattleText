@@ -307,6 +307,76 @@ assert(profiles.currentProfile.scrollAreas.Incoming.skillIconsDisabled)
 assert(MSBTProfiles_SavedVarsPerChar.currentProfileName == "Portable")
 assert(updates == updateCount + 2)
 
+-- Describe: the new damage preference survives profile transfer and migration.
+-- Given a user disables Blizzard damage on the selected profile.
+profiles.SetOption(nil, "blizzardDamageEnabled", false)
+local combatExport = assert(profiles.ExportProfile("Portable"))
+
+-- When that profile is imported under a new name.
+local combatName = assert(profiles.ImportProfile(combatExport, "Combat toggles"))
+
+-- Then the unchecked checkbox is preserved, independently of retired options.
+assert(combatName == "Combat toggles")
+assert(profiles.currentProfile.blizzardDamageEnabled == false,
+	"profile transfer lost the Blizzard damage preference")
+
+-- Given a saved profile with old solo/group restrictions.
+profiles.savedVariables.profiles.LegacyCombatText = {
+	enableBlizzardV2CombatText = true,
+	enableBlizzardV2CombatTextInGroup = true,
+	disableOutgoingInGroup = true,
+	normalFontSize = 24,
+}
+
+-- When the real profile facade selects it.
+profiles.SelectProfile("LegacyCombatText")
+
+-- Then it migrates before defaults are attached and keeps appearance settings.
+assert(profiles.currentProfile.blizzardDamageEnabled == false)
+assert(rawget(profiles.currentProfile, "enableBlizzardV2CombatText") == nil)
+assert(rawget(profiles.currentProfile, "disableOutgoingInGroup") == nil)
+assert(profiles.currentProfile.normalFontSize == 24)
+
+-- Given the migrated profile has Blizzard damage disabled.
+-- When the existing Blizzard reset action runs.
+profiles.ResetOfficialBlizzardCombatText()
+
+-- Then its result agrees with the two General checkboxes.
+assert(profiles.currentProfile.blizzardDamageEnabled == true)
+assert(profiles.IsModDisabled() == true)
+
+-- Describe: enabling MSBT clears Blizzard damage without resetting it on reload.
+-- Given MSBT is off and Blizzard damage is on after the reset action.
+local combatTextWrites = {}
+SetCVar = function(key, value) combatTextWrites[key] = value end
+
+-- When MSBT is enabled through its real profile action.
+profiles.SetOptionUserDisabled(false)
+
+-- Then MSBT is on and the Blizzard damage checkbox is unchecked.
+assert(not profiles.IsModDisabled())
+assert(profiles.currentProfile.blizzardDamageEnabled == false,
+	"enabling MSBT did not clear the Blizzard damage preference")
+for _, key in ipairs({
+	"enableFloatingCombatText", "floatingCombatTextCombatHealing_v2",
+	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
+	"floatingCombatTextCombatLogPeriodicSpells_v2",
+	"floatingCombatTextPetMeleeDamage_v2", "floatingCombatTextPetSpellDamage_v2",
+}) do
+	assert(combatTextWrites[key] == 0, key .. " remained enabled")
+end
+
+-- Given the user explicitly enables Blizzard damage afterward.
+profiles.SetOption(nil, "blizzardDamageEnabled", true)
+
+-- When the normal variables-loaded event reapplies settings.
+environment.CUSTOM_CLASS_COLORS = {}
+frame.scripts.OnEvent(frame, "VARIABLES_LOADED")
+
+-- Then loading settings preserves the explicit selection.
+assert(profiles.currentProfile.blizzardDamageEnabled == true,
+	"loading settings reset an explicit Blizzard damage selection")
+
 -- Given a character in combat.
 inCombat = true
 local active = profiles.currentProfile
