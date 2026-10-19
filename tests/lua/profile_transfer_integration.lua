@@ -82,6 +82,21 @@ for _, classic in ipairs({ false, true }) do
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
 
+	-- Given the real default profile and its outgoing spell message.
+	local formatter = LoadFile("Services/Formatter.lua")
+	formatter:Configure({
+		getProfile = function() return profiles.currentProfile end,
+		formatLargeNumber = tostring,
+	})
+	-- When a known outgoing spell is formatted with the default settings.
+	local message = formatter:FormatEvent({
+		message = profiles.currentProfile.events.OUTGOING_SPELL_DAMAGE.message,
+		amount = 42, effectName = "Fireball",
+		hideSkills = profiles.currentProfile.hideSkills,
+	})
+	-- Then only the amount is shown, without a skill name or empty brackets.
+	assert(message:match("^42%s*$"), "skill names were visible by default")
+
 	-- Given custom aura rows with both checkbox states on either client.
 	assert(type(profiles.currentProfile.auraTracking) == "table",
 		"missing custom aura defaults")
