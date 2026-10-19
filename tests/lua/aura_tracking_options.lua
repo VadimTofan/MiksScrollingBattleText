@@ -2,7 +2,7 @@
 local function Noop() end
 local function Frame(parent)
 	local frame = {
-		items = {}, lines = {}, scripts = {}, created = false, parent = parent,
+		items = {}, lines = {}, scripts = {}, created = false, parent = parent, auraID = false,
 	}
 	setmetatable(frame, { __index = function() return Noop end })
 	function frame:SetText(value) self.text = value end
@@ -11,7 +11,7 @@ local function Frame(parent)
 	function frame:GetHeight() return self.height end
 	function frame:SetPoint(...) self.point = {...} end
 	function frame:GetParent() return self.parent end
-	function frame:SetLabel(value) self.text = value end
+	function frame:SetLabel(value) self.text, self.fontString = value, self end
 	function frame:SetColor(r, g, b) self.r, self.g, self.b = r, g, b end
 	function frame:SetVertexColor(r, g, b)
 		assert(type(r) == "number" and type(g) == "number"
@@ -157,6 +157,7 @@ MSBTOptions.Popups = {
     ShowFont = function(config) fontPopup = config end,
 }
 MSBTOptions.Controls.CreateDropdown = Frame
+PET = "Pet"
 dofile("MSBTOptions/MSBTOptionsTabs.lua")
 local events = tabs[MikSBT.translations.TABS.events.label]
 events.scripts.OnShow()
@@ -280,3 +281,34 @@ for _, key in ipairs(list.items) do assert(type(key) == "number") end
 assert(not list.lines[1].auraLine.visible)
 assert(list.lines[1].colorSwatch.visible)
 print("Aura tracking options tests passed")
+
+-- Describe: pet settings are grouped under Outgoing Pet.
+-- Given the Events menu with player and pet outgoing event settings.
+-- When the user selects Events > Outgoing.
+controls.eventCategoryDropdown:SetSelectedID("OUTGOING_PLAYER_EVENTS")
+controls.eventCategoryDropdown:change("OUTGOING_PLAYER_EVENTS")
+-- Then player events remain and every pet event is absent.
+local outgoingRows = {}
+for _, line in ipairs(list.lines) do
+    assert(not line.eventType:match("^PET_"), "pet event remains in Outgoing")
+    outgoingRows[line.eventType] = true
+end
+assert(outgoingRows.OUTGOING_DAMAGE, "player damage must remain available")
+assert(outgoingRows.OUTGOING_HEAL, "player healing must remain available")
+
+-- Given the localized outgoing pet events and their existing settings.
+local petEvents = MikSBT.translations.OUTGOING_PET_EVENTS
+-- When the user selects Events > Outgoing Pet.
+controls.eventCategoryDropdown:SetSelectedID("OUTGOING_PET_EVENTS")
+controls.eventCategoryDropdown:change("OUTGOING_PET_EVENTS")
+local petRows = {}
+for _, line in ipairs(list.lines) do petRows[line.eventType] = line end
+-- Then every pet event has its own settings row in that category.
+for eventType, locale in pairs(petEvents) do
+    local line = petRows[eventType]
+    assert(line, eventType .. " is missing from Outgoing Pet")
+    assert(line.enableCheckbox.text == locale.label)
+    line.settingsButton:click()
+    assert(eventPopup.saveArg1 == eventType)
+    assert(eventPopup.scrollArea == "Notification")
+end

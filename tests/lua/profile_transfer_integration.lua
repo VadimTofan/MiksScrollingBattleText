@@ -82,6 +82,39 @@ for _, classic in ipairs({ false, true }) do
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
 
+	-- Given defaults on either client branch and an existing saved profile.
+	local defaults = profiles.masterProfile
+	for _, direction in ipairs({ "Incoming", "Outgoing" }) do
+		local areaKey = direction .. "Pet"
+		local area = defaults.scrollAreas[areaKey]
+		-- Then pets have independent areas beside their player counterparts.
+		assert(area and area.name == defaults.scrollAreas[direction].name .. " PET",
+			"missing localized pet area: " .. areaKey)
+		assert(area.offsetX == defaults.scrollAreas[direction].offsetX - 100)
+		assert(area.offsetY == defaults.scrollAreas[direction].offsetY)
+		assert(area.animationStyle == defaults.scrollAreas[direction].animationStyle)
+		assert(area ~= defaults.scrollAreas[direction])
+	end
+	for eventType, settings in pairs(defaults.events) do
+		if eventType:match("^PET_INCOMING_") then
+			assert(settings.scrollArea == "IncomingPet", eventType)
+		elseif eventType:match("^PET_OUTGOING_") then
+			assert(settings.scrollArea == "OutgoingPet", eventType)
+		end
+	end
+	-- When a profile with explicit pet event assignments is selected again.
+	for _, eventType in ipairs({ "PET_INCOMING_DAMAGE", "PET_OUTGOING_DAMAGE" }) do
+		profiles.SetOption("events." .. eventType, "scrollArea", "Static")
+	end
+	profiles.SelectProfile("Default")
+	-- Then custom assignments survive; inherited player routes stay unchanged.
+	assert(profiles.currentProfile.events.PET_INCOMING_DAMAGE.scrollArea == "Static")
+	assert(profiles.currentProfile.events.PET_OUTGOING_DAMAGE.scrollArea == "Static")
+	assert(profiles.currentProfile.events.INCOMING_DAMAGE.scrollArea == "Incoming")
+	assert(profiles.currentProfile.events.OUTGOING_DAMAGE.scrollArea == "Outgoing")
+	profiles.SetOption("events.PET_INCOMING_DAMAGE", "scrollArea", "IncomingPet")
+	profiles.SetOption("events.PET_OUTGOING_DAMAGE", "scrollArea", "OutgoingPet")
+
 	-- Given retired spam settings in an existing saved profile.
 	local retiredSettings = {
 		dotThrottleDuration = 3, hotThrottleDuration = 3,
@@ -187,6 +220,8 @@ for _, classic in ipairs({ false, true }) do
 	profiles.SetOption(nil, "damageColoringDisabled", true)
 	profiles.SetOption("scrollAreas.Incoming", "skillIconsDisabled", true)
 	profiles.SetOption("scrollAreas.Incoming", "offsetX", -320)
+	profiles.SetOption("scrollAreas.IncomingPet", "offsetX", -400)
+	profiles.SetOption("scrollAreas.OutgoingPet", "skillIconsDisabled", true)
 	profiles.SetOption("events.INCOMING_DAMAGE", "soundFile", 5678901)
 	local exported, errorCode = profiles.ExportProfile("Default")
 
@@ -258,6 +293,10 @@ local name, errorCode = profiles.ImportProfile(exports[1], "Portable")
 assert(name == "Portable", errorCode)
 assert(profiles.currentProfile ~= original)
 assert(profiles.currentProfile.scrollAreas.Incoming.offsetX == -320)
+assert(profiles.currentProfile.scrollAreas.IncomingPet.offsetX == -400)
+assert(profiles.currentProfile.scrollAreas.OutgoingPet.skillIconsDisabled)
+assert(profiles.currentProfile.events.PET_INCOMING_DAMAGE.scrollArea == "IncomingPet")
+assert(profiles.currentProfile.events.PET_OUTGOING_DAMAGE.scrollArea == "OutgoingPet")
 assert(profiles.currentProfile.events.INCOMING_DAMAGE.soundFile == 5678901)
 assert(profiles.currentProfile.partialColoringDisabled)
 assert(profiles.currentProfile.auraTracking["1459"] == false)

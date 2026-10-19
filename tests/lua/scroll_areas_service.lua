@@ -61,3 +61,19 @@ inGroup = true
 -- When / Then
 assert(ScrollAreas:IsSuppressedInGroup("Outgoing") == true,
 	"group suppression setting was ignored")
+
+-- Describe: pet areas retain the matching outgoing/incoming group controls.
+-- Given a group and outgoing suppression enabled.
+profile.disableIncomingInGroup = false
+-- When checking both pet areas.
+-- Then only outgoing pet text is suppressed.
+assert(ScrollAreas:IsSuppressedInGroup("OutgoingPet"))
+assert(not ScrollAreas:IsSuppressedInGroup("IncomingPet"))
+
+-- Given incoming suppression enabled and outgoing suppression disabled.
+profile.disableIncomingInGroup = true
+profile.disableOutgoingInGroup = false
+-- When checking both pet areas.
+-- Then only incoming pet text is suppressed.
+assert(ScrollAreas:IsSuppressedInGroup("IncomingPet"))
+assert(not ScrollAreas:IsSuppressedInGroup("OutgoingPet"))

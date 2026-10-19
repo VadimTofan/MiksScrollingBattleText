@@ -2401,6 +2401,29 @@ else
 	}
 end
 
+local function CreatePetScrollArea(playerArea)
+	local petArea = {}
+	for setting, value in pairs(playerArea) do
+		petArea[setting] = value
+	end
+	petArea.name = playerArea.name .. " " .. PET
+	petArea.offsetX = playerArea.offsetX - 100
+	return petArea
+end
+
+masterProfile.scrollAreas.IncomingPet = CreatePetScrollArea(
+	masterProfile.scrollAreas.Incoming)
+masterProfile.scrollAreas.OutgoingPet = CreatePetScrollArea(
+	masterProfile.scrollAreas.Outgoing)
+
+for eventType, settings in pairs(masterProfile.events) do
+	if eventType:match("^PET_INCOMING_") then
+		settings.scrollArea = "IncomingPet"
+	elseif eventType:match("^PET_OUTGOING_") then
+		settings.scrollArea = "OutgoingPet"
+	end
+end
+
 local function ShowOptions()
 	if (MSBTOptions and MSBTOptions.Main and MSBTOptions.Main.ShowMainFrame) then
 		MSBTOptions.Main.ShowMainFrame()

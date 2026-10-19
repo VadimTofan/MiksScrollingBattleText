@@ -6,7 +6,9 @@ local ScrollAreas = {
 
 local GROUP_SETTING_BY_AREA = {
 	Outgoing = "disableOutgoingInGroup",
+	OutgoingPet = "disableOutgoingInGroup",
 	Incoming = "disableIncomingInGroup",
+	IncomingPet = "disableIncomingInGroup",
 	Notification = "disableNotificationInGroup",
 	Static = "disableStaticInGroup",
 }
