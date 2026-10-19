@@ -1,5 +1,9 @@
 # Changelog
 
+## v12.034
+
+- Added WoW Retail 12.1.5 compatibility and CurseForge game-version metadata.
+
 ## v12.033
 
 - Re-released the v12.032 changes with an incremented addon version.

@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 DEFAULT_CHANGELOG = "Automated release"
-DEFAULT_GAME_VERSION_NAMES = ["Retail", "12.1.0"]
+DEFAULT_GAME_VERSION_NAMES = ["Retail", "12.1.5", "12.1.0"]
 
 
 def read_latest_changelog(changelog_path: Path) -> str:

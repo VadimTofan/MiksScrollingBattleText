@@ -77,6 +77,7 @@ jobs:
             --changelog CHANGELOG.md \
             --output dist/curseforge-metadata.json \
             --game-version Retail \
+            --game-version 12.1.5 \
             --game-version 12.1.0 \
             --game-version 1.60.1
 
