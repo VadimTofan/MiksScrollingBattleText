@@ -63,7 +63,6 @@ local component = OutgoingCombat:New({
 	isLikelySpellSchool = function(schoolMask)
 		return schoolMask ~= 1
 	end,
-	damageMeterEnabled = false,
 	autoAttackSpellID = 6603,
 	fallbackAttributionWindow = 0.9,
 	delayedAttributionWindow = 3,

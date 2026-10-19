@@ -62,9 +62,8 @@ by another reload. Existing combat-log filters are preserved. Unsupported
 events are skipped; clients without combat-log messages use the engine's
 cast and timing inference, whose attribution can be uncertain.
 
-The damage-meter fallback is disabled for this path to prevent duplicate
-outgoing damage. Loot, gains, cooldowns, and health/power triggers retain their
-existing MSBT sources. Older clients keep their existing combat handling.
+Loot, gains, cooldowns, and health/power triggers retain their existing MSBT
+sources. Older clients keep their existing combat handling.
 
 Spell-description parsing currently supports English. Other languages use
 the engine's learned spell timing and school information. That learned cache

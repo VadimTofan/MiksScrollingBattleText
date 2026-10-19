@@ -13,7 +13,6 @@ local Formatter = MikSBT.Services.Formatter
 local EventRouter = MikSBT.Services.EventRouter
 local IncomingCombat = MikSBT.Components.IncomingCombat
 local OutgoingBatcher = MikSBT.Components.OutgoingBatcher
-local DamageMeterSource = MikSBT.Components.DamageMeterSource
 local OutgoingCombat = MikSBT.Components.OutgoingCombat
 local CombatLogFilter = MikSBT.Components.CombatLogFilter
 local CombatEngine = MikSBT.Components.CombatEngine
@@ -36,7 +35,6 @@ local IsScrollAreaIconShown = MSBTAnimations.IsScrollAreaIconShown
 
 local powerTypes = MSBTTriggers.powerTypes
 
-local HasModernAPI = Client.hasModernAPI
 
 
 
@@ -95,7 +93,6 @@ local powerTokens = {}
 
 
 local isEnglish
-local playerGUID
 local AUTOSHOT_SPELL_ID = 6603
 local AUTO_REPEAT_SPELL_IDS = {75, 5019}
 local OUTGOING_GROUP_DELAY = 0.2
@@ -105,8 +102,6 @@ local OUTGOING_FALLBACK_ATTRIBUTION_WINDOW = 0.9
 local OUTGOING_DELAYED_SPELL_ATTRIBUTION_WINDOW = 3.0
 local OUTGOING_SIGNAL_CONFIDENCE_WINDOW = 1.25
 local INCOMING_SELF_HEAL_ICON_ATTRIBUTION_WINDOW = 12.0
-local DAMAGE_METER_FALLBACK_STALE_TIME = 0.35
-local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
 local outgoingCombat
@@ -585,37 +580,8 @@ local outgoingBatcher = OutgoingBatcher:New({
 	delay = OUTGOING_GROUP_DELAY,
 })
 
-local damageMeterSource = DamageMeterSource:New({
-	isAvailable = function()
-		return USE_DAMAGE_METER_OUTGOING and HasModernAPI and C_DamageMeter
-			and Enum and Enum.DamageMeterType
-	end,
-	inCombat = InCombatLockdown,
-	getTime = GetTime,
-	unitGUID = UnitGUID,
-	getPlayerGUID = function()
-		return playerGUID
-	end,
-	getSessionSource = function(sourceGUID, damageType)
-		return C_DamageMeter.GetCombatSessionSourceFromType(
-			0,
-			damageType,
-			sourceGUID
-		)
-	end,
-	queue = function(spellID, amount, isPet)
-		outgoingBatcher:Queue(spellID, amount, false, nil, nil, isPet)
-	end,
-	newTicker = C_Timer.NewTicker,
-	damageType = Enum and Enum.DamageMeterType
-		and Enum.DamageMeterType.DamageDone,
-	pollInterval = 0.1,
-	freshDuration = DAMAGE_METER_FALLBACK_STALE_TIME,
-})
-
 outgoingCombat = OutgoingCombat:New({
 	batcher = outgoingBatcher,
-	damageMeter = damageMeterSource,
 	getProfile = function()
 		return MSBTProfiles.currentProfile
 	end,
@@ -772,7 +738,6 @@ local function Enable()
 		if C_CombatText and C_CombatText.GetCurrentEventInfo then
 			eventFrame:RegisterEvent("COMBAT_TEXT_UPDATE")
 		end
-		outgoingCombat:Start()
 	end
 	MSBTParser.RegisterHandler(ParserEventsHandler)
 end
@@ -783,7 +748,6 @@ local function Disable()
 	eventFrame:UnregisterAllEvents()
 	incomingCombat:Reset()
 	outgoingCombat:Reset()
-	outgoingCombat:Stop()
 
 	MSBTParser.UnregisterHandler(ParserEventsHandler)
 end
@@ -796,7 +760,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 end)
 
 
-playerGUID = UnitGUID("player")
 
 parserNotifications = ParserNotifications:New()
 

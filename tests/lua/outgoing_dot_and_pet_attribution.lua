@@ -99,33 +99,6 @@ check("pending player casts take priority over pet melee", function()
 		"physical player spell was attributed to pet melee")
 end)
 
-check("fresh meter data suppresses unnamed DoT fallback", function()
-	-- Given a solo player whose damage meter is already reporting damage.
-	isSolo = true
-	petEngaged = false
-	component.config.damageMeter = {
-		IsActive = function() return true end,
-		IsDeltaFresh = function() return true end,
-	}
-	local countBefore = #queued
-
-	-- When an unexplained magical hit arrives without a recent cast.
-	hit(30, 20, 4)
-
-	-- Then fallback output does not duplicate the meter's damage.
-	assert(#queued == countBefore,
-		"unnamed DoT duplicated fresh damage-meter output")
-
-	-- Given meter data becomes stale.
-	component.config.damageMeter.IsDeltaFresh = function() return false end
-
-	-- When another unexplained magical hit arrives.
-	local fallback = hit(31, 25, 4)
-
-	-- Then fallback output resumes for that hit.
-	assert(#queued == countBefore + 1 and fallback.isDot
-		and fallback.amount == 25, "stale meter suppressed DoT fallback")
-end)
 
 if #failures > 0 then
 	error(table.concat(failures, "\n"))

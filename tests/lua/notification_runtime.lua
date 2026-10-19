@@ -128,7 +128,7 @@ if trackerFile then
 	dofile("Components/SelfHealTracker.lua")
 end
 for _, name in ipairs({
-	"IncomingCombat", "OutgoingBatcher", "DamageMeterSource",
+	"IncomingCombat", "OutgoingBatcher",
 	"OutgoingCombat", "ParserNotifications", "UtilityNotifications",
 }) do dofile("Components/" .. name .. ".lua") end
 local function LoadAddonFile(path)

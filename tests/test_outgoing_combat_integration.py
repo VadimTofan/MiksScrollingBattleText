@@ -18,10 +18,7 @@ class OutgoingCombatIntegrationTests(unittest.TestCase):
             "local OutgoingBatcher = MikSBT.Components.OutgoingBatcher",
             source,
         )
-        self.assertIn(
-            "local DamageMeterSource = MikSBT.Components.DamageMeterSource",
-            source,
-        )
+        self.assertNotIn("DamageMeterSource", source)
         self.assertIn(
             "local OutgoingCombat = MikSBT.Components.OutgoingCombat",
             source,
@@ -39,11 +36,10 @@ class OutgoingCombatIntegrationTests(unittest.TestCase):
 
         # When / Then
         batcher_index = toc_lines.index("Components\\OutgoingBatcher.lua")
-        meter_index = toc_lines.index("Components\\DamageMeterSource.lua")
+        self.assertNotIn("Components\\DamageMeterSource.lua", toc_lines)
         combat_index = toc_lines.index("Components\\OutgoingCombat.lua")
         main_index = toc_lines.index("MSBTMain.lua")
         self.assertLess(batcher_index, combat_index)
-        self.assertLess(meter_index, combat_index)
         self.assertLess(combat_index, main_index)
 
 

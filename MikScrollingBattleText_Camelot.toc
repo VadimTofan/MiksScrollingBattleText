@@ -30,7 +30,6 @@ Services\Formatter.lua
 Services\EventRouter.lua
 Components\IncomingCombat.lua
 Components\OutgoingBatcher.lua
-Components\DamageMeterSource.lua
 Combat\Context.lua
 Combat\Helpers.lua
 Combat\Mine.lua
