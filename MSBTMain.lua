@@ -15,6 +15,9 @@ local IncomingCombat = MikSBT.Components.IncomingCombat
 local OutgoingBatcher = MikSBT.Components.OutgoingBatcher
 local DamageMeterSource = MikSBT.Components.DamageMeterSource
 local OutgoingCombat = MikSBT.Components.OutgoingCombat
+local CombatLogFilter = MikSBT.Components.CombatLogFilter
+local CombatEngine = MikSBT.Components.CombatEngine
+local CombatPresentation = MikSBT.Components.CombatPresentation
 local ParserNotifications = MikSBT.Components.ParserNotifications
 local UtilityNotifications = MikSBT.Components.UtilityNotifications
 local Client = MikSBT.Compatibility.Client
@@ -106,6 +109,7 @@ local USE_DAMAGE_METER_OUTGOING = true
 local DOT_FALLBACK_DURATION = 18
 local incomingCombat
 local outgoingCombat
+local combatEngine
 local parserNotifications
 local utilityNotifications
 local DOT_FALLBACK_SPELLS = {
@@ -563,7 +567,9 @@ local outgoingBatcher = OutgoingBatcher:New({
 		local spellName = spellID and not IsAutoAttackSpellID(spellID)
 			and GetSpellInfo(spellID) or nil
 		return CleanupActionMessage(Formatter:FormatLegacyEvent(
-			eventSettings.message, amount, nil, nil, nil, nil, nil, nil, spellName
+			eventSettings.message, amount, nil, nil, nil, nil,
+			nil, nil, spellName, nil, nil, nil,
+			MSBTProfiles.currentProfile.hideSkills
 		))
 	end,
 	display = DisplayEvent,
@@ -669,6 +675,51 @@ incomingCombat = IncomingCombat:New({
 	end,
 })
 
+if Client.isMainline or Client.isForever then
+	local presentation = CombatPresentation:New({
+		getProfile = function() return MSBTProfiles.currentProfile end,
+		batcher = outgoingBatcher,
+		after = C_Timer.After,
+		delay = INCOMING_GROUP_DELAY,
+		getSpellTexture = function(spellID)
+			local _, _, texture = GetSpellInfo(spellID)
+			return texture
+		end,
+		formatMessage = function(settings, record)
+			local name = RestrictedValue:String(record.sourceName)
+			local effect = RestrictedValue:String(record.name)
+				or (record.spell and GetSpellInfo(record.spell))
+			local hideSkills = record.event and MSBTProfiles.currentProfile.hideSkills
+			local message = Formatter:FormatLegacyEvent(
+				settings.message or "", record.amount, record.school,
+				nil, nil, nil, name, nil, effect,
+				nil, nil, record.event == "heal", hideSkills
+			)
+			message = CleanupActionMessage(message)
+			if record.hitCount and record.hitCount > 1
+				and MSBTProfiles.currentProfile.stackSimilarHits then
+				message = message .. " [" .. record.hitCount .. " "
+					.. (L.MSG_HITS or "Hits") .. "]"
+			end
+			return message
+		end,
+		display = DisplayEvent,
+		displayRestricted = DisplayRestrictedAmount,
+	})
+	combatEngine = CombatEngine:New({
+		presentation = presentation,
+		log = CombatLogFilter:New({
+			getSaved = function() return Blizzard_CombatLog_Filters end,
+			getTemplate = function() return DEFAULT_COMBATLOG_FILTER_TEMPLATE end,
+			mineFlag = COMBATLOG_FILTER_MINE,
+			petFlag = COMBATLOG_FILTER_MY_PET,
+		}),
+		getSaved = function() return MSBTCombatEngine_SavedVars end,
+		setSaved = function(saved) MSBTCombatEngine_SavedVars = saved end,
+		notify = function(message) MikSBT.Print(message) end,
+	})
+end
+
 function eventFrame:UNIT_HEALTH(unitID)
 	incomingCombat:HandleHealthUpdate(unitID)
 end
@@ -706,21 +757,25 @@ function eventFrame:UNIT_COMBAT(unitTarget, action, flagText, amount, schoolMask
 end
 
 local function Enable()
-	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	eventFrame:RegisterEvent("CHAT_MSG_MONSTER_EMOTE")
-	eventFrame:RegisterEvent("UNIT_COMBAT")
-	eventFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
-	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-	if C_CombatText and C_CombatText.GetCurrentEventInfo then
-		eventFrame:RegisterEvent("COMBAT_TEXT_UPDATE")
+	if combatEngine then
+		combatEngine:Start()
+	else
+		eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+		eventFrame:RegisterEvent("UNIT_COMBAT")
+		eventFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+		eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+		if C_CombatText and C_CombatText.GetCurrentEventInfo then
+			eventFrame:RegisterEvent("COMBAT_TEXT_UPDATE")
+		end
+		outgoingCombat:Start()
 	end
-	outgoingCombat:Start()
-
 	MSBTParser.RegisterHandler(ParserEventsHandler)
 end
 
 local function Disable()
+	if combatEngine then combatEngine:Stop() end
 	eventFrame:Hide()
 	eventFrame:UnregisterAllEvents()
 	incomingCombat:Reset()

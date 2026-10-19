@@ -33,6 +33,14 @@ L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "Scroll area name already exists."
 L.MSG_INVALID_SCROLL_AREA_NAME		= "Invalid scroll area name."
 L.MSG_ACKNOWLEDGE_TEXT				= "Are you sure you wish to perform this action?"
 L.POPUP_CONFIRM_TITLE = "Confirm Action"
+L.AURA_TRACKING_TITLE = "Custom auras appear above. Uncheck to hide."
+L.AURA_TRACKING_INPUT = "Aura spell ID or name"
+L.AURA_TRACKING_ADD = "Add aura"
+L.AURA_TRACKING_HELP = "Add an aura to hide its gained and faded notifications. Tick its checkbox to show it again. Unlisted auras keep showing. Individual filtering requires a readable aura identity."
+L.AURA_TRACKING_CHECKBOX = "Show this aura's gained and faded notifications."
+L.AURA_TRACKING_REMOVE = "Remove this custom rule and track the aura normally."
+L.AURA_TRACKING_UNKNOWN = "Unknown aura"
+L.AURA_TRACKING_INVALID = "Aura not found. Enter a valid spell ID or exact spell name."
 L.MSG_NORMAL_PREVIEW_TEXT			= "Normal"
 L.MSG_DISPLAY_QUALITY				= "Display alerts for items of this quality."
 L.MSG_ITEM_QUALITIES				= "Item qualities"
@@ -406,6 +414,9 @@ obj["NOTIFICATION_EXPERIENCE_GAIN"]		= { label="Experience Gains", tooltip="Enab
 obj["NOTIFICATION_PC_KILLING_BLOW"]		= { label="Player Killing Blows", tooltip="Enable when you get a killing blow against a hostile player."}
 obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="NPC Killing Blows", tooltip="Enable when you get a killing blow against an NPC."}
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="Extra Attacks", tooltip="Enable when you gain extra attacks such as windfury, thrash, sword spec, etc."}
+obj["NOTIFICATION_PROC"] = { label="Ability Procs", tooltip="Show highlighted ability procs." }
+obj["NOTIFICATION_REACTIVE"] = { label="Reactive Abilities", tooltip="Show abilities becoming available in combat." }
+obj["NOTIFICATION_CROWD_CONTROL"] = { label="Crowd Control", tooltip="Show crowd control and interrupted control effects." }
 obj["NOTIFICATION_ENEMY_BUFF"]			= { label="Enemy Buff Gains", tooltip="Enable buffs your currently targeted enemy gains."}
 obj["NOTIFICATION_MONSTER_EMOTE"]		= { label="Monster Emotes", tooltip="Enable emotes by the currently targeted monster."}
 

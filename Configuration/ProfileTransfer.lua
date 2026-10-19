@@ -26,6 +26,8 @@ local SECTION_KEYS = {
 	powerThrottleDuration = "SpamControl", throttleList = "SpamControl",
 	mergeExclusions = "SpamControl", abilitySubstitutions = "SpamControl",
 	abilitySuppressions = "SpamControl", damageThreshold = "SpamControl",
+	auraTracking = "SpamControl",
+	auraSettings = "SpamControl",
 	healThreshold = "SpamControl", powerThreshold = "SpamControl",
 	hideFullHoTOverheals = "SpamControl",
 	qualityExclusions = "LootAlerts", alwaysShowQuestItems = "LootAlerts",
@@ -39,6 +41,7 @@ local COLLECTIONS = {
 local LIST_TYPES = {
 	throttleList = "number", abilitySubstitutions = "string",
 	mergeExclusions = "boolean", abilitySuppressions = "boolean",
+	auraTracking = "boolean",
 	qualityExclusions = "boolean", itemsAllowed = "boolean",
 	itemExclusions = "boolean", cooldownExclusions = "boolean",
 	ignoreCooldownThreshold = "boolean",
@@ -167,10 +170,26 @@ local function IsRecord(record)
 end
 
 local function IsSetting(key, value, defaults)
+	if key == "auraSettings" then
+		if type(value) ~= "table" then return false end
+		for id, settings in pairs(value) do
+			if type(id) ~= "string" or not id:match("^[1-9]%d*$")
+				or tonumber(id) > 2147483647 or not IsRecord(settings) then
+				return false
+			end
+		end
+		return true
+	end
 	if LIST_TYPES[key] then
 		if type(value) ~= "table" then return false end
 		for _, entry in pairs(value) do
 			if type(entry) ~= LIST_TYPES[key] and entry ~= false then return false end
+		end
+		if key == "auraTracking" then
+			for id in pairs(value) do
+				if type(id) ~= "string" or not id:match("^[1-9]%d*$")
+					or tonumber(id) > 2147483647 then return false end
+			end
 		end
 		return true
 	end

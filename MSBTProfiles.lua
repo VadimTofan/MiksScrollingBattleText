@@ -915,16 +915,25 @@ if IsClassic then
 				colorR		= 0.918,
 				colorG		= 0.918,
 				colorB		= 0,
-				message		= "-[%sl]",
+				message		= "-[%sl] faded",
 			},
 			NOTIFICATION_ITEM_BUFF_FADE = {
 				colorR		= 0.831,
 				colorG		= 0.831,
 				colorB		= 0.831,
-				message		= "-[%sl]",
+				message		= "-[%sl] faded",
 			},
 			NOTIFICATION_COMBAT_ENTER = {
 				message		= "+" .. L.MSG_COMBAT,
+			},
+			NOTIFICATION_PROC = {
+				message = "%sl", scrollArea = "Notification",
+			},
+			NOTIFICATION_REACTIVE = {
+				message = "<%sl>", scrollArea = "Notification",
+			},
+			NOTIFICATION_CROWD_CONTROL = {
+				message = "%sl", scrollArea = "Notification",
 			},
 			NOTIFICATION_COMBAT_LEAVE = {
 				message		= "-" .. L.MSG_COMBAT,
@@ -1172,6 +1181,8 @@ if IsClassic then
 
 		mergeExclusions					= {},
 		abilitySubstitutions			= {},
+		auraTracking = {},
+		auraSettings = {},
 		abilitySuppressions				= {
 
 		},
@@ -2019,16 +2030,25 @@ else
 				colorR		= 0.918,
 				colorG		= 0.918,
 				colorB		= 0,
-				message		= "-[%sl]",
+				message		= "-[%sl] faded",
 			},
 			NOTIFICATION_ITEM_BUFF_FADE = {
 				colorR		= 0.831,
 				colorG		= 0.831,
 				colorB		= 0.831,
-				message		= "-[%sl]",
+				message		= "-[%sl] faded",
 			},
 			NOTIFICATION_COMBAT_ENTER = {
 				message		= "+" .. L.MSG_COMBAT,
+			},
+			NOTIFICATION_PROC = {
+				message = "%sl", scrollArea = "Notification",
+			},
+			NOTIFICATION_REACTIVE = {
+				message = "<%sl>", scrollArea = "Notification",
+			},
+			NOTIFICATION_CROWD_CONTROL = {
+				message = "%sl", scrollArea = "Notification",
 			},
 			NOTIFICATION_COMBAT_LEAVE = {
 				message		= "-" .. L.MSG_COMBAT,
@@ -2384,6 +2404,8 @@ else
 
 		mergeExclusions					= {},
 		abilitySubstitutions			= {},
+		auraTracking = {},
+		auraSettings = {},
 		abilitySuppressions				= {
 			[SPELL_UNDYING_RESOLVE]		= true,
 		},

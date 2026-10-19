@@ -1,5 +1,14 @@
 # Changelog
 
+## v12.032
+
+- Added per-profile custom aura rows with visibility, color, font, message,
+  scroll-area, sound, and sticky settings.
+- Added explicit faded text for buff removals and restored missing notification
+  event defaults.
+- Fixed hidden color swatches failing when closing settings dialogs.
+- Preserved healing colors and the Hide Skills option in the new combat path.
+
 ## v12.031
 
 - Added display support for protected combat amounts without inspecting them in Lua.

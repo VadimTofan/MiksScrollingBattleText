@@ -69,6 +69,9 @@ local environment = setmetatable({}, {
 local sourceFile = assert(io.open("MSBTProfiles.lua", "rb"))
 local source = sourceFile:read("*a"):gsub("^\239\187\191", "")
 sourceFile:close()
+local optionsFile = assert(io.open("MSBTOptions/MSBTOptionsTabs.lua", "rb"))
+local optionsSource = optionsFile:read("*a")
+optionsFile:close()
 local exports = {}
 for _, classic in ipairs({ false, true }) do
 	MikSBT.Compatibility.Client.isClassicContent = classic
@@ -78,6 +81,64 @@ for _, classic in ipairs({ false, true }) do
 	chunk()
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
+
+	-- Given custom aura rows with both checkbox states on either client.
+	assert(type(profiles.currentProfile.auraTracking) == "table",
+		"missing custom aura defaults")
+	assert(type(profiles.currentProfile.auraSettings) == "table",
+		"missing custom aura style defaults")
+	profiles.SetOption(nil, "auraTracking", {
+		["1459"] = false, ["17"] = true,
+	})
+	profiles.SetOption(nil, "auraSettings", {
+		["17"] = { colorR = 0.4, fontSize = 28, message = "Aura %sl",
+			scrollArea = "Notification", soundFile = 123456, alwaysSticky = false },
+	})
+	-- When the profile is exported and decoded for importing.
+	local auraExport = assert(profiles.ExportProfile("Default"))
+	local auraTransfer = MikSBT.Configuration.ProfileTransfer:New({
+		masterProfile = profiles.masterProfile,
+		version = "12.031", client = 120100, locale = "enUS",
+	})
+	local auraPayload = assert(auraTransfer:Decode(auraExport))
+	-- Then unchecked rows survive, rather than becoming missing defaults.
+	assert(auraPayload.sections.SpamControl.auraTracking["1459"] == false)
+	assert(auraPayload.sections.SpamControl.auraTracking["17"] == true)
+	assert(auraPayload.sections.SpamControl.auraSettings["17"].fontSize == 28)
+	assert(auraPayload.sections.SpamControl.auraSettings["17"].alwaysSticky == false)
+	-- Given a malformed custom style in an imported profile.
+	auraPayload.sections.SpamControl.auraSettings["17"].fontSize = "large"
+	-- When validation checks its display settings.
+	-- Then the invalid style is rejected before it reaches the runtime.
+	assert(not auraTransfer:Validate(auraPayload))
+	auraPayload.sections.SpamControl.auraSettings["17"].fontSize = 28
+	-- When an import contains an invalid aura key or checkbox state.
+	auraPayload.sections.SpamControl.auraTracking[1] = true
+	-- Then validation rejects data that cannot be displayed as a rule row.
+	assert(not auraTransfer:Validate(auraPayload))
+	auraPayload.sections.SpamControl.auraTracking[1] = nil
+
+	-- Given every event offered by the actual options list on this client.
+	for eventType in optionsSource:gmatch(
+		'EventsTab_AddEvent%([^,]+,%s*"([A-Z_]+)"') do
+		-- When the list resolves settings from the active profile.
+		local eventSettings = profiles.currentProfile.events[eventType]
+
+		-- Then its rendering/editing controls have a complete settings object.
+		assert(type(eventSettings) == "table",
+			"missing options event defaults: " .. eventType
+				.. " (classic=" .. tostring(classic) .. ")")
+		assert(type(eventSettings.message) == "string",
+			"missing options event message: " .. eventType)
+	end
+
+	-- Given the loaded defaults for a buff ending on either client branch.
+	local fade = profiles.currentProfile.events.NOTIFICATION_BUFF_FADE
+	-- When the buff name is rendered into its notification message.
+	local fadedMessage = fade.message:gsub("%%sl", "Arcane Intellect")
+	-- Then the notification explicitly says that the buff faded.
+	assert(fadedMessage == "-[Arcane Intellect] faded",
+		"buff removal notification did not say faded")
 	assert(type(profiles.ExportProfile) == "function",
 		"profile facade has no ExportProfile action")
 
@@ -159,6 +220,9 @@ assert(profiles.currentProfile ~= original)
 assert(profiles.currentProfile.scrollAreas.Incoming.offsetX == -320)
 assert(profiles.currentProfile.events.INCOMING_DAMAGE.soundFile == 5678901)
 assert(profiles.currentProfile.partialColoringDisabled)
+assert(profiles.currentProfile.auraTracking["1459"] == false)
+assert(profiles.currentProfile.auraTracking["17"] == true)
+assert(profiles.currentProfile.auraSettings["17"].message == "Aura %sl")
 assert(profiles.currentProfile.damageColoringDisabled)
 assert(profiles.currentProfile.scrollAreas.Incoming.skillIconsDisabled)
 assert(MSBTProfiles_SavedVarsPerChar.currentProfileName == "Portable")

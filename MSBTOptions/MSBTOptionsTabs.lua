@@ -1110,6 +1110,9 @@ local function EventsTab_SetupEvents()
 	EventsTab_AddEvent(category, "NOTIFICATION_ITEM_BUFF_FADE", c.ITEM_BUFF_NAME .. c.SKILL_LONG)
 	EventsTab_AddEvent(category, "NOTIFICATION_ITEM_COOLDOWN", c.ITEM_COOLDOWN_NAME)
 	EventsTab_AddEvent(category, "NOTIFICATION_COMBAT_ENTER", "")
+	EventsTab_AddEvent(category, "NOTIFICATION_PROC", c.SKILL_LONG)
+	EventsTab_AddEvent(category, "NOTIFICATION_REACTIVE", c.SKILL_LONG)
+	EventsTab_AddEvent(category, "NOTIFICATION_CROWD_CONTROL", c.SKILL_LONG)
 	EventsTab_AddEvent(category, "NOTIFICATION_COMBAT_LEAVE", "")
 	EventsTab_AddEvent(category, "NOTIFICATION_HONOR_GAIN", c.HONOR_AMOUNT)
 	EventsTab_AddEvent(category, "NOTIFICATION_REP_GAIN", c.REP_AMOUNT)
@@ -1124,10 +1127,18 @@ local function EventsTab_SetupEvents()
 end
 
 
-local function EventsTab_ChangeEventCategory(category)
+local function EventsTab_ChangeEventCategory(category, firstAuraID)
 	local controls = tabFrames.events.controls
 
 	controls.eventsListbox:Clear()
+	if category == "NOTIFICATION_EVENTS" then
+		controls.eventsListbox:Configure(400, 250, 25)
+		MSBTOptions.Auras.AddRows(controls.eventsListbox, firstAuraID)
+		controls.auraPanel:Show()
+	else
+		controls.eventsListbox:Configure(400, 300, 25)
+		controls.auraPanel:Hide()
+	end
 	for index in ipairs(orderedEvents[category]) do
 		controls.eventsListbox:AddItem(index)
 	end
@@ -1149,25 +1160,46 @@ local function EventsTab_MoveAll(scrollArea)
 end
 
 
+local function EventsTab_GetSettings(eventType)
+	if eventType:match("^%d+$") then
+		return MikSBT.Configuration.AuraTracking:GetSettings(
+			MSBTProfiles.currentProfile, eventType)
+	end
+	return MSBTProfiles.currentProfile.events[eventType]
+end
+
+local function EventsTab_SaveOption(eventType, field, value, default)
+	if eventType:match("^%d+$") then
+		MSBTOptions.Auras.SaveSetting(eventType, field, value)
+	else
+		MSBTProfiles.SetOption("events." .. eventType, field, value, default)
+	end
+end
+
+local function EventsTab_LineLabel(line)
+	if line.auraID then return line.label:GetText() end
+	return line.enableCheckbox.fontString:GetText()
+end
+
 local function EventsTab_ColorswatchOnChanged(this)
 	local eventType = this:GetParent().eventType
-	MSBTProfiles.SetOption("events." .. eventType, "colorR", this.r, 1)
-	MSBTProfiles.SetOption("events." .. eventType, "colorG", this.g, 1)
-	MSBTProfiles.SetOption("events." .. eventType, "colorB", this.b, 1)
+	EventsTab_SaveOption(eventType, "colorR", this.r, 1)
+	EventsTab_SaveOption(eventType, "colorG", this.g, 1)
+	EventsTab_SaveOption(eventType, "colorB", this.b, 1)
 end
 
 
 local function EventsTab_EnableOnClick(this, isChecked)
 	local eventType = this:GetParent().eventType
-	MSBTProfiles.SetOption("events." .. eventType, "disabled", not isChecked)
+	EventsTab_SaveOption(eventType, "disabled", not isChecked)
 end
 
 
 local function EventsTab_SaveEventSettings(settings, eventType)
-	MSBTProfiles.SetOption("events." .. eventType, "soundFile", settings.soundFile)
-	MSBTProfiles.SetOption("events." .. eventType, "scrollArea", settings.scrollArea, DEFAULT_SCROLL_AREA)
-	MSBTProfiles.SetOption("events." .. eventType, "message", settings.message)
-	MSBTProfiles.SetOption("events." .. eventType, "alwaysSticky", settings.alwaysSticky)
+	EventsTab_SaveOption(eventType, "soundFile", settings.soundFile)
+	EventsTab_SaveOption(eventType, "scrollArea", settings.scrollArea, DEFAULT_SCROLL_AREA)
+	EventsTab_SaveOption(eventType, "message", settings.message)
+	EventsTab_SaveOption(eventType, "alwaysSticky", settings.alwaysSticky)
 
 	tabFrames.events.controls.eventsListbox:Refresh()
 end
@@ -1175,11 +1207,11 @@ end
 
 local function EventsTab_SettingsButtonOnClick(this)
 	local eventType = this:GetParent().eventType
-	local eventSettings = MSBTProfiles.currentProfile.events[eventType]
+	local eventSettings = EventsTab_GetSettings(eventType)
 	local categoryText = tabFrames.events.controls.eventCategoryDropdown:GetSelectedText()
 
 	EraseTable(configTable)
-	configTable.title = categoryText .. " - " .. this:GetParent().enableCheckbox.fontString:GetText()
+	configTable.title = categoryText .. " - " .. EventsTab_LineLabel(this:GetParent())
 	configTable.message = eventSettings.message
 	configTable.soundFile = eventSettings.soundFile
 	configTable.codes = this:GetParent().codes
@@ -1199,25 +1231,25 @@ end
 
 
 local function EventsTab_SaveFontSettings(settings, eventType)
-	local isCrit = MSBTProfiles.currentProfile.events[eventType].isCrit
-	MSBTProfiles.SetOption("events." .. eventType, "fontName", isCrit and settings.critFontName or settings.normalFontName)
-	MSBTProfiles.SetOption("events." .. eventType, "outlineIndex", isCrit and settings.critOutlineIndex or settings.normalOutlineIndex)
-	MSBTProfiles.SetOption("events." .. eventType, "fontSize", isCrit and settings.critFontSize or settings.normalFontSize)
-	MSBTProfiles.SetOption("events." .. eventType, "fontAlpha", isCrit and settings.critFontAlpha or settings.normalFontAlpha)
+	local isCrit = EventsTab_GetSettings(eventType).isCrit
+	EventsTab_SaveOption(eventType, "fontName", isCrit and settings.critFontName or settings.normalFontName)
+	EventsTab_SaveOption(eventType, "outlineIndex", isCrit and settings.critOutlineIndex or settings.normalOutlineIndex)
+	EventsTab_SaveOption(eventType, "fontSize", isCrit and settings.critFontSize or settings.normalFontSize)
+	EventsTab_SaveOption(eventType, "fontAlpha", isCrit and settings.critFontAlpha or settings.normalFontAlpha)
 end
 
 
 local function EventsTab_FontButtonOnClick(this)
 	local categoryText = tabFrames.events.controls.eventCategoryDropdown:GetSelectedText()
 	local eventType = this:GetParent().eventType
-	local eventSettings = MSBTProfiles.currentProfile.events[eventType]
+	local eventSettings = EventsTab_GetSettings(eventType)
 
 	local saKey = eventSettings.scrollArea
 	local saSettings = MSBTProfiles.currentProfile.scrollAreas[saKey]
 	if (not saSettings) then saSettings = MSBTProfiles.currentProfile.scrollAreas[DEFAULT_SCROLL_AREA] end
 
 	EraseTable(configTable)
-	configTable.title = categoryText .. " - " .. this:GetParent().enableCheckbox.fontString:GetText()
+	configTable.title = categoryText .. " - " .. EventsTab_LineLabel(this:GetParent())
 
 	local fontName
 	if (not eventSettings.isCrit) then
@@ -1256,6 +1288,24 @@ local function EventsTab_FontButtonOnClick(this)
 		configTable.hideNormal = true
 	end
 
+	if eventType:match("^%d+$") then
+		local profile = MSBTProfiles.currentProfile
+		local base = profile.events.NOTIFICATION_BUFF
+		local custom = profile.auraSettings and profile.auraSettings[eventType] or {}
+		if fonts[base.fontName] then
+			configTable.inheritedNormalFontName = base.fontName
+		end
+		configTable.inheritedNormalOutlineIndex = base.outlineIndex
+			or configTable.inheritedNormalOutlineIndex
+		configTable.inheritedNormalFontSize = base.fontSize
+			or configTable.inheritedNormalFontSize
+		configTable.inheritedNormalFontAlpha = base.fontAlpha
+			or configTable.inheritedNormalFontAlpha
+		configTable.normalFontName = custom.fontName
+		configTable.normalOutlineIndex = custom.outlineIndex
+		configTable.normalFontSize = custom.fontSize
+		configTable.normalFontAlpha = custom.fontAlpha
+	end
 	configTable.parentFrame = tabFrames.events
 	configTable.anchorFrame = tabFrames.events
 	configTable.anchorPoint = "BOTTOM"
@@ -1293,6 +1343,7 @@ local function EventsTab_CreateLine(this)
 	button:SetTooltip(objLocale.tooltip)
 	button:SetPoint("RIGHT", frame, "RIGHT", -10, 0)
 	button:SetClickHandler(EventsTab_SettingsButtonOnClick)
+	frame.settingsButton = button
 	controls[#controls+1] = button
 
 	button = MSBTControls.CreateIconButton(frame, "FontSettings")
@@ -1307,12 +1358,39 @@ local function EventsTab_CreateLine(this)
 	fontString:SetPoint("RIGHT", button, "LEFT", -10, 0)
 	fontString:SetJustifyH("LEFT")
 	frame.messageFontString = fontString
+	frame.eventControls = {
+		colorswatch, checkbox, frame.settingsButton, button, fontString,
+	}
+	frame.auraLine = MSBTOptions.Auras.CreateLine(frame, function()
+		EventsTab_ChangeEventCategory(
+			controls.eventCategoryDropdown:GetSelectedID())
+	end, {
+		color = EventsTab_ColorswatchOnChanged,
+		settings = EventsTab_SettingsButtonOnClick,
+		font = EventsTab_FontButtonOnClick,
+	})
+	controls[#controls + 1] = frame.auraLine.checkbox
+	controls[#controls + 1] = frame.auraLine.remove
+	controls[#controls + 1] = frame.auraLine.settingsButton
+	controls[#controls + 1] = frame.auraLine.fontButton
+	controls[#controls + 1] = frame.auraLine.colorSwatch
 
 	return frame
 end
 
 
 local function EventsTab_DisplayLine(this, line, key, isSelected)
+	local isAura = type(key) == "string"
+	for _, control in ipairs(line.eventControls) do
+		if isAura then control:Hide() else control:Show() end
+	end
+	if isAura then
+		line.eventType, line.codes = nil, nil
+		line.auraLine:Show()
+		MSBTOptions.Auras.DisplayLine(line.auraLine, key)
+		return
+	end
+	line.auraLine:Hide()
 	local events = orderedEvents[tabFrames.events.controls.eventCategoryDropdown:GetSelectedID()]
 	local eventType = events[key].eventType
 	local eventSettings = MSBTProfiles.currentProfile.events[eventType]
@@ -1390,6 +1468,9 @@ local function EventsTab_Create()
 	listbox:SetCreateLineHandler(EventsTab_CreateLine)
 	listbox:SetDisplayHandler(EventsTab_DisplayLine)
 	controls.eventsListbox = listbox
+	controls.auraPanel = MSBTOptions.Auras.Create(tabFrame, function(firstAuraID)
+		EventsTab_ChangeEventCategory(dropdown:GetSelectedID(), firstAuraID)
+	end)
 
 
 	EventsTab_SetupEvents()
@@ -1407,7 +1488,8 @@ end
 local function EventsTab_OnShow()
 	if (not tabFrames.events.created) then EventsTab_Create() end
 
-	tabFrames.events.controls.eventsListbox:Refresh()
+	EventsTab_ChangeEventCategory(
+		tabFrames.events.controls.eventCategoryDropdown:GetSelectedID())
 end
 
 

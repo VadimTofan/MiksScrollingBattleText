@@ -4,7 +4,7 @@ Mik's Scrolling Battle Text is a World of Warcraft addon that replaces Blizzard'
 
 ## Status
 
-- Current version: `12.028`
+- Current version: `12.032`
 - Supported interface values: `120100`, `11504`, `40400`, `110002`, `16001`
 - Addon type: combat text replacement and combat event presentation
 
@@ -45,6 +45,43 @@ The addon options are split into focused sections:
 2. Place the `MikScrollingBattleText` folder into your WoW `Interface/AddOns` directory.
 3. Restart the game or reload the UI.
 4. Open the addon settings with `/msbt`.
+
+### Retail and Forever combat engine
+
+Retail and Forever use an engine adapted from Forever Combat Text 0.6.8 for
+incoming hits, healing, outgoing damage, and combat alerts. It matches casts,
+hit reports, spell descriptions, damage-over-time timing, and available
+combat-log message colours. MSBT still owns the scrolling windows, animations,
+fonts, sounds, crit styling, event settings, and profiles.
+
+Where combat-log messages are supported, MSBT initially asks for `/reload`.
+During logout it saves a dedicated **MSBT combat** filter; Blizzard activates
+it on the next load. Keep it selected in the Combat Log. Changing its sources,
+event types, or colours pauses outgoing damage until the filter is restored
+by another reload. Existing combat-log filters are preserved. Unsupported
+events are skipped; clients without combat-log messages use the engine's
+cast and timing inference, whose attribution can be uncertain.
+
+The damage-meter fallback is disabled for this path to prevent duplicate
+outgoing damage. Loot, gains, cooldowns, and health/power triggers retain their
+existing MSBT sources. Older clients keep their existing combat handling.
+
+Spell-description parsing currently supports English. Other languages use
+the engine's learned spell timing and school information. That learned cache
+is bounded and saved separately from profiles.
+
+In **Events → Notification**, add an aura by spell ID or exact name to the
+top of the existing notification list. New entries are unchecked and hide
+that aura's gained and
+faded notifications. Tick an entry to show it again, or remove it to restore
+normal tracking. Unlisted auras remain visible. Rules save with the profile
+and its export. Filtering requires a readable aura ID or name; unidentified
+notifications remain visible.
+
+Custom aura rows also have color, font, and event settings controls. Set their
+message, scroll area, sound, or sticky behavior independently. Untouched
+fields inherit the corresponding buff/debuff notification style, including
+the separate gained and faded messages. Aura styles save with the profile.
 
 ## Commands
 
