@@ -1,5 +1,15 @@
 # Changelog
 
+## v12.038
+
+- Simplified General combat-text controls to Enable MSBT and Enable Blizzard
+  Damage, removing the solo/group and Blizzard incoming overrides.
+- Enabling MSBT now turns off all Blizzard combat text and unchecks Blizzard
+  Damage. Changes made during combat apply when combat ends.
+- Preserved red incoming damage text and negative amounts for physical and
+  spell hits, including protected amounts.
+- Increased outgoing damage grouping to 300 ms.
+
 ## v12.037
 
 - Added separate Incoming Pet and Outgoing Pet scroll areas, positioned
