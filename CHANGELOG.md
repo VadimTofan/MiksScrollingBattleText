@@ -1,5 +1,13 @@
 # Changelog
 
+## v12.035
+
+- Increased incoming damage grouping to 200 ms on Retail and Forever.
+- Matched incoming healer names within 200 ms in either event order while
+  retaining the 120 ms heal grouping window.
+- Deferred incoming heal spell attribution until the end of the frame.
+- Hid skill names by default while retaining damage amounts and icons.
+
 ## v12.034
 
 - Added WoW Retail 12.1.5 compatibility and CurseForge game-version metadata.
