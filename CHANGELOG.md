@@ -1,5 +1,9 @@
 # Changelog
 
+## v12.033
+
+- Re-released the v12.032 changes with an incremented addon version.
+
 ## v12.032
 
 - Added per-profile custom aura rows with visibility, color, font, message,
