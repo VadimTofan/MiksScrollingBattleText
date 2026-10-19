@@ -82,6 +82,31 @@ for _, classic in ipairs({ false, true }) do
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
 
+	-- Given retired spam settings in an existing saved profile.
+	local retiredSettings = {
+		dotThrottleDuration = 3, hotThrottleDuration = 3,
+		powerThrottleDuration = 3, throttleList = { Legacy = 3 },
+		mergeExclusions = { Legacy = true }, damageThreshold = 10,
+		healThreshold = 10, powerThreshold = 10, hideFullHoTOverheals = true,
+	}
+	for key, value in pairs(retiredSettings) do
+		assert(profiles.masterProfile[key] == nil, "retired default remains: " .. key)
+		profiles.currentProfile[key] = value
+	end
+	-- When that profile is exported using the current schema.
+	local legacyTransfer = MikSBT.Configuration.ProfileTransfer:New({
+		masterProfile = profiles.masterProfile,
+		version = "12.035", client = 120100, locale = "enUS",
+	})
+	local legacyExport = assert(profiles.ExportProfile("Default"))
+	local legacyPayload = assert(legacyTransfer:Decode(legacyExport))
+	-- Then retired settings stay saved but are absent from the portable profile.
+	for key, value in pairs(retiredSettings) do
+		assert(profiles.currentProfile[key] == value)
+		assert(legacyPayload.sections.SpamControl[key] == nil)
+		assert(legacyPayload.sections.General[key] == nil)
+	end
+
 	-- Given the real default profile and its outgoing spell message.
 	local formatter = LoadFile("Services/Formatter.lua")
 	formatter:Configure({

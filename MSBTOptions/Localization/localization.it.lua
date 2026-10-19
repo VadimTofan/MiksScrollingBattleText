@@ -59,7 +59,6 @@ obj["mergeSwings"]				= { label="Unifica Sferzate", tooltip="Unifica sferzate re
 obj["hideSkills"]				= { label="Nascondi Abilita'", tooltip="Non mostrare i nomi delle abilita' per 'in attivo' e 'in uscita'.\n\nNon usera' alcune personalizzationi a livello di compatibilita' se scegli questa opzione perche' causa l'evento %s di venir ignorato."}
 obj["hideNames"]				= { label="Nascondi Nomi", tooltip="Non mostrare i nomi per 'in attivo' e 'in uscita'.\n\nNon usera' alcune personalizzationi a livello di compatibilita' se scegli questa opzione perche' causa l'evento %s di venir ignorato."}
 obj["hideFullOverheals"]		= { label="Nascondi Intere Sovracure", tooltip="Non mostrare le cure non periodiche che hanno come effettiva cura un ammontare pari a zero."}
-obj["hideFullHoTOverheals"]		= { label="Nascondi Intere CaT Sovracuranti", tooltip="Non mostrare le cure a tempo che hanno come cura effettiva un ammontare pari a zero."}
 obj["hideMergeTrailer"]			= { label="Nascondi Unione Code", tooltip="Non mostrare le code che specificano il numeo di colpi e critici alla fine di un evento unificato."}
 obj["lootedItems"]				= { label="Oggetti Raccolti", tooltip="Mostra le notifiche quando un oggetto e' raccolto."}
 obj["moneyGains"]				= { label="Guadagno Monete", tooltip="Attiva la raccolta soldi."}
@@ -136,9 +135,6 @@ obj["critFontOpacity"]		= { label="Opacita' Critici", tooltip="Imposta l'opacita
 obj["scrollHeight"]			= { label="Altezza Scorrimento", tooltip="L'altezza dell'area di scorrimento."}
 obj["scrollWidth"]			= { label="Larghezza Scorrimento", tooltip="La larghezza dell'area di scorrimento."}
 obj["scrollAnimationSpeed"]	= { label="Velocità Animazione", tooltip="Imposta la velocita' di animazione per l'area di scorrimento."}
-obj["powerThreshold"]		= { label="Limite Potere", tooltip="Il limite che i guadagni di potere devono superare per essere mostrati."}
-obj["healThreshold"]		= { label="Limite Cure", tooltip="Il limite che le cure devono superare per essere mostrate."}
-obj["damageThreshold"]		= { label="Limite Danno", tooltip="Il limite che il danno deve superare per essere mostrato."}
 obj["dotThrottleTime"]		= { label="Tempo Aggregazione DaT", tooltip="Il numero di secondi prima di aggregare i DaT."}
 obj["hotThrottleTime"]		= { label="Tempo Aggregazione CaT", tooltip="Il numero di secondi prima di aggregare le CaT."}
 obj["powerThrottleTime"]	= { label="Tempo Aggregazione Potre", tooltip="Il numero di secondi prima di aggregare i cambi di potere."}

@@ -17,8 +17,7 @@ local defaults = {
 	normalFontName = "Default Font",
 	normalFontSize = 18,
 	shortenNumbers = false,
-	damageThreshold = 0,
-	throttleList = { Spell = 3 },
+	abilitySubstitutions = { Spell = "Default name" },
 	abilitySuppressions = {},
 	qualityExclusions = { [0] = true },
 	itemsAllowed = {},
@@ -52,7 +51,7 @@ do
 		creationVersion = "12.029.0",
 		normalFontName = "Custom Font",
 		shortenNumbers = true,
-		throttleList = { Spell = false, Other = 1.5 },
+		abilitySubstitutions = { Spell = false, Other = "Custom name" },
 		qualityExclusions = { [0] = false, [2] = true },
 		events = { INCOMING_DAMAGE = { soundFile = "Custom Sound" } },
 		triggers = { LOW_HEALTH = false },
@@ -76,12 +75,12 @@ do
 	assert(payload.sections.ScrollAreas.Incoming.offsetX == -140)
 	assert(payload.sections.Events.INCOMING_DAMAGE.message == "-%a")
 	assert(payload.sections.Triggers.LOW_HEALTH == false)
-	assert(payload.sections.SpamControl.throttleList.Spell == false)
+	assert(payload.sections.SpamControl.abilitySubstitutions.Spell == false)
 	assert(payload.sections.LootAlerts.qualityExclusions[0] == false)
 	assert(payload.media.fonts["Custom Font"] == media.fonts["Custom Font"])
 	assert(payload.media.sounds["Custom Sound"] == media.sounds["Custom Sound"])
 	assert(profile.normalFontSize == nil, "export modified the source profile")
-	assert(defaults.throttleList.Spell == 3, "export modified defaults")
+	assert(defaults.abilitySubstitutions.Spell == "Default name", "export modified defaults")
 
 	-- Given different destination defaults and an existing media registration.
 	local destination = ProfileTransfer:New({
@@ -199,3 +198,17 @@ do
 end
 
 print("Profile transfer tests passed")
+
+-- Describe: profiles exported before retiring unused spam settings still import.
+do
+	-- Given an older portable profile containing the retired settings.
+	local payload = assert(transfer:Decode(assert(transfer:Export("Old", {}, {}))))
+	payload.sections.SpamControl.damageThreshold = 25
+	payload.sections.SpamControl.throttleList = { Legacy = 3 }
+	local profiles = {}
+	-- When it is imported by the current version.
+	local name = assert(transfer:Import(encode(payload), "Old", profiles, {}))
+	-- Then active settings survive while retired options do not become active.
+	assert(name == "Old" and profiles.Old.normalFontSize == defaults.normalFontSize)
+	assert(profiles.Old.damageThreshold == nil and profiles.Old.throttleList == nil)
+end

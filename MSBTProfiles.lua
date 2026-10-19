@@ -53,22 +53,15 @@ local SPELL_PREDATORS_SWIFTNESS		= not IsClassic and GetSkillName(69369)
 local SPELL_PVP_TRINKET				= not IsClassic and GetSkillName(42292)
 local SPELL_REVENGE					= GetSkillName(SPELLID_REVENGE)
 local SPELL_RIME 					= not IsClassic and GetSkillName(59057)
-local SPELL_SHADOW_TRANCE			= GetSkillName(17941)
-local SPELL_SHIELD_SLAM				= GetSkillName(23922)
 
 local SPELL_SUDDEN_DEATH			= not IsClassic and GetSkillName(52437)
-local SPELL_SUDDEN_DOOM				= not IsClassic and GetSkillName(81340)
 
 local SPELL_TIDAL_WAVES				= not IsClassic and GetSkillName(53390)
 
 local SPELL_VICTORY_RUSH			= not IsClassic and GetSkillName(SPELLID_VICTORY_RUSH)
 
-local SPELL_DRAIN_LIFE				= not IsClassic and GetSkillName(234153)
-local SPELL_SHADOWMEND				= not IsClassic and GetSkillName(39373)
 
 local SPELL_UNDYING_RESOLVE			= not IsClassic and GetSkillName(51915)
-local SPELL_VAMPIRIC_EMBRACE		= GetSkillName(15286)
-local SPELL_VAMPIRIC_TOUCH			= not IsClassic and GetSkillName(34914)
 
 local _
 
@@ -1170,26 +1163,12 @@ if IsClassic then
 		DEMONHUNTER		= CreateClassSettingsTable("DEMONHUNTER"),
 		EVOKER			= CreateClassSettingsTable("EVOKER"),
 
-		dotThrottleDuration				= 3,
-		hotThrottleDuration				= 3,
-		powerThrottleDuration			= 3,
-		throttleList = {
-
-			[SPELL_VAMPIRIC_EMBRACE]	= 5,
-
-		},
-
-		mergeExclusions					= {},
 		abilitySubstitutions			= {},
 		auraTracking = {},
 		auraSettings = {},
 		abilitySuppressions				= {
 
 		},
-		damageThreshold					= 0,
-		healThreshold					= 0,
-		powerThreshold					= 0,
-		hideFullHoTOverheals			= true,
 		hideSkills = true,
 		shortenNumbers					= false,
 		stackSimilarHits				= false,
@@ -2391,29 +2370,12 @@ else
 		DEMONHUNTER		= CreateClassSettingsTable("DEMONHUNTER"),
 		EVOKER			= CreateClassSettingsTable("EVOKER"),
 
-		dotThrottleDuration				= 3,
-		hotThrottleDuration				= 3,
-		powerThrottleDuration			= 3,
-		throttleList = {
-
-			[SPELL_DRAIN_LIFE]			= 3,
-			[SPELL_SHADOWMEND]			= 5,
-
-			[SPELL_VAMPIRIC_EMBRACE]	= 5,
-			[SPELL_VAMPIRIC_TOUCH]		= 5,
-		},
-
-		mergeExclusions					= {},
 		abilitySubstitutions			= {},
 		auraTracking = {},
 		auraSettings = {},
 		abilitySuppressions				= {
 			[SPELL_UNDYING_RESOLVE]		= true,
 		},
-		damageThreshold					= 0,
-		healThreshold					= 0,
-		powerThreshold					= 0,
-		hideFullHoTOverheals			= true,
 		hideSkills = true,
 		shortenNumbers					= false,
 		stackSimilarHits				= false,
