@@ -487,7 +487,6 @@ local function CleanupActionMessage(message)
 	message = string_gsub(message, "%[%s*%-?%s*%]", "")
 	message = string_gsub(message, "%{%s*%-?%s*%}", "")
 	message = string_gsub(message, "%<%s*%-?%s*%>", "")
-	message = string_gsub(message, "^%s*%-%s*", "")
 	message = string_gsub(message, "%s*%-%s*$", "")
 	message = string_gsub(message, "%s%s+", " ")
 	message = string_gsub(message, "^%s+", "")
@@ -647,10 +646,11 @@ if Client.isMainline or Client.isForever then
 			local effect = RestrictedValue:String(record.name)
 				or (record.spell and GetSpellInfo(record.spell))
 			local hideSkills = record.event and MSBTProfiles.currentProfile.hideSkills
+			local useEventColor = record.event == "damage" or record.event == "heal"
 			local message = Formatter:FormatLegacyEvent(
 				settings.message or "", record.amount, record.school,
 				nil, nil, nil, name, nil, effect,
-				nil, nil, record.event == "heal", hideSkills
+				nil, nil, useEventColor, hideSkills
 			)
 			message = CleanupActionMessage(message)
 			if record.hitCount and record.hitCount > 1

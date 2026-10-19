@@ -39,8 +39,8 @@ C_DamageMeter = {
 }
 Enum.DamageMeterType = { DamageDone = 0 }
 C_EventUtils = { IsEventValid = function(event) return event ~= "PLAYER_SWING" end }
-MikSBT.Animations.DisplayEvent = function(settings, message, icon)
-	displayed[#displayed + 1] = { settings, message, icon }
+MikSBT.Animations.DisplayEvent = function(settings, message, icon, _, amount)
+	displayed[#displayed + 1] = { settings, message, icon, amount }
 end
 local events = MikSBT.Profiles.currentProfile.events
 events.OUTGOING_SPELL_DAMAGE = { message = "Hit %a", scrollArea = "Custom outgoing" }
@@ -182,6 +182,56 @@ for _, forever in ipairs({ false, true }) do
 
 	-- Given incoming heals have their own styling and damage-school colours are on.
 	profile.damageColoringDisabled = false
+
+	-- Given incoming damage uses red text and a negative amount template.
+	local incomingMessage = events.INCOMING_DAMAGE.message
+	local incomingSpellSettings = events.INCOMING_SPELL_DAMAGE
+	events.INCOMING_DAMAGE.message = "(%n) -%a"
+	events.INCOMING_DAMAGE.colorR = 1
+	events.INCOMING_DAMAGE.colorG = 0
+	events.INCOMING_DAMAGE.colorB = 0
+	events.INCOMING_SPELL_DAMAGE = {
+		message = "(%s) -%a", scrollArea = "Incoming",
+		colorR = 1, colorG = 0, colorB = 0,
+	}
+	profile.physical = { colorR = 1, colorG = 1, colorB = 1 }
+	profile.fire = { colorR = 1, colorG = 0.5, colorB = 0 }
+
+	for _, school in ipairs({ 1, 4 }) do
+		-- When the player's physical or spell damage reaches the real formatter.
+		MikSBT.CombatEngine.liveRouter:In({
+			event = "damage", amount = 37, school = school,
+		})
+		Advance(0.21)
+
+		-- Then the minus remains and school colors cannot override event red.
+		local damage = displayed[#displayed]
+		assert(damage[2] == "-37",
+			"incoming damage lost its minus sign or event color: " .. damage[2])
+		assert(damage[1].colorR == 1 and damage[1].colorG == 0
+			and damage[1].colorB == 0)
+	end
+
+	-- Given an opaque incoming damage amount that Lua cannot inspect.
+	local opaque = {}
+	local wasSecret, largeNumbers = issecretvalue, BreakUpLargeNumbers
+	issecretvalue = function(value) return value == opaque end
+	BreakUpLargeNumbers = nil
+
+	-- When it takes the restricted display path through the real main module.
+	MikSBT.CombatEngine.liveRouter:In({
+		event = "damage", amount = opaque, school = 1,
+	})
+
+	-- Then the negative template and separate amount keep the event's red style.
+	local restrictedDamage = displayed[#displayed]
+	assert(restrictedDamage[2] == "-%s" and restrictedDamage[4] == opaque,
+		"restricted incoming damage lost its negative template")
+	assert(restrictedDamage[1].colorG == 0 and restrictedDamage[1].colorB == 0)
+	issecretvalue, BreakUpLargeNumbers = wasSecret, largeNumbers
+	events.INCOMING_DAMAGE.message = incomingMessage
+	events.INCOMING_SPELL_DAMAGE = incomingSpellSettings
+
 	profile.holy = { colorR = 1, colorG = 0.5, colorB = 0 }
 	events.INCOMING_HEAL = { message = "+%a", scrollArea = "Custom heals" }
 	events.INCOMING_HEAL_CRIT = nil
