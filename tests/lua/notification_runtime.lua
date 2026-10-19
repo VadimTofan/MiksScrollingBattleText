@@ -323,3 +323,24 @@ triggerFrame.scripts.OnEvent(triggerFrame, "UNIT_HEALTH", "player")
 -- Then disabled triggers produce no display.
 assert(#displayed == displaysBeforeDisable)
 print("Chat notification runtime tests passed")
+
+-- Describe: outgoing damage within 300 ms shares one display.
+-- Given an enabled outgoing spell and a successful cast.
+profile.events.OUTGOING_SPELL_DAMAGE = {
+    message = "Damage %a", scrollArea = "Outgoing",
+}
+local beforeOutgoing = #displayed
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_SPELLCAST_SUCCEEDED", "player", nil, 1234)
+-- When the first hit arrives and 250 ms of its grouping window passes.
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "target", "WOUND", "", 50, 1)
+local outgoingTimer = scheduledTimers[#scheduledTimers]
+if outgoingTimer.delay <= 0.25 then outgoingTimer.callback() end
+-- Then the batch is still pending for another matching hit.
+assert(#displayed == beforeOutgoing, "outgoing damage flushed before 300 ms")
+mainFrame.scripts.OnEvent(mainFrame, "UNIT_COMBAT", "target", "WOUND", "", 25, 1)
+-- When the 300 ms window expires.
+assert(outgoingTimer.delay == 0.3, "outgoing grouping must expire at 300 ms")
+outgoingTimer.callback()
+-- Then both amounts appear once in the same batch.
+assert(#displayed == beforeOutgoing + 1)
+assert(displayed[#displayed][2] == "75", "matching outgoing hits did not merge")

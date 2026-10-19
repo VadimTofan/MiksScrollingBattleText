@@ -109,7 +109,7 @@ for _, forever in ipairs({ false, true }) do
 	local rgb = filter.colors.eventColoring.SPELL_DAMAGE
 	Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
 	Advance(0.02)
-	Advance(0.21)
+	Advance(0.31)
 
 	-- Then one outgoing hit keeps the configured message, area and icon.
 	local hits = 0
@@ -160,7 +160,7 @@ for _, forever in ipairs({ false, true }) do
 		event = "damage", amount = 26, name = "Fireball", school = 1,
 	})
 	Advance(0.02)
-	Advance(0.21)
+	Advance(0.31)
 	-- Then amounts and icons remain, with spell names and empty brackets removed.
 	local hiddenOutgoing, hiddenIncoming = false, false
 	for _, record in ipairs(displayed) do
@@ -256,7 +256,7 @@ for _, forever in ipairs({ false, true }) do
 	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 123)
 	Dispatch("UNIT_COMBAT", "target", "WOUND", "", 999, 4)
 	Advance(0.02)
-	Advance(0.21)
+	Advance(0.31)
 	-- Then unconfirmed outgoing damage stays hidden on a log-capable client.
 	assert(#displayed == before, "changed filter allowed guessed outgoing damage")
 	main.Disable()
