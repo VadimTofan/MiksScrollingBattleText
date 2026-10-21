@@ -160,7 +160,7 @@ end
 -- facts(id): what the spell's description says (Spells.lua), or nil.
 function ns.NewMine(learned, learn, facts)
     return setmetatable({ pending = {}, dots = {}, swings = {}, held = {}, rhythm = {}, petLast = {}, evidence = {}, votes = {},
-        casts = {}, amounts = {},
+        casts = {}, amounts = {}, channels = {},
         learned = learned or function() end, learn = learn or function() end, facts = facts or function() end }, Mine)
 end
 
@@ -212,6 +212,12 @@ local function KeepDot(dot, now, tracker)
 end
 
 function Mine:Tidy(now)
+    for caster, channel in pairs(self.channels) do
+        if now - channel.at > CAST_HISTORY_WINDOW
+            or (channel.stoppedAt and now - channel.stoppedAt > 0.5) then
+            self.channels[caster] = nil
+        end
+    end
     for key, schools in pairs(self.rhythm) do
         for school, beat in pairs(schools) do
             if now - beat.last > RHYTHM_WINDOW then schools[school] = nil end
@@ -238,6 +244,50 @@ end
 
 local function SchoolFits(known, school)
     return known == nil or school == nil or known == school
+end
+
+local function ChannelFits(channel, key, school, now)
+    return channel.key == key and SchoolFits(channel.school, school)
+        and now >= channel.at
+        and (not channel.stoppedAt or now <= channel.stoppedAt)
+end
+
+function Mine:StartChannel(caster, spell, key, now)
+    caster = caster == "pet" and "pet" or "you"
+    self.channels[caster] = nil
+    local facts = self.facts(spell)
+    if type(facts) ~= "table" or facts.damages ~= true then return end
+
+    -- A channel's hits follow its lifecycle, not a guessed DoT interval.
+    -- Remove its ordinary cast records so they cannot claim later damage.
+    for _, list in ipairs({ self.pending, self.dots }) do
+        for index = #list, 1, -1 do
+            local entry = list[index]
+            if entry.caster == caster and entry.spell == spell then
+                table.remove(list, index)
+            end
+        end
+    end
+    local casts = self.casts[spell]
+    if casts then
+        for index = #casts, 1, -1 do
+            if casts[index].caster == caster then table.remove(casts, index) end
+        end
+        if #casts == 0 then self.casts[spell] = nil end
+    end
+    self.channels[caster] = {
+        caster = caster, spell = spell, key = key, at = now,
+        school = facts.school or self.learned("school", spell),
+    }
+end
+
+function Mine:StopChannel(caster, spell, now)
+    caster = caster == "pet" and "pet" or "you"
+    local channel = self.channels[caster]
+    if channel and (spell == nil or channel.spell == spell) then
+        -- Buffered hits retain their event time, including the final tick.
+        channel.stoppedAt = now
+    end
 end
 
 local function LearnSchool(self, spell, school)
@@ -309,6 +359,10 @@ end
 function Mine:Cast(caster, spell, key, now)
     if type(spell) ~= "number" then return end
     caster = caster == "pet" and "pet" or "you"
+    local channel = self.channels[caster]
+    if channel and not channel.stoppedAt and channel.spell == spell then
+        return
+    end
     local facts = self.facts(spell)
     -- With no unit, only a spell of yours whose description says it deals
     -- damage counts (opening a chest is a cast with no target too).
@@ -578,6 +632,13 @@ end
 
 local function Yours(self, key, kind, school, now)
     local allowed, sure = Allowed(self.restrictNow), self.restrictNow == "tick"
+    if kind == "damage" and allowed.casts then
+        for _, channel in pairs(self.channels) do
+            if ChannelFits(channel, key, school, now) then
+                return Result(channel.caster, channel.spell, sure)
+            end
+        end
+    end
     -- 1. A DoT's next tick; of several due now, the one whose time and
     -- amount fit best. 0.3.49: a tick that healed you for its amount in the
     -- same moment (leechNow, from the reader) is a draining DoT's, one that
@@ -762,6 +823,11 @@ function Mine:Fit(key, kind, school, now, amount, restrict)
     if restrict == "shield" then return (kind == "damage" or kind == "miss") and 0.7 or nil end
     local allowed = Allowed(restrict)
     local function Take(score) if not best or score < best then best = score end end
+    if kind == "damage" and allowed.casts then
+        for _, channel in pairs(self.channels) do
+            if ChannelFits(channel, key, school, now) then Take(0.1) end
+        end
+    end
     for _, entry in ipairs(allowed.casts and self.pending or {}) do
         if not entry.used and entry.key == key and now >= entry.at - 0.05 and now - entry.at <= DIRECT_WINDOW then
             if kind == "miss" then Take(0.5)

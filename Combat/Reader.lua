@@ -1363,6 +1363,7 @@ local EVENTS = {
     "UNIT_COMBAT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "PLAYER_SWING", "PLAYER_TARGET_CHANGED",
     "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOSS_OF_CONTROL_ADDED", "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",
     "COMBAT_TEXT_UPDATE",
+    "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP",
     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
     "PLAYER_ENTERING_WORLD", "COMBAT_LOG_MESSAGE", "SPELL_TEXT_UPDATE",
     "PLAYER_EQUIPMENT_CHANGED",
@@ -1375,6 +1376,16 @@ local function OnEvent(_, event, ...)
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, _, spell = ...
         if unit == "player" or unit == "pet" then OnCast(unit, spell) end
+    elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
+        local unit, _, spell = ...
+        if (unit == "player" or unit == "pet") and ns.Number(spell, 1) then
+            ns.mine:StartChannel(unit, spell, ns.TargetKey(), Now())
+        end
+    elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+        local unit, _, spell = ...
+        if unit == "player" or unit == "pet" then
+            ns.mine:StopChannel(unit, ns.Number(spell, 1) and spell or nil, Now())
+        end
     elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
         local unit, _, _, interruptedBy = ...
         OnInterrupted(unit, interruptedBy)

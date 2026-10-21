@@ -5,6 +5,16 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: the adapted engine feeds MSBT without replacing its display.
 class CombatEngineTests(unittest.TestCase):
+    def test_channel_hits_keep_their_spell_until_the_channel_stops(self):
+        # Given
+        script = "channel_attribution.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_cleanup_avoids_allocation_churn_during_repeated_combat_events(self):
         # Given
         script = "combat_cleanup_allocations.lua"

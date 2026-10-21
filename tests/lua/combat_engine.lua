@@ -54,6 +54,7 @@ C_Spell = {
 		if id == 301 then return "Deals 20 Nature damage." end
 		if id == 401 then return "Deals (315% of Spell Power) Cosmic damage." end
 		if id == 402 then return "Deals 100 Chaos damage." end
+		if id == 403 then return "Deals 100 Chaos damage over 2 sec." end
 		return "Forces the target to speak in Demonic."
 	end,
 	IsSpellHelpful = function(id) return id == 201 end,
@@ -142,6 +143,26 @@ for _, example in ipairs({ { spell = 401, school = 106 },
     assert(record.result.spell == example.spell, "wrong spell claimed the hit")
     assert(record.school == example.school and not record.result.melee)
 end
+
+-- Given a damaging channel whose rapid hits are reported as direct spells.
+Advance(4)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 403)
+Event("UNIT_SPELLCAST_CHANNEL_START", "player", "channel-1", 403)
+for index = 1, 5 do
+    Advance(0.2)
+    local previous = #outgoing
+
+    -- When each confirmed channel hit arrives before a normal DoT tick.
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_COMBAT", "target", "WOUND", "", 10, 127)
+    Advance(0.02)
+
+    -- Then every hit retains the channel's spell instead of disappearing.
+    assert(#outgoing == previous + 1, "rapid channel hit disappeared")
+    record = outgoing[#outgoing]
+    assert(record.result.spell == 403, "channel hit used another spell")
+end
+Event("UNIT_SPELLCAST_CHANNEL_STOP", "player", "channel-1", 403)
 
 -- Given incoming damage and healing.
 -- When the game reports them on the player and pet.
