@@ -30,6 +30,46 @@ setfenv(build, env)
 local apply = build()
 local profile = {}
 
+-- Given MSBT resource gains enabled while Blizzard output is hidden.
+profile.events = { NOTIFICATION_RESOURCE_GAIN = { message = "+%a %p" } }
+profile.blizzardIncomingDisabled = true
+profile.blizzardNotificationsDisabled = true
+-- When the runtime applies its settings outside combat.
+apply(false, true, profile)
+-- Then direct and periodic resource feeds are enabled despite hidden output.
+assert(writes.floatingCombatTextEnergyGains_v2 == 1,
+    "resource-gain feed was not enabled")
+assert(writes.floatingCombatTextPeriodicEnergyGains_v2 == 1,
+    "periodic resource-gain feed was not enabled")
+assert(not shown, "resource feed enabled Blizzard's hidden text")
+
+-- Given resource notifications are disabled in the profile.
+profile.events.NOTIFICATION_RESOURCE_GAIN.disabled = true
+writes = {}
+-- When preferences are reapplied, then resource CVars are left alone.
+apply(false, true, profile)
+assert(writes.floatingCombatTextEnergyGains_v2 == nil)
+assert(writes.floatingCombatTextPeriodicEnergyGains_v2 == nil)
+
+-- Given MSBT is disabled, then enabling its saved event cannot change CVars.
+profile.events.NOTIFICATION_RESOURCE_GAIN.disabled = nil
+writes = {}
+apply(false, false, profile)
+assert(writes.floatingCombatTextEnergyGains_v2 == nil)
+
+-- Given combat lockdown, then feed setup waits until combat ends.
+env.InCombatLockdown = function() return true end
+writes = {}
+apply(false, true, profile)
+assert(next(writes) == nil)
+env.InCombatLockdown = function() return false end
+apply(false, true, profile)
+assert(writes.floatingCombatTextEnergyGains_v2 == 1)
+
+-- Reset the output preferences for the category-isolation checks below.
+profile.blizzardIncomingDisabled = false
+profile.blizzardNotificationsDisabled = false
+
 -- Given both systems enabled with only Blizzard incoming text disabled.
 profile.blizzardIncomingDisabled = true
 -- When the category settings apply.

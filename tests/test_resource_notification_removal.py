@@ -16,6 +16,25 @@ RESOURCE_EVENTS = (
 
 # Describe: removed resource notifications have no defaults or settings UI.
 class ResourceNotificationRemovalTests(unittest.TestCase):
+    def test_resource_gains_have_defaults_and_a_configurable_event(self):
+        # Given both client defaults and the notification settings UI.
+        profiles = (ROOT / "MSBTProfiles.lua").read_text(encoding="utf-8-sig")
+        tabs = (ROOT / "MSBTOptions" / "MSBTOptionsTabs.lua").read_text(
+            encoding="utf-8-sig"
+        )
+        locale = (
+            ROOT / "MSBTOptions" / "Localization" / "localization.lua"
+        ).read_text(encoding="utf-8-sig")
+
+        # When checking the supported resource-gain event.
+        event = "NOTIFICATION_RESOURCE_GAIN"
+
+        # Then both clients and the settings UI offer the event.
+        self.assertEqual(profiles.count(event + " = {"), 2)
+        self.assertEqual(profiles.count('message = "%a - %p"'), 2)
+        self.assertIn('EventsTab_AddEvent(category, "' + event + '"', tabs)
+        self.assertIn('obj["' + event + '"]', locale)
+
     def test_resource_notifications_are_not_offered_on_either_client(self):
         # Given both client defaults and the notification settings UI.
         paths = [

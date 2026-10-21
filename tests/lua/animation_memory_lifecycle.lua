@@ -1,6 +1,10 @@
 local frames = {}
 local object = {}
+local formattedText
 object.__index = function(_, key)
+	if key == "SetFormattedText" then
+		return function(_, ...) formattedText = { ... } end
+	end
 	if key == "CreateFontString" or key == "CreateTexture" then
 		return function() return setmetatable({}, object) end
 	end
@@ -42,6 +46,18 @@ local function initialize(event)
 end
 MikSBT.Animations.RegisterAnimationStyle("Straight", initialize)
 MikSBT.Animations.RegisterStickyAnimationStyle("Pow", initialize)
+
+-- Given two opaque values for a resource-gain notification.
+local hiddenAmount, hiddenName = {}, {}
+issecretvalue = function(value) return value == hiddenAmount or value == hiddenName end
+-- When the animation renderer creates its font string.
+displayConfig.display("+%s %s", {}, false, 1, 1, 1, 18, "font", 1, 100,
+	nil, hiddenAmount, hiddenName)
+-- Then WoW's text widget receives both values without inspection.
+assert(formattedText[1] == "+%s %s")
+assert(formattedText[2] == hiddenAmount)
+assert(formattedText[3] == hiddenName, "font string lost the hidden resource name")
+animationFrame:OnUpdate(4)
 
 -- Given fresh normal and sticky scroll-area settings from repeated profiles.
 for index = 1, 100 do

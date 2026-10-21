@@ -39,8 +39,8 @@ C_DamageMeter = {
 }
 Enum.DamageMeterType = { DamageDone = 0 }
 C_EventUtils = { IsEventValid = function(event) return event ~= "PLAYER_SWING" end }
-MikSBT.Animations.DisplayEvent = function(settings, message, icon, _, amount)
-	displayed[#displayed + 1] = { settings, message, icon, amount }
+MikSBT.Animations.DisplayEvent = function(settings, message, icon, _, ...)
+	displayed[#displayed + 1] = { settings, message, icon, ... }
 end
 local events = MikSBT.Profiles.currentProfile.events
 events.OUTGOING_SPELL_DAMAGE = { message = "Hit %a", scrollArea = "Custom outgoing" }
@@ -123,6 +123,101 @@ for _, forever in ipairs({ false, true }) do
 	assert(hits == 1, "modern combat did not produce exactly one hit")
 	assert(not mainFrame.events.UNIT_COMBAT, "legacy incoming reader remained active")
 	assert(meterReads == 0, "duplicate damage-meter source was queried")
+
+	-- Given resource notifications and the resource labels supplied by Blizzard.
+	local resourceSettings = { message = "%a - %p", scrollArea = "Notification" }
+	events.NOTIFICATION_RESOURCE_GAIN = resourceSettings
+	MANA, HOLY_POWER = "Mana", "Holy Power"
+	local resourceAmount, resourceToken = 20, "MANA"
+	C_CombatText = { GetCurrentEventInfo = function()
+		return resourceAmount, resourceToken
+	end }
+	local beforeResource = #displayed
+
+	-- When direct and periodic resource gains arrive through the real reader.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	resourceAmount, resourceToken = 1, "HOLY_POWER"
+	Dispatch("COMBAT_TEXT_UPDATE", "PERIODIC_ENERGIZE")
+
+	-- Then the amount, resource name, and configured area reach the display.
+	assert(#displayed == beforeResource + 2, "resource gains were delayed")
+	assert(displayed[beforeResource + 1][2] == "20 - MANA")
+	assert(displayed[beforeResource + 2][2] == "1 - HOLY_POWER")
+	assert(displayed[#displayed][1] == resourceSettings)
+
+	-- Given Blizzard supplies the amount as text, as its own renderer supports.
+	resourceAmount, resourceToken = "25", "MANA"
+	beforeResource = #displayed
+	-- When the gain arrives, then its numeric text is displayed as an amount.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(#displayed == beforeResource + 1, "numeric text dropped a resource gain")
+	assert(displayed[#displayed][2] == "25 - MANA")
+
+	-- Given number shortening is enabled and Blizzard supplies a custom label.
+	local previousShortening = MikSBT.Profiles.currentProfile.shortenNumbers
+	MikSBT.Profiles.currentProfile.shortenNumbers = true
+	resourceAmount, resourceToken = "001250", "Energy supplied by Blizzard"
+	-- When the gain is displayed, then both supplied strings stay unchanged.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(displayed[#displayed][2] == "001250 - Energy supplied by Blizzard")
+	MikSBT.Profiles.currentProfile.shortenNumbers = previousShortening
+
+	-- Given a restricted amount and a restricted resource token in combat.
+	local secretResource, secretToken = {}, {}
+	local previousSecretCheck = issecretvalue
+	issecretvalue = function(value)
+		return value == secretResource or value == secretToken
+			or (previousSecretCheck and previousSecretCheck(value)) or false
+	end
+	resourceAmount, resourceToken = secretResource, "MANA"
+
+	-- When only the amount is hidden, then the resource name stays visible.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(displayed[#displayed][2] == "%s - %s")
+	assert(displayed[#displayed][4] == secretResource)
+	assert(displayed[#displayed][5] == "MANA")
+
+	-- When the resource token is hidden too, then its label reaches rendering.
+	resourceToken = secretToken
+	beforeResource = #displayed
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(#displayed == beforeResource + 2, "hidden resource type dropped a gain")
+	assert(displayed[#displayed][2] == "%s - %s")
+	assert(displayed[#displayed][4] == secretResource)
+	assert(displayed[#displayed][5] == secretToken,
+		"hidden resource name was replaced by a generic label")
+
+	-- Given a customized template with reversed and repeated resource tokens.
+	resourceSettings.message = "%p: %a (%p) 100%"
+	-- When the same opaque values arrive, then template order is preserved.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	local resource = displayed[#displayed]
+	assert(resource[2] == "%s: %s (%s) 100%%")
+	assert(resource[4] == secretToken and resource[5] == secretResource)
+	assert(resource[6] == secretToken)
+	resourceSettings.message = "%a - %p"
+	issecretvalue = previousSecretCheck
+
+	-- Given zero, negative, missing, and invalid amounts.
+	beforeResource = #displayed
+	resourceToken = "MANA"
+	-- When unusable gains arrive, then no notification is displayed.
+	for _, amount in ipairs({ 0, -5, "invalid" }) do
+		resourceAmount = amount
+		Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	end
+	resourceAmount = nil
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(#displayed == beforeResource)
+
+	-- Given a disabled gain event, then subsequent gains stay hidden.
+	resourceSettings.disabled = true
+	resourceAmount = 10
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(#displayed == beforeResource)
+	assert(resourceSettings.message == "%a - %p", "resource template was mutated")
+	resourceSettings.disabled = nil
 
 	-- Given absorb templates for player and pet melee and spell attacks.
 	for _, case in ipairs({

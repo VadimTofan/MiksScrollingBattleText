@@ -39,3 +39,11 @@ assert(received[1] == "100%% heal: +%s",
     "the display template did not escape literal percent signs")
 assert(not restricted:Equals(secretAmount, 1),
     "secret values were compared as readable data")
+
+-- Given a hidden resource name alongside the amount.
+local secretName = {}
+-- When both values are forwarded to the animation renderer.
+display:DisplayEvent({}, "+%s %s", nil, nil, secretAmount, secretName)
+-- Then neither value is dropped or substituted by the display service.
+assert(received[12] == secretAmount)
+assert(received[13] == secretName, "display lost the hidden resource name")
