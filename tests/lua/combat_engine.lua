@@ -52,6 +52,8 @@ C_Spell = {
 		if id == 102 then return "Causes 90 Shadow damage over 9 sec." end
 		if id == 201 then return "Heals 90 damage." end
 		if id == 301 then return "Deals 20 Nature damage." end
+		if id == 401 then return "Deals (315% of Spell Power) Cosmic damage." end
+		if id == 402 then return "Deals 100 Chaos damage." end
 		return "Forces the target to speak in Demonic."
 	end,
 	IsSpellHelpful = function(id) return id == 201 end,
@@ -120,6 +122,26 @@ Advance(0.02)
 local record = outgoing[#outgoing]
 assert(record and record.result.who == "you" and record.result.spell == 101)
 assert(record.amount == 100 and record.crit)
+
+for _, example in ipairs({ { spell = 401, school = 106 },
+    { spell = 402, school = 127 } }) do
+    -- Given a composite-school cast following an unrelated spell.
+    Advance(4)
+    local previous = #outgoing
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example.spell)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+
+    -- When its confirmed hit arrives on the target.
+    Event("UNIT_COMBAT", "target", "WOUND", "", 100, example.school)
+    Advance(0.02)
+
+    -- Then the hit scrolls under its own spell and retains its school.
+    assert(#outgoing == previous + 1, "composite-school damage disappeared")
+    record = outgoing[#outgoing]
+    assert(record.result.who == "you")
+    assert(record.result.spell == example.spell, "wrong spell claimed the hit")
+    assert(record.school == example.school and not record.result.melee)
+end
 
 -- Given incoming damage and healing.
 -- When the game reports them on the player and pet.
