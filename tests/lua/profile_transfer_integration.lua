@@ -358,13 +358,15 @@ assert(not profiles.IsModDisabled())
 assert(profiles.currentProfile.blizzardDamageEnabled == false,
 	"enabling MSBT did not clear the Blizzard damage preference")
 for _, key in ipairs({
-	"enableFloatingCombatText", "floatingCombatTextCombatHealing_v2",
+	"floatingCombatTextCombatHealing_v2",
 	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
 	"floatingCombatTextCombatLogPeriodicSpells_v2",
 	"floatingCombatTextPetMeleeDamage_v2", "floatingCombatTextPetSpellDamage_v2",
 }) do
 	assert(combatTextWrites[key] == 0, key .. " remained enabled")
 end
+assert(combatTextWrites.enableFloatingCombatText == 1,
+	"enabling MSBT disabled the aura notice feed")
 
 -- Given the user explicitly enables Blizzard damage afterward.
 profiles.SetOption(nil, "blizzardDamageEnabled", true)

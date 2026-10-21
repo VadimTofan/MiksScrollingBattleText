@@ -2584,12 +2584,18 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText)
 
 	local value = isEnabled and 1 or 0
 	if suppressOtherText then
-		SetCVar("enableFloatingCombatText", 0)
+		-- MSBT needs this feed for aura notices when UNIT_AURA is secret.
+		-- Hide Blizzard's frame below without disabling the event source.
+		if not CombatText then
+			local loadAddon = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+			if loadAddon then loadAddon("Blizzard_CombatText") end
+		end
+		SetCVar("enableFloatingCombatText", 1)
 		if not IsClassic then
 			SetCVar("floatingCombatTextCombatHealing", 0)
 		end
 		SetCVar("floatingCombatTextCombatHealing_v2", 0)
-		SHOW_COMBAT_TEXT = "0"
+		SHOW_COMBAT_TEXT = "1"
 	end
 
 	SetCVar("floatingCombatTextCombatDamage", value)
@@ -2598,6 +2604,13 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText)
 	SetCVar("floatingCombatTextPetMeleeDamage_v2", value)
 	SetCVar("floatingCombatTextPetSpellDamage_v2", value)
 	if (not Client.hasModernAPI and CombatText_UpdateDisplayedMessages) then CombatText_UpdateDisplayedMessages() end
+	if CombatText then
+		if suppressOtherText then
+			CombatText:Hide()
+		else
+			CombatText:Show()
+		end
+	end
 end
 
 local function SetAddonEnabled(isEnabled)

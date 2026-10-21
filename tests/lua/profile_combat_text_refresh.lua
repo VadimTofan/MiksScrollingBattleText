@@ -19,10 +19,16 @@ for _, modern in ipairs({ true, false }) do
 	for _, enabled in ipairs({ true, false }) do
 		-- Given unrelated incoming and healing text settings.
 		local writes, refreshes = {}, 0
+		local shown = true
+		local blizzardFrame = {
+			Hide = function() shown = false end,
+			Show = function() shown = true end,
+		}
 		local environment = {
 			Client = { hasModernAPI = modern },
 			IsClassic = not modern,
 			SHOW_COMBAT_TEXT = "unchanged",
+			CombatText = blizzardFrame,
 			SetCVar = function(name, value) writes[name] = value end,
 			CombatText_UpdateDisplayedMessages = function()
 				refreshes = refreshes + 1
@@ -56,22 +62,36 @@ for _, modern in ipairs({ true, false }) do
 		action(enabled)
 		assert(writes.floatingCombatTextCombatDamage_v2 == (enabled and 1 or 0))
 
-		-- Given MSBT is enabled and all Blizzard combat text must be hidden.
+		-- Given MSBT needs aura notices while Blizzard text stays hidden.
 		writes = {}
 
 		-- When MSBT's suppression policy applies.
 		action(false, true)
 
-		-- Then damage, incoming, healing, and the legacy global are all off.
+		-- Then the event feed stays enabled while Blizzard's frame is hidden.
 		for name in pairs(damageSettings) do
 			assert(writes[name] == 0, name .. " was not disabled")
 		end
-		assert(writes.enableFloatingCombatText == 0,
-			"Blizzard incoming combat text was not disabled")
+		assert(writes.enableFloatingCombatText == 1,
+			"suppression disabled MSBT's aura event feed")
+		assert(not shown, "Blizzard self combat text remained visible")
 		assert(writes.floatingCombatTextCombatHealing_v2 == 0,
 			"Blizzard healing text was not disabled")
 		assert(writes.floatingCombatTextCombatHealing == (modern and 0 or nil))
-		assert(environment.SHOW_COMBAT_TEXT == "0")
+		assert(environment.SHOW_COMBAT_TEXT == "1")
+
+		-- Given Blizzard's combat-text addon has not loaded yet.
+		environment.CombatText = nil
+		local loaded
+		environment.C_AddOns = { LoadAddOn = function(name)
+			loaded = name
+			environment.CombatText = blizzardFrame
+			shown = true
+		end }
+		-- When suppression is applied before the frame exists.
+		action(false, true)
+		-- Then its frame is loaded and hidden before normal gameplay.
+		assert(loaded == "Blizzard_CombatText" and not shown)
 
 		-- Given MSBT is enabled during combat.
 		environment.InCombatLockdown = function() return true end
@@ -84,7 +104,7 @@ for _, modern in ipairs({ true, false }) do
 		assert(next(writes) == nil)
 		environment.InCombatLockdown = function() return false end
 		action(false, true)
-		assert(writes.enableFloatingCombatText == 0)
+		assert(writes.enableFloatingCombatText == 1)
 		assert(writes.floatingCombatTextCombatDamage_v2 == 0)
 
 		-- Given a client without the optional legacy refresh function.
@@ -95,6 +115,7 @@ for _, modern in ipairs({ true, false }) do
 
 		-- Then settings still apply without needing that API.
 		assert(writes.floatingCombatTextCombatDamage_v2 == (enabled and 1 or 0))
+		assert(shown, "disabling MSBT did not restore Blizzard's frame")
 
 		-- Given a CVar write fails.
 		environment.SetCVar = function() error("write failed") end
