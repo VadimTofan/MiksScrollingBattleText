@@ -45,7 +45,13 @@ function Presentation:Emit(key, record, eventSettings)
 		self.config.displayRestricted(settings, record.amount, icon)
 		return
 	end
-	local message = self.config.formatMessage(settings, record)
+	local message
+	if record.event == "miss" and record.amount == nil
+		and MissAction(record.missWord) == "ABSORB" then
+		message = (_G.ABSORB or "Absorb") .. "!"
+	else
+		message = self.config.formatMessage(settings, record)
+	end
 	if message and message ~= "" then
 		self.config.display(settings, message, icon)
 	end

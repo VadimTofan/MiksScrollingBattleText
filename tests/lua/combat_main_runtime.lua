@@ -124,6 +124,44 @@ for _, forever in ipairs({ false, true }) do
 	assert(not mainFrame.events.UNIT_COMBAT, "legacy incoming reader remained active")
 	assert(meterReads == 0, "duplicate damage-meter source was queried")
 
+	-- Given absorb templates for player and pet melee and spell attacks.
+	for _, case in ipairs({
+		{ key = "OUTGOING_ABSORB", who = "you", melee = true },
+		{ key = "OUTGOING_SPELL_ABSORB", who = "you" },
+		{ key = "PET_OUTGOING_ABSORB", who = "pet", melee = true },
+		{ key = "PET_OUTGOING_SPELL_ABSORB", who = "pet" },
+	}) do
+		local settings = { message = "Absorb! <%a> (%s)",
+			scrollArea = "Custom outgoing" }
+		events[case.key] = settings
+		local beforeAbsorb = #displayed
+
+		-- When a fully absorbed hit has no amount from the reader.
+		MikSBT.CombatEngine.liveRouter:Out({
+			event = "miss", missWord = "Absorb",
+			result = { who = case.who, melee = case.melee, spell = 123 },
+		})
+
+		-- Then only the fallback text appears with the original settings and icon.
+		assert(#displayed == beforeAbsorb + 1)
+		local absorb = displayed[#displayed]
+		assert(absorb[2] == "Absorb!",
+			"missing absorb amount leaked the template: " .. absorb[2])
+		assert(absorb[1] == settings and absorb[3] == "icon")
+		assert(settings.message == "Absorb! <%a> (%s)")
+	end
+
+	-- Given an absorbed spell hit with a known amount.
+	-- When it is formatted through the same presentation adapter.
+	MikSBT.CombatEngine.liveRouter:Out({
+		event = "miss", missWord = "Absorb", amount = 17,
+		result = { who = "you", spell = 123 },
+	})
+	Advance(0.13)
+	-- Then the configured amount and spell name are preserved.
+	assert(displayed[#displayed][2] == "Absorb! <17> (Spell 123)",
+		"known absorb amount changed: " .. displayed[#displayed][2])
+
 	-- Given similar incoming hits arriving 150 ms apart.
 	local beforeDamage = #displayed
 	Dispatch("UNIT_COMBAT", "player", "WOUND", "", 25, 1)
