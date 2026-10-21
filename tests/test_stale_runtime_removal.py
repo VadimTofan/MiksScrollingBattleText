@@ -100,6 +100,9 @@ class StaleRuntimeRemovalTests(unittest.TestCase):
                 "GenerelTab_ValidateProfileName",
             ),
             "MSBTOptions/MSBTOptionsPopups.lua": ("PairsByKeys",),
+            "MSBTOptions/MSBTOptionsMain.lua": (
+                "ScheduleCallback", "waitTable", "waitFrame",
+            ),
             "Services/Formatter.lua": ("FormatPartialEffects",),
         }
 
