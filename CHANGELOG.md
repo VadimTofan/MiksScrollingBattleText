@@ -1,5 +1,16 @@
 # Changelog
 
+## v12.039
+
+- Added independent MSBT and Blizzard combat-text category controls.
+- Improved rapid-hit attribution for active channeled spells and recognition of
+  all supported damage schools.
+- Preserved aura notifications when Blizzard combat text is hidden and guarded
+  aura reads when values are protected.
+- Reduced combat tracking overhead by expiring idle records and reusing timing
+  calculations.
+- Removed the unused Die Die Die font and options callback scheduler.
+
 ## v12.038
 
 - Simplified General combat-text controls to Enable MSBT and Enable Blizzard
