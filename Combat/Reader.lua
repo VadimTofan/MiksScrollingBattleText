@@ -1196,15 +1196,18 @@ local function SampleGap(record, gap)
     local gaps = reader.gaps
     gaps[#gaps + 1] = gap
     if #gaps > SAMPLES then table.remove(gaps, 1) end
+    reader.pairWindow = nil
 end
 local function PairWindow()
     local gaps = reader.gaps
     if #gaps < MIN_SAMPLES then return LOG_PAIR end
+    if reader.pairWindow then return reader.pairWindow end
     local sorted = {}
     for index, gap in ipairs(gaps) do sorted[index] = gap end
     table.sort(sorted)
     local middle = sorted[math.ceil(#sorted / 2)]
-    return math.min(LOG_PAIR, math.max(0.004, middle * 2 + 0.004))
+    reader.pairWindow = math.min(LOG_PAIR, math.max(0.004, middle * 2 + 0.004))
+    return reader.pairWindow
 end
 ns.PairWindow = PairWindow
 local function Close(hit) return hit.line ~= nil and (hit.gap or 0) <= PairWindow() end
@@ -1449,7 +1452,7 @@ ns.ReaderEvent = OnEvent
 local initialReader = {}
 for key, value in pairs(reader) do initialReader[key] = value end
 
-function ns.StartReader()
+local function ResetReader()
     if ns.ResetHealing then ns.ResetHealing() end
     local frame = reader.frame
     for key in pairs(reader) do reader[key] = nil end
@@ -1459,6 +1462,10 @@ function ns.StartReader()
     reader.frame = frame
     lastCast, lastInterrupt = nil, 0
     beats = {}
+end
+
+function ns.StartReader()
+    ResetReader()
     ns.mine = ns.NewMine(ns.Learned, ns.Learn, ns.SpellFacts)
     local frame = reader.frame or CreateFrame("Frame")
     -- Event availability differs between Retail and Classic clients.
@@ -1479,6 +1486,11 @@ end
 
 -- MSBT owns enable/disable and invalidates all delayed work in Context.lua.
 function ns.StopReader()
-    if reader.frame then reader.frame:UnregisterAllEvents() end
+    if reader.frame then
+        reader.frame:UnregisterAllEvents()
+        reader.frame:SetScript("OnEvent", nil)
+    end
     ns.KeepCombatLog(false)
+    ResetReader()
+    ns.mine = nil
 end

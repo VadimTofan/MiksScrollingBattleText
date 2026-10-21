@@ -213,9 +213,23 @@ end
 -- Given pending callbacks from the current session.
 Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
 local before = #outgoing
+local ns = MikSBT.CombatEngine
+ns.Learn("school", 101, 4)
+ns.NoteHealCast("player", 201, "target", now)
+local learned = ns.learned
 -- When stopped and restarted before they run.
 engine:Stop()
 assert(next(frame.events) == nil)
+-- Then temporary combat records are released and learned data survives.
+assert(ns.mine == nil, "disabled engine retained its combat tracker")
+for key, value in pairs(ns.reader) do
+	if type(value) == "table" and key ~= "frame" then
+		assert(next(value) == nil, "disabled reader retained " .. key)
+	end
+end
+assert(ns.MatchHealing("target", now, false) == nil,
+	"disabled engine retained healing casts")
+assert(ns.learned == learned and ns.Learned("school", 101) == 4)
 engine:Start()
 Advance(1)
 -- Then stale callbacks cannot emit records into the new session.
@@ -231,5 +245,17 @@ engine:Start()
 assert(frame.events.UNIT_COMBAT and not frame.events.COMBAT_LOG_MESSAGE)
 Event("UNIT_COMBAT", "player", "WOUND", "", 33, 1)
 assert(incoming[#incoming].amount == 33)
+
+-- Given target timings and cast histories on a client without combat logs.
+ns.mine:Hit("expiredTarget", "damage", 4, now, false, false)
+ns.mine:Cast("you", 101, "expiredTarget", now)
+
+-- When idle maintenance runs after their useful windows.
+Advance(31)
+engine:MaintainLog()
+
+-- Then cleanup runs even without further hits or combat-log support.
+assert(next(ns.mine.rhythm) == nil, "idle target timings were retained")
+assert(next(ns.mine.casts) == nil, "idle cast histories were retained")
 engine:Stop()
 print("Adapted combat engine tests passed")

@@ -5,6 +5,46 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: the adapted engine feeds MSBT without replacing its display.
 class CombatEngineTests(unittest.TestCase):
+    def test_cleanup_avoids_allocation_churn_during_repeated_combat_events(self):
+        # Given
+        script = "combat_cleanup_allocations.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_matching_window_reuses_samples_and_refreshes_when_they_change(self):
+        # Given
+        script = "combat_pair_window.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_expired_target_timings_release_keys_and_preserve_active_rhythms(self):
+        # Given
+        script = "target_cache_lifecycle.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_cast_histories_expire_without_recasting_the_same_spell(self):
+        # Given
+        script = "cast_history_lifecycle.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_incoming_healer_notices_pair_in_either_order_within_200_ms(self):
         # Given
         script = "incoming_healer_pairing.lua"
