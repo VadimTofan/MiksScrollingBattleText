@@ -49,7 +49,7 @@ for _, name in ipairs({ "SetPoint", "ClearAllPoints", "EnableMouse", "SetMovable
 	"SetTextChangedHandler", "SetValueChangedHandler" }) do
 	Widget[name] = function() end
 end
-for _, name in ipairs({ "SetTexture", "SetTexCoord", "SetSize",
+for _, name in ipairs({ "SetTexture", "SetColorTexture", "SetTexCoord", "SetSize",
 	"SetBackdropColor", "SetBackdropBorderColor", "SetJustifyH",
 	"SetTextColor" }) do
 	Widget[name] = function() end

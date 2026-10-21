@@ -24,9 +24,10 @@ local build = assert(loadstring(createSource .. "\n" .. populateSource ..
 -- Given the existing appearance settings and the two enabled text systems.
 local disabled = false
 local profile = { blizzardDamageEnabled = true, animationSpeed = 100 }
-local frame = { CreateFontString = NewControl }
+local frame = { CreateFontString = NewControl, CreateTexture = NewControl }
 local applied = 0
 local environment = {
+	ipairs = ipairs,
 	tabFrames = { general = frame },
 	MSBTControls = {
 		CreateCheckbox = NewControl,
@@ -60,6 +61,25 @@ local controls = frame.controls
 -- Then both toggles and all the existing appearance controls populate.
 assert(controls.enableCheckbox.checked == true)
 assert(controls.blizzardDamageCheckbox.checked == true)
+
+-- Given independent category switches beneath both master toggles.
+for _, side in ipairs({ "msbt", "blizzard" }) do
+	for _, category in ipairs({ "Outgoing", "Notifications", "Incoming" }) do
+		local control = controls[side .. category .. "Checkbox"]
+		local key = side .. category .. "Disabled"
+		assert(control and not control.checked, key .. " did not populate")
+
+		-- When only this category is disabled.
+		control.click(control, true)
+		populate()
+
+		-- Then the preference persists without disabling either system.
+		assert(profile[key] == true and control.checked)
+		assert(not disabled and profile.blizzardDamageEnabled)
+		control.click(control, false)
+	end
+end
+applied = 0
 
 assert(controls.animationSpeedSlider.value == 100)
 assert(controls.enableSoundsCheckbox.checked == true)

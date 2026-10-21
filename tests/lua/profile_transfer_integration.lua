@@ -84,6 +84,11 @@ for _, classic in ipairs({ false, true }) do
 
 	-- Given defaults on either client branch and an existing saved profile.
 	local defaults = profiles.masterProfile
+	-- Category identity includes critical self-heals and pet events.
+	assert(defaults.events.SELF_HEAL_CRIT.textCategory == "Incoming")
+	assert(defaults.events.SELF_HOT_CRIT.textCategory == "Incoming")
+	assert(defaults.events.PET_OUTGOING_DAMAGE.textCategory == "Outgoing")
+	assert(defaults.events.NOTIFICATION_BUFF.textCategory == "Notifications")
 	for _, direction in ipairs({ "Incoming", "Outgoing" }) do
 		local areaKey = direction .. "Pet"
 		local area = defaults.scrollAreas[areaKey]

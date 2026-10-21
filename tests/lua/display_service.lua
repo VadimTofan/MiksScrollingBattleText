@@ -89,3 +89,25 @@ assert(calls[1][8] == "crit.ttf", "critical font was not resolved")
 assert(calls[2][4] == 1 and calls[2][5] == 128 / 255,
 	"public message colors were not normalized")
 assert(calls[2][7] == 20, "public message font size changed")
+
+-- Describe: category switches apply independently of custom scroll areas.
+for _, category in ipairs({ "Outgoing", "Incoming", "Notifications" }) do
+	-- Given one muted category routed to a shared custom area.
+	profile["msbt" .. category .. "Disabled"] = true
+	local settings = { textCategory = category, scrollArea = "Shared" }
+	local before = #calls
+
+	-- When that category emits text.
+	DisplayService:DisplayEvent(settings, "Hidden", 100)
+
+	-- Then output is suppressed without changing individual event settings.
+	assert(#calls == before, category .. " was not disabled")
+	assert(settings.disabled == nil)
+
+	-- When the category is re-enabled.
+	profile["msbt" .. category .. "Disabled"] = false
+	DisplayService:DisplayEvent(settings, "Visible", 100)
+
+	-- Then its previous event configuration works immediately.
+	assert(#calls == before + 1)
+end
