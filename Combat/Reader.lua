@@ -850,7 +850,13 @@ end
 -- an aura would be secret (SecretPredicateAPIDocumentation); a hidden one is
 -- skipped, and the combat text notices stand in for it as in combat.
 local function AuraSecret(check, ...)
-    if not (C_Secrets and C_Secrets[check]) then return false end
+    if not C_Secrets then return false end
+    -- Individual predicates do not establish general aura access.
+    if C_Secrets.ShouldAurasBeSecret then
+        local secret = C_Secrets.ShouldAurasBeSecret()
+        if not ns.Bool(secret) or secret then return true end
+    end
+    if not C_Secrets[check] then return true end
     local secret = C_Secrets[check](...)
     return not ns.Bool(secret) or secret
 end
