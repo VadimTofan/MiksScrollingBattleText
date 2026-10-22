@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.040
+
+- Restored resource-gain notifications with support for protected labels.
+- Displayed Absorb! when Blizzard does not provide the absorbed amount.
+
 ## v12.039
 
 - Added independent MSBT and Blizzard combat-text category controls.
