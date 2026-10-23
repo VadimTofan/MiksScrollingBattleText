@@ -8,21 +8,20 @@ PROFILES_FILE = REPOSITORY_ROOT / "MSBTProfiles.lua"
 
 # Describe: health triggers under Midnight restrictions
 class RestrictedHealthTriggerTests(unittest.TestCase):
-    def test_low_health_and_low_mana_defaults_are_disabled(self):
-        # Given
+    def test_health_and_mana_threshold_defaults_are_removed(self):
+        # Given the default profiles for both client branches.
         source = PROFILES_FILE.read_text(encoding="utf-8-sig")
 
-        # When
-        low_health_blocks = source.split("MSBT_TRIGGER_LOW_HEALTH = {")[1:]
-        low_mana_blocks = source.split("MSBT_TRIGGER_LOW_MANA = {")[1:]
+        # When inspecting the default trigger definitions.
+        retired_keys = (
+            "MSBT_TRIGGER_LOW_HEALTH", "MSBT_TRIGGER_LOW_MANA",
+            "MSBT_TRIGGER_LOW_PET_HEALTH", "MSBT_TRIGGER_EXECUTE",
+            "MSBT_TRIGGER_HAMMER_OF_WRATH",
+        )
 
-        # Then
-        self.assertEqual(len(low_health_blocks), 2)
-        self.assertEqual(len(low_mana_blocks), 2)
-        for block in low_health_blocks:
-            self.assertIn("disabled", block.split("},", 1)[0])
-        for block in low_mana_blocks:
-            self.assertIn("disabled", block.split("},", 1)[0])
+        # Then no threshold trackers are offered as built-in triggers.
+        for key in retired_keys:
+            self.assertNotIn(key + " = {", source)
 
 
 if __name__ == "__main__":

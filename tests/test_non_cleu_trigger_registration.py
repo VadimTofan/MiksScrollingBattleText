@@ -8,20 +8,19 @@ TRIGGERS_FILE = REPOSITORY_ROOT / "MSBTTriggers.lua"
 
 # Describe: non-CLEU trigger event registration
 class NonCleuTriggerRegistrationTests(unittest.TestCase):
-    def test_health_and_power_events_register_without_cleu(self):
-        # Given
+    def test_retired_threshold_tracker_registers_no_events(self):
+        # Given the legacy trigger source.
         source = TRIGGERS_FILE.read_text(encoding="utf-8-sig")
 
-        # When
-        registration_block = source.split(
-            'eventFrame:SetScript("OnEvent", OnEvent)', 1
-        )[1].split("CreateTestFuncs()", 1)[0]
+        # When inspecting its event lifecycle.
+        removed_calls = (
+            "RegisterUnitEvent(", "RegisterEvent(", "UnitHealth(",
+            "UnitHealthMax(", "UnitPower(", "UnitPowerMax(",
+        )
 
-        # Then
-        self.assertEqual(registration_block.count("SafeRegisterUnitEvent("), 2)
-        self.assertIn('"UNIT_HEALTH"', registration_block)
-        self.assertIn('"UNIT_POWER_UPDATE"', registration_block)
-        self.assertNotIn("COMBAT_LOG_EVENT_UNFILTERED", registration_block)
+        # Then health and mana cannot be polled or subscribed to.
+        for call in removed_calls:
+            self.assertNotIn(call, source)
 
 
 if __name__ == "__main__":

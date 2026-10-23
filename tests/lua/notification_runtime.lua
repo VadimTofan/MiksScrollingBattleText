@@ -263,65 +263,45 @@ parserFrame.scripts.OnEvent(parserFrame, cases[1][1], cases[1][2])
 assert(#received == count, "disabled parser delivered a message")
 assert(next(frames[2].events) == nil, "disabled main kept events registered")
 
--- Describe: health and power triggers keep their existing registration and output.
-local health, power = 60, 60
-UnitHealth = function() return health end
-UnitHealthMax = function() return 100 end
-UnitPower = function() return power end
-UnitPowerMax = function() return 100 end
-UnitIsDeadOrGhost = function() return false end
+-- Describe: retired health and mana triggers remain saved but never run.
+-- Given saved thresholds and APIs that must not be read by the tracker.
+UnitHealth = function() error("retired tracker read health") end
+UnitHealthMax = function() error("retired tracker read max health") end
+UnitPower = function() error("retired tracker read power") end
+UnitPowerMax = function() error("retired tracker read max power") end
 MikSBT.GetComboPoints = function() return 0 end
 MikSBT.HasAura = function() return false end
 MikSBT.IsRestrictedContext = function() return false end
 MikSBT.GetSpellCooldown = function() return 0, 0 end
-local notices = {}
-MikSBT.Print = function(message) notices[#notices + 1] = message end
+MikSBT.Print = function() end
 profile.triggers = {
-	Health = {
-		message = "%r at %a", scrollArea = "Static",
-		mainEvents = "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}",
-	},
-	Mana = {
-		message = "Mana at %a", scrollArea = "Static",
-		mainEvents = "UNIT_POWER_UPDATE{unitID;;eq;;player;;powerType;;eq;;0;;threshold;;lt;;35}",
-	},
-	Retired = { message = "Stale", mainEvents = "SPELL_DAMAGE{}" },
+    Health = { message = "Low health",
+        mainEvents = "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}" },
+    Mana = { message = "Low mana",
+        mainEvents = "UNIT_POWER_UPDATE{unitID;;eq;;player;;powerType;;eq;;0;;threshold;;lt;;35}" },
+    Retired = { message = "Stale", mainEvents = "SPELL_DAMAGE{}" },
 }
 MikSBT.Profiles.masterProfile = { triggers = {} }
+local framesBeforeTriggers, displaysBeforeTriggers = #frames, #displayed
+
+-- When the trigger facade loads and refreshes saved profiles.
 LoadAddonFile("MSBTTriggers.lua")
 local triggers = MikSBT.Triggers
-local triggerFrame = frames[#frames]
-
--- Given saved health, mana and retired combat-log triggers.
 triggers.UpdateTriggers()
 triggers.Enable()
-triggerFrame.scripts.OnEvent(triggerFrame, "UNIT_HEALTH", "player")
-triggerFrame.scripts.OnEvent(triggerFrame, "UNIT_POWER_UPDATE", "player", "MANA")
-local displaysBeforeTriggers = #displayed
-
--- When health and mana cross their configured thresholds.
-health, power = 30, 20
-triggerFrame.scripts.OnEvent(triggerFrame, "UNIT_HEALTH", "player")
-triggerFrame.scripts.OnEvent(triggerFrame, "UNIT_POWER_UPDATE", "player", "MANA")
-
--- Then active triggers display unchanged messages and the retired trigger stays disabled.
-assert(displayed[displaysBeforeTriggers + 1][2] == "Tester at 30")
-assert(displayed[displaysBeforeTriggers + 2][2] == "Mana at 20")
-assert(not triggerFrame.events.COMBAT_LOG_EVENT_UNFILTERED)
-assert(#notices == 1 and notices[1] == "CLEU-based triggers are disabled.")
-assert(triggers.categorizedTriggers.SPELL_DAMAGE == nil)
-assert(profile.triggers.Retired.mainEvents == "SPELL_DAMAGE{}", "saved trigger was changed")
-
--- Given disabled trigger processing.
 triggers.Disable()
-local displaysBeforeDisable = #displayed
 
--- When another health event arrives.
-health = 10
-triggerFrame.scripts.OnEvent(triggerFrame, "UNIT_HEALTH", "player")
+-- Then no health listener is created, no alert fires, and saves stay intact.
+assert(#frames == framesBeforeTriggers, "retired tracker created an event frame")
+assert(#displayed == displaysBeforeTriggers)
+assert(triggers.categorizedTriggers.UNIT_HEALTH == nil)
+assert(triggers.categorizedTriggers.UNIT_POWER_UPDATE == nil)
+assert(triggers.categorizedTriggers.SPELL_DAMAGE == nil)
+assert(profile.triggers.Health.mainEvents ==
+    "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}")
+assert(profile.triggers.Mana.mainEvents ==
+    "UNIT_POWER_UPDATE{unitID;;eq;;player;;powerType;;eq;;0;;threshold;;lt;;35}")
 
--- Then disabled triggers produce no display.
-assert(#displayed == displaysBeforeDisable)
 print("Chat notification runtime tests passed")
 
 -- Describe: outgoing damage within 300 ms shares one display.

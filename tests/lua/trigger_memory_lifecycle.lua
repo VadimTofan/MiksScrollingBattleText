@@ -11,7 +11,7 @@ local environment = setmetatable({
 		currentProfile = { triggers = {} }, masterProfile = { triggers = {} },
 	},
 	firedTimes = {}, triggerExceptions = {}, categorizedTriggers = {},
-	listenEvents = {}, lastPercentages = {}, triggerSuppressions = {},
+	listenEvents = {}, triggerSuppressions = {},
 	captureFuncs = {}, playerClass = "WARRIOR",
 	string_find = string.find, string_gmatch = string.gmatch,
 	IsCLEUTriggerMainEvent = function() return false end,
@@ -26,7 +26,7 @@ local UpdateTriggers = chunk()
 -- Given a trigger with a recently-fired exception on an active profile.
 local removed = {
 	message = "Custom trigger", exceptions = "recentlyFired;;lt;;5",
-	mainEvents = "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}",
+	mainEvents = "TEST_EVENT{}",
 }
 local weak = setmetatable({ [removed] = true }, { __mode = "k" })
 environment.MSBTProfiles.currentProfile.triggers.Custom = removed
@@ -46,7 +46,7 @@ assert(next(environment.firedTimes) == nil, "stale trigger timer remains")
 -- Given an active trigger whose timer was previously updated.
 local active = {
 	message = "Active", exceptions = "recentlyFired;;lt;;5",
-	mainEvents = "UNIT_HEALTH{unitID;;eq;;player;;threshold;;lt;;35}",
+	mainEvents = "TEST_EVENT{}",
 }
 environment.MSBTProfiles.currentProfile.triggers.Active = active
 UpdateTriggers()
