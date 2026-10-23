@@ -8,6 +8,7 @@ local function NewControl()
 	function control:SetClickHandler(handler) self.click = handler end
 	function control:SetChecked(value) self.checked = value end
 	function control:SetValue(value) self.value = value end
+	function control:SetPoint(...) self.point = { ... } end
 	return control
 end
 
@@ -23,7 +24,9 @@ local build = assert(loadstring(createSource .. "\n" .. populateSource ..
 
 -- Given the existing appearance settings and the two enabled text systems.
 local disabled = false
-local profile = { blizzardDamageEnabled = true, animationSpeed = 100 }
+local profile = {
+	blizzardDamageEnabled = true, animationSpeed = 100, hideSkills = true,
+}
 local frame = { CreateFontString = NewControl, CreateTexture = NewControl }
 local applied = 0
 local environment = {
@@ -89,6 +92,48 @@ assert(controls.shortenNumbersCheckbox ~= nil)
 assert(controls.stackSimilarHitsCheckbox ~= nil)
 assert(controls.masterFontButton ~= nil)
 assert(controls.addCustomSoundButton ~= nil)
+
+-- Given the default profile hides skill names.
+local namesCheckbox = controls.enableNamesCheckbox
+
+-- When General is populated.
+populate()
+
+-- Then names are unchecked directly above icons, below the slider.
+assert(namesCheckbox, "Enable Skill Names checkbox is missing")
+assert(namesCheckbox.checked == false)
+assert(namesCheckbox.point[1] == "BOTTOMLEFT")
+assert(namesCheckbox.point[2] == controls.enableIconsCheckbox)
+assert(namesCheckbox.point[3] == "TOPLEFT")
+assert(controls.animationSpeedSlider.point[2] == namesCheckbox)
+
+-- When skill names are enabled.
+namesCheckbox.click(namesCheckbox, true)
+populate()
+
+-- Then only the saved skill-name preference changes.
+assert(profile.hideSkills == false and namesCheckbox.checked == true)
+assert(controls.enableIconsCheckbox.checked == true)
+
+-- Given another profile still hides skill names.
+environment.MSBTProfiles.currentProfile = { hideSkills = true }
+
+-- When the tab refreshes after a profile change.
+populate()
+
+-- Then the checkbox reflects the selected profile.
+assert(namesCheckbox.checked == false)
+environment.MSBTProfiles.currentProfile = profile
+populate()
+assert(namesCheckbox.checked == true)
+
+-- When skill names are disabled again.
+namesCheckbox.click(namesCheckbox, false)
+populate()
+
+-- Then hiding is saved without disabling icons.
+assert(profile.hideSkills == true and namesCheckbox.checked == false)
+assert(controls.enableIconsCheckbox.checked == true)
 
 -- When Blizzard damage is unchecked while MSBT stays enabled.
 controls.blizzardDamageCheckbox.click(controls.blizzardDamageCheckbox, false)
