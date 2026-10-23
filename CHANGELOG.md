@@ -1,5 +1,12 @@
 # Changelog
 
+## v12.041
+
+- Added Enable Skill Names above Enable Skill Icons in General, unchecked by
+  default and saved per profile.
+- Removed legacy health and mana threshold tracking, including pet-health and
+  target-health alerts. Existing saved definitions remain inactive.
+
 ## v12.040
 
 - Restored resource-gain notifications with support for protected labels.
