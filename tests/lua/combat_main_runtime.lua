@@ -4,8 +4,43 @@ dofile("tests/lua/notification_runtime.lua")
 
 local createFrame = CreateFrame
 local frames, timers, displayed = {}, {}, {}
-CreateFrame = function(...)
-	local frame = createFrame(...)
+local popups, reloads = {}, 0
+-- Given Blizzard's shared popup system, MSBT must leave it untouched.
+StaticPopupDialogs = setmetatable({}, {
+	__newindex = function()
+		error("reload prompt wrote to Blizzard's shared popup definitions")
+	end,
+})
+RELOADUI, CANCEL = "Reload UI", "Cancel"
+StaticPopup_Show = function()
+	error("reload prompt used Blizzard's shared popup frames")
+end
+ReloadUI = function() reloads = reloads + 1 end
+CreateFrame = function(kind, name, parent, template)
+	local frame = createFrame(kind, name, parent, template)
+	frame.children, frame.fontStrings = {}, {}
+	if parent and parent.children then
+		parent.children[#parent.children + 1] = frame
+	end
+	function frame:SetSize() end
+	function frame:SetPoint() end
+	function frame:EnableMouse() end
+	function frame:SetClampedToScreen() end
+	function frame:SetBackdrop() end
+	function frame:SetBackdropColor() end
+	function frame:SetBackdropBorderColor() end
+	function frame:SetText(text) self.text = text end
+	function frame:SetFrameStrata(strata)
+		if strata == "DIALOG" then popups[#popups + 1] = self end
+	end
+	function frame:CreateFontString()
+		local fontString = {}
+		function fontString:SetPoint() end
+		function fontString:SetWidth() end
+		function fontString:SetText(text) self.text = text end
+		self.fontStrings[#self.fontStrings + 1] = fontString
+		return fontString
+	end
 	frames[#frames + 1] = frame
 	return frame
 end
@@ -22,7 +57,8 @@ UnitXP = function() return 0 end
 UnitXPMax = function() return 100 end
 GetMoney = function() return 0 end
 UnitHealthMax = function() return 1000 end
-InCombatLockdown = function() return true end
+local inCombat = true
+InCombatLockdown = function() return inCombat end
 C_Spell = {
 	IsSpellHelpful = function() return false end,
 	GetSpellDescription = function() return "Deals 42 Fire damage." end,
@@ -92,6 +128,37 @@ for _, forever in ipairs({ false, true }) do
 	local main = MikSBT.Main
 	local mainFrame = frames[#frames]
 	main.Enable()
+	-- Given first-run setup while the player is in combat.
+	-- When the missing filter is checked, then no popup interrupts combat.
+	local popupCount = #popups
+	assert(popupCount == (forever and 1 or 0))
+	inCombat = false
+	Dispatch("ADDON_LOADED", "Blizzard_CombatLog")
+
+	-- Then leaving combat allows one persistent, dismissible reload prompt.
+	assert(#popups == popupCount + 1, "missing filter did not show a popup")
+	local dialog = popups[#popups]
+	assert(dialog.fontStrings[2].text:find("In order for MSBT to start", 1, true))
+	local reloadButton, cancelButton = dialog.children[1], dialog.children[2]
+	assert(reloadButton.text == RELOADUI and cancelButton.text == CANCEL)
+	assert(dialog:IsVisible())
+	assert(reloads == (forever and 1 or 0), "setup reloaded automatically")
+
+	-- Given Cancel on MSBT's own window.
+	-- When setup is checked again, then it stays dismissed without reloading.
+	cancelButton.scripts.OnClick(cancelButton)
+	assert(not dialog:IsVisible(), "cancel did not hide the window")
+	Dispatch("ADDON_LOADED", "AnotherAddon")
+	main.Disable()
+	main.Enable()
+	assert(#popups == popupCount + 1, "cancelled popup reopened")
+	assert(reloads == (forever and 1 or 0))
+
+	-- When Reload UI is accepted, then it invokes the game's reload action.
+	reloadButton.scripts.OnClick(reloadButton)
+	assert(not dialog:IsVisible())
+	assert(reloads == (forever and 2 or 1))
+	inCombat = true
 	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 123)
 	Dispatch("UNIT_COMBAT", "target", "WOUND", "", 999, 4)
 	Advance(0.4)
@@ -102,6 +169,15 @@ for _, forever in ipairs({ false, true }) do
 	Dispatch("PLAYER_LOGOUT")
 	main.Disable()
 	main.Enable()
+	-- Then an activated filter needs no further setup popup.
+	assert(#popups == popupCount + 1)
+
+	-- Given an already visible setup prompt while saved filters finish loading.
+	dialog:Show()
+	-- When maintenance sees the now-valid filter.
+	Dispatch("ADDON_LOADED", "Blizzard_CombatLog")
+	-- Then the stale prompt closes instead of requesting another reload.
+	assert(not dialog:IsVisible(), "ready filter left a stale reload popup visible")
 	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 123)
 	Dispatch("PLAYER_REGEN_DISABLED")
 	Dispatch("UNIT_COMBAT", "target", "WOUND", "", 42, 4)
