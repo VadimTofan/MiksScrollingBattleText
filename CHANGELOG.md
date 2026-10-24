@@ -1,5 +1,11 @@
 # Changelog
 
+## v12.042
+
+- Added an MSBT window prompting for the UI reload required to activate the
+  combat-log filter, with Reload UI and Cancel buttons.
+- Delayed setup checks until login and deferred reload prompts during combat.
+
 ## v12.041
 
 - Added Enable Skill Names above Enable Skill Icons in General, unchecked by
