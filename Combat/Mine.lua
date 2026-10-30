@@ -798,6 +798,10 @@ end
 -- Frost hit (a Frost Nova showed Frostbolt's icon).
 local FLIGHT_MIN = 0.05
 function Mine:InFlight(key, school, now)
+    -- Channel hits need the same cross-frame line pairing as bolts.
+    for _, channel in pairs(self.channels) do
+        if ChannelFits(channel, key, school, now) then return true end
+    end
     for _, entry in ipairs(self.pending) do
         local since = now - entry.at
         if not entry.used and not entry.missOnly and entry.key == key and since >= FLIGHT_MIN

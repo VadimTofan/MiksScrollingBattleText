@@ -155,17 +155,52 @@ for index = 1, 5 do
     Advance(0.2)
     local previous = #outgoing
 
-    -- When each confirmed channel hit arrives before a normal DoT tick.
+    -- When channel lines and hits arrive in different frames, either first.
+    if index % 2 == 0 then
+        Event("UNIT_COMBAT", "target", "WOUND", "", 10, 124)
+        Advance(0.03)
+    end
     Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
-    Event("UNIT_COMBAT", "target", "WOUND", "", 10, 124)
+    if index % 2 ~= 0 then
+        Advance(0.03)
+        Event("UNIT_COMBAT", "target", "WOUND", "", 10, 124)
+    end
     Advance(0.02)
+    Advance(0.13)
 
     -- Then every hit retains the channel's spell instead of disappearing.
     assert(#outgoing == previous + 1, "rapid channel hit disappeared")
     record = outgoing[#outgoing]
     assert(record.result.spell == 403, "channel hit used another spell")
 end
+
+-- Given another player's same-school hit during the channel.
+local previous = #outgoing
+Advance(0.2)
+
+-- When no confirming line arrives for that hit.
+Event("UNIT_COMBAT", "target", "WOUND", "", 10, 124)
+Advance(0.02)
+Advance(0.13)
+
+-- Then the active channel must not claim it.
+assert(#outgoing == previous + 1)
+assert(outgoing[#outgoing].result.who == "other",
+    "channel claimed an unconfirmed hit")
+
+-- Given a final hit whose confirming line follows the channel stop.
+previous = #outgoing
+Event("UNIT_COMBAT", "target", "WOUND", "", 10, 124)
+Advance(0.02)
+
+-- When the channel stops before the delayed pairing runs.
 Event("UNIT_SPELLCAST_CHANNEL_STOP", "player", "channel-1", 403)
+Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+Advance(0.13)
+
+-- Then the buffered final hit still retains Eye Beam's identity.
+assert(#outgoing == previous + 1, "final channel hit disappeared")
+assert(outgoing[#outgoing].result.spell == 403)
 
 -- Given incoming damage and healing.
 -- When the game reports them on the player and pet.
