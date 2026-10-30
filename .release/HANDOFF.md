@@ -2,6 +2,17 @@
 
 Updated: 2026-10-30
 
+- Prepared v12.043 with the Chaos-school and delayed channel-hit fixes from
+  2b3aa22 and 257752a. The user confirmed Eye Beam and Chaos Bolt work in game.
+- Cancelled and deleted feat/friendly-healing at the user's request. Its five
+  commits are not part of main or this release.
+- Local validation: 120 tests run, 119 passed, one expected archive skip;
+  whitespace passed. No generated task logs remain.
+- Next: push main, verify a package-only CI build and its ZIP,
+  then tag v12.043 and confirm the CurseForge upload succeeds.
+
+## Channel timing checkpoint
+
 - Follow-up: active channels now use the existing delayed line-pairing path.
   Previously only pending bolts and ranged swings were eligible, so channel
   hits lost their spell identity when their confirming line crossed frames.

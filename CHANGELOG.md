@@ -1,5 +1,12 @@
 # Changelog
 
+## v12.043
+
+- Fixed missing or misattributed Eye Beam and Chaos Bolt damage caused by
+  different Chaos damage-school variants.
+- Improved channel-hit tracking when hit reports and confirmations arrive in
+  separate frames, including the final hit before a channel stops.
+
 ## v12.042
 
 - Added an MSBT window prompting for the UI reload required to activate the
