@@ -1,6 +1,16 @@
 # Release handoff
 
-Updated: 2026-10-24
+Updated: 2026-10-30
+
+- Fixed outgoing Chaos spell attribution when a Chaos tooltip (127) is
+  followed by damage reported as 124 or 126, including bolt and channel hits.
+- Regression cases failed before the fix and passed afterward. Full validation:
+  120 tests run, 119 passed, one expected actual-archive skip; whitespace passed.
+- Next: reload in game and verify outgoing Eye Beam and Chaos Bolt damage.
+  Incoming damage was not reproduced; the user's direction clarification is open.
+- This checkpoint has not been pushed or released.
+
+## Previous release
 
 - Prepared v12.042 for the combat setup reload prompt in commit 6cb6bd2.
 - Deleted the local feat/forever-outgoing-attribution branch as requested.

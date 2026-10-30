@@ -91,6 +91,21 @@ for _, example in ipairs({
         example.name .. " periodic damage lost its attribution")
 end
 
+for _, school in ipairs({ 124, 126, 127 }) do
+    -- Given a Chaos spell cast at one target.
+    local facts = ns.ParseSpellDescription("Deals 100 Chaos damage.")
+    local mine = ns.NewMine(nil, nil, function() return facts end)
+    mine:Cast("player", 116858, "target", 10)
+
+    -- When its area damage is considered on another enemy in that moment.
+    local fit = mine:Fit("other", "damage", school, 10.01, 100, "direct")
+
+    -- Then every complete Chaos variant can pair with the cast's line.
+    assert(fit ~= nil, "Chaos area hit lost its matching cast")
+    assert(mine:Fit("other", "damage", 4, 10.01, 100, "direct") == nil,
+        "Chaos cast claimed an unrelated Fire hit")
+end
+
 -- Given a harmless ability.
 local text = "Forces the target to speak in Demonic."
 

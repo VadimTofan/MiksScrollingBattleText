@@ -23,11 +23,11 @@ mine:Cast("player", 1, "target", 10)
 -- Then ordinary cast/DoT guesses cannot outlive the channel.
 assert(mine.casts[1] == nil and #mine.pending == 0 and #mine.dots == 0)
 
--- Given rapid hits during that channel.
+-- Given rapid hits reported without Chaos's Holy and Physical bits.
 -- When they match the channel's school and target.
-local hit = mine:Hit("target", "damage", 127, 10.2, false, true,
+local hit = mine:Hit("target", "damage", 124, 10.2, false, true,
     10, false, "direct")
-local fit = mine:Fit("target", "damage", 127, 10.2, 10, "direct")
+local fit = mine:Fit("target", "damage", 124, 10.2, 10, "direct")
 
 -- Then ownership and identity are available before any DoT rhythm is learned.
 assert(hit.who == "you" and hit.spell == 1 and not hit.tick)

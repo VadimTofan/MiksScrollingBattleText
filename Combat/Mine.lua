@@ -243,7 +243,10 @@ function Mine:Tidy(now)
 end
 
 local function SchoolFits(known, school)
-    return known == nil or school == nil or known == school
+    if known == nil or school == nil or known == school then return true end
+    -- Chaos tooltips cover all schools. Hits can omit Holy and Physical
+    -- (124, including Chaos Bolt and Eye Beam), or just Physical (126).
+    return known == 127 and (school == 124 or school == 126)
 end
 
 local function ChannelFits(channel, key, school, now)
@@ -680,7 +683,7 @@ local function Yours(self, key, kind, school, now)
                 if kind == "miss" then exact = exact or entry end
             elseif kind == "miss" then
                 exact = exact or entry
-            elseif entry.school and entry.school == school then
+            elseif entry.school and SchoolFits(entry.school, school) then
                 local fit = DirectFit(self, entry.spell, self.amountNow, self.critNow)
                 if not exact then
                     exact, exactFit = entry, fit
@@ -875,7 +878,8 @@ function Mine:Fit(key, kind, school, now, amount, restrict)
             local known = (type(facts) == "table" and facts.school) or self.learned("school", spell)
             local harmful = not (type(facts) == "table" and (facts.damages == false or facts.helpful == true))
             local ticksOnly = type(facts) == "table" and facts.direct == false and facts.ticks == true
-            if known == school and harmful and not ticksOnly then
+            if known and SchoolFits(known, school)
+                and harmful and not ticksOnly then
                 for _, cast in ipairs(list) do
                     local since = now - cast.at
                     if cast.caster == "you" and since >= -0.05 and since <= AREA_MOMENT then

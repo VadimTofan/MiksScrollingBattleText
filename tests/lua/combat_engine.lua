@@ -124,8 +124,11 @@ local record = outgoing[#outgoing]
 assert(record and record.result.who == "you" and record.result.spell == 101)
 assert(record.amount == 100 and record.crit)
 
+-- Chaos Bolt's tooltip says Chaos; its damage uses 124, not always 127.
 for _, example in ipairs({ { spell = 401, school = 106 },
-    { spell = 402, school = 127 } }) do
+    { spell = 402, school = 127 },
+    { spell = 402, school = 124 },
+    { spell = 402, school = 126 } }) do
     -- Given a composite-school cast following an unrelated spell.
     Advance(4)
     local previous = #outgoing
@@ -144,7 +147,7 @@ for _, example in ipairs({ { spell = 401, school = 106 },
     assert(record.school == example.school and not record.result.melee)
 end
 
--- Given a damaging channel whose rapid hits are reported as direct spells.
+-- Given an Eye Beam-like channel: a Chaos tooltip with school-124 hits.
 Advance(4)
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 403)
 Event("UNIT_SPELLCAST_CHANNEL_START", "player", "channel-1", 403)
@@ -154,7 +157,7 @@ for index = 1, 5 do
 
     -- When each confirmed channel hit arrives before a normal DoT tick.
     Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
-    Event("UNIT_COMBAT", "target", "WOUND", "", 10, 127)
+    Event("UNIT_COMBAT", "target", "WOUND", "", 10, 124)
     Advance(0.02)
 
     -- Then every hit retains the channel's spell instead of disappearing.
