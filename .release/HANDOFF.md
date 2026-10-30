@@ -2,14 +2,23 @@
 
 Updated: 2026-10-30
 
-- Prepared v12.043 with the Chaos-school and delayed channel-hit fixes from
-  2b3aa22 and 257752a. The user confirmed Eye Beam and Chaos Bolt work in game.
+- Released v12.043 from ef18446 with the Chaos-school and delayed channel-hit
+  fixes from 2b3aa22 and 257752a. The user confirmed both spells work in game.
 - Cancelled and deleted feat/friendly-healing at the user's request. Its five
   commits are not part of main or this release.
-- Local validation: 120 tests run, 119 passed, one expected archive skip;
-  whitespace passed. No generated task logs remain.
-- Next: push main, verify a package-only CI build and its ZIP,
-  then tag v12.043 and confirm the CurseForge upload succeeds.
+- Pushed main and tag v12.043 to origin. Main and tag CI validation passed:
+  120 tests run, 119 passed, one expected archive skip.
+- Package-only run: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/41134404534
+- Release run: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/41134600765
+- Both actual ZIPs passed all six archive checks. Final ZIP: 99 files,
+  598,350 bytes; all 69 packaged Lua files parse with Lua 5.1. Dependencies,
+  runtime media, and notices are retained; development files are excluded.
+- Final contents match the dry run except for the expected release-tag
+  substitution in LibDeflate's metadata comment. Healing experiments are absent.
+- CurseForge accepted the upload as file 9377689. Public availability and
+  processing status have not been checked.
+- Final artifact: D:/Downloads/MSBT-v12.043-release/MikScrollingBattleText-v12.043.zip
+- Whitespace passed. No generated task logs remain. No release actions remain.
 
 ## Channel timing checkpoint
 
