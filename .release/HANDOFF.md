@@ -1,6 +1,17 @@
 # Release handoff
 
-Updated: 2026-10-30
+Updated: 2026-11-06
+
+## Reload reminder checkpoint
+
+- Removed the redundant reload chat message; the setup popup and its Reload UI
+  and Cancel buttons remain covered by the runtime regression.
+- Regression failed before the fix and passed afterward. Validation: 120 tests
+  run, 119 passed, one expected archive skip, using Lupa's Lua 5.1 runtime.
+- Whitespace passed. No generated task logs remain.
+- Next: reload in game to load the change. This checkpoint is local only.
+
+## Released version
 
 - Released v12.043 from ef18446 with the Chaos-school and delayed channel-hit
   fixes from 2b3aa22 and 257752a. The user confirmed both spells work in game.

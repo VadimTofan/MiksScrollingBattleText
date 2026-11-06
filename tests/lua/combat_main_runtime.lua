@@ -5,6 +5,10 @@ dofile("tests/lua/notification_runtime.lua")
 local createFrame = CreateFrame
 local frames, timers, displayed = {}, {}, {}
 local popups, reloads = {}, 0
+local chatMessages = {}
+MikSBT.Print = function(message)
+	chatMessages[#chatMessages + 1] = message
+end
 -- Given Blizzard's shared popup system, MSBT must leave it untouched.
 StaticPopupDialogs = setmetatable({}, {
 	__newindex = function()
@@ -131,12 +135,15 @@ for _, forever in ipairs({ false, true }) do
 	-- Given first-run setup while the player is in combat.
 	-- When the missing filter is checked, then no popup interrupts combat.
 	local popupCount = #popups
+	local chatCount = #chatMessages
 	assert(popupCount == (forever and 1 or 0))
 	inCombat = false
 	Dispatch("ADDON_LOADED", "Blizzard_CombatLog")
 
 	-- Then leaving combat allows one persistent, dismissible reload prompt.
 	assert(#popups == popupCount + 1, "missing filter did not show a popup")
+	assert(#chatMessages == chatCount,
+		"reload popup also printed a redundant chat reminder")
 	local dialog = popups[#popups]
 	assert(dialog.fontStrings[2].text:find("In order for MSBT to start", 1, true))
 	local reloadButton, cancelButton = dialog.children[1], dialog.children[2]
