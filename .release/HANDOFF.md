@@ -9,9 +9,17 @@ Updated: 2026-11-06
 - Regression failed before the fix and passed afterward. Validation: 120 tests
   run, 119 passed, one expected archive skip, using Lupa's Lua 5.1 runtime.
 - Whitespace passed. No generated task logs remain.
-- Preparing v12.044 at the user's request. Both addon TOCs, README, and changelog
-  reflect the new version. Next: validate, push main, and run package-only CI
-  before tagging and uploading the release.
+- Released v12.044 from 29887c3; main and tag are pushed. Main and tag CI passed.
+- Package-only run: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/42306011042
+- Release run: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/42306189378
+- Both actual ZIPs passed all six archive checks. Final ZIP: 99 files,
+  598,285 bytes; all 69 packaged Lua files parse with Lua 5.1. Runtime files,
+  media, libraries, and notices remain; development files are excluded.
+- Final contents match the dry run except for the expected release-tag
+  substitution in LibDeflate's metadata comment.
+- CurseForge accepted file 9482708. Processing and public availability have not
+  been checked. No release actions remain.
+- Final artifact: D:/Codex-Temp/msbt-v12.044-release/final/MikScrollingBattleText-v12.044.zip/MikScrollingBattleText-v12.044.zip
 
 ## Released version
 
