@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.044
+
+- Removed the redundant reload reminder in chat. The setup popup still provides
+  Reload UI and Cancel buttons.
+
 ## v12.043
 
 - Fixed missing or misattributed Eye Beam and Chaos Bolt damage caused by

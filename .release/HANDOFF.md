@@ -9,7 +9,9 @@ Updated: 2026-11-06
 - Regression failed before the fix and passed afterward. Validation: 120 tests
   run, 119 passed, one expected archive skip, using Lupa's Lua 5.1 runtime.
 - Whitespace passed. No generated task logs remain.
-- Next: reload in game to load the change. This checkpoint is local only.
+- Preparing v12.044 at the user's request. Both addon TOCs, README, and changelog
+  reflect the new version. Next: validate, push main, and run package-only CI
+  before tagging and uploading the release.
 
 ## Released version
 
