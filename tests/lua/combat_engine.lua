@@ -269,6 +269,99 @@ assert(record.selfHeal and record.spell == 201 and record.icon == "icon-201",
 targetIsPlayer = false
 Event("PLAYER_TARGET_CHANGED")
 
+-- Describe: Forever's queued melee strikes emit a zero report before the hit.
+local queuedSpells = {
+	78, 284, 285, 1608, 11564, 11565, 11566, 11567, 25286,
+	6807, 6808, 6809, 8972, 9745, 9880, 9881,
+	2973, 14260, 14261, 14262, 14263, 14264, 14265, 14266,
+}
+local descriptions = C_Spell.GetSpellDescription
+local opaqueZero, opaqueDamage = {}, {}
+local previousSecretCheck = issecretvalue
+issecretvalue = function(value)
+	return value == opaqueZero or value == opaqueDamage
+end
+local previousCompatibility = MikSBT.Compatibility
+MikSBT.Compatibility = { Client = { isForever = true } }
+local strikeDescriptions = { [105] = true }
+for _, spell in ipairs(queuedSpells) do strikeDescriptions[spell] = true end
+C_Spell.GetSpellDescription = function(spell)
+	if strikeDescriptions[spell] then
+		return "A strong attack that increases melee damage by 5."
+	end
+	return descriptions(spell)
+end
+
+for _, spell in ipairs(queuedSpells) do
+	-- Given a queued strike succeeding as its melee swing lands.
+	Advance(4)
+	local before = #outgoing
+	Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, spell)
+
+	-- When its two opaque physical reports share one spell confirmation.
+	Event("UNIT_COMBAT", "target", "WOUND", "", opaqueZero, 1)
+	Event("UNIT_COMBAT", "target", "WOUND", "", opaqueDamage, 1)
+	Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+	Advance(0.02)
+
+	-- Then the real hit receives the spell instead of displaying its zero.
+	local own = {}
+	for index = before + 1, #outgoing do
+		if outgoing[index].result.who == "you" then
+			own[#own + 1] = outgoing[index]
+		end
+	end
+	assert(#own == 1, "queued strike did not retain exactly one confirmed hit")
+	assert(own[1].result.spell == spell, "queued strike lost its spell")
+	assert(own[1].amount == opaqueDamage,
+		"queued strike displayed the zero report instead of its real hit")
+end
+
+for _, example in ipairs({
+	{ spell = 105, forever = true, hits = 2, lines = 1, expected = opaqueZero },
+	{ spell = 2973, forever = false, hits = 2, lines = 1, expected = opaqueZero },
+	{ spell = 2973, forever = true, hits = 1, lines = 1, expected = opaqueDamage },
+	{ spell = 2973, forever = true, hits = 2, lines = 0 },
+	{ spell = 2973, forever = true, hits = 3, lines = 1, expected = opaqueZero },
+	{ spell = 2973, forever = true, hits = 2, lines = 1,
+		delay = 0.01, expected = opaqueZero },
+}) do
+	-- Given a normal spell, another client, a lone hit, or no confirmation.
+	Advance(4)
+	local before = #outgoing
+	MikSBT.Compatibility.Client.isForever = example.forever
+	Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example.spell)
+	if example.delay then Advance(example.delay) end
+
+	-- When ordinary matching handles those reports.
+	for index = 1, example.hits - 1 do
+		Event("UNIT_COMBAT", "target", "WOUND", "", opaqueZero, 1)
+	end
+	Event("UNIT_COMBAT", "target", "WOUND", "", opaqueDamage, 1)
+	for index = 1, example.lines do
+		Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+	end
+	Advance(0.02)
+	Advance(0.5)
+
+	-- Then the special pair rule does not alter their normal matching.
+	local own = {}
+	for index = before + 1, #outgoing do
+		if outgoing[index].result.who == "you" then
+			own[#own + 1] = outgoing[index]
+		end
+	end
+	assert(#own == (example.expected and 1 or 0),
+		"queued strike rule changed ordinary confirmation behavior")
+	if example.expected then
+		assert(own[1].amount == example.expected,
+			"queued strike rule changed an unrelated hit's event order")
+	end
+end
+C_Spell.GetSpellDescription = descriptions
+MikSBT.Compatibility = previousCompatibility
+issecretvalue = previousSecretCheck
+
 -- Given a readable aura added to the player.
 local aura = { auraInstanceID = 77, spellId = 1459,
 	name = "Arcane Intellect", icon = 135932, isHarmful = false,

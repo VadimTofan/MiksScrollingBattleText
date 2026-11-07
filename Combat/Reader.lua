@@ -496,6 +496,38 @@ local function NoteSwingHit(hit, line)
     while list[1] and (hit.at - list[1].at > 2 or #list > 16) do table.remove(list, 1) end
 end
 
+-- Classic ranks of the three queued-strike families supported on Forever.
+local QUEUED_STRIKES = {
+    -- Heroic Strike.
+    [78] = true, [284] = true, [285] = true, [1608] = true,
+    [11564] = true, [11565] = true, [11566] = true,
+    [11567] = true, [25286] = true,
+    -- Maul.
+    [6807] = true, [6808] = true, [6809] = true, [8972] = true,
+    [9745] = true, [9880] = true, [9881] = true,
+    -- Raptor Strike.
+    [2973] = true, [14260] = true, [14261] = true, [14262] = true,
+    [14263] = true, [14264] = true, [14265] = true, [14266] = true,
+}
+
+local function PreferQueuedStrikeHit(group, lines, restrict)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not client or not client.isForever or #group ~= 2
+        or lines ~= 1 or restrict ~= "direct" then return false end
+    local first, last = group[1], group[2]
+    if first.key ~= last.key or first.at ~= last.at
+        or first.record.event ~= "damage" or last.record.event ~= "damage"
+        or first.record.school ~= ns.SCHOOL_PHYSICAL
+        or last.record.school ~= ns.SCHOOL_PHYSICAL then return false end
+    for _, cast in ipairs(ns.mine.pending) do
+        if not cast.used and cast.caster == "you" and cast.key == first.key
+            and cast.at == first.at and QUEUED_STRIKES[cast.spell] then
+            return true
+        end
+    end
+    return false
+end
+
 -- One frame's hits (of one class, with lines by kind) against the lines of
 -- yours that may be theirs: as many lines as hits (or more: a DoT of yours
 -- on an enemy without a plate also sends one) and every hit is yours; none
@@ -590,9 +622,15 @@ function DecideGroup(group, frameLines, decided)
             ranked[#ranked + 1] = { hit = hit, index = index,
                 fit = ns.mine:Fit(hit.key, kind, record.school, hit.at, amount, restrict) }
         end
+        -- Observed on Forever: a queued strike reports zero before its
+        -- physical hit in the cast's frame, with one spell confirmation.
+        -- Both amounts are opaque and their school/flags are identical.
+        -- Only this two-report pattern favors the later hit on a fit tie.
+        local preferQueuedHit = PreferQueuedStrikeHit(group, lines, restrict)
         table.sort(ranked, function(a, b)
             if (a.fit ~= nil) ~= (b.fit ~= nil) then return a.fit ~= nil end
             if a.fit and b.fit and a.fit ~= b.fit then return a.fit < b.fit end
+            if preferQueuedHit then return a.index > b.index end
             return a.index < b.index
         end)
         local flags = {}

@@ -2,6 +2,30 @@
 
 Updated: 2026-11-07
 
+## Queued-strike patch checkpoint
+
+- The second Raptor Strike trace shows both same-frame WOUND reports use
+  school 1 and an empty flag. MSBT assigned the initial zero to spell 2973
+  and rejected the subsequent real hit (12 in that capture).
+- Added a Forever-only tie breaker for exactly two physical damage reports
+  on one unit, one direct spell confirmation, and an unused Heroic Strike,
+  Maul, or Raptor Strike cast in that exact frame. The later report wins an
+  equal-fit tie. Damage amounts remain opaque and are never compared.
+- This is a narrow timing inference, not authoritative ownership. Ordinary
+  spells, Retail, lone hits, unconfirmed hits, frames with more reports, and
+  casts from earlier frames retain their existing matching behavior.
+- The real reader regression failed on the zero report before the patch.
+  Tests now cover all 24 Vanilla ranks across the three abilities and the
+  real MSBT presentation pipeline for their base ranks, including Maul's
+  different description wording.
+- Validation: 122 tests run, 121 passed, one expected actual-archive skip.
+  Lua 5.1 parsing and whitespace passed. No generated task logs remain.
+- Installed the tested `Combat/Reader.lua` in the requested Forever addon
+  folder and verified its SHA-256 matches the workspace file.
+- Next: reload and confirm Raptor Strike displays its actual hit in game.
+  Keep `/msbttrace` available
+  for confirmation; the patch has not yet been verified in game or released.
+
 ## Queued-strike damage investigation
 
 - Heroic Strike, Maul, and Raptor Strike reportedly show a literal zero. The

@@ -207,6 +207,47 @@ for _, forever in ipairs({ false, true }) do
 	assert(not mainFrame.events.UNIT_COMBAT, "legacy incoming reader remained active")
 	assert(meterReads == 0, "duplicate damage-meter source was queried")
 
+	if forever then
+		for _, spell in ipairs({ 2973, 78, 6807 }) do
+			-- Given a queued strike with two opaque physical hit reports.
+			Advance(4)
+			local beforeStrike = #displayed
+			local opaqueZero, opaqueDamage = {}, {}
+			local secretCheck = issecretvalue
+			local spellDescription = C_Spell.GetSpellDescription
+			issecretvalue = function(value)
+				return value == opaqueZero or value == opaqueDamage
+			end
+			C_Spell.GetSpellDescription = function(id)
+				if id == 6807 then
+					return "Increases the druid's next attack by 18 damage."
+				elseif id == spell then
+					return "A strong attack that increases melee damage by 5."
+				end
+				return spellDescription(id)
+			end
+
+			-- When the cast, zero, real hit and one line share the same frame.
+			Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, spell)
+			Dispatch("UNIT_COMBAT", "target", "WOUND", "", opaqueZero, 1)
+			Dispatch("UNIT_COMBAT", "target", "WOUND", "", opaqueDamage, 1)
+			Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+			Advance(0.02)
+			Advance(0.31)
+
+			-- Then only the real amount reaches MSBT's native text renderer.
+			assert(#displayed == beforeStrike + 1,
+				"queued strike produced missing or duplicate damage text")
+			local hit = displayed[#displayed]
+			assert(hit[1] == events.OUTGOING_SPELL_DAMAGE)
+			assert(hit[2] == "Hit %s" and hit[3] == "icon")
+			assert(hit[4] == opaqueDamage,
+				"queued strike's zero report reached the final renderer")
+			issecretvalue = secretCheck
+			C_Spell.GetSpellDescription = spellDescription
+		end
+	end
+
 	-- Given resource notifications and the resource labels supplied by Blizzard.
 	local resourceSettings = { message = "%a - %p", scrollArea = "Notification" }
 	events.NOTIFICATION_RESOURCE_GAIN = resourceSettings
