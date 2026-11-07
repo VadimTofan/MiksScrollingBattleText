@@ -2,6 +2,29 @@
 
 Updated: 2026-11-07
 
+## Windfury delayed-hit patch
+
+- The latest capture shows one swing line and two spell lines at 43707.394.
+  A physical proc hit of 179 is accepted at swing age 0.22 s, the ordinary
+  196 hit is accepted at 0.59 s, and the later physical 180 hit is rejected
+  at 1.02 s. No separate `extra` marker is shown in this capture.
+- Reproduced that sequence with opaque amounts through the real reader.
+  The second proc was missing before the fix. Extended Forever's physical
+  proc pairing to 0.5 seconds after a confirmed normal hit, requiring the
+  same target and an unused direct-damage line from that swing's frame.
+  Every confirmation still serves once. No damage amount is inspected.
+- Tests retain the early proc, ordinary hit and delayed proc. They reject
+  another target's hit, reused confirmations, magic hits, reports outside
+  the window, DoT confirmations, and the new behavior on Retail. A real
+  main-module regression verifies all three amounts reach MSBT's renderer.
+- Validation: 122 tests run, 121 passed, one expected archive skip. Lua 5.1
+  parsing and whitespace passed. No generated task logs remain.
+- Installed the tested Reader.lua in Forever and verified its SHA-256.
+- Next: verify both extra-hit amounts in game after reload. Proc-specific
+  Windfury names/icons are not
+  added by this patch; the recovered hit uses outgoing spell-damage settings.
+  Do not push or release without a new user request.
+
 ## Windfury Weapon investigation
 
 - User reports missing damage from their shaman's Windfury Weapon after

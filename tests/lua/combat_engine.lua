@@ -86,6 +86,7 @@ local function Event(event, ...)
     if event == "COMBAT_LOG_MESSAGE" then
         local _, kind = ...
         local eventName = kind == "heal" and "SPELL_HEAL"
+            or (kind == "swing" and "SWING_DAMAGE")
             or (kind == "spell" and "SPELL_DAMAGE" or "SPELL_PERIODIC_DAMAGE")
         local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[eventName]
         engine:HandleEvent(event, "opaque message", rgb.r, rgb.g, rgb.b, 1)
@@ -268,6 +269,103 @@ assert(record.selfHeal and record.spell == 201 and record.icon == "icon-201",
     "self heal lost its cast's spell icon")
 targetIsPlayer = false
 Event("PLAYER_TARGET_CHANGED")
+
+-- Describe: Windfury reports a proc before the swing hit and another after it.
+local windfuryCompatibility = MikSBT.Compatibility
+MikSBT.Compatibility = { Client = { isForever = true } }
+unsupported.PLAYER_SWING = nil
+Enum.PlayerSwingType = { MainHand = 0, OffHand = 1, Ranged = 2 }
+local windfurySecretCheck = issecretvalue
+local firstProc, normalHit, delayedProc = {}, {}, {}
+issecretvalue = function(value)
+	return value == firstProc or value == normalHit or value == delayedProc
+end
+
+-- Given one native swing and its melee line plus two direct proc lines.
+Advance(4)
+local burstStart = now
+local beforeBurst = #outgoing
+Event("PLAYER_SWING", 3.8, 0)
+Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+
+-- When the first proc precedes the normal hit, matching the captured timing.
+Advance(0.213)
+Event("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+Advance(0.01)
+Advance(0.362)
+Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+Advance(0.01)
+
+-- Given an unrelated hit on another nameplate before the delayed proc.
+MikSBT.CombatEngine.reader.plates.nameplate1 = true
+Advance(0.2)
+Event("UNIT_COMBAT", "nameplate1", "WOUND", "", 321, 1)
+Advance(0.01)
+
+-- When the second physical proc lands 0.424 seconds after the normal hit.
+Advance(burstStart + 1.009 - now)
+Event("UNIT_COMBAT", "target", "WOUND", "", delayedProc, 1)
+Advance(0.01)
+
+-- Then both opaque proc amounts and the ordinary swing retain ownership.
+local burst = {}
+for index = beforeBurst + 1, #outgoing do
+	local hit = outgoing[index]
+	if hit.amount == 321 then
+		assert(hit.result.who == "other",
+			"a delayed proc line was stolen by another target")
+	elseif hit.result.who == "you" then
+		burst[#burst + 1] = hit
+	end
+end
+assert(#burst == 3, "Windfury's delayed second proc disappeared")
+assert(burst[1].amount == firstProc and burst[1].result.proc)
+assert(burst[2].amount == normalHit and burst[2].result.melee)
+assert(burst[3].amount == delayedProc and burst[3].result.proc,
+	"the delayed Windfury proc lost its original amount or classification")
+
+-- Given both confirming proc lines have already been consumed.
+-- When another physical hit arrives in the same timing window.
+Event("UNIT_COMBAT", "target", "WOUND", "", 322, 1)
+Advance(0.01)
+
+-- Then that hit cannot reuse either proc confirmation.
+assert(outgoing[#outgoing].amount == 322)
+assert(outgoing[#outgoing].result.who == "other",
+	"a proc confirmation was reused for unrelated damage")
+
+for _, example in ipairs({
+	{ forever = true, school = 4, delay = 0.424, kind = "spell" },
+	{ forever = true, school = 1, delay = 0.6, kind = "spell" },
+	{ forever = true, school = 1, delay = 0.424, kind = "tick" },
+	{ forever = false, school = 1, delay = 0.424, kind = "spell" },
+}) do
+	-- Given a spare confirmation outside the supported physical-proc case.
+	Advance(4)
+	MikSBT.Compatibility.Client.isForever = example.forever
+	Event("PLAYER_SWING", 3.8, 0)
+	Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+	Event("COMBAT_LOG_MESSAGE", nil, example.kind, 0, 0, 1)
+	Advance(0.585)
+	Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+	Advance(0.01)
+
+	-- When a magic, late, DoT-confirmed or Retail hit follows the swing.
+	Advance(example.delay - 0.01)
+	Event("UNIT_COMBAT", "target", "WOUND", "", 323, example.school)
+	Advance(0.01)
+
+	-- Then the widened path does not claim that unrelated damage.
+	assert(outgoing[#outgoing].amount == 323)
+	assert(outgoing[#outgoing].result.who == "other",
+		"delayed-proc matching claimed an unsupported report")
+end
+MikSBT.CombatEngine.reader.plates.nameplate1 = nil
+MikSBT.Compatibility = windfuryCompatibility
+issecretvalue = windfurySecretCheck
+unsupported.PLAYER_SWING = true
 
 -- Describe: Forever's queued melee strikes emit a zero report before the hit.
 local queuedSpells = {

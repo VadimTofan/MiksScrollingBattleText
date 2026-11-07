@@ -71,14 +71,17 @@ C_Spell = {
 }
 COMBATLOG_FILTER_MINE, COMBATLOG_FILTER_MY_PET = 1, 2
 DEFAULT_COMBATLOG_FILTER_TEMPLATE = { settings = {}, colors = {} }
-Enum.PlayerSwingType = { MainHand = 1, OffHand = 2, Ranged = 3 }
+Enum.PlayerSwingType = { MainHand = 0, OffHand = 1, Ranged = 2 }
 Enum.CombatLogMessageOrder = { Oldest = 0, Newest = 1 }
 local meterReads = 0
 C_DamageMeter = {
 	GetCombatSessionSourceFromType = function() meterReads = meterReads + 1 end,
 }
 Enum.DamageMeterType = { DamageDone = 0 }
-C_EventUtils = { IsEventValid = function(event) return event ~= "PLAYER_SWING" end }
+local swingEventsSupported = false
+C_EventUtils = { IsEventValid = function(event)
+	return swingEventsSupported or event ~= "PLAYER_SWING"
+end }
 MikSBT.Animations.DisplayEvent = function(settings, message, icon, _, ...)
 	displayed[#displayed + 1] = { settings, message, icon, ... }
 end
@@ -122,6 +125,7 @@ local function Advance(seconds)
 end
 
 for _, forever in ipairs({ false, true }) do
+	swingEventsSupported = forever
 	-- Given a modern client and the player's existing event configuration.
 	timers, displayed = {}, {}
 	Blizzard_CombatLog_Filters = { filters = {}, currentFilter = 1 }
@@ -246,6 +250,45 @@ for _, forever in ipairs({ false, true }) do
 			issecretvalue = secretCheck
 			C_Spell.GetSpellDescription = spellDescription
 		end
+
+		-- Given Windfury's two opaque proc hits and its ordinary melee hit.
+		Advance(4)
+		local beforeBurst = #displayed
+		local firstProc, normalHit, delayedProc = {}, {}, {}
+		local secretCheck = issecretvalue
+		local meleeSettings = events.OUTGOING_DAMAGE
+		events.OUTGOING_DAMAGE = { message = "Swing %a", scrollArea = "Outgoing" }
+		issecretvalue = function(value)
+			return value == firstProc or value == normalHit or value == delayedProc
+		end
+		local melee = filter.colors.eventColoring.SWING_DAMAGE
+
+		-- When their confirmations share a swing but their reports cross frames.
+		Dispatch("PLAYER_SWING", 3.8, 0)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", melee.r, melee.g, melee.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Advance(0.213)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+		Advance(0.01)
+		Advance(0.362)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+		Advance(0.01)
+		Advance(0.414)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", delayedProc, 1)
+		Advance(0.01)
+
+		-- Then the final renderer receives both procs and the ordinary swing.
+		assert(#displayed == beforeBurst + 3,
+			"the delayed Windfury hit did not reach the real display pipeline")
+		assert(displayed[beforeBurst + 1][4] == firstProc)
+		assert(displayed[beforeBurst + 1][1] == events.OUTGOING_SPELL_DAMAGE)
+		assert(displayed[beforeBurst + 2][4] == normalHit)
+		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
+		assert(displayed[beforeBurst + 3][4] == delayedProc)
+		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
+		issecretvalue = secretCheck
+		events.OUTGOING_DAMAGE = meleeSettings
 	end
 
 	-- Given resource notifications and the resource labels supplied by Blizzard.

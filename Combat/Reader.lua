@@ -456,21 +456,31 @@ local function OrphanSwingLine(hit)
     end
 end
 
--- 0.6.5 (predicted, not yet seen in client): a proc riding on your swing (a
--- seal, a poison, Windfury's damage) reported late with the swing's hit,
--- its line back in the swing's frame like the swing's own. A hit with no
--- line in its frame, within a frame of a swing hit of yours just paired,
--- takes a spare line of its class that is no melee line from that swing's
--- frame.
+-- A proc's confirmation can share the swing's frame even when its damage
+-- arrives in another frame. Each proc consumes a separate unused damage
+-- line from that swing, with a longer delay for physical procs on Forever.
 reader.swingHits = {}
+local LATE_PHYSICAL_PROC = 0.5
 local function ProcLine(hit)
     local record = hit.record
     if record.event ~= "damage" and record.event ~= "miss" then return nil end
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     for _, paired in ipairs(reader.swingHits) do
-        if math.abs(paired.at - hit.at) <= 0.05 then
+        local since = hit.at - paired.at
+        local nearby = math.abs(since) <= 0.05
+        -- Windfury's second hit was reported 0.424 s after its ordinary
+        -- swing hit. It still needs a spare direct line from that swing's
+        -- frame, on the same unit; proximity alone never confirms it.
+        local delayed = client and client.isForever
+            and record.event == "damage"
+            and record.school == ns.SCHOOL_PHYSICAL
+            and paired.key == hit.key and since >= 0
+            and since <= LATE_PHYSICAL_PROC
+        if nearby or delayed then
             for _, line in ipairs(reader.logLines or {}) do
                 if not line.claimed and not line.hit and line.kind and not MeleeLine(line) and Pairs(line, record)
-                    and math.abs(line.at - paired.lineAt) <= SWING_FRAME then
+                    and math.abs(line.at - paired.lineAt) <= SWING_FRAME
+                    and (nearby or LineRestrict(line) == "direct") then
                     return line
                 end
             end
@@ -492,7 +502,7 @@ local function FlightProcLine(hit)
 end
 local function NoteSwingHit(hit, line)
     local list = reader.swingHits
-    list[#list + 1] = { at = hit.at, lineAt = line.at }
+    list[#list + 1] = { at = hit.at, lineAt = line.at, key = hit.key }
     while list[1] and (hit.at - list[1].at > 2 or #list > 16) do table.remove(list, 1) end
 end
 
