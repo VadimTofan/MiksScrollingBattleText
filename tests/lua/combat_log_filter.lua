@@ -41,6 +41,20 @@ local tick = filter.colors.eventColoring.SPELL_PERIODIC_DAMAGE
 assert(log:Kind(tick.r, tick.g, tick.b) == "tick")
 assert(log:Kind(0.5, 0.5, 0.5) == nil, "unrelated log line confirmed damage")
 
+-- Given a proc grants extra attacks without another native swing event.
+-- When building the outgoing filter and its readable colour kinds.
+assert(filter.filters[1].eventList.SPELL_EXTRA_ATTACKS == true,
+    "the outgoing filter omits Windfury's extra-attack notification")
+local extra = filter.colors.eventColoring.SPELL_EXTRA_ATTACKS
+assert(extra and log:Kind(extra.r, extra.g, extra.b) == "extra",
+    "extra attacks cannot be distinguished from ordinary damage")
+local namespace = {}
+log:ConfigureNamespace(namespace)
+
+-- Then an extra-attack grant remains a separate signal, not a damage line.
+assert(namespace.LINE_KINDS.extra.class == nil,
+    "a proc grant incorrectly confirms an unrelated damage report")
+
 -- Given repeated reloads.
 -- When writing the same dedicated filter again.
 assert(log:WriteSettings())

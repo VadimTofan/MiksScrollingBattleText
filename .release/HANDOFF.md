@@ -39,6 +39,24 @@ Updated: 2026-11-07
   expected archive skip. Next: capture another Windfury proc with the age
   fields visible. There is still no Windfury damage patch.
 
+### Windfury timing evidence and missing proc signal
+
+- The next screenshot shows the accepted 60 hit at native/tracked/log age
+  0.58 s, followed by rejected target hits 84 at 0.60 s and critical 299 at
+  0.71 s. Both refer to the already-consumed swing line. Later physical
+  reports also remain `other`; their ownership must not be inferred solely
+  from proximity to the player's swing.
+- Found `SPELL_EXTRA_ATTACKS` missing from MSBT's outgoing combat-log filter.
+  Blizzard's combat-log source supports that event. Added it with a distinct
+  `extra` colour/kind and no damage class, so a grant cannot itself confirm an
+  unrelated damage report. This is signal collection, not yet a damage fix.
+- The filter regression failed first. Full validation: 122 tests, 121 passed,
+  one expected actual-archive skip; Lua 5.1 parsing and whitespace passed.
+- Installed the tested filter update in Forever and verified its SHA-256.
+- Next: reload and accept MSBT's reload prompt to activate the updated
+  filter, then trace Windfury for `log [extra]`.
+  Do not attribute a burst until its proc marker is verified in game.
+
 ## v12.045 released
 
 - User confirmed the queued-strike patch works in game and requested commit,
