@@ -19,13 +19,16 @@ class CombatTraceTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
-    def test_both_clients_load_the_trace_after_its_dependencies(self):
+    def test_temporary_trace_stays_out_of_both_release_manifests(self):
         # Given
         for manifest in ROOT.glob("MikScrollingBattleText*.toc"):
             files = manifest.read_text(encoding="utf-8-sig").replace("\\", "/")
 
-            # When
-            trace_position = files.find("Combat/Trace.lua")
+            # When / Then
+            self.assertNotIn("Combat/Trace.lua", files)
 
-            # Then
-            self.assertGreater(trace_position, files.index("MSBTMain.lua"))
+        # Given / When
+        exclusions = (ROOT / ".pkgmeta").read_text(encoding="utf-8")
+
+        # Then
+        self.assertIn("  - Combat/Trace.lua\n", exclusions)

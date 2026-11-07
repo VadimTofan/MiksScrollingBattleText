@@ -1,5 +1,10 @@
 # Changelog
 
+## v12.045
+
+- Fixed zero damage shown for Raptor Strike, Heroic Strike, and Maul on
+  WoW Forever when the client reports a zero hit before the landed damage.
+
 ## v12.044
 
 - Removed the redundant reload reminder in chat. The setup popup still provides

@@ -2,6 +2,19 @@
 
 Updated: 2026-11-07
 
+## v12.045 release preparation
+
+- User confirmed the queued-strike patch works in game and requested commit,
+  push, and release. The fix is already saved in 54a00aa.
+- Prepared v12.045 with matching manifests, README status, and release notes.
+  The temporary trace stays in the source/test tree but is no longer loaded
+  by either manifest and is excluded from release packages.
+- Local validation passed: 122 tests run, 121 passed, one expected archive
+  skip; Lua 5.1 parsing and whitespace passed. No generated task logs remain.
+- Next: run validation, push the release commit, validate the actual CI
+  package-only artifact, then push v12.045 to upload through the existing
+  CurseForge workflow. No release has been uploaded yet.
+
 ## Queued-strike patch checkpoint
 
 - The second Raptor Strike trace shows both same-frame WOUND reports use

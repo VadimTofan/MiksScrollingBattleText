@@ -140,7 +140,7 @@ class ReleasePackagingTests(unittest.TestCase):
         for excluded in (
             "tests", "scripts", ".github", ".vscode", ".agents", ".codex",
             ".release", "dist", "README.md", "CHANGELOG.md",
-            "Research.md",
+            "Research.md", "Combat/Trace.lua",
             "MSBTOptions/Artwork/TriggerSettingsIcon*",
         ):
             self.assertIn(f"  - {excluded}\n", pkgmeta)
