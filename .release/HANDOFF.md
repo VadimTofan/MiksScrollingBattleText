@@ -2,7 +2,7 @@
 
 Updated: 2026-11-07
 
-## v12.045 release preparation
+## v12.045 released
 
 - User confirmed the queued-strike patch works in game and requested commit,
   push, and release. The fix is already saved in 54a00aa.
@@ -11,9 +11,20 @@ Updated: 2026-11-07
   by either manifest and is excluded from release packages.
 - Local validation passed: 122 tests run, 121 passed, one expected archive
   skip; Lua 5.1 parsing and whitespace passed. No generated task logs remain.
-- Next: run validation, push the release commit, validate the actual CI
-  package-only artifact, then push v12.045 to upload through the existing
-  CurseForge workflow. No release has been uploaded yet.
+- Release commit 9745923 and tag v12.045 are pushed. Main and tag validation
+  passed. Package-only and final uploaded ZIPs passed all six archive checks.
+- Package-only run: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/42401188330
+- Release run: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/42401301431
+- Final ZIP: 99 files, 598,860 bytes; all 69 packaged Lua files parse with
+  Lua 5.1. Runtime dependencies, media, and notices remain. The temporary
+  trace is excluded. Final contents match the package-only build except
+  the expected release-tag metadata comment in LibDeflate.
+- CurseForge accepted file 9496878. Processing and public availability have
+  not been checked. No release actions remain.
+- Final artifact: D:/Codex-Temp/msbt-v12.045-release/final/MikScrollingBattleText-v12.045.zip/MikScrollingBattleText-v12.045.zip
+- The Forever installation has the release manifests and tested Reader.lua.
+  Removed the unchanged temporary trace file from that installation.
+- Whitespace passed and no generated task logs remain.
 
 ## Queued-strike patch checkpoint
 
