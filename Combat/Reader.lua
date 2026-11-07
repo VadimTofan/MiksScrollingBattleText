@@ -188,6 +188,7 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     end
     local hit = { record = record, key = key, at = now, unit = unit,
         petOn = PetAttacking(token) }
+    if ns.traceCombat then ns.traceCombat("report", hit) end
     -- 0.3.8: while lines of yours come, a hit is decided at the end of its
     -- frame, once every line of that frame has come (the game sends a hit
     -- and its line in the same frame, either one first; 1.60.1.70374).
@@ -291,6 +292,10 @@ function ns.DecideHit(hit, line, restrict)
     end
     if result.proc and not result.drain and not result.spell then result.procSpell = ProcSpell(hit.at, record.school) end
     record.result = result
+    if ns.traceCombat then
+        ns.traceCombat("decision", hit, { stage = "decision",
+            confirmed = line, restrict = restrict })
+    end
     if result.hold then
         local entry = { record = record, held = result.held, at = hit.at, line = line }
         reader.held[#reader.held + 1] = entry
@@ -516,12 +521,24 @@ local function ProcLine(hit)
             and record.school == ns.SCHOOL_PHYSICAL
             and paired.key == hit.key and since >= 0
             and since <= LATE_PHYSICAL_PROC
+        if ns.traceCombat then
+            ns.traceCombat("candidate", hit, { stage = "pair",
+                pairedKey = paired.key, pairAge = since,
+                nearby = nearby, delayed = not not delayed })
+        end
         if nearby or delayed then
             for _, line in ipairs(reader.logLines or {}) do
                 local lineGap = line.at - paired.lineAt
                 local sameFrame = math.abs(lineGap) <= SWING_FRAME
                 local followsSwing = delayed and LineRestrict(line) == "direct"
                     and lineGap >= -SWING_FRAME and lineGap <= PROC_FLIGHT
+                if ns.traceCombat then
+                    ns.traceCombat("candidate", hit, { stage = "line",
+                        lineGap = lineGap, kind = line.kind,
+                        source = line.source, claimed = not not line.claimed,
+                        hasHit = not not line.hit, pairs = not not Pairs(line, record),
+                        sameFrame = sameFrame, followsSwing = not not followsSwing })
+                end
                 if not line.claimed and not line.hit and line.kind and not MeleeLine(line) and Pairs(line, record)
                     and ((nearby and sameFrame) or followsSwing) then
                     return line
@@ -1498,6 +1515,10 @@ local function OnEvent(_, event, ...)
                 -- Casts made while your target had no plate follow it.
                 ns.mine:Rekey("target" .. reader.epoch, token)
                 ns.RekeyHealing("target" .. reader.epoch, token)
+                if ns.traceCombat then
+                    ns.traceCombat("rekey", nil,
+                        { old = "target" .. reader.epoch, new = token })
+                end
                 reader.targetPlate = token
             end
         end
@@ -1511,6 +1532,10 @@ local function OnEvent(_, event, ...)
             if token == reader.targetPlate then
                 ns.mine:Rekey(token, "target" .. reader.epoch)
                 ns.RekeyHealing(token, "target" .. reader.epoch)
+                if ns.traceCombat then
+                    ns.traceCombat("rekey", nil,
+                        { old = token, new = "target" .. reader.epoch })
+                end
             else
                 ns.mine:Forget(token)
                 ns.ForgetHealing(token)

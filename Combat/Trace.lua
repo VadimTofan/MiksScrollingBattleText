@@ -151,4 +151,18 @@ function Trace:Toggle()
 end
 
 SLASH_MSBTDAMAGETRACE1 = "/msbttrace"
-SlashCmdList.MSBTDAMAGETRACE = function() Trace:Toggle() end
+SlashCmdList.MSBTDAMAGETRACE = function(command)
+    local capture = MikSBT.WindfuryCapture
+    if command == "wf" and capture then
+        if Trace.active then Trace:Toggle() end
+        capture:Start()
+    elseif command == "pause" and capture then
+        capture:Stop()
+        if Trace.active then Trace:Toggle() end
+    elseif command == "report" and capture then
+        capture:ShowReport()
+    else
+        if capture then capture:Stop() end
+        Trace:Toggle()
+    end
+end

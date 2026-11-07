@@ -180,4 +180,21 @@ assert(trace.sequence == 2, "trace omitted the failed attack outcome")
 assert(trace.rows[1].label.text:find("DODGE", 1, true))
 assert(trace.rows[2].label.text:find("miss other", 1, true))
 assert(trace.rows[2].value.args[1] == "Dodge")
+
+-- Given the deeper capture is available alongside the ordinary overlay.
+local started, stopped, reported = 0, 0, 0
+MikSBT.WindfuryCapture = {
+    Start = function() started = started + 1 end,
+    Stop = function() stopped = stopped + 1 end,
+    ShowReport = function() reported = reported + 1 end,
+}
+
+-- When the dedicated commands are used.
+SlashCmdList.MSBTDAMAGETRACE("wf")
+SlashCmdList.MSBTDAMAGETRACE("pause")
+SlashCmdList.MSBTDAMAGETRACE("report")
+
+-- Then capture starts without an overlay hiding the outgoing text.
+assert(started == 1 and stopped >= 1 and reported == 1)
+assert(not trace.active and not trace.frame.shown)
 print("Optional damage trace tests passed")

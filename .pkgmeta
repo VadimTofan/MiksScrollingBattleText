@@ -8,6 +8,8 @@ manual-changelog:
 
 ignore:
   - Combat/Trace.lua
+  - Combat/WindfuryTrace.lua
+  - Combat/WindfuryCapture.lua
   - .pkgmeta
   - .github
   - .vscode

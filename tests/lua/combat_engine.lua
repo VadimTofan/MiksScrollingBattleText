@@ -282,6 +282,10 @@ issecretvalue = function(value)
 end
 
 -- Given one native swing and its melee line plus two direct proc lines.
+local observations = {}
+MikSBT.CombatEngine.traceCombat = function(stage, hit, info)
+	observations[#observations + 1] = { stage = stage, hit = hit, info = info }
+end
 Advance(4)
 local burstStart = now
 local beforeBurst = #outgoing
@@ -325,6 +329,21 @@ assert(burst[1].amount == firstProc and burst[1].result.proc)
 assert(burst[2].amount == normalHit and burst[2].result.melee)
 assert(burst[3].amount == delayedProc and burst[3].result.proc,
 	"the delayed Windfury proc lost its original amount or classification")
+-- Then diagnostics see raw records before decisions and pairing rejections.
+local raw, decisions, pairsSeen = {}, {}, 0
+for _, observation in ipairs(observations) do
+	if observation.stage == "report" then raw[observation.hit.record] = true end
+	if observation.stage == "decision" then
+		assert(raw[observation.hit.record], "decision preceded raw report tracking")
+		assert(observation.info and observation.info.stage == "decision",
+			"decision omitted its confirmation and restriction metadata")
+		decisions[observation.hit.record] = true
+	end
+	if observation.stage == "candidate" then pairsSeen = pairsSeen + 1 end
+end
+assert(raw[burst[3]] and decisions[burst[3]] and pairsSeen > 0,
+	"reader omitted diagnostic report, decision or pairing evidence")
+MikSBT.CombatEngine.traceCombat = nil
 
 -- Given both confirming proc lines have already been consumed.
 -- When another physical hit arrives in the same timing window.

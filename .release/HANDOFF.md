@@ -2,6 +2,37 @@
 
 Updated: 2026-11-07
 
+## Deeper Windfury capture
+
+- Added `/msbttrace wf` for background capture without the ordinary trace
+  overlay. Retains eight native swing timelines with stable raw-report IDs,
+  own log classifications, damage/miss decisions, pairing windows, consumed
+  confirmations, target keys and display paths. Each timeline is bounded to
+  32 reports; truncation is reported.
+- A candidate expects two extra attack outcomes plus its ordinary swing.
+  Evidence is an identified Windfury proc, or an active enchant with two
+  nearby own direct confirmations or an extra-attack notice. This grouping
+  is diagnostic evidence, not authoritative spell identification.
+- Captures fewer than two damage outcomes, misses, batching into one number,
+  and display gates. Automatically freezes an incomplete candidate after
+  3.1 seconds and opens a copyable report. `/msbttrace pause` stops capture;
+  `/msbttrace report` reopens the retained report. Escape closes the panel.
+- Report data contains public metadata only, never damage values or combat
+  log text. Animation dispatch is recorded separately from display requests;
+  it cannot prove visible pixels. Matching rules remain unchanged. Optional
+  reader observers are absent during normal play.
+- Regression tests failed before their implementations. Full validation:
+  125 tests run, 124 passed, one expected actual-archive skip. Includes real
+  reader observations, real presentation/batching/display gates, opaque
+  values, failed attacks, retention, rekeys, stop/restart timer isolation,
+  return values and error propagation. Lua 5.1 parsing and whitespace pass.
+- Installed four Lua files and both local diagnostic TOC loaders into
+  Forever; verified source/destination hashes and manifest contents.
+  Diagnostic files remain excluded from release manifests and packaging.
+- Next: reload, run `/msbttrace wf`, and copy the automatically frozen report
+  after a proc shows fewer than two numbers. In-game capture remains pending.
+  This checkpoint is local; no new push or release was requested.
+
 ## Intermittent single Windfury number
 
 - User now reports that some Windfury procs show only one hit. Do not assume
