@@ -287,6 +287,33 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
+
+		-- Given the next capture's confirmations arrive after the swing frame.
+		Advance(4)
+		local beforeOffsetBurst = #displayed
+		Dispatch("PLAYER_SWING", 3.8, 0)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", melee.r, melee.g, melee.b, 1)
+		Advance(0.099)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+
+		-- When the proc reports follow the normal hit by 0.379 and 0.873 s.
+		Advance(0.213)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+		Advance(0.01)
+		Advance(0.369)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+		Advance(0.01)
+		Advance(0.484)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "GLANCING", delayedProc, 1)
+		Advance(0.01)
+
+		-- Then the event display receives every original amount exactly once.
+		assert(#displayed == beforeOffsetBurst + 3,
+			"offset Windfury confirmations lost damage before presentation")
+		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
+		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
+		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
 		issecretvalue = secretCheck
 		events.OUTGOING_DAMAGE = meleeSettings
 	end

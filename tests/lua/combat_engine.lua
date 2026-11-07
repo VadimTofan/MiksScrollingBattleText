@@ -338,7 +338,7 @@ assert(outgoing[#outgoing].result.who == "other",
 
 for _, example in ipairs({
 	{ forever = true, school = 4, delay = 0.424, kind = "spell" },
-	{ forever = true, school = 1, delay = 0.6, kind = "spell" },
+	{ forever = true, school = 1, delay = 1.1, kind = "spell" },
 	{ forever = true, school = 1, delay = 0.424, kind = "tick" },
 	{ forever = false, school = 1, delay = 0.424, kind = "spell" },
 }) do
@@ -362,6 +362,42 @@ for _, example in ipairs({
 	assert(outgoing[#outgoing].result.who == "other",
 		"delayed-proc matching claimed an unsupported report")
 end
+
+-- Given the later capture: proc confirmations trail the swing by 0.099 s.
+Advance(4)
+Event("PLAYER_ENTERING_WORLD")
+MikSBT.Compatibility.Client.isForever = true
+local beforeOffsetBurst = #outgoing
+Event("PLAYER_SWING", 3.8, 0)
+Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+Advance(0.099)
+Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+
+-- When the ordinary hit lands first and both proc reports follow it.
+Advance(0.213)
+Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+Advance(0.01)
+Advance(0.369)
+Event("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+Advance(0.01)
+Advance(0.484)
+Event("UNIT_COMBAT", "target", "WOUND", "GLANCING", delayedProc, 1)
+Advance(0.01)
+
+-- Then the offset confirmations still explain both later physical hits.
+local offsetBurst = {}
+for index = beforeOffsetBurst + 1, #outgoing do
+	if outgoing[index].result.who == "you" then
+		offsetBurst[#offsetBurst + 1] = outgoing[index]
+	end
+end
+assert(#offsetBurst == 3,
+	"Windfury reports were lost when their lines followed the native swing")
+assert(offsetBurst[1].amount == normalHit and offsetBurst[1].result.melee)
+assert(offsetBurst[2].amount == firstProc and offsetBurst[2].result.proc)
+assert(offsetBurst[3].amount == delayedProc and offsetBurst[3].result.proc)
+
 MikSBT.CombatEngine.reader.plates.nameplate1 = nil
 MikSBT.Compatibility = windfuryCompatibility
 issecretvalue = windfurySecretCheck

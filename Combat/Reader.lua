@@ -460,7 +460,7 @@ end
 -- arrives in another frame. Each proc consumes a separate unused damage
 -- line from that swing, with a longer delay for physical procs on Forever.
 reader.swingHits = {}
-local LATE_PHYSICAL_PROC = 0.5
+local LATE_PHYSICAL_PROC = 1.0
 local function ProcLine(hit)
     local record = hit.record
     if record.event ~= "damage" and record.event ~= "miss" then return nil end
@@ -468,9 +468,9 @@ local function ProcLine(hit)
     for _, paired in ipairs(reader.swingHits) do
         local since = hit.at - paired.at
         local nearby = math.abs(since) <= 0.05
-        -- Windfury's second hit was reported 0.424 s after its ordinary
-        -- swing hit. It still needs a spare direct line from that swing's
-        -- frame, on the same unit; proximity alone never confirms it.
+        -- Observed Windfury reports follow the ordinary hit by up to
+        -- 0.873 s. Their confirmations can also follow the native swing,
+        -- so use its existing proc-line window rather than exact frames.
         local delayed = client and client.isForever
             and record.event == "damage"
             and record.school == ns.SCHOOL_PHYSICAL
@@ -478,9 +478,12 @@ local function ProcLine(hit)
             and since <= LATE_PHYSICAL_PROC
         if nearby or delayed then
             for _, line in ipairs(reader.logLines or {}) do
+                local lineGap = line.at - paired.lineAt
+                local sameFrame = math.abs(lineGap) <= SWING_FRAME
+                local followsSwing = delayed and LineRestrict(line) == "direct"
+                    and lineGap >= -SWING_FRAME and lineGap <= PROC_FLIGHT
                 if not line.claimed and not line.hit and line.kind and not MeleeLine(line) and Pairs(line, record)
-                    and math.abs(line.at - paired.lineAt) <= SWING_FRAME
-                    and (nearby or LineRestrict(line) == "direct") then
+                    and ((nearby and sameFrame) or followsSwing) then
                     return line
                 end
             end

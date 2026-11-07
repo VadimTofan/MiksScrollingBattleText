@@ -2,6 +2,29 @@
 
 Updated: 2026-11-07
 
+## Windfury confirmation-offset follow-up
+
+- User confirms both the generic outgoing display test and the exact
+  OUTGOING_SPELL_DAMAGE event display test are visible. The window and event
+  style therefore work; missing proc reports still require matcher fixes.
+- A successful post-patch capture accepts proc 168, normal 178, and proc 130.
+  The next capture rejects 179 and glancing 111: their two spell lines arrive
+  0.099 seconds after the native swing, and the last report follows the normal
+  hit by 0.873 seconds. The first patch required exact-frame confirmations
+  and allowed only 0.5 seconds after the ordinary hit.
+- Added that second capture as an opaque-amount regression; it failed before
+  the correction. Physical proc matching now reuses the existing 0.5-second
+  swing-to-proc-line window and permits up to 1 second after a confirmed
+  normal hit. The same target, unused direct confirmation, and one-use line
+  rules remain required. Retail and magic proc timing remain unchanged.
+- Both captures pass through the real reader and real main/display adapter
+  fixtures. Full validation: 122 tests, 121 passed and one expected archive
+  skip; Lua 5.1 parsing and whitespace passed. No generated task logs remain.
+- Installed the corrected Reader.lua in Forever and verified its SHA-256.
+- Next: reload and test without the trace panel covering combat text. If
+  damage is still missing, capture
+  the new trace. No additional game confirmation or release has happened yet.
+
 ## Windfury delayed-hit patch
 
 - The latest capture shows one swing line and two spell lines at 43707.394.
