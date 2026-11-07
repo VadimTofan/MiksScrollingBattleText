@@ -1,4 +1,4 @@
-﻿
+
 local module = {}
 local moduleName = "Triggers"
 MikSBT[moduleName] = module
@@ -385,6 +385,77 @@ local function DisplayTrigger(triggerSettings, sourceName, sourceClass, recipien
 end
 
 -- Kept for the profile/runtime facade; legacy trigger events are retired.
+-- Low Health
+local function ShowLowHealth()
+    DisplayTrigger({
+        message = "Low Health!",
+        scrollArea = "Notification",
+        colorR = 1,
+        colorG = 0,
+        colorB = 0,
+        fontSize = 26,
+        alwaysSticky = true,
+    })
+
+    PlaySoundFile("Interface\\AddOns\\MikScrollingBattleText\\Sounds\\LowHealth.ogg", "Master")
+end
+
+if LowHealthFrame then
+    LowHealthFrame:HookScript("OnShow", ShowLowHealth)
+end
+
+-- Low Mana (35%)
+local manaCurve = C_CurveUtil.CreateCurve()
+manaCurve:SetType(Enum.LuaCurveType.Linear)
+manaCurve:AddPoint(0, 100)
+manaCurve:AddPoint(0.349, 100)
+manaCurve:AddPoint(0.351, 0)
+manaCurve:AddPoint(1, 0)
+
+local manaProbe = UIParent:CreateFontString(nil, "BACKGROUND", "GameFontNormal")
+local manaAlerted = false
+
+local function CheckLowMana()
+    if UnitPowerType("player") ~= Enum.PowerType.Mana then
+        manaAlerted = false
+        return
+    end
+
+    local value = UnitPowerPercent("player", 0, false, manaCurve)
+    manaProbe:SetText(C_StringUtil.TruncateWhenZero(value))
+
+    local isLow = manaProbe:GetText() ~= nil
+
+    if isLow and not manaAlerted then
+        manaAlerted = true
+
+        DisplayTrigger({
+            message = "Low Mana!",
+            scrollArea = "Notification",
+            colorR = 0,
+            colorG = 0.5,
+            colorB = 1,
+            fontSize = 26,
+            alwaysSticky = true,
+        })
+
+        PlaySoundFile("Interface\\AddOns\\MikScrollingBattleText\\Sounds\\LowMana.ogg", "Master")
+    elseif not isLow then
+        manaAlerted = false
+    end
+end
+
+local manaFrame = CreateFrame("Frame")
+manaFrame:RegisterEvent("UNIT_POWER_UPDATE")
+manaFrame:RegisterEvent("UNIT_DISPLAYPOWER")
+manaFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+manaFrame:SetScript("OnEvent", function(_, event, unit)
+    if event == "PLAYER_ENTERING_WORLD" or unit == "player" then
+        CheckLowMana()
+    end
+end)
+
 local function Enable() end
 local function Disable() end
 
