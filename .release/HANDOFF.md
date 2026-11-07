@@ -2,6 +2,27 @@
 
 Updated: 2026-11-07
 
+## Windfury Weapon investigation
+
+- User reports missing damage from their shaman's Windfury Weapon after
+  confirming the queued-strike patch. No Windfury fix has been made yet.
+- Current extra-swing pairing assumes at least 0.38 seconds between an
+  orphan melee log line and its hit. A hypothetical immediate three-hit
+  melee burst is rejected by the actual reader. The live Windfury sequence
+  is still unknown. Accepted extra attacks currently use the Auto Attack
+  icon; Windfury Weapon is not recognized as a named weapon-proc source.
+- Expanded the opt-in trace to include PLAYER_SWING, combat-log kind/source
+  timing, and extra/proc result markers. Combat-log text and opaque amounts
+  are never inspected. The regression failed first; validation: 122 tests,
+  121 passed and one expected actual-archive skip. Whitespace passed and no
+  generated task logs remain.
+- Installed the tested trace only in Forever and inserted its load entry
+  into that installation's two manifests. Repository/release manifests
+  still exclude the trace. Restore those installed manifests from the
+  repository and remove the installed Trace.lua after the investigation.
+- Next: reload, run `/msbttrace`, trigger Windfury Weapon, stop attacking,
+  and capture the panel. Do not assume the timing hypothesis is confirmed.
+
 ## v12.045 released
 
 - User confirmed the queued-strike patch works in game and requested commit,

@@ -127,4 +127,29 @@ SlashCmdList.MSBTDAMAGETRACE()
 assert(hooks == 5 and #created == 1 and trace.sequence == 0)
 MikSBT.Components.OutgoingBatcher:Queue(2973, 13)
 assert(trace.sequence == 1 and calls == 57)
+
+-- Given a fresh capture with opaque swing timing and a classified log line.
+SlashCmdList.MSBTDAMAGETRACE()
+SlashCmdList.MSBTDAMAGETRACE()
+MikSBT.CombatEngine = { reader = { logLines = {
+    { at = now, kind = "melee", source = "mine" },
+} } }
+
+-- When a melee swing, its log line and an extra attack reach the pipeline.
+MikSBT.Components.CombatEngine:HandleEvent("PLAYER_SWING", opaque, 1)
+MikSBT.Components.CombatEngine:HandleEvent(
+    "COMBAT_LOG_MESSAGE", opaque, 0.9, 0.9, 0.9, 1)
+MikSBT.Components.CombatPresentation:Out({
+    event = "damage", amount = opaque,
+    result = { who = "you", melee = true, hand = "main", extra = true },
+})
+
+-- Then timing and extra-attack classification remain visible without reading
+-- either the opaque duration or Blizzard's combat-log message.
+assert(trace.sequence == 3, "trace omitted swing or combat-log timing")
+assert(trace.rows[1].label.text:find("swing", 1, true))
+assert(trace.rows[1].value.args[1] == opaque)
+assert(trace.rows[2].label.text:find("melee", 1, true))
+assert(trace.rows[2].value.args[1] == "mine")
+assert(trace.rows[3].label.text:find("extra", 1, true))
 print("Optional damage trace tests passed")

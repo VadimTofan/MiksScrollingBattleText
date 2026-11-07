@@ -61,12 +61,23 @@ function Trace:InstallHooks()
             elseif event == "UNIT_SPELLCAST_SUCCEEDED"
                 and RestrictedValue:Equals(unit, "player") then
                 self:Write("cast", flag, "%s", "cast succeeded")
+            elseif event == "PLAYER_SWING" then
+                self:Write("swing", action, "duration %s", unit)
+            elseif event == "COMBAT_LOG_MESSAGE" then
+                local engine = MikSBT.CombatEngine
+                local reader = engine and engine.reader
+                local lines = reader and reader.logLines
+                local line = lines and lines[#lines]
+                if line and line.at == GetTime() then
+                    self:Write("log", line.kind, "%s", line.source)
+                end
             end
         end)
     hooksecurefunc(components.CombatPresentation, "Out", function(_, record)
         if not self.active or record.event ~= "damage" then return end
         local result = record.result or {}
-        self:Write("match " .. (result.who or "unknown"),
+        local kind = result.extra and " extra" or (result.proc and " proc" or "")
+        self:Write("match " .. (result.who or "unknown") .. kind,
             result.spell or (result.melee and "auto"), "%s", record.amount)
     end)
     hooksecurefunc(components.OutgoingBatcher, "Queue",
