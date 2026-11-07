@@ -16,7 +16,7 @@ function Trace:CreatePanel()
     frame:SetBackdropColor(0, 0, 0, 0.9)
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 12, -12)
-    title:SetText("MSBT damage trace | /msbttrace to stop | /reload to remove")
+    title:SetText("MSBT trace | ages: native/tracked/log seconds (-1 missing)")
     self.frame = frame
 end
 
@@ -46,6 +46,25 @@ function Trace:Write(stage, spell, template, ...)
     row.value:SetFormattedText(template, ...)
 end
 
+function Trace:WriteMatch(record)
+    local result = record.result or {}
+    local kind = result.extra and " extra" or (result.proc and " proc" or "")
+    local engine = MikSBT.CombatEngine
+    local reader = engine and engine.reader
+    local swings = reader and reader.swingTimes
+    local swing = swings and swings[#swings]
+    local line = self.lastMeleeLine
+    local now = GetTime()
+    local nativeAge = self.lastSwingAt and now - self.lastSwingAt or -1
+    local trackedAge = swing and now - swing.at or -1
+    local lineAge = line and now - line.at or -1
+    local state = line and (line.claimed and "used" or "free") or "missing"
+    self:Write("match " .. (result.who or "unknown") .. kind,
+        result.spell or (result.melee and "auto"),
+        "%s | ages %.2f/%.2f/%.2f %s", record.amount,
+        nativeAge, trackedAge, lineAge, state)
+end
+
 function Trace:InstallHooks()
     if self.hooked then return end
     self.hooked = true
@@ -62,6 +81,7 @@ function Trace:InstallHooks()
                 and RestrictedValue:Equals(unit, "player") then
                 self:Write("cast", flag, "%s", "cast succeeded")
             elseif event == "PLAYER_SWING" then
+                self.lastSwingAt = GetTime()
                 self:Write("swing", action, "duration %s", unit)
             elseif event == "COMBAT_LOG_MESSAGE" then
                 local engine = MikSBT.CombatEngine
@@ -69,16 +89,17 @@ function Trace:InstallHooks()
                 local lines = reader and reader.logLines
                 local line = lines and lines[#lines]
                 if line and line.at == GetTime() then
+                    if (line.kind == "swing" or line.kind == "swingMiss")
+                        and (line.source == "mine" or line.source == "unknown") then
+                        self.lastMeleeLine = line
+                    end
                     self:Write("log", line.kind, "%s", line.source)
                 end
             end
         end)
     hooksecurefunc(components.CombatPresentation, "Out", function(_, record)
         if not self.active or record.event ~= "damage" then return end
-        local result = record.result or {}
-        local kind = result.extra and " extra" or (result.proc and " proc" or "")
-        self:Write("match " .. (result.who or "unknown") .. kind,
-            result.spell or (result.melee and "auto"), "%s", record.amount)
+        self:WriteMatch(record)
     end)
     hooksecurefunc(components.OutgoingBatcher, "Queue",
         function(_, spell, amount)
@@ -108,6 +129,7 @@ function Trace:Toggle()
     self:CreatePanel()
     self:InstallHooks()
     self.sequence = 0
+    self.lastSwingAt, self.lastMeleeLine = nil, nil
     for _, row in ipairs(self.rows) do
         row.label:SetText("")
         row.value:SetText("")

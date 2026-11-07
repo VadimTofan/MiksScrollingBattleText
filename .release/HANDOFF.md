@@ -23,6 +23,22 @@ Updated: 2026-11-07
 - Next: reload, run `/msbttrace`, trigger Windfury Weapon, stop attacking,
   and capture the panel. Do not assume the timing hypothesis is confirmed.
 
+### Windfury capture follow-up
+
+- The first capture ended in a swing/kill without a target damage report.
+  The second shows physical hits 58 (glancing), 13, 97, 91, and 61 classified
+  as `other`, while the Fire tick is correctly assigned to spell 8053.
+- The rolling panel no longer contains the preceding native swing and melee
+  log lines. It cannot yet establish which physical reports were Windfury
+  or why their timing failed the matcher.
+- Added native/tracked/melee-log ages directly to every match row, plus
+  whether that last log line is free or consumed. The native timestamp is
+  captured independently of the engine's enum/hand mapping, so missing
+  tracked swings can be distinguished from an overly narrow timing window.
+- The regression failed first. Full validation: 122 tests, 121 passed and one
+  expected archive skip. Next: capture another Windfury proc with the age
+  fields visible. There is still no Windfury damage patch.
+
 ## v12.045 released
 
 - User confirmed the queued-strike patch works in game and requested commit,
