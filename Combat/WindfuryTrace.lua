@@ -29,12 +29,6 @@ function Tracker:Find(at, key)
     end
 end
 
-function Tracker:Strike(at, key, spell, active)
-    local burst = self:Swing(at, key, nil, active)
-    burst.spell = spell
-    return burst
-end
-
 function Tracker:Log(line, key)
     if self.seenLines[line] then return end
     self.seenLines[line] = true
@@ -71,7 +65,6 @@ function Tracker:Decision(record, info)
     if not entry then return end
     entry.who, entry.melee = info.who, info.melee
     entry.procSpell, entry.held = info.procSpell, info.hold or info.held
-    entry.spell = info.spell
     entry.confirmed = info.confirmed
 end
 
@@ -172,17 +165,16 @@ end
 function Tracker:ReportText()
     local rows = {
         "MSBT Windfury timeline (metadata only; no damage amounts)",
-        "Expected: 2 extra outcomes per candidate proc, plus its triggering attack.",
+        "Expected: 2 extra outcomes per candidate proc, plus the normal swing.",
         "Candidate evidence is timing/enchant based, not proof of spell identity.",
         "Dispatch means animation requested, not proof of visible pixels.",
     }
     for _, burst in ipairs(self.bursts) do
         local s = self:Summary(burst)
         rows[#rows + 1] = string.format(
-            "%s #%d %.3f key=%s hand=%s enchant=%s expected=%d " ..
+            "Swing #%d %.3f key=%s hand=%s enchant=%s expected=%d " ..
             "WF damage=%d miss=%d normal=%d raw=%d/%d other=%d " ..
             "forwarded=%d dispatches=%d merged=%s truncated=%s",
-            burst.spell == 17364 and "Stormstrike" or "Swing",
             burst.id, burst.at, Value(burst.key), Value(burst.hand),
             Value(burst.active), s.expected, s.damage, s.misses, s.normal,
             s.rawDamage, s.rawMisses, s.rejected, s.forwarded, s.displays,
@@ -200,10 +192,10 @@ function Tracker:ReportText()
             table.sort(dispatches)
             rows[#rows + 1] = string.format(
                 "  R%d +%.3f %s school=%s outcome=%s who=%s " ..
-                "melee=%s WF=%s spell=%s held=%s path=%s attempted=%s " ..
+                "melee=%s WF=%s held=%s path=%s attempted=%s " ..
                 "blocked=%s area=%s alpha=%s dispatchIDs=%s", id, e.at - burst.at,
                 Value(e.event), Value(e.school), Value(e.outcome),
-                Value(e.who), Value(e.melee), Value(e.procSpell == 8232), Value(e.spell),
+                Value(e.who), Value(e.melee), Value(e.procSpell == 8232),
                 Value(e.held), Value(e.path), Value(e.attempted),
                 Value(e.blocked), Value(e.area), Value(e.alpha),
                 table.concat(dispatches, ","))

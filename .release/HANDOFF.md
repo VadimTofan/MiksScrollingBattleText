@@ -1,36 +1,21 @@
 # Release handoff
 
-Updated: 2026-11-07
+Updated: 2026-11-08
 
-## Stormstrike procs and confirmed Windfury misses
+## Windfury rollback
 
-- First user capture contains two successful Windfury damage dispatches,
-  followed by three own direct lines with Stormstrike. Its next two physical
-  reports at +0.245 and +0.585 seconds were rejected against a normal swing
-  1.9 to 2.26 seconds earlier. User confirms Stormstrike was used.
-- Confirmed Forever Stormstrike (17364) damage now anchors up to two delayed
-  physical Windfury outcomes for one second. Requires the active enchant,
-  same target and one unused own direct confirmation from the strike's
-  frame per outcome. No new native PLAYER_SWING event is required.
-- Second capture has a confirmed own direct Parry at +0.210, the normal
-  swing at +0.586 and one Windfury damage hit at +1.010. The parry was held
-  as someone else's. An otherwise unplaced, confirmed physical direct miss
-  within 0.5 seconds of a same-target melee swing with Windfury active now
-  becomes a Windfury miss. Its held entry is consumed to prevent duplication.
-- Diagnostics start a separate Stormstrike timeline and include matched
-  spell IDs. A successful earlier auto-attack proc cannot conceal a later
-  incomplete Stormstrike proc in the same swing interval.
-- Both captured sequences failed their new regressions before the fixes.
-  Tests cover real reader and main/display paths, original opaque damage
-  values/icons, parry output, one-use confirmations and negative cases for
-  Retail, inactive enchants, other targets, magic, timing and missing evidence.
+- User reports Windfury stopped working after b4d9549 and requests reverting
+  the last change. Reverted that commit; retained the earlier Windfury
+  matching, icons and deeper diagnostic capture from 97495ad.
+- Removed the Stormstrike anchor and direct-miss attribution changes, along
+  with their diagnostic timeline additions and associated regressions.
 - Validation: 125 tests run, 124 passed, one expected actual-archive skip.
   Lua 5.1 parsing and whitespace pass. No generated task logs remain.
-- Installed Reader.lua, WindfuryCapture.lua and WindfuryTrace.lua in Forever;
-  source/destination SHA-256 hashes verified. No release manifest changes.
-- Next: reload and test Stormstrike with Windfury. Use `/msbttrace wf` for
-  another incomplete proc. One damage hit plus a parry is two attack outcomes.
-  In-game confirmation is pending. No push or release was requested.
+- Restored Reader.lua, WindfuryCapture.lua and WindfuryTrace.lua in Forever;
+  source/destination SHA-256 hashes verified.
+- Next: reload and verify the previous Windfury behavior in game. Do not
+  reapply b4d9549 without investigating the reported regression. No push
+  or release was requested.
 
 ## Deeper Windfury capture
 

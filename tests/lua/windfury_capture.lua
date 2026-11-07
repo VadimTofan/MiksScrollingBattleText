@@ -178,30 +178,6 @@ assert(values.n == 3 and values[1] == "first" and values[3] == "third")
 assert(not ok and err == "observed failure" and capture.ids == nil)
 capture:Stop()
 
--- Given a successful auto-attack proc followed by a separate Stormstrike proc.
-capture:Start()
-local ordinaryBurst = Swing()
-now = now + 0.5
-Hit(opaque)
-Hit(opaque)
-now = now + 1.757
-
--- When Stormstrike succeeds and its own confirmations arrive between swings.
-Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 17364)
-for index = 1, 3 do
-    ns.reader.logLines[index] = { at = now, source = "mine", kind = "spell" }
-    Engine:HandleEvent("COMBAT_LOG_MESSAGE")
-end
-local strikeBurst = capture.model.bursts[#capture.model.bursts]
-
--- Then its missing proc cannot be hidden by the earlier successful pair.
-assert(strikeBurst ~= ordinaryBurst and strikeBurst.spell == 17364)
-assert(capture.model:Summary(ordinaryBurst).damage == 2)
-assert(capture.model:Summary(strikeBurst).expected == 2)
-assert(capture.model:NeedsAttention(strikeBurst))
-assert(capture.model:ReportText():find("Stormstrike", 1, true))
-capture:Stop()
-
 -- Given old settle timers survive a stop and restart.
 capture:Start()
 

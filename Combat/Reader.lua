@@ -276,31 +276,6 @@ local function ProcSpell(at, school)
 end
 ns.ProcSpell = ProcSpell
 
-local STORMSTRIKE = 17364
-reader.windfuryStrikes = {}
-local function NoteWindfuryStrike(hit, line, restrict, result)
-    if line ~= true or restrict ~= "direct" or result.who ~= "you"
-        or result.spell ~= STORMSTRIKE or result.tick
-        or hit.record.event ~= "damage"
-        or ActiveWindfurySpell(hit.record.school) == nil then return end
-    local list = reader.windfuryStrikes
-    list[#list + 1] = { at = hit.at, key = hit.key, remaining = 2 }
-    while list[1] and (hit.at - list[1].at > 2 or #list > 8) do
-        table.remove(list, 1)
-    end
-end
-
-local function WindfurySwingMiss(hit, line, restrict)
-    if hit.record.event ~= "miss" or line ~= true or restrict ~= "direct"
-        or ActiveWindfurySpell(hit.record.school) == nil then return false end
-    for _, swing in ipairs(ns.mine.swings or {}) do
-        local age = hit.at - swing.at
-        if swing.hand ~= "ranged" and swing.key == hit.key
-            and age >= 0 and age <= 0.5 then return true end
-    end
-    return false
-end
-
 function ns.DecideHit(hit, line, restrict)
     local router = Router()
     if not router then return end
@@ -315,12 +290,6 @@ function ns.DecideHit(hit, line, restrict)
         result = ns.mine:Hit(hit.key, kind, record.school, hit.at, hit.petOn, line,
             ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech)
     end
-    -- A direct miss can confirm a Windfury attack before the normal swing
-    -- lands. It must not remain held for a future swing to claim again.
-    if result.hold and WindfurySwingMiss(hit, line, restrict) then
-        if result.held then result.held.claimed = true end
-        result = { who = "you", proc = true, missed = true }
-    end
     if result.proc and not result.drain and not result.spell then result.procSpell = ProcSpell(hit.at, record.school) end
     record.result = result
     if ns.traceCombat then
@@ -334,7 +303,6 @@ function ns.DecideHit(hit, line, restrict)
         return result, entry
     end
     if ns.OnYourHit and (result.who == "you" or result.who == "pet") then ns.OnYourHit(record, hit.at) end
-    NoteWindfuryStrike(hit, line, restrict, result)
     router:Out(record)
     return result
 end
@@ -538,33 +506,6 @@ end
 -- line from that swing, with a longer delay for physical procs on Forever.
 reader.swingHits = {}
 local LATE_PHYSICAL_PROC = 1.0
--- A confirmed Stormstrike can trigger Windfury between native swings. Its
--- spare direct lines share the strike's frame; each confirms one outcome.
-local function WindfuryStrikeLine(hit)
-    local record = hit.record
-    if record.event ~= "damage" and record.event ~= "miss" then return end
-    if ActiveWindfurySpell(record.school) == nil then return end
-    for _, strike in ipairs(reader.windfuryStrikes) do
-        local age = hit.at - strike.at
-        if ns.traceCombat then
-            ns.traceCombat("candidate", hit, { stage = "stormstrike",
-                pairedKey = strike.key, pairAge = age,
-                remaining = strike.remaining })
-        end
-        if strike.key == hit.key and strike.remaining > 0
-            and age >= 0 and age <= LATE_PHYSICAL_PROC then
-            for _, line in ipairs(reader.logLines or {}) do
-                if line.source == "mine" and not line.claimed and not line.hit
-                    and LineRestrict(line) == "direct" and Pairs(line, record)
-                    and math.abs(line.at - strike.at) <= SWING_FRAME then
-                    strike.remaining = strike.remaining - 1
-                    return line
-                end
-            end
-        end
-    end
-end
-
 local function ProcLine(hit)
     local record = hit.record
     if record.event ~= "damage" and record.event ~= "miss" then return nil end
@@ -715,7 +656,7 @@ function DecideGroup(group, frameLines, decided)
         end
         for _, hit in ipairs(rest) do
             local record = hit.record
-            local procLine = WindfuryStrikeLine(hit) or ProcLine(hit)
+            local procLine = ProcLine(hit)
             if procLine then
                 procLine.claimed, procLine.hit = true, { at = hit.at, record = record }
 
