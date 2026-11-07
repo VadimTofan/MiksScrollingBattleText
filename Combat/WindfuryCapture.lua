@@ -45,26 +45,38 @@ function Capture:Observe(stage, hit, info)
     end
 end
 
-function Capture:Event(event, duration, hand)
+function Capture:BeginTimeline(hand, spell)
     local ns = MikSBT.CombatEngine
     local key = ns.TargetKey()
+    local active = ns.ProcSpell(GetTime(), 1) == 8232
+    local burst
+    if spell then burst = self.model:Strike(GetTime(), key, spell, active)
+    else burst = self.model:Swing(GetTime(), key, Metadata(hand), active) end
+    local generation, model = self.generation, self.model
+    C_Timer.After(3.1, function()
+        if not self.active or self.generation ~= generation then return end
+        if model:NeedsAttention(burst) then
+            self:Stop()
+            self:ShowReport()
+            MikSBT.Print("Windfury capture paused: fewer than two damage " ..
+                "numbers. Copy the report; misses and batching are listed.")
+        end
+    end)
+end
+
+function Capture:Event(event, first, second, third)
+    local ns = MikSBT.CombatEngine
     if event == "PLAYER_SWING" then
-        local burst = self.model:Swing(GetTime(), key, Metadata(hand),
-            ns.ProcSpell(GetTime(), 1) == 8232)
-        local generation, model = self.generation, self.model
-        C_Timer.After(3.1, function()
-            if not self.active or self.generation ~= generation then return end
-            if model:NeedsAttention(burst) then
-                self:Stop()
-                self:ShowReport()
-                MikSBT.Print("Windfury capture paused: fewer than two damage " ..
-                    "numbers. Copy the report; misses and batching are listed.")
-            end
-        end)
+        self:BeginTimeline(second)
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED"
+        and RV:Equals(first, "player") and RV:Equals(third, 17364) then
+        self:BeginTimeline(nil, 17364)
     elseif event == "COMBAT_LOG_MESSAGE" then
         local lines = ns.reader and ns.reader.logLines
         local line = lines and lines[#lines]
-        if line and line.at == GetTime() then self.model:Log(line, key) end
+        if line and line.at == GetTime() then
+            self.model:Log(line, ns.TargetKey())
+        end
     end
 end
 
