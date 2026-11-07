@@ -223,8 +223,48 @@ end
 -- once (a seal and an enchant), so a hit takes the newest one of its school,
 -- and none when no source of its school is on (Thunderfury beside a seal).
 local PROC_KEEP = { seal = 35, poison = 3660, oil = 1860, enchant = math.huge }
+-- Windfury Weapon's four Vanilla enchant ranks share the same spell icon.
+local WINDFURY_ENCHANTS = {
+    [283] = true, [284] = true, [525] = true, [1669] = true,
+}
+local MELEE_WEAPON_SLOTS = { 16, 17 }
+local WINDFURY_WEAPON_SPELL_ID = 8232
+
+local function ActiveWindfurySpell(school)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not client or not client.isForever or school ~= ns.SCHOOL_PHYSICAL then
+        return nil
+    end
+    local getEnchant = C_PaperDollInfo
+        and C_PaperDollInfo.GetTemporaryEnchantmentInfo
+    if type(getEnchant) == "function" then
+        for _, slot in ipairs(MELEE_WEAPON_SLOTS) do
+            local ok, info = pcall(getEnchant, slot)
+            if not ok then return nil end
+            if type(info) == "table" and ns.Public(info)
+                and ns.Number(info.enchantID, 1)
+                and WINDFURY_ENCHANTS[info.enchantID] then
+                return WINDFURY_WEAPON_SPELL_ID
+            end
+        end
+        return nil
+    end
+    if type(GetWeaponEnchantInfo) ~= "function" then return nil end
+    local ok, hasMain, mainTime, mainCharges, mainID,
+        hasOff, offTime, offCharges, offID = pcall(GetWeaponEnchantInfo)
+    if not ok then return nil end
+    if ns.Bool(hasMain) and hasMain and ns.Number(mainID, 1)
+        and WINDFURY_ENCHANTS[mainID] then return WINDFURY_WEAPON_SPELL_ID end
+    if ns.Bool(hasOff) and hasOff and ns.Number(offID, 1)
+        and WINDFURY_ENCHANTS[offID] then return WINDFURY_WEAPON_SPELL_ID end
+end
+
 reader.procSources = {}
 local function ProcSpell(at, school)
+    -- Inspect the current enchant rather than a cast cache: reloads,
+    -- expiration, replacements and weapon swaps must not leave stale icons.
+    local windfury = ActiveWindfurySpell(school)
+    if windfury then return windfury end
     local best
     for kind, source in pairs(reader.procSources) do
         local fresh = at - source.at <= (PROC_KEEP[kind] or 0)

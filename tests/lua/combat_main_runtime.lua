@@ -257,6 +257,10 @@ for _, forever in ipairs({ false, true }) do
 		local firstProc, normalHit, delayedProc = {}, {}, {}
 		local secretCheck = issecretvalue
 		local meleeSettings = events.OUTGOING_DAMAGE
+		local weaponEnchantInfo = GetWeaponEnchantInfo
+		GetWeaponEnchantInfo = function()
+			return true, 300000, 0, 283, false, 0, 0, 0
+		end
 		events.OUTGOING_DAMAGE = { message = "Swing %a", scrollArea = "Outgoing" }
 		issecretvalue = function(value)
 			return value == firstProc or value == normalHit or value == delayedProc
@@ -283,10 +287,14 @@ for _, forever in ipairs({ false, true }) do
 			"the delayed Windfury hit did not reach the real display pipeline")
 		assert(displayed[beforeBurst + 1][4] == firstProc)
 		assert(displayed[beforeBurst + 1][1] == events.OUTGOING_SPELL_DAMAGE)
+		assert(displayed[beforeBurst + 1][3] == "icon",
+			"early Windfury proc reached the display without its icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
 		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
+		assert(displayed[beforeBurst + 3][3] == "icon",
+			"delayed Windfury proc reached the display without its icon")
 
 		-- Given the next capture's confirmations arrive after the swing frame.
 		Advance(4)
@@ -314,7 +322,10 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
 		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
 		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
+		assert(displayed[beforeOffsetBurst + 2][3] == "icon")
+		assert(displayed[beforeOffsetBurst + 3][3] == "icon")
 		issecretvalue = secretCheck
+		GetWeaponEnchantInfo = weaponEnchantInfo
 		events.OUTGOING_DAMAGE = meleeSettings
 	end
 

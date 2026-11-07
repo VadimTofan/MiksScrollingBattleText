@@ -2,6 +2,30 @@
 
 Updated: 2026-11-07
 
+## Windfury icon identification
+
+- User confirms extra damage numbers now appear, but without an icon.
+  The confirmed proc records had no spell/procSpell identity for presentation.
+- Added active Windfury enchant identification for Forever physical procs.
+  Queries C_PaperDollInfo.GetTemporaryEnchantmentInfo on slots 16/17 when
+  available, otherwise the guarded GetWeaponEnchantInfo tuple. Vanilla
+  Windfury enchant IDs 283/284/525/1669 resolve to spell 8232 for its icon and
+  localized name. No cast history or saved icon cache is required after reload.
+- Existing confirmed-proc matching is unchanged. Ordinary melee remains an
+  Auto Attack; magic, unknown-school, and non-Forever procs retain their
+  existing identity logic. Expired/replaced enchants and unreadable/erroring
+  API results do not supply a stale Windfury icon.
+- Both the icon identity test and actual main/display regression failed
+  before implementation. Tests cover modern and legacy API shapes, all four
+  enchant ranks, both hands, removal/replacement, unreadable metadata and API
+  failures. Both captured damage sequences now supply icons to presentation.
+- Validation: 123 tests run, 122 passed, one expected archive skip. Lua 5.1
+  parsing and whitespace passed. No generated task logs remain.
+- Installed the tested Reader.lua in Forever and verified its SHA-256.
+- Next: confirm the icon after reload with Windfury already active.
+  No push or release is authorized for
+  these new checkpoints yet.
+
 ## Windfury confirmation-offset follow-up
 
 - User confirms both the generic outgoing display test and the exact
