@@ -51,12 +51,13 @@ function Trace:InstallHooks()
     self.hooked = true
     local components = MikSBT.Components
     hooksecurefunc(components.CombatEngine, "HandleEvent",
-        function(_, event, unit, action, flag, amount)
+        function(_, event, unit, action, flag, amount, school)
             if not self.active then return end
             if event == "UNIT_COMBAT"
                 and RestrictedValue:Equals(unit, "target")
                 and RestrictedValue:Equals(action, "WOUND") then
-                self:Write("target hit", nil, "%s", amount)
+                self:Write("target hit", nil,
+                    "%s (school %s, flag %s)", amount, school, flag)
             elseif event == "UNIT_SPELLCAST_SUCCEEDED"
                 and RestrictedValue:Equals(unit, "player") then
                 self:Write("cast", flag, "%s", "cast succeeded")

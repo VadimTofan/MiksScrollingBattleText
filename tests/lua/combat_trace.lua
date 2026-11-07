@@ -89,6 +89,10 @@ assert(trace.sequence == 4 and #trace.rows == 4)
 for index = 1, 4 do
     assert(trace.rows[index].value.args[1] == opaque)
 end
+assert(trace.rows[1].value.args[2] == 1,
+    "raw hit tracing omitted the school needed to distinguish duplicate reports")
+assert(trace.rows[1].value.args[3] == "",
+    "raw hit tracing omitted the report flag")
 assert(trace.rows[2].label.text:find("2973", 1, true))
 assert(trace.rows[4].value.template == "%s")
 

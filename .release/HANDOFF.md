@@ -23,6 +23,21 @@ Updated: 2026-11-07
   Strike, and capture the panel immediately after stopping auto-attacks.
 - The panel is temporary investigation tooling, not a fix or a release.
 
+### Trace evidence from Raptor Strike
+
+- The screenshot shows spell 2973 casting at 10622.631, then two target WOUND
+  reports at the same time: 0 followed by 13. At 10622.640 MSBT renders 0,
+  assigns that report to spell 2973, and attributes the 13 report to `other`.
+- The shortage-of-lines matcher ranks both reports and uses their original
+  event order to break equal-fit ties. The first report consumes the spell's
+  confirmation. The prior raw-13 probe did not distinguish these reports.
+- The next diagnostic adds native school and flag fields to each raw-hit row.
+  This is needed before selecting a safe discriminator; reversing hit order
+  alone could wrongly claim another player's damage.
+- The metadata regression failed before the trace update. Full validation:
+  122 tests run, 121 passed, one expected archive skip. Next: capture one more
+  Raptor Strike with the school/flag fields visible. No damage fix exists yet.
+
 ## Reload reminder checkpoint
 
 - Removed the redundant reload chat message; the setup popup and its Reload UI
