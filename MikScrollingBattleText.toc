@@ -54,6 +54,7 @@ MSBTTriggers.lua
 MSBTCooldowns.lua
 Components\LootNotifications.lua
 MSBTMain.lua
+Combat\Trace.lua
 Display\AnimationStyles.lua
 
 MSBTOptions\Localization\localization.xml

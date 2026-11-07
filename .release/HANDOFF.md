@@ -1,6 +1,27 @@
 # Release handoff
 
-Updated: 2026-11-06
+Updated: 2026-11-07
+
+## Queued-strike damage investigation
+
+- Heroic Strike, Maul, and Raptor Strike reportedly show a literal zero. The
+  user confirmed Raptor Strike's zero appears when the melee hit lands.
+- Short Numbers was already off. A temporary raw-event probe showed raw 13
+  and formatted 13, but auto-attacks could overwrite that sample. The cause
+  remains unconfirmed; no damage fix has been implemented.
+- Added an opt-in `/msbttrace` panel with 18 retained rows for target hits,
+  spell casts, attribution, outgoing batching, and final display text. Native
+  font strings render opaque amounts directly. Tracing changes no damage
+  arguments, saves no hit values, and is off by default after each reload.
+- Regression tests failed before implementation. Validation: 122 tests run,
+  121 passed, one expected actual-archive skip. Lua 5.1 parsing and whitespace
+  checks passed. No generated task logs remain.
+- Installed `Combat/Trace.lua` and both addon manifests in the requested
+  `_forever_/Interface/AddOns/MikScrollingBattleText` folder; all three copied
+  files match the tested workspace files by SHA-256.
+- Next: load the diagnostic in Forever, run `/msbttrace`, land one Raptor
+  Strike, and capture the panel immediately after stopping auto-attacks.
+- The panel is temporary investigation tooling, not a fix or a release.
 
 ## Reload reminder checkpoint
 
