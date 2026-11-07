@@ -162,4 +162,22 @@ assert(math.abs((trace.rows[3].value.args[3] or -1) - 0.45) < 0.001,
 assert(math.abs((trace.rows[3].value.args[4] or -1) - 0.25) < 0.001,
     "match row omitted the age of the latest own melee line")
 assert(trace.rows[3].value.args[5] == "free")
+
+-- Given a Windfury burst with one damage report and one failed attack.
+SlashCmdList.MSBTDAMAGETRACE()
+SlashCmdList.MSBTDAMAGETRACE()
+
+-- When the target reports a dodge and the engine classifies its outcome.
+MikSBT.Components.CombatEngine:HandleEvent(
+    "UNIT_COMBAT", "target", "DODGE", "", 0, 1)
+MikSBT.Components.CombatPresentation:Out({
+    event = "miss", missWord = "Dodge", school = 1,
+    result = { who = "other" },
+})
+
+-- Then the trace retains the failed attack instead of suggesting lost damage.
+assert(trace.sequence == 2, "trace omitted the failed attack outcome")
+assert(trace.rows[1].label.text:find("DODGE", 1, true))
+assert(trace.rows[2].label.text:find("miss other", 1, true))
+assert(trace.rows[2].value.args[1] == "Dodge")
 print("Optional damage trace tests passed")

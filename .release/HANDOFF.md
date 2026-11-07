@@ -2,6 +2,26 @@
 
 Updated: 2026-11-07
 
+## Intermittent single Windfury number
+
+- User now reports that some Windfury procs show only one hit. Do not assume
+  another timing failure without distinguishing dropped damage, a failed
+  attack, a killing blow with no second report, or public-amount batching.
+- Restricted amounts go directly through DisplayRestricted and are never
+  merged. Readable amounts are batched for 0.3 s; the stackSimilarHits setting
+  controls the count trailer, not whether that batching occurs.
+- The trace previously omitted target MISS/DODGE/PARRY/etc. and classified
+  miss records. Added those outcomes using native text rendering and the
+  existing timing context. Damage matching, counting and presentation are
+  unchanged by this diagnostic update.
+- The outcome regression failed first. Full validation: 123 tests run,
+  122 passed, one expected archive skip; Lua 5.1 parsing and whitespace passed.
+  No generated task logs remain.
+- Installed the updated trace in Forever and verified its SHA-256.
+- Next: capture a proc that shows only one damage number, preferably before
+  the target dies. Look for the
+  second raw damage or failed-attack report before changing the matcher.
+
 ## Windfury icon identification
 
 - User confirms extra damage numbers now appear, but without an icon.

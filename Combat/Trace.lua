@@ -59,9 +59,16 @@ function Trace:WriteMatch(record)
     local trackedAge = swing and now - swing.at or -1
     local lineAge = line and now - line.at or -1
     local state = line and (line.claimed and "used" or "free") or "missing"
-    self:Write("match " .. (result.who or "unknown") .. kind,
+    local stage = record.event == "miss" and "miss " or "match "
+    local value
+    if record.event == "miss" then
+        value = record.missWord
+    else
+        value = record.amount
+    end
+    self:Write(stage .. (result.who or "unknown") .. kind,
         result.spell or (result.melee and "auto"),
-        "%s | ages %.2f/%.2f/%.2f %s", record.amount,
+        "%s | ages %.2f/%.2f/%.2f %s", value,
         nativeAge, trackedAge, lineAge, state)
 end
 
@@ -73,10 +80,14 @@ function Trace:InstallHooks()
         function(_, event, unit, action, flag, amount, school)
             if not self.active then return end
             if event == "UNIT_COMBAT"
-                and RestrictedValue:Equals(unit, "target")
-                and RestrictedValue:Equals(action, "WOUND") then
-                self:Write("target hit", nil,
-                    "%s (school %s, flag %s)", amount, school, flag)
+                and RestrictedValue:Equals(unit, "target") then
+                local readableAction = RestrictedValue:String(action)
+                if readableAction then
+                    local stage = readableAction == "WOUND" and "target hit"
+                        or "target " .. readableAction
+                    self:Write(stage, nil,
+                        "%s (school %s, flag %s)", amount, school, flag)
+                end
             elseif event == "UNIT_SPELLCAST_SUCCEEDED"
                 and RestrictedValue:Equals(unit, "player") then
                 self:Write("cast", flag, "%s", "cast succeeded")
@@ -98,7 +109,8 @@ function Trace:InstallHooks()
             end
         end)
     hooksecurefunc(components.CombatPresentation, "Out", function(_, record)
-        if not self.active or record.event ~= "damage" then return end
+        if not self.active or (record.event ~= "damage"
+            and record.event ~= "miss") then return end
         self:WriteMatch(record)
     end)
     hooksecurefunc(components.OutgoingBatcher, "Queue",
