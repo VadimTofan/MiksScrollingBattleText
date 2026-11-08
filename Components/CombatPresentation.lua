@@ -170,7 +170,7 @@ function Presentation:Out(record)
 	local spell = result.spell or result.procSpell
 	if result.melee then spell = result.hand == "ranged" and 5019 or 6603 end
 	local icon = record.icon or (spell and self.config.getSpellTexture(spell))
-	if result.ambiguous then
+	if result.ambiguous or (result.proc and not spell) then
 		spell, icon = nil, GENERIC_SPELL_ICON
 	end
 	if record.event == "damage" then

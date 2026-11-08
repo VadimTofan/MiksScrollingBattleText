@@ -50,7 +50,7 @@ function Capture:Event(event, duration, hand)
     local key = ns.TargetKey()
     if event == "PLAYER_SWING" then
         local burst = self.model:Swing(GetTime(), key, Metadata(hand),
-            ns.ProcSpell(GetTime(), 1) == 8232)
+            ns.ActiveWindfurySpell(1) == 8232)
         local generation, model = self.generation, self.model
         C_Timer.After(3.1, function()
             if not self.active or self.generation ~= generation then return end

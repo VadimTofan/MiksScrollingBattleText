@@ -259,13 +259,14 @@ local function ActiveWindfurySpell(school)
     if ns.Bool(hasOff) and hasOff and ns.Number(offID, 1)
         and WINDFURY_ENCHANTS[offID] then return WINDFURY_WEAPON_SPELL_ID end
 end
+ns.ActiveWindfurySpell = ActiveWindfurySpell
 
 reader.procSources = {}
 local function ProcSpell(at, school)
-    -- Inspect the current enchant rather than a cast cache: reloads,
-    -- expiration, replacements and weapon swaps must not leave stale icons.
-    local windfury = ActiveWindfurySpell(school)
-    if windfury then return windfury end
+    -- The enchant is a possible source, not a damage identity. Even an
+    -- "extra" log line exposes neither the granting spell nor attack count.
+    -- Do not choose Windfury or a competing physical proc without that data.
+    if ActiveWindfurySpell(school) then return nil end
     local best
     for kind, source in pairs(reader.procSources) do
         local fresh = at - source.at <= (PROC_KEEP[kind] or 0)

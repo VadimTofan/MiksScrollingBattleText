@@ -3,9 +3,9 @@ import unittest
 from tests.lua_test_runner import run_lua_test
 
 
-# Describe: confirmed Windfury procs inherit the active weapon enchant's icon.
+# Describe: an active Windfury enchant cannot identify a physical proc.
 class WindfuryIconTests(unittest.TestCase):
-    def test_active_windfury_enchants_identify_physical_procs_safely(self):
+    def test_active_enchants_do_not_supply_unproven_damage_identities(self):
         # Given
         script = "windfury_icons.lua"
 

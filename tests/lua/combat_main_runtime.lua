@@ -251,7 +251,7 @@ for _, forever in ipairs({ false, true }) do
 			C_Spell.GetSpellDescription = spellDescription
 		end
 
-		-- Given Windfury's two opaque proc hits and its ordinary melee hit.
+		-- Given an active Windfury enchant and two unidentified physical procs.
 		Advance(4)
 		local beforeBurst = #displayed
 		local firstProc, normalHit, delayedProc = {}, {}, {}
@@ -266,6 +266,7 @@ for _, forever in ipairs({ false, true }) do
 			return value == firstProc or value == normalHit or value == delayedProc
 		end
 		local melee = filter.colors.eventColoring.SWING_DAMAGE
+		local unknownIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 		-- When their confirmations share a swing but their reports cross frames.
 		Dispatch("PLAYER_SWING", 3.8, 0)
@@ -287,21 +288,23 @@ for _, forever in ipairs({ false, true }) do
 			"the delayed Windfury hit did not reach the real display pipeline")
 		assert(displayed[beforeBurst + 1][4] == firstProc)
 		assert(displayed[beforeBurst + 1][1] == events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 1][3] == "icon",
-			"early Windfury proc reached the display without its icon")
+		assert(displayed[beforeBurst + 1][3] == unknownIcon,
+			"an early unidentified proc received Windfury's icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
 		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 3][3] == "icon",
-			"delayed Windfury proc reached the display without its icon")
+		assert(displayed[beforeBurst + 3][3] == unknownIcon,
+			"a delayed unidentified proc received Windfury's icon")
 
-		-- Given the next capture's confirmations arrive after the swing frame.
+		-- Given another burst with an unidentified extra-attack grant.
 		Advance(4)
 		local beforeOffsetBurst = #displayed
 		Dispatch("PLAYER_SWING", 3.8, 0)
 		Dispatch("COMBAT_LOG_MESSAGE", "opaque", melee.r, melee.g, melee.b, 1)
 		Advance(0.099)
+		local extra = filter.colors.eventColoring.SPELL_EXTRA_ATTACKS
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", extra.r, extra.g, extra.b, 1)
 		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
 		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
 
@@ -322,8 +325,9 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
 		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
 		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
-		assert(displayed[beforeOffsetBurst + 2][3] == "icon")
-		assert(displayed[beforeOffsetBurst + 3][3] == "icon")
+		assert(displayed[beforeOffsetBurst + 2][3] == unknownIcon,
+			"an unidentified extra-attack grant supplied a guessed icon")
+		assert(displayed[beforeOffsetBurst + 3][3] == unknownIcon)
 		issecretvalue = secretCheck
 		GetWeaponEnchantInfo = weaponEnchantInfo
 		events.OUTGOING_DAMAGE = meleeSettings

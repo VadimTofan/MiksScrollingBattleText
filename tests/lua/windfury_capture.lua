@@ -8,7 +8,8 @@ C_Timer = { After = function(delay, callback)
 end }
 local ns = MikSBT.CombatEngine
 ns.TargetKey = function() return "target1" end
-ns.ProcSpell = function() return 8232 end
+ns.ActiveWindfurySpell = function() return 8232 end
+ns.ProcSpell = function() error("capture confused enchant with damage identity") end
 ns.reader = { logLines = {} }
 MikSBT.Print = function() end
 MikSBT.Compatibility = { Client = { isForever = true } }

@@ -94,3 +94,24 @@ for _, amount in ipairs({ 75, secret }) do
     assert(queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark",
         "ambiguous spell damage did not receive a generic icon")
 end
+
+-- Given confirmed proc damage with no identified spell.
+for _, amount in ipairs({ 36, secret }) do
+    -- When readable and restricted critical hits reach presentation.
+    presentation:Out({ event = "damage", amount = amount, crit = true,
+        result = { who = "you", proc = true } })
+
+    -- Then both keep their amount and critical flag without a guessed name.
+    assert(queued[1] == nil and queued[2] == amount and queued[3])
+    assert(queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark",
+        "unidentified proc damage did not receive a generic icon")
+end
+
+-- Given a proc whose spell identity is available to presentation.
+-- When its damage is drawn.
+presentation:Out({ event = "damage", amount = 24,
+    result = { who = "you", proc = true, procSpell = 601 } })
+
+-- Then the identified source retains its own spell and icon.
+assert(queued[1] == 601 and queued[2] == 24)
+assert(queued[4] == "icon-601")
