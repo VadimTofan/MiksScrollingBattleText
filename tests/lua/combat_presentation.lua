@@ -80,3 +80,17 @@ presentation:In({ event = "heal", amount = 15, selfHeal = true, spell = 103 })
 assert(displayed[#displayed][1] == profile.events.SELF_HEAL)
 assert(displayed[#displayed][3] == "icon-103")
 print("Combat presentation tests passed")
+
+-- Given confirmed damage whose spell remains ambiguous.
+-- When normal and restricted amounts reach presentation.
+for _, amount in ipairs({ 75, secret }) do
+    presentation.config.batcher.DisplayRestricted = function(_, ...)
+        queued = { ... }
+    end
+    presentation:Out({ event = "damage", amount = amount,
+        result = { who = "you", ambiguous = true } })
+    -- Then the exact damage survives with a generic icon and no spell identity.
+    assert(queued[1] == nil and queued[2] == amount)
+    assert(queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark",
+        "ambiguous spell damage did not receive a generic icon")
+end

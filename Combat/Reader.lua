@@ -690,7 +690,8 @@ function DecideGroup(group, frameLines, decided)
             local kind = record.event == "miss" and "miss" or record.event
             local amount = ns.Number(record.amount) and record.amount or nil
             ranked[#ranked + 1] = { hit = hit, index = index,
-                fit = ns.mine:Fit(hit.key, kind, record.school, hit.at, amount, restrict) }
+                fit = ns.mine:Fit(hit.key, kind, record.school, hit.at,
+                    amount, restrict, record.crit) }
         end
         -- Observed on Forever: a queued strike reports zero before its
         -- physical hit in the cast's frame, with one spell confirmation.

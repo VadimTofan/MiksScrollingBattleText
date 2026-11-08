@@ -54,6 +54,10 @@ hit reports, spell descriptions, damage-over-time timing, and available
 combat-log message colours. MSBT still owns the scrolling windows, animations,
 fonts, sounds, crit styling, event settings, and profiles.
 
+Confirmed outgoing damage with several equally plausible direct spells keeps
+its amount and uses a generic question-mark icon without a guessed spell name.
+Ambiguous direct matches do not teach the engine a spell's school or hit type.
+
 Where combat-log messages are supported, MSBT initially asks for `/reload`.
 During logout it saves a dedicated **MSBT combat** filter; Blizzard activates
 it on the next load. Keep it selected in the Combat Log. Changing its sources,
