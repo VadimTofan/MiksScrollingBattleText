@@ -29,9 +29,10 @@ Core capabilities:
 
 The addon options are split into focused sections:
 
-- `General`: master enable state, Blizzard combat text behavior, short numbers, hit stacking, icons, animation speed, fonts, and shared media controls
+- `General`: master enable state, Blizzard combat text behavior, short numbers, hit stacking, icons, animation speed, and fonts
 - `Scroll Areas`: placement and behavior for the scrolling regions
 - `Events`: per-event toggles, colors, crit handling, and filtering
+- `Sounds`: enable sounds and register custom sound files
 - `Cooldowns`: cooldown alert configuration
 - `Loot`: item and currency display behavior
 - `Spam Control`: throttling and merge rules
@@ -124,7 +125,7 @@ and both licenses are included with the addon.
    separate personal media folder keeps it outside MSBT's update directory, for
    example `Interface\AddOns\MySounds\bell.ogg`.
 2. Fully restart WoW after adding sound files.
-3. Open `/msbt`, then select `General`. Check `Enable Sounds` and use `Add Sound`
+3. Open `/msbt`, then select `Sounds`. Check `Enable Sounds` and use `Add Sound`
    to register a name and the file's path relative to your WoW folder.
 4. In `Events`, open an event's settings, select the sound, use `Play` to preview
    it, then save. The custom-file button also accepts a path without registration.

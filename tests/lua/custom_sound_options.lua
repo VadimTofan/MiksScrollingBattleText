@@ -88,10 +88,13 @@ Widget.CreateFontString = NewWidget
 Widget.CreateTexture = NewWidget
 CreateFrame = function(_, _, parent) return NewWidget(parent) end
 UIParent = NewWidget()
-local tabs = {}
+local tabs, tabOrder = {}, {}
 MSBTOptions = { Controls = {}, Main = {
 	RegisterPopupFrame = function() end,
-	AddTab = function(frame, label) tabs[label] = frame end,
+	AddTab = function(frame, label)
+		tabs[label] = frame
+		tabOrder[#tabOrder + 1] = label
+	end,
 } }
 for _, name in ipairs({ "CreateDropdown", "CreateOptionButton", "CreateIconButton",
 	"CreateCheckbox", "CreateEditbox", "CreateSlider" }) do
@@ -101,19 +104,50 @@ dofile("MSBTOptions/MSBTOptionsPopups.lua")
 dofile("MSBTOptions/MSBTOptionsSounds.lua")
 dofile("MSBTOptions/MSBTOptionsTabs.lua")
 
--- When General is opened and Enable Sounds is toggled.
+-- Given a dedicated Sounds tab immediately after Events in the sidebar.
+local sounds = assert(tabs["Sounds"], "Sounds tab is missing")
+local eventsIndex, soundsIndex
+for index, label in ipairs(tabOrder) do
+	if label == MikSBT.translations.TABS.events.label then eventsIndex = index end
+	if label == "Sounds" then soundsIndex = index end
+end
+assert(soundsIndex == eventsIndex + 1, "Sounds does not follow Events")
+assert(not sounds.created, "Sounds controls should be created on first open")
+
+-- When General and Sounds are opened and Enable Sounds is toggled.
 local general = tabs[MikSBT.translations.TABS.general.label]
 general:Show()
-local controls = general.controls
-assert(controls.enableSoundsCheckbox, "General sound toggle is missing")
+assert(not general.controls.enableSoundsCheckbox,
+	"General retained a duplicate sound toggle")
+assert(not general.controls.addCustomSoundButton,
+	"General retained a duplicate Add Sound button")
+sounds:Show()
+local controls = sounds.controls
+assert(controls.enableSoundsCheckbox, "Sounds toggle is missing")
 controls.enableSoundsCheckbox.clickHandler(controls.enableSoundsCheckbox, false)
 -- Then the profile is muted and reopening shows the persisted choice.
 assert(MikSBT.Profiles.currentProfile.soundsDisabled)
-general:Show()
+sounds:Show()
 assert(controls.enableSoundsCheckbox.checked == false)
+
+-- Given a different active profile with sounds enabled.
+local previousProfile = MikSBT.Profiles.currentProfile
+MikSBT.Profiles.currentProfile = { events = {}, soundsDisabled = false }
+
+-- When Sounds is reopened and its toggle is changed.
+sounds:Show()
+assert(controls.enableSoundsCheckbox.checked == true)
+controls.enableSoundsCheckbox.clickHandler(controls.enableSoundsCheckbox, false)
+
+-- Then the current profile receives the change and reopening refreshes it.
+assert(MikSBT.Profiles.currentProfile.soundsDisabled)
+MikSBT.Profiles.currentProfile = previousProfile
+sounds:Show()
 
 -- When Add Sound is opened, validated and saved.
 controls.addCustomSoundButton.clickHandler(controls.addCustomSoundButton)
+assert(not controls.enableSoundsCheckbox:IsEnabled(),
+	"Sounds controls remained active behind the registration dialog")
 local input
 for _, widget in ipairs(widgets) do
 	if widget.inputEditbox then input = widget end
@@ -130,6 +164,7 @@ input.okayButton.clickHandler(input.okayButton)
 assert(MikSBT.Profiles.savedMedia.sounds["New Bell"] ==
 	"Interface\\AddOns\\MySounds\\new.ogg")
 assert(controls.addCustomSoundButton.enabled)
+assert(controls.enableSoundsCheckbox:IsEnabled())
 
 -- Given an event popup using the original saved sound name.
 local saved

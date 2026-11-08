@@ -85,13 +85,15 @@ end
 applied = 0
 
 assert(controls.animationSpeedSlider.value == 100)
-assert(controls.enableSoundsCheckbox.checked == true)
+assert(controls.enableSoundsCheckbox == nil)
 assert(controls.enableIconsCheckbox.checked == true)
 assert(controls.stickyCritsCheckbox.checked == true)
 assert(controls.shortenNumbersCheckbox ~= nil)
 assert(controls.stackSimilarHitsCheckbox ~= nil)
 assert(controls.masterFontButton ~= nil)
-assert(controls.addCustomSoundButton ~= nil)
+assert(controls.addCustomSoundButton == nil)
+assert(controls.shortenNumbersCheckbox.point[2] == frame,
+	"General layout still depends on the removed sound toggle")
 
 -- Given the default profile hides skill names.
 local namesCheckbox = controls.enableNamesCheckbox

@@ -40,7 +40,7 @@ class GeneralMediaButtonTests(unittest.TestCase):
         ):
             self.assertNotIn(removed, general_tab)
 
-    def test_general_tab_offers_custom_sounds_without_custom_fonts(self):
+    def test_general_tab_keeps_font_controls_after_sound_controls_move(self):
         # Given
         source = OPTIONS_TABS_FILE.read_text(encoding="utf-8-sig")
 
@@ -51,7 +51,7 @@ class GeneralMediaButtonTests(unittest.TestCase):
 
         # Then
         self.assertNotIn('L.BUTTONS["addCustomFont"]', general_tab)
-        self.assertIn('L.BUTTONS["addCustomSound"]', general_tab)
+        self.assertNotIn('L.BUTTONS["addCustomSound"]', general_tab)
         self.assertIn(
             'controls.partialEffectsButton, "TOPLEFT", 0, 10',
             general_tab,

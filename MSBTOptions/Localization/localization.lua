@@ -81,6 +81,10 @@ obj["profile"]		= { label="Profile", tooltip="Display options for profile manage
 obj["general"]		= { label="General", tooltip="Display general options."}
 obj["scrollAreas"]	= { label="Scroll Areas", tooltip="Display options for creating, deleting, and configuring scroll areas.\n\nMouse over the icon buttons for more information."}
 obj["events"]		= { label="Events", tooltip="Display options for incoming, outgoing, and notification events.\n\nMouse over the icon buttons for more information."}
+obj["sounds"] = {
+	label = "Sounds",
+	tooltip = "Enable event sounds and add custom sound files.",
+}
 obj["lootAlerts"]	= { label="Loot Alerts", tooltip="Display options for loot related notifications."}
 obj["language"]		= { label="Language", tooltip="Shows the current game locale and how language selection works for MSBT."}
 obj["resetBlizzardSCT"] = { label="Reset Blizzard SCT", tooltip="Enable Blizzard damage and turn off MSBT."}

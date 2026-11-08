@@ -7,6 +7,40 @@ local Media = MikSBT.Media
 local SoundAPI = MikSBT.API.Sounds
 local L = MikSBT.translations
 
+function module.ShowTab(frame)
+	if not frame.created then
+		frame.controls = {}
+		local controls = frame.controls
+		local locale = L.CHECKBOXES.enableSounds
+		local checkbox = Controls.CreateCheckbox(frame)
+		checkbox:Configure(28, locale.label, locale.tooltip)
+		checkbox:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -18)
+		checkbox:SetClickHandler(function(_, checked)
+			MikSBT.Profiles.SetOption(nil, "soundsDisabled", not checked)
+		end)
+		controls.enableSoundsCheckbox = checkbox
+
+		local button = Controls.CreateOptionButton(frame)
+		locale = L.BUTTONS.addCustomSound
+		button:Configure(20, locale.label, locale.tooltip)
+		button:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 0, -20)
+		button:SetClickHandler(function(this)
+			Popups.DisableControls(controls)
+			module.ShowAddSound(frame, this, function()
+				for _, control in pairs(controls) do
+					if control.Enable then control:Enable() end
+				end
+			end)
+		end)
+		controls.addCustomSoundButton = button
+		frame.created = true
+	end
+
+	frame.controls.enableSoundsCheckbox:SetChecked(
+		not MikSBT.Profiles.currentProfile.soundsDisabled
+	)
+end
+
 local function ValidateRegistration(name, file)
 	if type(name) ~= "string" or name:match("^%s*$") then
 		return L.MSG_INVALID_CUSTOM_SOUND_NAME
