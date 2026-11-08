@@ -84,6 +84,10 @@ for _, classic in ipairs({ false, true }) do
 
 	-- Given defaults on either client branch and an existing saved profile.
 	local defaults = profiles.masterProfile
+	assert(defaults.lowHealthSoundDisabled == false,
+		"low-health sounds are not enabled by default")
+	assert(defaults.lowManaSoundDisabled == false,
+		"low-mana sounds are not enabled by default")
 	-- Category identity includes critical self-heals and pet events.
 	assert(defaults.events.SELF_HEAL_CRIT.textCategory == "Incoming")
 	assert(defaults.events.SELF_HOT_CRIT.textCategory == "Incoming")
@@ -228,6 +232,8 @@ for _, classic in ipairs({ false, true }) do
 	profiles.SetOption("scrollAreas.IncomingPet", "offsetX", -400)
 	profiles.SetOption("scrollAreas.OutgoingPet", "skillIconsDisabled", true)
 	profiles.SetOption("events.INCOMING_DAMAGE", "soundFile", 5678901)
+	profiles.SetOption(nil, "lowHealthSoundDisabled", true)
+	profiles.SetOption(nil, "lowManaSoundDisabled", false)
 	local exported, errorCode = profiles.ExportProfile("Default")
 
 	-- Then both complete client schemas can be exported.
@@ -303,6 +309,8 @@ assert(profiles.currentProfile.scrollAreas.OutgoingPet.skillIconsDisabled)
 assert(profiles.currentProfile.events.PET_INCOMING_DAMAGE.scrollArea == "IncomingPet")
 assert(profiles.currentProfile.events.PET_OUTGOING_DAMAGE.scrollArea == "OutgoingPet")
 assert(profiles.currentProfile.events.INCOMING_DAMAGE.soundFile == 5678901)
+assert(profiles.currentProfile.lowHealthSoundDisabled == true)
+assert(profiles.currentProfile.lowManaSoundDisabled == false)
 assert(profiles.currentProfile.partialColoringDisabled)
 assert(profiles.currentProfile.auraTracking["1459"] == false)
 assert(profiles.currentProfile.auraTracking["17"] == true)

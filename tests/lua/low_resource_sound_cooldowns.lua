@@ -153,5 +153,60 @@ service:DisplayEvent(otherEvent, "Other")
 
 -- Then its sound behavior remains unchanged.
 assert(#played == 10 and played[9] == "Bell" and played[10] == "Bell")
+
+-- Given only the low-health sound is disabled and both cooldowns expired.
+now = 40
+profile.lowHealthSoundDisabled = true
+local beforeText = #displayed
+HealthChanged(1)
+ManaChanged(1)
+
+-- When both resources fall below the threshold.
+HealthChanged(0.2)
+ManaChanged(0.2)
+
+-- Then both text warnings remain visible, but only mana plays its sound.
+assert(#displayed == beforeText + 2)
+assert(#played == 11 and played[11]:match("LowMana%.ogg$"),
+    "disabling low-health sound also muted mana or left health audible")
+
+-- Given health is enabled and only the low-mana sound is disabled.
+now = 40.1
+profile.lowHealthSoundDisabled = false
+profile.lowManaSoundDisabled = true
+beforeText = #displayed
+HealthChanged(1)
+ManaChanged(1)
+
+-- When both resources cross the threshold again.
+HealthChanged(0.2)
+ManaChanged(0.2)
+
+-- Then both text warnings remain visible, but only health plays its sound.
+assert(#displayed == beforeText + 2)
+assert(#played == 12 and played[12]:match("LowHealth%.ogg$"),
+    "disabling low-mana sound also muted health or left mana audible")
+
+-- Given both resource sounds are enabled but the master sound switch is off.
+now = 56
+profile.lowManaSoundDisabled = false
+profile.soundsDisabled = true
+HealthChanged(1)
+ManaChanged(1)
+
+-- When both warnings fire, then the master switch still mutes both sounds.
+HealthChanged(0.2)
+ManaChanged(0.2)
+assert(#played == 12, "resource sound switches bypassed the master mute")
+
+-- When the master is enabled and both warnings rearm immediately.
+profile.soundsDisabled = false
+HealthChanged(1)
+ManaChanged(1)
+HealthChanged(0.2)
+ManaChanged(0.2)
+
+-- Then neither mute option consumed a sound cooldown.
+assert(#played == 14)
 triggers.Disable()
 print("Low resource sound cooldown tests passed")

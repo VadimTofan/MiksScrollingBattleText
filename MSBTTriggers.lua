@@ -399,6 +399,7 @@ local lowHealthSettings = {
 	alwaysSticky = true,
 	soundFile = "Interface\\AddOns\\MikScrollingBattleText\\Sounds\\LowHealth.ogg",
 	soundCooldown = 8,
+	soundDisabledOption = "lowHealthSoundDisabled",
 }
 local lowManaSettings = {
 	message = "Low Mana!",
@@ -408,6 +409,7 @@ local lowManaSettings = {
 	alwaysSticky = true,
 	soundFile = "Interface\\AddOns\\MikScrollingBattleText\\Sounds\\LowMana.ogg",
 	soundCooldown = 8,
+	soundDisabledOption = "lowManaSoundDisabled",
 }
 
 local function EvaluateRestrictedResource(isHealth)

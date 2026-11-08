@@ -124,6 +124,23 @@ assert(not general.controls.addCustomSoundButton,
 sounds:Show()
 local controls = sounds.controls
 assert(controls.enableSoundsCheckbox, "Sounds toggle is missing")
+local healthSound = assert(controls.lowHealthSoundCheckbox,
+	"Low Health Sound toggle is missing")
+local manaSound = assert(controls.lowManaSoundCheckbox,
+	"Low Mana Sound toggle is missing")
+assert(healthSound.checked and manaSound.checked,
+	"resource sounds must remain enabled on existing profiles")
+
+-- When each resource sound is independently unchecked and the tab reopens.
+healthSound.clickHandler(healthSound, false)
+assert(MikSBT.Profiles.currentProfile.lowHealthSoundDisabled)
+assert(not MikSBT.Profiles.currentProfile.lowManaSoundDisabled)
+manaSound.clickHandler(manaSound, false)
+sounds:Show()
+
+-- Then both saved choices appear without disabling the master sound switch.
+assert(not healthSound.checked and not manaSound.checked)
+assert(not MikSBT.Profiles.currentProfile.soundsDisabled)
 controls.enableSoundsCheckbox.clickHandler(controls.enableSoundsCheckbox, false)
 -- Then the profile is muted and reopening shows the persisted choice.
 assert(MikSBT.Profiles.currentProfile.soundsDisabled)
@@ -137,17 +154,32 @@ MikSBT.Profiles.currentProfile = { events = {}, soundsDisabled = false }
 -- When Sounds is reopened and its toggle is changed.
 sounds:Show()
 assert(controls.enableSoundsCheckbox.checked == true)
+assert(healthSound.checked and manaSound.checked,
+	"resource sound toggles did not refresh after a profile change")
 controls.enableSoundsCheckbox.clickHandler(controls.enableSoundsCheckbox, false)
 
 -- Then the current profile receives the change and reopening refreshes it.
 assert(MikSBT.Profiles.currentProfile.soundsDisabled)
 MikSBT.Profiles.currentProfile = previousProfile
 sounds:Show()
+assert(not healthSound.checked and not manaSound.checked)
+
+-- When both resource sounds are checked again while the master is muted.
+healthSound.clickHandler(healthSound, true)
+assert(not previousProfile.lowHealthSoundDisabled)
+assert(previousProfile.lowManaSoundDisabled)
+manaSound.clickHandler(manaSound, true)
+sounds:Show()
+
+-- Then each resource choice is restored without changing the master mute.
+assert(healthSound.checked and manaSound.checked)
+assert(previousProfile.soundsDisabled)
 
 -- When Add Sound is opened, validated and saved.
 controls.addCustomSoundButton.clickHandler(controls.addCustomSoundButton)
 assert(not controls.enableSoundsCheckbox:IsEnabled(),
 	"Sounds controls remained active behind the registration dialog")
+assert(not healthSound:IsEnabled() and not manaSound:IsEnabled())
 local input
 for _, widget in ipairs(widgets) do
 	if widget.inputEditbox then input = widget end
@@ -165,6 +197,7 @@ assert(MikSBT.Profiles.savedMedia.sounds["New Bell"] ==
 	"Interface\\AddOns\\MySounds\\new.ogg")
 assert(controls.addCustomSoundButton.enabled)
 assert(controls.enableSoundsCheckbox:IsEnabled())
+assert(healthSound:IsEnabled() and manaSound:IsEnabled())
 
 -- Given an event popup using the original saved sound name.
 local saved

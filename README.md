@@ -32,7 +32,7 @@ The addon options are split into focused sections:
 - `General`: master enable state, Blizzard combat text behavior, short numbers, hit stacking, icons, animation speed, and fonts
 - `Scroll Areas`: placement and behavior for the scrolling regions
 - `Events`: per-event toggles, colors, crit handling, and filtering
-- `Sounds`: enable sounds and register custom sound files
+- `Sounds`: enable sounds, toggle low-health/low-mana audio, and register custom files
 - `Cooldowns`: cooldown alert configuration
 - `Loot`: item and currency display behavior
 - `Spam Control`: throttling and merge rules
@@ -140,8 +140,10 @@ Legacy filenames such as `bell.ogg` resolve under
 if using that form.
 
 Built-in low-health and low-mana warnings use bundled sounds. Each sound has
-an independent 8-second cooldown. Text warnings still rearm as soon as the
-resource recovers above the warning threshold.
+an independent 8-second cooldown. In `Sounds`, use `Low Health Sound` and
+`Low Mana Sound` to enable or disable each sound for the current profile.
+These switches leave text warnings visible. Text warnings rearm as soon as
+the resource recovers above the warning threshold.
 
 Other addons can call `MikSBT.RegisterSound(name, pathOrFileID)` after MSBT loads
 and enumerate registrations with `MikSBT.IterateSounds()`. Programmatic
