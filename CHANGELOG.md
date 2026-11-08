@@ -1,5 +1,15 @@
 # Changelog
 
+## v12.046
+
+- Restored low-health and low-mana messages and sounds at about 35%.
+- Made health alerts independent of Blizzard's low-health screen flash.
+- Kept both alerts working with restricted resource values while respecting
+  MSBT's mute, notification, and enable/disable settings.
+- Improved Windfury icon detection and delayed physical proc matching on
+  WoW Forever, and retained extra-attack grants in the combat-log filter.
+- Kept diagnostic helpers out of the release package.
+
 ## v12.045
 
 - Fixed zero damage shown for Raptor Strike, Heroic Strike, and Maul on
