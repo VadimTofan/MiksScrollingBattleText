@@ -1,5 +1,13 @@
 # Changelog
 
+## v12.047
+
+- Added a Sounds tab with the master sound switch and custom sound registration.
+- Added separate low-health and low-mana sound switches, saved per profile.
+  Text warnings remain visible when either sound is disabled.
+- Limited each low-health and low-mana sound to once every 8 seconds.
+- Aligned the General tab's appearance checkboxes with its bottom controls.
+
 ## v12.046
 
 - Restored low-health and low-mana messages and sounds at about 35%.
