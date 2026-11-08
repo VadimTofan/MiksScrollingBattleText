@@ -633,6 +633,30 @@ local function Leeches(self, spell)
     return type(facts) == "table" and facts.leech == true
 end
 
+-- Drain Life and Drain Soul are channels whose hits the log reports as
+-- periodic ticks, unlike Arcane Missiles. A tick that healed you for its
+-- amount is a draining channel's (leechOnly). Otherwise the channel takes a
+-- tick only when no DoT of yours on that unit, of a rhythm not yet known,
+-- could have made it: a due DoT has had its turn already (DueTick).
+local function TickingChannel(self, key, school, now, leechOnly)
+    for _, channel in pairs(self.channels) do
+        local facts = self.facts(channel.spell)
+        local leeches = type(facts) == "table" and facts.leech == true
+        local ticks = type(facts) == "table" and facts.ticks == true or leeches
+        if ticks and ChannelFits(channel, key, school, now) then
+            if leechOnly then
+                if leeches and self.leechNow == true then return channel end
+            elseif leeches or self.leechNow ~= true then
+                local unsure = false
+                for _, dot in ipairs(self.dots) do
+                    if dot.key == key and not dot.period and SchoolFits(dot.school, school) then unsure = true end
+                end
+                if not unsure then return channel end
+            end
+        end
+    end
+end
+
 local function Yours(self, key, kind, school, now)
     local allowed, sure = Allowed(self.restrictNow), self.restrictNow == "tick"
     if kind == "damage" and allowed.casts then
@@ -641,6 +665,10 @@ local function Yours(self, key, kind, school, now)
                 return Result(channel.caster, channel.spell, sure)
             end
         end
+    end
+    if kind == "damage" and sure then
+        local channel = TickingChannel(self, key, school, now, true)
+        if channel then return Result(channel.caster, channel.spell, true) end
     end
     -- 1. A DoT's next tick; of several due now, the one whose time and
     -- amount fit best. 0.3.49: a tick that healed you for its amount in the
@@ -670,6 +698,10 @@ local function Yours(self, key, kind, school, now)
     if not castsFirst then
         local tick = DueTick()
         if tick then return tick end
+    end
+    if kind == "damage" and sure then
+        local channel = TickingChannel(self, key, school, now, false)
+        if channel then return Result(channel.caster, channel.spell, true) end
     end
     -- 2. The first hit after a cast of its school (any cast for a miss),
     -- oldest first: bolts land in the order they were cast. Of casts of
@@ -833,6 +865,15 @@ function Mine:Fit(key, kind, school, now, amount, restrict)
     if kind == "damage" and allowed.casts then
         for _, channel in pairs(self.channels) do
             if ChannelFits(channel, key, school, now) then Take(0.1) end
+        end
+    end
+    if kind == "damage" and restrict == "tick" then
+        for _, channel in pairs(self.channels) do
+            local facts = self.facts(channel.spell)
+            if type(facts) == "table" and (facts.ticks == true or facts.leech == true)
+                and ChannelFits(channel, key, school, now) then
+                Take(0.2)
+            end
         end
     end
     for _, entry in ipairs(allowed.casts and self.pending or {}) do
