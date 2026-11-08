@@ -19,7 +19,7 @@ class RestoredCooldownAndSoundFeatureTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
-    def test_only_cooldown_sound_is_bundled(self):
+    def test_builtin_alert_sounds_are_bundled(self):
         # Given
         media = (ROOT / "MSBTMedia.lua").read_text(encoding="utf-8-sig")
 
@@ -31,7 +31,7 @@ class RestoredCooldownAndSoundFeatureTests(unittest.TestCase):
             ("MSBT Low Mana", "LowMana.ogg"),
         ):
             self.assertNotIn(name, media)
-            self.assertFalse((ROOT / "Sounds" / file).exists())
+            self.assertTrue((ROOT / "Sounds" / file).is_file())
 
     def test_item_cooldown_is_loaded_with_default_notification(self):
         # Given

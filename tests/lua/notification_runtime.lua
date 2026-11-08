@@ -291,8 +291,8 @@ triggers.UpdateTriggers()
 triggers.Enable()
 triggers.Disable()
 
--- Then no health listener is created, no alert fires, and saves stay intact.
-assert(#frames == framesBeforeTriggers, "retired tracker created an event frame")
+-- Then built-in alerts stay idle and saved custom thresholds stay inactive.
+assert(#frames == framesBeforeTriggers + 1, "expected one built-in alert frame")
 assert(#displayed == displaysBeforeTriggers)
 assert(triggers.categorizedTriggers.UNIT_HEALTH == nil)
 assert(triggers.categorizedTriggers.UNIT_POWER_UPDATE == nil)
