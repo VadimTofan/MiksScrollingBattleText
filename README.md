@@ -136,8 +136,11 @@ even when `Enable Sounds` is unchecked.
 
 Legacy filenames such as `bell.ogg` resolve under
 `Interface\AddOns\MikScrollingBattleText\Sounds\`; provide your own files there
-if using that form. MSBT no longer bundles sound files or provides cooldown,
-low-health, or low-mana sound alerts.
+if using that form.
+
+Built-in low-health and low-mana warnings use bundled sounds. Each sound has
+an independent 8-second cooldown. Text warnings still rearm as soon as the
+resource recovers above the warning threshold.
 
 Other addons can call `MikSBT.RegisterSound(name, pathOrFileID)` after MSBT loads
 and enumerate registrations with `MikSBT.IterateSounds()`. Programmatic

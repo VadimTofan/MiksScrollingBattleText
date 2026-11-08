@@ -5,6 +5,16 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: built-in low resource alerts use the normal runtime lifecycle.
 class LowResourceAlertTests(unittest.TestCase):
+    def test_resource_sounds_have_independent_eight_second_cooldowns(self):
+        # Given the real trigger and display services with a controlled clock.
+        script_name = "low_resource_sound_cooldowns.lua"
+
+        # When health and mana repeatedly cross their alert thresholds.
+        result = run_lua_test(script_name)
+
+        # Then sounds are throttled independently while text remains immediate.
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_restricted_health_warns_without_blizzard_screen_flash(self):
         # Given secret health values and no Blizzard low-health flash frame.
         script_name = "restricted_health_alerts.lua"

@@ -1,6 +1,7 @@
 local DisplayService = {
 	config = {},
 }
+local soundPlayedAt = setmetatable({}, { __mode = "k" })
 
 function DisplayService:Configure(config)
 	self.config = config
@@ -62,7 +63,16 @@ function DisplayService:DisplayEvent(eventSettings, message, texturePath, muteSo
 	)
 	if not muteSound and not profile.soundsDisabled and eventSettings.soundFile
 		and eventSettings.soundFile ~= "" and self.config.playSound then
+		local cooldown = eventSettings.soundCooldown
+		local now
+		if type(cooldown) == "number" and cooldown > 0 then
+			now = self.config.getTime()
+			local lastPlayedAt = soundPlayedAt[eventSettings]
+			if lastPlayedAt and now - lastPlayedAt < cooldown then return end
+		end
+
 		self.config.playSound(eventSettings.soundFile)
+		if now then soundPlayedAt[eventSettings] = now end
 	end
 end
 
