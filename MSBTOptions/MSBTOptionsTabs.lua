@@ -256,7 +256,7 @@ local function GeneralTab_Create()
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
 	objLocale = L.CHECKBOXES["shortenNumbers"]
 	checkbox:Configure(28, objLocale.label, objLocale.tooltip)
-	checkbox:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", -30, 43)
+	checkbox:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", -30, 15)
 	checkbox:SetClickHandler(
 		function (this, isChecked)
 			MSBTProfiles.SetOption(nil, "shortenNumbers", isChecked)

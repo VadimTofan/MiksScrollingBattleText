@@ -94,6 +94,9 @@ assert(controls.masterFontButton ~= nil)
 assert(controls.addCustomSoundButton == nil)
 assert(controls.shortenNumbersCheckbox.point[2] == frame,
 	"General layout still depends on the removed sound toggle")
+assert(controls.shortenNumbersCheckbox.point[5] ==
+	controls.classColorsButton.point[5],
+	"appearance checkboxes do not align with the bottom controls")
 
 -- Given the default profile hides skill names.
 local namesCheckbox = controls.enableNamesCheckbox
