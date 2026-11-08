@@ -228,7 +228,9 @@ Advance(3)
 Event("COMBAT_LOG_MESSAGE", nil, "tick", 0, 0, 1)
 -- When its first periodic hit arrives.
 Event("UNIT_COMBAT", "target", "WOUND", "", 30, 32)
-Advance(0.02)
+-- Allow the periodic confirmation window to settle.
+Advance(0)
+Advance(0.13)
 -- Then the imported engine distinguishes ticks from direct spells.
 record = outgoing[#outgoing]
 assert(record.result.spell == 102 and record.result.tick)

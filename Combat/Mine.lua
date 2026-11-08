@@ -119,6 +119,19 @@ ns.LATE_SWING = LATE_SWING
 local DIRECT_ONLY, TICKS_ONLY, BOTH = 1, 2, 3
 ns.SPELL_KINDS = { directOnly = DIRECT_ONLY, ticksOnly = TICKS_ONLY, both = BOTH }
 
+local function SpellKind(facts, kind)
+    if type(facts) ~= "table" then return kind end
+    if facts.ticks == true then
+        if facts.direct == true then return BOTH end
+        if facts.direct == false then return TICKS_ONLY end
+        if kind == DIRECT_ONLY then return nil end
+    elseif facts.direct == true then
+        if facts.ticks == false then return DIRECT_ONLY end
+        if kind == TICKS_ONLY then return nil end
+    end
+    return kind
+end
+
 local PHYSICAL = 1
 ns.SCHOOL_PHYSICAL = PHYSICAL
 
@@ -186,6 +199,11 @@ local function KeepHeld(entry, now)
 end
 
 local function KeepDot(dot, now, tracker)
+    if dot.bufferUntil then
+        if now <= dot.bufferUntil then return true end
+        dot.bufferUntil = nil
+    end
+    if dot.confirmedAt and not dot.period then return now - dot.confirmedAt <= CAST_HISTORY_WINDOW end
     if dot.period then
         -- Allow up to three skipped ticks before discarding a known rhythm.
         while now > dot.next + TICK_SLACK and (dot.skipped or 0) < 3 do
@@ -376,7 +394,8 @@ function Mine:Cast(caster, spell, key, now)
     -- hid the one still ticking on another).
     local list = self.casts[spell] or {}
     self.casts[spell] = list
-    list[#list + 1] = { at = now, caster = caster }
+    local cast = { at = now, caster = caster, key = key }
+    list[#list + 1] = cast
     while #list > 6 do table.remove(list, 1) end
     -- 0.3.42: a cast of yours with nothing targeted (an Arcane Explosion)
     -- has no unit to wait on, but stays in that list, so a hit or resist
@@ -396,9 +415,8 @@ function Mine:Cast(caster, spell, key, now)
         -- The description wins over anything learned from hits (0.3.6: a
         -- Curse of Agony learned as Physical from a pet's swings).
         school = facts.school or school
-        if facts.direct ~= nil then
-            kind = (facts.direct and facts.ticks and BOTH) or (facts.ticks and TICKS_ONLY) or (facts.direct and DIRECT_ONLY) or kind
-        end
+        kind = SpellKind(facts, kind)
+        period = facts.period or period
     end
     -- A recast refreshes its DoT: the ticks start again from now.
     for index = #self.dots, 1, -1 do
@@ -412,7 +430,7 @@ function Mine:Cast(caster, spell, key, now)
         self.dots[#self.dots + 1] = dot
     end
     if kind ~= TICKS_ONLY then
-        local entry = { caster = caster, spell = spell, key = key, at = now, school = school, dot = dot }
+        local entry = { caster = caster, spell = spell, key = key, at = now, school = school, dot = dot, cast = cast }
         self.pending[#self.pending + 1] = entry
         if dot then dot.pending = entry end
     end
@@ -474,6 +492,11 @@ function Mine:Rekey(old, new)
             if entry.key == old then entry.key = new end
         end
     end
+    for _, casts in pairs(self.casts) do
+        for _, cast in ipairs(casts) do
+            if cast.key == old then cast.key = new end
+        end
+    end
     self.rhythm[new], self.rhythm[old] = self.rhythm[old], nil
     self.petLast[new], self.petLast[old] = self.petLast[old], nil
 end
@@ -493,6 +516,11 @@ function Mine:Forget(key)
                 touched = touched + 1
                 if list == self.dots and entry.period then entry.key = false else table.remove(list, index) end
             end
+        end
+    end
+    for _, casts in pairs(self.casts) do
+        for _, cast in ipairs(casts) do
+            if cast.key == key then cast.key = false end
         end
     end
     self.rhythm[key], self.petLast[key] = nil, nil
@@ -564,10 +592,11 @@ local function RememberAmount(self, spell)
 end
 
 local function Ticked(self, dot, school, now)
+    dot.bufferUntil = nil
     dot.ticks, dot.next, dot.skipped = dot.ticks + 1, now + dot.period, 0
     RememberAmount(self, dot.spell)
     if school and not dot.school then dot.school = school end
-    if not dot.known and dot.ticks >= 2 then
+    if not dot.known and dot.ticks >= 2 and not self.ambiguous then
         dot.known = true
         if dot.school and self.learned("school", dot.spell) == nil then LearnSchool(self, dot.spell, dot.school) end
         self.learn("period", dot.spell, dot.period)
@@ -595,6 +624,112 @@ local function FirstTick(dot, now)
         local gap = dot.directAt - dot.castAt
         if gap >= RETIME_GAP and math.abs((now - dot.directAt) - gap) <= TICK_SLACK then return gap, true end
     end
+end
+
+local function TickPeriod(dot, now, confirmed)
+    if dot.period then
+        if dot.next and math.abs(now - dot.next) <= TICK_SLACK then return dot.period end
+        return nil
+    end
+    if not confirmed and dot.pending and not dot.pending.used
+        and dot.pending.school == nil and now - dot.pending.at <= FIRST_HIT_WAIT then return nil end
+    local candidate = dot.candidate
+    if candidate and math.abs(now - candidate.at - candidate.period) <= TICK_SLACK then return candidate.period end
+    return FirstTick(dot, now)
+end
+
+-- Typed periodic lines can recover a cast even when its tooltip is unavailable
+-- or a learned school/kind/interval is stale. Fitting never changes the tracker.
+local function PeriodicCandidate(self, key, school, now, amount)
+    local best, bestScore, count
+    local function Consider(spell, cast, dot)
+        local at = dot and dot.castAt or cast.at
+        local since = now - at
+        if since < 0.5 or (not dot and since > CAST_HISTORY_WINDOW) then return end
+        if dot and dot.confirmedAt and now - dot.confirmedAt < 0.5 then return end
+        local facts = self.facts(spell)
+        if type(facts) == "table" then
+            if facts.damages == false or facts.helpful or facts.healthCost
+                or facts.ticks == false or not SchoolFits(facts.school, school) then return end
+            if facts.duration and since > facts.duration + DIRECT_WINDOW then return end
+        end
+        local known = dot and dot.school or self.learned("school", spell)
+        local period = dot and dot.period or self.learned("period", spell)
+        local score = AmountFit(self, spell, amount, period)
+        if dot and dot.next and math.abs(now - dot.next) <= TICK_SLACK then
+            score = score + math.abs(now - dot.next) / TICK_SLACK * 0.3
+        else
+            score = score + 0.8
+        end
+        if not SchoolFits(known, school) then score = score + 2 end
+        local target
+        if dot then target = dot.key else target = cast.key end
+        if target ~= key then score = score + (target == false and 0.4 or 1.5) end
+        if self.learned("direct", spell) == DIRECT_ONLY then score = score + 1 end
+        if not bestScore or score < bestScore - 0.1 then
+            best, bestScore, count = { spell = spell, cast = cast, dot = dot }, score, 1
+        elseif math.abs(score - bestScore) <= 0.1 then
+            count = count + 1
+        end
+    end
+    for _, dot in ipairs(self.dots) do
+        if dot.key == key or dot.key == false then Consider(dot.spell, nil, dot) end
+    end
+    for spell, casts in pairs(self.casts) do
+        local seen = {}
+        for index = #casts, 1, -1 do
+            local cast = casts[index]
+            local target = cast.key or false
+            if not seen[target] then
+                seen[target] = true
+                local tracked = false
+                for _, dot in ipairs(self.dots) do
+                    if dot.spell == spell and dot.castAt == cast.at and (dot.key == key or dot.key == false) then
+                        tracked = true
+                        break
+                    end
+                end
+                if not tracked then Consider(spell, cast, nil) end
+            end
+        end
+    end
+    return best, bestScore, count
+end
+
+local function ConfirmTick(self, candidate, key, school, now)
+    local dot = candidate.dot
+    if not dot then
+        local cast = candidate.cast
+        dot = { caster = cast.caster, spell = candidate.spell, key = key, castAt = cast.at,
+            ticks = 0, direct = cast.direct }
+        self.dots[#self.dots + 1] = dot
+        for _, entry in ipairs(self.pending) do
+            if entry.spell == dot.spell and entry.at == dot.castAt and entry.key == key then
+                entry.used = true
+            end
+        end
+    end
+    dot.key = key
+    if dot.pending then dot.pending.used = true end
+    local previous, previousSchool = dot.confirmedAt, dot.confirmedSchool
+    dot.confirmedAt, dot.confirmedSchool = now, school
+    if school then dot.school = school end
+    if previous then
+        local gap = now - previous
+        local skipped = dot.period and math.floor(gap / dot.period + 0.5)
+        if not (skipped and skipped > 1 and math.abs(gap - skipped * dot.period) <= TICK_SLACK) then
+            dot.period = gap
+        end
+        dot.known = false
+        if not self.ambiguous and school and school == previousSchool then LearnSchool(self, dot.spell, school) end
+        return Ticked(self, dot, school, now)
+    end
+    -- Anchor on the actual impact; flight time must not become the interval.
+    dot.ticks = dot.ticks + 1
+    dot.next = dot.period and now + dot.period or nil
+    dot.skipped, dot.bufferUntil = 0, nil
+    RememberAmount(self, dot.spell)
+    return Result(dot.caster, dot.spell, true, { dot = dot })
 end
 
 -- Steps 1 to 5: a hit of yours, or nil.
@@ -635,6 +770,14 @@ end
 
 local function Yours(self, key, kind, school, now)
     local allowed, sure = Allowed(self.restrictNow), self.restrictNow == "tick"
+    if kind == "damage" and sure then
+        local candidate, _, count = PeriodicCandidate(self, key, school, now, self.amountNow)
+        if candidate then
+            self.ambiguous = count > 1
+            return ConfirmTick(self, candidate, key, school, now)
+        end
+        return nil
+    end
     if kind == "damage" and allowed.casts then
         for _, channel in pairs(self.channels) do
             if ChannelFits(channel, key, school, now) then
@@ -697,6 +840,7 @@ local function Yours(self, key, kind, school, now)
     end
     local function Direct(entry)
         entry.used = true
+        if entry.cast and kind ~= "miss" then entry.cast.direct = true end
         if entry.dot then entry.dot.direct, entry.dot.directAt = true, now end
         local guess
         if kind ~= "miss" and school and not entry.school then guess = Guess(self, entry, school) end
@@ -719,7 +863,7 @@ local function Yours(self, key, kind, school, now)
             -- once, so a new spell's cast need not wait for one.
             local waiting = not sure and dot.pending and not dot.pending.used and dot.pending.school == nil
                 and now - dot.pending.at <= FIRST_HIT_WAIT
-            if dot.key == key and not dot.period and not waiting and SchoolFits(dot.school, school) then
+            if dot.key == key and not dot.period and not dot.confirmedAt and not waiting and SchoolFits(dot.school, school) then
                 local candidate = dot.candidate
                 if candidate and math.abs(now - (candidate.at + candidate.period)) <= TICK_SLACK then
                     -- The tick it was waiting to confirm, on time.
@@ -848,8 +992,11 @@ function Mine:Fit(key, kind, school, now, amount, restrict)
     end
     if kind ~= "miss" and allowed.ticks then
         for _, dot in ipairs(self.dots) do
-            if dot.key == key and dot.period and dot.next and SchoolFits(dot.school, school) and math.abs(now - dot.next) <= TICK_SLACK then
-                Take(AmountFit(self, dot.spell, amount, dot.period))
+            if dot.key == key and SchoolFits(dot.school, school) then
+                local period = TickPeriod(dot, now, restrict == "tick")
+                if period then
+                    Take((dot.period and 0 or 0.4) + AmountFit(self, dot.spell, amount, dot.period))
+                end
             end
         end
         if DotDue(self, school, now) then Take(0.9) end
@@ -914,12 +1061,13 @@ function Mine:Likeliest(school, now, restrict)
             local facts = self.facts(spell)
             local known = (type(facts) == "table" and facts.school) or self.learned("school", spell)
             local damages = not (type(facts) == "table" and facts.damages == false)
+            if restrict == "direct" and type(facts) == "table" and facts.direct == false and facts.ticks == true then
+                damages = false
+            end
             if damages and SchoolFits(known, school) then
                 local kind = self.learned("direct", spell)
-                if type(facts) == "table" and facts.direct ~= nil then
-                    kind = (facts.direct and facts.ticks and BOTH) or (facts.ticks and TICKS_ONLY) or (facts.direct and DIRECT_ONLY) or kind
-                end
-                local period = self.learned("period", spell)
+                kind = SpellKind(facts, kind)
+                local period = (type(facts) == "table" and facts.period) or self.learned("period", spell)
                 local score
                 if kind ~= DIRECT_ONLY and period and since >= period - TICK_SLACK then
                     -- Only the latest cast's moment is known (the same DoT
@@ -945,6 +1093,23 @@ function Mine:Likeliest(school, now, restrict)
     end
     if not best then return nil end
     return Result(best.caster, best.spell, best.tick, { likely = true })
+end
+
+-- Read-only fit for a tick on this unit, including the first tick. A typed
+-- periodic confirmation may bypass an unknown cast's wait for a direct hit.
+function Mine:TickFit(key, school, now, amount)
+    local candidate, score = PeriodicCandidate(self, key, school, now, amount)
+    local dot = candidate and candidate.dot
+    return score, dot and dot.next and math.abs(now - dot.next) <= TICK_SLACK
+end
+
+function Mine:BufferTicks(key, school, at, untilTime)
+    for _, dot in ipairs(self.dots) do
+        if (dot.key == key or dot.key == false) and dot.period and dot.next
+            and SchoolFits(dot.school, school) and math.abs(at - dot.next) <= TICK_SLACK then
+            dot.bufferUntil = math.max(dot.bufferUntil or 0, untilTime + TICK_SLACK)
+        end
+    end
 end
 
 -- A hit (kind "damage" or "heal") or a miss (kind "miss") on the unit keyed
