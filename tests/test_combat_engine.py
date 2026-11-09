@@ -5,6 +5,16 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: the adapted engine feeds MSBT without replacing its display.
 class CombatEngineTests(unittest.TestCase):
+    def test_late_killing_hits_keep_the_lost_target_without_reusing_it(self):
+        # Given
+        script = "killing_blow_target_lifecycle.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_setup_waits_for_saved_filters_and_stays_quiet_after_reload(self):
         # Given
         script = "combat_setup_lifecycle.lua"
