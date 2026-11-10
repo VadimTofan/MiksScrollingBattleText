@@ -142,14 +142,18 @@ function Mine:MeleeWindow(hand)
     if hand then
         local lag = self:SwingDelay(hand)
         if not lag then return SWING_MIN, SWING_LINED end
-        return math.max(0.05, lag - SWING_EARLY), lag + SWING_LATE
+        -- A two-hander's hits came 0.36, 0.46 or 0.73 s after its swing, in
+        -- no order (a 3.3 s axe, 1.60.1.70862): the middle delay kept moving
+        -- between them and its narrow window dropped the others, 16 of 32
+        -- swings. So the learned window never closes inside the unlearned one.
+        return math.min(SWING_MIN, math.max(0.05, lag - SWING_EARLY)), math.max(SWING_LINED, lag + SWING_LATE)
     end
     local early, late
     for _, each in ipairs({ "main", "off" }) do
         local lag = self:SwingDelay(each)
         if lag then
-            early = math.min(early or 99, math.max(0.05, lag - SWING_EARLY))
-            late = math.max(late or 0, lag + SWING_LATE)
+            early = math.min(early or 99, math.min(SWING_MIN, math.max(0.05, lag - SWING_EARLY)))
+            late = math.max(late or 0, math.max(SWING_LINED, lag + SWING_LATE))
         end
     end
     if not early then return SWING_MIN, SWING_LINED end
