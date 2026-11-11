@@ -1,4 +1,4 @@
-# v12.048 release preparation
+# v12.048 release
 
 Updated: 2026-11-11
 
@@ -15,11 +15,20 @@ Verification: the merged suite ran 132 tests: 131 passed and the release
 archive check was skipped because no archive was supplied. Lua 5.1 checks
 used the existing Lupa runner. Conflict markers and whitespace were checked.
 
-Both client manifests and the README now report version 12.048. The changelog
-describes the merged spell matching, Windfury, sound, and killing-blow changes.
-The release tag will trigger the existing CurseForge workflow, which verifies
-the actual package before upload.
+Release commit `9b61910` and tag `v12.048` were pushed to origin. Both Validate
+runs and the CurseForge release workflow completed successfully. The workflow
+verified the archive before upload; CurseForge accepted file ID `9550672`.
+Public availability or moderation status was not independently checked.
+
+The exact workflow ZIP was downloaded to
+`D:/Codex-Temp/msbt-v12.048-release/MikScrollingBattleText-v12.048.zip`.
+Its six archive tests passed, all 69 packaged Lua files parsed as Lua 5.1,
+and both client manifests report 12.048. The ZIP contains 101 files and is
+622,870 bytes. Runtime dependencies, media, and licenses are retained;
+tests, diagnostics, and development files are excluded.
+
+Workflow: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/42930592192
 
 The Forever installation still has the feature branch version from before
-the merge. Next: verify the release workflow, then install v12.048 in Forever
-and check Windfury bursts and killing blows in game.
+the merge. Next: install v12.048 in Forever and check Windfury bursts and
+killing blows in game.
