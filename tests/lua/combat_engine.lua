@@ -148,6 +148,76 @@ for _, example in ipairs({ { spell = 401, school = 106 },
     assert(record.school == example.school and not record.result.melee)
 end
 
+do
+    -- Given combo points that the client reports one change at a time.
+    local combo = {}
+    engine.config.presentation.ComboPoints = function(_, gained, total) combo[#combo + 1] = { gained, total } end
+    local points = 0
+    GetComboPoints = function(unit, target)
+        assert(unit == "player" and target == "target")
+        return points
+    end
+    local function Points(...)
+        for _, value in ipairs({ ... }) do
+            points = value
+            Event("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+        end
+        Advance(0.02)
+        return combo[#combo]
+    end
+    assert(frame.events.UNIT_POWER_UPDATE, "the player's power is not heard")
+    -- When one point is gained, then two in one frame, then all are spent.
+    -- Then each gain is shown once with the points now on the target, and
+    -- spending them is not shown.
+    local shown = Points(1)
+    assert(shown and shown[1] == 1 and shown[2] == 1, "single combo point was not shown")
+    shown = Points(2, 3)
+    assert(#combo == 2 and shown[1] == 2 and shown[2] == 3, "two points in one frame were not shown together")
+    Points(0)
+    assert(#combo == 2, "spent combo points were shown as a gain")
+
+    -- Given a target that still holds points, another resource changing, a
+    -- hidden resource name and a hidden number of points.
+    points = 3
+    Event("PLAYER_TARGET_CHANGED")
+    shown = Points(4)
+    assert(#combo == 3 and shown[1] == 1 and shown[2] == 4, "points found on a target counted as gained")
+    points = 5
+    Event("UNIT_POWER_UPDATE", "player", "ENERGY")
+    local hiddenPoints = {}
+    local plainCheck = issecretvalue
+    issecretvalue = function(value) return value == "COMBO_POINTS" end
+    Event("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+    Advance(0.02)
+    assert(#combo == 3, "another or a hidden resource was read as combo points")
+    issecretvalue = function(value) return value == hiddenPoints end
+    points = hiddenPoints
+    Event("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+    Advance(0.02)
+    issecretvalue = plainCheck
+    assert(#combo == 3, "hidden combo points were shown")
+    -- When the points are readable again.
+    -- Then the gain counts from the last readable number, and a change that
+    -- leaves the number as it was shows nothing.
+    shown = Points(5)
+    assert(#combo == 4 and shown[1] == 1 and shown[2] == 5, "gain after hidden points was miscounted")
+    Points(5)
+    assert(#combo == 4, "unchanged combo points were shown")
+
+    -- Given a client without GetComboPoints.
+    GetComboPoints = nil
+    UnitPower = function(unit, kind)
+        assert(unit == "player" and kind == 4)
+        return points
+    end
+    Points(0)
+    -- When a point is gained.
+    shown = Points(1)
+    -- Then it is read from the player's power.
+    assert(#combo == 5 and shown[1] == 1 and shown[2] == 1, "combo points were not read from power")
+    GetComboPoints, UnitPower = nil, nil
+end
+
 -- Given an Eye Beam-like channel: a Chaos tooltip with school-124 hits.
 Advance(4)
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 403)

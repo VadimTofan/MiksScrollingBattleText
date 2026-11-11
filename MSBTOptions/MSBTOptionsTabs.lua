@@ -1045,6 +1045,8 @@ local function EventsTab_SetupEvents()
 	EventsTab_AddEvent(category, "NOTIFICATION_HONOR_GAIN", c.HONOR_AMOUNT)
 	EventsTab_AddEvent(category, "NOTIFICATION_RESOURCE_GAIN",
 		c.RESOURCE_AMOUNT .. c.RESOURCE_NAME)
+	EventsTab_AddEvent(category, "NOTIFICATION_COMBO_POINTS",
+		c.RESOURCE_AMOUNT .. c.RESOURCE_NAME .. c.RESOURCE_TOTAL)
 	EventsTab_AddEvent(category, "NOTIFICATION_REP_GAIN", c.REP_AMOUNT)
 	EventsTab_AddEvent(category, "NOTIFICATION_REP_LOSS", c.REP_AMOUNT)
 	EventsTab_AddEvent(category, "NOTIFICATION_SKILL_GAIN", c.SKILL_AMOUNT .. c.SKILL_NAME .. c.SKILL_LONG)

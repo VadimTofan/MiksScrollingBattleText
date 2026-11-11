@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
 
 from tests.lua_test_runner import run_lua_test
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 # Describe: the adapted engine feeds MSBT without replacing its display.
@@ -124,3 +127,21 @@ class CombatEngineTests(unittest.TestCase):
 
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_combo_point_gains_have_event_settings(self):
+        # Given
+        profiles = (ROOT / "MSBTProfiles.lua").read_text(encoding="utf-8-sig")
+        options = (ROOT / "MSBTOptions" / "MSBTOptionsTabs.lua").read_text(
+            encoding="utf-8-sig"
+        )
+        locale = (
+            ROOT / "MSBTOptions" / "Localization" / "localization.lua"
+        ).read_text(encoding="utf-8-sig")
+
+        # When / Then
+        self.assertEqual(profiles.count("\tNOTIFICATION_COMBO_POINTS = {"), 2)
+        self.assertIn(
+            'EventsTab_AddEvent(category, "NOTIFICATION_COMBO_POINTS"', options
+        )
+        self.assertIn('obj["NOTIFICATION_COMBO_POINTS"]', locale)
+        self.assertIn('obj["RESOURCE_TOTAL"]', locale)

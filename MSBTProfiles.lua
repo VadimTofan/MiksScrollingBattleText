@@ -934,6 +934,10 @@ if IsClassic then
 				colorR = 0.5, colorG = 0.5, colorB = 1,
 				message = "%a - %p", scrollArea = "Notification",
 			},
+			NOTIFICATION_COMBO_POINTS = {
+				colorG = 0.5, colorB = 0,
+				message = "+%a %p (%t)", scrollArea = "Notification",
+			},
 			NOTIFICATION_REP_GAIN = {
 				colorR		= 0.5,
 				colorG		= 0.5,
@@ -1982,6 +1986,10 @@ else
 			NOTIFICATION_RESOURCE_GAIN = {
 				colorR = 0.5, colorG = 0.5, colorB = 1,
 				message = "%a - %p", scrollArea = "Notification",
+			},
+			NOTIFICATION_COMBO_POINTS = {
+				colorG = 0.5, colorB = 0,
+				message = "+%a %p (%t)", scrollArea = "Notification",
 			},
 			NOTIFICATION_REP_GAIN = {
 				colorR		= 0.5,

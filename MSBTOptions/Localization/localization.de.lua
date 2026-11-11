@@ -180,6 +180,7 @@ obj["EMOTE_TEXT"]			= "%e - Der Text der Geste.\n"
 obj["MONEY_TEXT"]			= "%e - Der Text des erhaltenen Geldes.\n"
 obj["ITEM_NAME"]			= "%e - Der Name des geplünderten Gegenstands.\n"
 obj["TOTAL_ITEMS"]			= "%t - Gesamte Anzahl der geplünderten Gegenstände im Inventar."
+obj["RESOURCE_TOTAL"]		= "%t - Menge der Ressource, die du jetzt hast."
 
 
 
@@ -316,6 +317,7 @@ obj["PET_OUTGOING_DISPEL"]						= { label="Dispel", tooltip="Aktiviert von Begle
 
 obj = L.NOTIFICATION_EVENTS
 obj["NOTIFICATION_DEBUFF"]				= { label="Debuffs", tooltip="Aktiviert Debuffs, wenn du betroffen bist."}
+obj["NOTIFICATION_COMBO_POINTS"]		= { label="Combopunkte erhalten", tooltip="Zeigt erhaltene Combopunkte mit der Zahl, die jetzt auf dem Ziel liegt."}
 obj["NOTIFICATION_DEBUFF_STACK"]		= { label="Debuff-Stapel", tooltip="Aktiviert Debuff-Stapel, wenn du betroffen bist."}
 obj["NOTIFICATION_BUFF"]				= { label="Buffs", tooltip="Aktiviert Buffs, die du erhälst."}
 obj["NOTIFICATION_BUFF_STACK"]			= { label="Buff-Stacks", tooltip="Aktiviert Buff-Stapel, die du erhälst."}

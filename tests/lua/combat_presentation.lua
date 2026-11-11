@@ -115,3 +115,12 @@ presentation:Out({ event = "damage", amount = 24,
 -- Then the identified source retains its own spell and icon.
 assert(queued[1] == 601 and queued[2] == 24)
 assert(queued[4] == "icon-601")
+
+-- Given combo points gained on the target.
+profile.events.NOTIFICATION_COMBO_POINTS = { message = "+%a %p (%t)", scrollArea = "My notices" }
+COMBO_POINTS = "Combo Points"
+-- When the engine reports the gain and the points now there.
+presentation:ComboPoints(2, 4)
+-- Then both numbers scroll with the resource's name.
+assert(displayed[#displayed][1] == profile.events.NOTIFICATION_COMBO_POINTS)
+assert(displayed[#displayed][2] == "+2 Combo Points (4)")

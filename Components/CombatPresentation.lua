@@ -81,6 +81,16 @@ function Presentation:Resource(amount, powerToken)
 	self.config.displayResource(settings, amount, powerToken)
 end
 
+-- Combo points gained, shown like looted items: the gain, the resource's
+-- name and the points now on the target (Combat/Reader.lua, ShowComboPoints).
+function Presentation:ComboPoints(gained, total)
+	local settings = self:Settings("NOTIFICATION_COMBO_POINTS")
+	if not settings then return end
+	local message = settings.message:gsub("%%a", gained):gsub("%%t", total)
+		:gsub("%%p", _G.COMBO_POINTS or "Combo Points")
+	self.config.display(settings, message)
+end
+
 function Presentation:RememberIncomingHeal(record)
 	local now = self.config.getTime()
 	record.healerTime = now

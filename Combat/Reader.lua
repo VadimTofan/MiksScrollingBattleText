@@ -1588,6 +1588,37 @@ local function OnLogMessage(text, r, g, b, order)
 end
 
 -- Events -------------------------------------------------------------------------------------------------
+-- Combo points -------------------------------------------------------------------
+-- Gained combo points are shown like looted items: the gain, then the points
+-- now on the target. The combat text feed cannot serve: in a fight its
+-- amount and its resource are secret. But each change comes as a
+-- UNIT_POWER_UPDATE of the player with the readable name COMBO_POINTS, and
+-- the points are then plain numbers (seen on Forever). A strike that gives
+-- two points comes as two such events in one frame, and after a finisher
+-- GetComboPoints lags one event behind, so the points are read a frame later
+-- and compared with the last number read. Points found on a target are not a
+-- gain: the number is taken afresh when the target changes (predicted, not
+-- yet seen in client).
+local COMBO_POINTS = Enum and Enum.PowerType and Enum.PowerType.ComboPoints or 4
+local function ReadComboPoints()
+    local _, points
+    if GetComboPoints then
+        _, points = pcall(GetComboPoints, "player", "target")
+    else
+        _, points = pcall(UnitPower, "player", COMBO_POINTS)
+    end
+    if ns.Number(points, 0) then return points end
+end
+local function ShowComboPoints()
+    local points = ReadComboPoints()
+    if not points then return end
+    local before = reader.comboPoints or 0
+    reader.comboPoints = points
+    if points <= before then return end
+    local router = Router()
+    if router then router:ComboPoints(points - before, points) end
+end
+
 local EVENTS = {
     "UNIT_COMBAT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "PLAYER_SWING", "PLAYER_TARGET_CHANGED",
     "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOSS_OF_CONTROL_ADDED", "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",
@@ -1632,6 +1663,7 @@ local function OnEvent(_, event, ...)
         reader.epoch = reader.epoch + 1
         FindTargetPlate()
         ns.TargetKey()
+        reader.comboPoints = ReadComboPoints()
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         local token = ...
         if ns.Text(token) then
@@ -1699,6 +1731,9 @@ local function OnEvent(_, event, ...)
         end
     elseif event == "COMBAT_TEXT_UPDATE" then
         OnCombatText(...)
+    elseif event == "UNIT_POWER_UPDATE" then
+        local _, kind = ...
+        if ns.Text(kind) and kind == "COMBO_POINTS" then C_Timer.After(0, ShowComboPoints) end
     elseif event == "PLAYER_REGEN_DISABLED" then
         OnCombat(true)
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -1746,6 +1781,9 @@ function ns.StartReader()
         frame:RegisterUnitEvent("UNIT_AURA", "player")
     end
     reader.auras = {}
+    if ns.EventAvailable("UNIT_POWER_UPDATE") then
+        frame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
+    end
     frame:SetScript("OnEvent", function(_, event, ...)
         ns.Dispatch(event, ...)
     end)
