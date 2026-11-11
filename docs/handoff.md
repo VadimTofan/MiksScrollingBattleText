@@ -8,6 +8,15 @@ their original input is unknown. Name rows display "all ranks"; ID rows keep
 their number. Both rule types retain checkbox states and custom styles through
 profile export and import.
 
+Follow-up: name entry no longer requires a successful spell API lookup. If
+lookup returns no result, the trimmed name is saved directly for exact display
+name matching. This permits unlearned or otherwise unresolved aura names;
+users must check their spelling. Numeric IDs still require a valid lookup,
+and empty or control-character input is rejected. Regression tests reproduced
+the rejection in both resolution and the real options panel before the fix.
+The full suite still passes (132 passed, one archive check skipped), and both
+follow-up runtime files were synced to Forever with SHA-256 verification.
+
 Either matching exclusion hides the notification. When both matching rules
 are enabled, the exact-ID style takes priority. Name-only combat-text notices
 can match name rules, but cannot establish an exact rank for ID rules. If WoW

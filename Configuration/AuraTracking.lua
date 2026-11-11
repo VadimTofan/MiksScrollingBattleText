@@ -26,12 +26,12 @@ end
 function AuraTracking:Resolve(input)
 	if type(input) ~= "string" then return end
 	input = input:match("^%s*(.-)%s*$")
-	if input == "" then return end
+	if input == "" or input:find("%c") then return end
 	local number = tonumber(input)
 	local info = Spells:GetInfo(number or input)
-	if not info then return end
-	if number then return SpellKey(number) end
-	return NameKey(nil, info.name)
+	if number then return info and SpellKey(number) end
+	-- A valid aura name need not be resolvable through the spellbook API.
+	return NameKey(nil, info and info.name or input)
 end
 
 function AuraTracking:ShouldShow(rules, spellID, name)

@@ -237,7 +237,7 @@ assert(MikSBT.Profiles.currentProfile.auraTracking["17"] == false)
 
 -- Given invalid input and an already listed aura.
 -- When Add is clicked for each.
-panel.input:SetText("unknown")
+panel.input:SetText("99999999")
 panel.add.clickHandler(panel.add)
 panel.input:SetText("17")
 panel.add.clickHandler(panel.add)
@@ -340,3 +340,14 @@ list.lines[1].auraLine.remove:click()
 assert(MikSBT.Profiles.currentProfile.auraTracking[nameKey] == nil)
 assert(MikSBT.Profiles.currentProfile.auraSettings[nameKey] == nil)
 assert(MikSBT.Profiles.currentProfile.auraTracking["17"] == true)
+
+-- Given a name that the spell API cannot resolve.
+-- When it is added through the real options panel.
+local errorsBefore = #messages
+panel.input:SetText("Unlearned Aura")
+panel.add.clickHandler(panel.add)
+-- Then a name rule appears without a false 'Aura not found' error.
+assert(MikSBT.Profiles.currentProfile.auraTracking[
+    "name:Unlearned Aura"] == false, "unresolved name was rejected")
+assert(#messages == errorsBefore)
+assert(list.items[1] == "name:Unlearned Aura")

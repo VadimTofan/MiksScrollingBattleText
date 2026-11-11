@@ -22,7 +22,7 @@ local named = Tracking:Resolve("Power Word: Shield")
 -- Then the input's matching scope is preserved, and invalid input is rejected.
 assert(id == "1459" and named == "name:Power Word: Shield",
 	"name input lost its all-ranks scope")
-assert(Tracking:Resolve("not an aura") == nil)
+assert(Tracking:Resolve("") == nil)
 assert(Tracking:Resolve("-3") == nil)
 
 -- Given only one hidden aura in the active profile.
@@ -136,3 +136,30 @@ presentation:Aura(true, false, secret, 135932, secret)
 -- Then it remains displayable without inspecting restricted data.
 assert(#shown == before + 1 and shown[#shown][2] == secret)
 print("Aura rank matching tests passed")
+
+-- Describe: name rules do not require spellbook name lookup support.
+-- Given a client that resolves numeric IDs but not names.
+local getSpellInfo = C_Spell.GetSpellInfo
+C_Spell.GetSpellInfo = function(value)
+	if type(value) == "number" then return getSpellInfo(value) end
+end
+-- When the user enters an exact name with surrounding whitespace.
+local unlistedName = Tracking:Resolve("  Arcane Intellect  ")
+-- Then it is saved as a name rule, and numeric validation still applies.
+assert(unlistedName == "name:Arcane Intellect",
+	"name rule incorrectly required a successful spell lookup")
+assert(Tracking:Resolve("1459") == "1459")
+assert(Tracking:Resolve("99999999") == nil)
+assert(Tracking:Resolve("   ") == nil)
+assert(Tracking:Resolve("Arcane\nIntellect") == nil)
+
+-- Given the rule entered while name lookup was unavailable.
+profile.auraTracking = { [unlistedName] = false }
+before = #shown
+-- When two ranks and a name-only notification arrive.
+presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
+presentation:Aura(false, false, "Arcane Intellect", 135932, 1460)
+presentation:Aura(true, false, "Arcane Intellect", 135932)
+-- Then every matching notification is hidden.
+assert(#shown == before)
+C_Spell.GetSpellInfo = getSpellInfo
