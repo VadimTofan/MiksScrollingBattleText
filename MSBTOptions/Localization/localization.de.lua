@@ -277,6 +277,7 @@ obj["OUTGOING_HEAL_CRIT"]					= { label="Heilung: Krit", tooltip="Aktiviert ausg
 obj["OUTGOING_HOT"]							= { label="HoT", tooltip="Aktiviert ausgehende Heilungen über Zeit."}
 obj["OUTGOING_HOT_CRIT"]					= { label="HoT: Krit", tooltip="Aktiviert ausgehende, kritische Heilungen über Zeit."}
 obj["OUTGOING_DISPEL"]						= { label="Dispel", tooltip="Aktiviert ausgehende Entzauberungen."}
+obj["OUTGOING_DEBUFF"]						= { label="Debuffs auf dem Ziel", tooltip="Aktiviert die Anzeige, wenn dein Debuff auf deinem Ziel ankommt."}
 
 obj = L.OUTGOING_PET_EVENTS
 obj["PET_OUTGOING_DAMAGE"]						= { label="Melee: Treffer", tooltip="Aktiviert von Begleiter ausgehende Melee-Treffer."}

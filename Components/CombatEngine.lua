@@ -38,10 +38,14 @@ function Engine:CreateRouter()
 			return presentation[method](presentation, ...)
 		end
 	end
-	router.Out = function(_, record)
-		if ns.EventAvailable("COMBAT_LOG_MESSAGE")
-			and not self.config.log:IsReady() then return end
-		return presentation:Out(record)
+	-- Outgoing text waits for the combat log filter to be ready.
+	for _, name in ipairs({ "Out", "Landed" }) do
+		local method = name
+		router[method] = function(_, ...)
+			if ns.EventAvailable("COMBAT_LOG_MESSAGE")
+				and not self.config.log:IsReady() then return end
+			return presentation[method](presentation, ...)
+		end
 	end
 	return router
 end

@@ -402,6 +402,8 @@ end
 
 -- A cast of yours or your pet's on the unit keyed key (nil: no unit to
 -- match against).
+-- Returns the cast's record when it waits on a unit (Reader.lua watches it
+-- for a landing).
 function Mine:Cast(caster, spell, key, now)
     if type(spell) ~= "number" then return end
     caster = caster == "pet" and "pet" or "you"
@@ -438,7 +440,7 @@ function Mine:Cast(caster, spell, key, now)
                 missOnly = true, cast = cast,
             }
             while #self.pending > MAX do table.remove(self.pending, 1) end
-            return
+            return cast
         end
         -- The description wins over anything learned from hits (0.3.6: a
         -- Curse of Agony learned as Physical from a pet's swings).
@@ -467,6 +469,7 @@ function Mine:Cast(caster, spell, key, now)
     end
     while #self.pending > MAX do table.remove(self.pending, 1) end
     while #self.dots > MAX do table.remove(self.dots, 1) end
+    return cast
 end
 
 -- One of your swings (hand: "main", "off" or "ranged"). Returns a held hit

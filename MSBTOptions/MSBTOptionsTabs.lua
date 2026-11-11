@@ -994,6 +994,7 @@ local function EventsTab_SetupEvents()
 	EventsTab_AddEvent(category, "OUTGOING_HOT", c.HEALING_DONE .. c.HEALED_NAME .. c.SPELL_NAME .. c.SKILL_LONG)
 	EventsTab_AddEvent(category, "OUTGOING_HOT_CRIT", c.HEALING_DONE .. c.HEALED_NAME .. c.SPELL_NAME .. c.SKILL_LONG)
 	EventsTab_AddEvent(category, "OUTGOING_DISPEL", c.ATTACKED_NAME .. c.BUFF_NAME .. c.SKILL_LONG)
+	EventsTab_AddEvent(category, "OUTGOING_DEBUFF", c.SKILL_NAME .. c.SKILL_LONG)
 
 	category = "OUTGOING_PET_EVENTS"
 	EventsTab_AddEvent(category, "PET_OUTGOING_DAMAGE", c.DAMAGE_DONE .. c.ATTACKED_NAME)

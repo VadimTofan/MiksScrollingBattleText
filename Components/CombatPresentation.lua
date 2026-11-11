@@ -254,6 +254,12 @@ function Presentation:Aura(gained, harmful, name, icon, spellID)
 	end
 end
 
+-- A harmful spell of yours that left its debuff on the target and took no
+-- hit of its own (Combat/Reader.lua, WatchLanding).
+function Presentation:Landed(spell)
+	self:Emit("OUTGOING_DEBUFF", { spell = spell })
+end
+
 local ALERT_EVENTS = {
 	interrupt = "OUTGOING_SPELL_INTERRUPT",
 	dispel = "OUTGOING_DISPEL",

@@ -373,6 +373,7 @@ obj["OUTGOING_HEAL_CRIT"]					= { label="Crit Heals", tooltip="Enable outgoing c
 obj["OUTGOING_HOT"]							= { label="Heals Over Time", tooltip="Enable outgoing heals over time."}
 obj["OUTGOING_HOT_CRIT"]					= { label="Crit Heals Over Time", tooltip="Enable outgoing crit heals over time."}
 obj["OUTGOING_DISPEL"]						= { label="Dispels", tooltip="Enable outgoing dispels."}
+obj["OUTGOING_DEBUFF"]						= { label="Debuffs on Target", tooltip="Enable your debuffs landing on your target."}
 
 obj = L.OUTGOING_PET_EVENTS
 obj["PET_OUTGOING_DAMAGE"]						= { label="Melee Hits", tooltip="Enable your pet's outgoing melee hits."}

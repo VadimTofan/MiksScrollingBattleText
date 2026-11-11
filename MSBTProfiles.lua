@@ -505,6 +505,13 @@ if IsClassic then
 				message		= L.MSG_DISPEL .. "! (%s)",
 				scrollArea	= "Outgoing",
 			},
+			OUTGOING_DEBUFF = {
+				colorR		= 0,
+				colorG		= 0.5,
+				colorB		= 0.5,
+				message		= "[%sl]",
+				scrollArea	= "Outgoing",
+			},
 
 			PET_INCOMING_DAMAGE = {
 				colorG		= 0.41,
@@ -1552,6 +1559,13 @@ else
 			OUTGOING_DISPEL = {
 				colorB		= 0.5,
 				message		= L.MSG_DISPEL .. "! (%s)",
+				scrollArea	= "Outgoing",
+			},
+			OUTGOING_DEBUFF = {
+				colorR		= 0,
+				colorG		= 0.5,
+				colorB		= 0.5,
+				message		= "[%sl]",
 				scrollArea	= "Outgoing",
 			},
 
