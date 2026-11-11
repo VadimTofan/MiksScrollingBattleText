@@ -14,7 +14,8 @@ local ns = MikSBT.CombatEngine
 -- So a hit on a unit is matched to them by time and school:
 --   1. the next tick of a DoT of yours, on its rhythm;
 --   2. a direct cast whose target, school and readable damage fit the hit,
---      with a clear margin over other spell identities;
+--      with a clear margin over other spell identities, or the one cast
+--      made in the hit's frame;
 --   3. the first tick of a spell that may tick: 1, 1.5, 2 or 3 seconds
 --      after its cast, or as long after its first matched hit as that hit
 --      came after the cast (a first tick taken for a hit);
@@ -58,6 +59,16 @@ local DIRECT_WINDOW = 3.0
 -- Time breaks ties within one identity, but cannot by itself name a spell.
 local DIRECT_MATCH_MARGIN = 0.1
 local DIRECT_TIME_WEIGHT = 0.05
+-- The frame of a cast can: a strike's report came with the timestamp of its
+-- cast's event (seen on Forever with Rake and Claw, three of three; a
+-- queued strike reports in its cast's frame too, Reader.lua). With amounts
+-- hidden in a fight and no description read, two different casts waiting on
+-- a unit left every hit without a name, and as such a hit uses up no cast,
+-- the next was nameless again: after a taunt, seven strikes of seven, each
+-- shown with a question mark. A cast made within SAME_FRAME of the hit leads
+-- older casts by more than the margin; two casts of one frame still tie, and
+-- a readable amount that fits another cast still outranks the frame.
+local SAME_FRAME, SAME_FRAME_LEAD = 0.02, 0.2
 -- A spell that hits every enemy near lands in its cast's own frame: every
 -- recorded Frost Nova, Arcane Explosion and Flamestrike hit at once did (0.3.42,
 -- 1.60.1.70374). A little room for the cast's event coming a frame late.
@@ -610,8 +621,10 @@ local function DirectCandidateScore(self, entry, key, school, now, amount, crit)
         return nil
     end
 
-    return DirectFit(self, entry.spell, amount, crit)
+    local score = DirectFit(self, entry.spell, amount, crit)
         + math.max(0, age) / DIRECT_WINDOW * DIRECT_TIME_WEIGHT
+    if age <= SAME_FRAME then score = score - SAME_FRAME_LEAD end
+    return score
 end
 
 local function SameIdentity(first, second)
