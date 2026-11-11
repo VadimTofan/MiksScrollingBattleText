@@ -55,9 +55,9 @@ assert(shown[2][1].colorB == 0.3)
 
 -- Given a category style changed after the aura was customized.
 profile.events.NOTIFICATION_BUFF.colorG = 0.7
--- When that aura is reported without a spell ID.
-presentation:Aura(true, false, "Arcane Intellect", 135932)
--- Then untouched fields still inherit, even through the name-only fallback.
+-- When that exact aura is reported with its spell ID.
+presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
+-- Then untouched fields still inherit.
 assert(shown[4][1].colorG == 0.7 and shown[4][1].colorR == 0.9)
 
 -- Given a custom message and an explicit non-sticky override.
@@ -102,3 +102,13 @@ presentation:Aura(true, false, secret, 135932, 1459)
 -- Then it receives the same custom style and the original opaque name.
 assert(shown[8][1].fontSize == 24 and shown[8][2] == secret)
 print("Custom aura style tests passed")
+
+-- Given a name-based style covering every rank.
+profile.auraTracking = { ["name:Arcane Intellect"] = true }
+profile.auraSettings["name:Arcane Intellect"] = { fontSize = 32 }
+-- When another rank gains and a name-only fade notice arrives.
+presentation:Aura(true, false, "Arcane Intellect", 135932, 1460)
+presentation:Aura(false, false, "Arcane Intellect", 135932)
+-- Then both use the all-ranks style and keep their category messages.
+assert(shown[9][1].fontSize == 32 and shown[10][1].fontSize == 32)
+assert(shown[10][2] == "Lost Arcane Intellect")

@@ -13,39 +13,41 @@ local function SpellKey(value)
 	end
 end
 
+local function NameKey(spellID, name)
+	name = RestrictedValue:String(name)
+	if not name then
+		local id = SpellKey(spellID)
+		local info = id and Spells:GetInfo(tonumber(id))
+		name = info and info.name
+	end
+	if name and name ~= "" then return "name:" .. name end
+end
+
 function AuraTracking:Resolve(input)
 	if type(input) ~= "string" then return end
 	input = input:match("^%s*(.-)%s*$")
 	if input == "" then return end
-	local info = Spells:GetInfo(tonumber(input) or input)
-	return info and SpellKey(info.spellID)
+	local number = tonumber(input)
+	local info = Spells:GetInfo(number or input)
+	if not info then return end
+	if number then return SpellKey(number) end
+	return NameKey(nil, info.name)
 end
 
 function AuraTracking:ShouldShow(rules, spellID, name)
 	if type(rules) ~= "table" then return true end
 	local key = SpellKey(spellID)
-	if key then return rules[key] ~= false end
-	name = RestrictedValue:String(name)
-	if not name then return true end
-	-- Combat-text fallbacks may expose a name without a spell ID.
-	for id, enabled in pairs(rules) do
-		if enabled == false then
-			local info = Spells:GetInfo(tonumber(id))
-			if info and info.name == name then return false end
-		end
-	end
-	return true
+	if key and rules[key] == false then return false end
+	local named = NameKey(spellID, name)
+	return not named or rules[named] ~= false
 end
 
 function AuraTracking:FindID(rules, spellID, name)
+	if type(rules) ~= "table" then return end
 	local key = SpellKey(spellID)
-	if key then return key end
-	name = RestrictedValue:String(name)
-	if not name or type(rules) ~= "table" then return end
-	for id in pairs(rules) do
-		local info = Spells:GetInfo(tonumber(id))
-		if info and info.name == name then return id end
-	end
+	if key and rules[key] ~= nil then return key end
+	local named = NameKey(spellID, name)
+	if named and rules[named] ~= nil then return named end
 end
 
 function AuraTracking:GetSettings(profile, id, eventKey)

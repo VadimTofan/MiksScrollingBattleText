@@ -1,4 +1,29 @@
-# Font size range
+# Aura exclusions by name or ID
+
+Updated: 2026-11-11
+
+Adding an aura by name now creates an all-ranks rule. Adding a numeric ID
+creates an exact-ID rule. Existing saved rules remain exact-ID rules because
+their original input is unknown. Name rows display "all ranks"; ID rows keep
+their number. Both rule types retain checkbox states and custom styles through
+profile export and import.
+
+Either matching exclusion hides the notification. When both matching rules
+are enabled, the exact-ID style takes priority. Name-only combat-text notices
+can match name rules, but cannot establish an exact rank for ID rules. If WoW
+hides both identity fields, the notification still displays.
+
+Regression tests failed before implementation for name resolution, the options
+row, and profile transfer. The full suite ran 133 tests: 132 passed and the
+release archive check was skipped. Whitespace checks passed.
+
+The four changed runtime files were synced to Forever and verified by SHA-256.
+In-game behavior has not yet been checked.
+
+Next: run `/reload` in Forever and replace an old ID rule with a name entry to
+check gains and fades across ranks in game.
+
+## Font size range
 
 Updated: 2026-11-11
 

@@ -69,6 +69,7 @@ CreateFrame = function(_, _, parent) return Frame(parent) end
 MikSBT = { Configuration = {}, API = {}, translations = {} }
 dofile("API/RestrictedValue.lua")
 C_Spell = { GetSpellInfo = function(id)
+	if id == "Aura 17" then id = 17 end
 	id = tonumber(id)
 	if id == 1459 or id == 17 then
 		return { name = "Aura " .. id, spellID = id, iconID = id }
@@ -132,6 +133,7 @@ MikSBT.Compatibility = { Client = { isClassicContent = false } }
 MikSBT.EraseTable = function(value)
     for key in pairs(value) do value[key] = nil end
 end
+
 MikSBT.Profiles.currentProfile.events = setmetatable({}, {
     __index = function() return {
         message = "%sl", scrollArea = "Notification", colorG = 0.6,
@@ -312,3 +314,29 @@ for eventType, locale in pairs(petEvents) do
     assert(eventPopup.saveArg1 == eventType)
     assert(eventPopup.scrollArea == "Notification")
 end
+
+-- Describe: entering a name and an ID creates independently scoped rows.
+-- Given the notification category with an existing ID rule.
+controls.eventCategoryDropdown:SetSelectedID("NOTIFICATION_EVENTS")
+controls.eventCategoryDropdown:change("NOTIFICATION_EVENTS")
+-- When the same spell is added by name.
+panel.input:SetText("Aura 17")
+panel.add.clickHandler(panel.add)
+-- Then a distinct all-ranks row is saved and clearly labeled.
+local nameKey = "name:Aura 17"
+assert(MikSBT.Profiles.currentProfile.auraTracking[nameKey] == false,
+    "name entry was saved as an exact ID")
+assert(list.items[1] == nameKey)
+assert(list.lines[1].auraLine.label.text == "Aura 17 (all ranks)")
+assert(list.lines[2].auraLine.label.text == "Aura 17 (17)")
+
+-- Given the all-ranks row with a custom font.
+MSBTOptions.Auras.SaveSetting(nameKey, "fontSize", 32)
+-- When it is enabled and removed.
+list.lines[1].auraLine.checkbox:click(true)
+assert(MikSBT.Profiles.currentProfile.auraTracking[nameKey] == true)
+list.lines[1].auraLine.remove:click()
+-- Then its rule and style disappear while the exact-ID rule survives.
+assert(MikSBT.Profiles.currentProfile.auraTracking[nameKey] == nil)
+assert(MikSBT.Profiles.currentProfile.auraSettings[nameKey] == nil)
+assert(MikSBT.Profiles.currentProfile.auraTracking["17"] == true)

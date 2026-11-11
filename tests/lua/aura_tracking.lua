@@ -3,6 +3,7 @@ MikSBT = { Configuration = {}, Components = {}, API = {} }
 dofile("API/RestrictedValue.lua")
 local spells = {
 	[1459] = { name = "Arcane Intellect", spellID = 1459, iconID = 135932 },
+	[1460] = { name = "Arcane Intellect", spellID = 1460, iconID = 135932 },
 	[17] = { name = "Power Word: Shield", spellID = 17, iconID = 135940 },
 }
 C_Spell = { GetSpellInfo = function(value)
@@ -18,8 +19,9 @@ local Tracking = dofile("Configuration/AuraTracking.lua")
 -- When each input is resolved.
 local id = Tracking:Resolve(" 1459 ")
 local named = Tracking:Resolve("Power Word: Shield")
--- Then a canonical spell ID is used, and invalid input is rejected.
-assert(id == "1459" and named == "17")
+-- Then the input's matching scope is preserved, and invalid input is rejected.
+assert(id == "1459" and named == "name:Power Word: Shield",
+	"name input lost its all-ranks scope")
 assert(Tracking:Resolve("not an aura") == nil)
 assert(Tracking:Resolve("-3") == nil)
 
@@ -37,12 +39,11 @@ local presentation = Presentation:New({
 	displayRestricted = function(...) shown[#shown + 1] = {...} end,
 })
 
--- When that aura gains or fades, including a name-only combat-text notice.
+-- When that exact aura gains or fades.
 presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
 presentation:Aura(false, false, "Arcane Intellect", 135932, 1459)
 presentation:Aura(true, true, "Arcane Intellect", 135932, 1459)
 presentation:Aura(false, true, "Arcane Intellect", 135932, 1459)
-presentation:Aura(true, false, "Arcane Intellect", 135932)
 -- Then all of its aura notifications are hidden.
 assert(#shown == 0, "unchecked aura still displayed")
 
@@ -83,3 +84,55 @@ presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
 -- Then the old profile's rules do not leak into it.
 assert(#shown == 5)
 print("Aura tracking tests passed")
+
+-- Describe: name exclusions match ranks, while ID exclusions stay exact.
+-- Given a rule added by name and a separately listed, enabled rank.
+profile = { events = profile.events, auraTracking = {
+	["name:Arcane Intellect"] = false, ["1460"] = true,
+} }
+local before = #shown
+-- When either rank gains or fades, or only its name or ID is readable.
+for _, spellID in ipairs({ 1459, 1460 }) do
+	for _, harmful in ipairs({ false, true }) do
+		presentation:Aura(true, harmful, "Arcane Intellect", 135932, spellID)
+		presentation:Aura(false, harmful, "Arcane Intellect", 135932, spellID)
+	end
+end
+presentation:Aura(true, false, "Arcane Intellect", 135932)
+presentation:Aura(true, false, secret, 135932, 1460)
+-- Then the name exclusion hides all identified ranks, even an enabled ID.
+assert(#shown == before, "a name exclusion did not hide every rank")
+
+-- Given only an ID exclusion.
+profile.auraTracking = { ["1459"] = false }
+-- When another rank or a name-only notice arrives.
+presentation:Aura(true, false, "Arcane Intellect", 135932, 1460)
+presentation:Aura(true, false, "Arcane Intellect", 135932)
+-- Then neither can be suppressed by that exact-ID rule.
+assert(#shown == before + 2, "ID exclusion matched an unproven rank")
+
+-- Given both a name rule and a more specific ID rule with custom styles.
+profile.auraTracking = { ["name:Arcane Intellect"] = true, ["1459"] = true }
+-- When a different rank, the exact rank, or a name-only notice is matched.
+local rank = Tracking:FindID(profile.auraTracking, 1460, "Arcane Intellect")
+local exact = Tracking:FindID(profile.auraTracking, 1459, "Arcane Intellect")
+local fallback = Tracking:FindID(profile.auraTracking, nil, "Arcane Intellect")
+-- Then name styles cover ranks and exact ID styles take priority.
+assert(rank == "name:Arcane Intellect" and exact == "1459")
+assert(fallback == "name:Arcane Intellect")
+
+-- Given only an exact-ID style rule and a name-only notice.
+-- When its style is matched without an ID.
+local unknownRank = Tracking:FindID({ ["1459"] = true }, nil,
+	"Arcane Intellect")
+-- Then an unproven rank does not inherit the exact-ID style.
+assert(unknownRank == nil)
+
+-- Given an unidentified notice with an active name exclusion.
+profile.auraTracking["name:Arcane Intellect"] = false
+before = #shown
+-- When neither the ID nor name can be inspected.
+presentation:Aura(true, false, secret, 135932, secret)
+-- Then it remains displayable without inspecting restricted data.
+assert(#shown == before + 1 and shown[#shown][2] == secret)
+print("Aura rank matching tests passed")

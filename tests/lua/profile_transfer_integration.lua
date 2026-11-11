@@ -171,10 +171,12 @@ for _, classic in ipairs({ false, true }) do
 		"missing custom aura style defaults")
 	profiles.SetOption(nil, "auraTracking", {
 		["1459"] = false, ["17"] = true,
+		["name:Arcane Intellect"] = false,
 	})
 	profiles.SetOption(nil, "auraSettings", {
 		["17"] = { colorR = 0.4, fontSize = 28, message = "Aura %sl",
 			scrollArea = "Notification", soundFile = 123456, alwaysSticky = false },
+		["name:Arcane Intellect"] = { fontSize = 32 },
 	})
 	-- When the profile is exported and decoded for importing.
 	local auraExport = assert(profiles.ExportProfile("Default"))
@@ -186,6 +188,11 @@ for _, classic in ipairs({ false, true }) do
 	-- Then unchecked rows survive, rather than becoming missing defaults.
 	assert(auraPayload.sections.SpamControl.auraTracking["1459"] == false)
 	assert(auraPayload.sections.SpamControl.auraTracking["17"] == true)
+	assert(auraPayload.sections.SpamControl.auraTracking[
+		"name:Arcane Intellect"] == false)
+	assert(auraPayload.sections.SpamControl.auraSettings[
+		"name:Arcane Intellect"].fontSize == 32)
+	assert(auraTransfer:Validate(auraPayload), "name rules failed validation")
 	assert(auraPayload.sections.SpamControl.auraSettings["17"].fontSize == 28)
 	assert(auraPayload.sections.SpamControl.auraSettings["17"].alwaysSticky == false)
 	-- Given a malformed custom style in an imported profile.
@@ -199,6 +206,11 @@ for _, classic in ipairs({ false, true }) do
 	-- Then validation rejects data that cannot be displayed as a rule row.
 	assert(not auraTransfer:Validate(auraPayload))
 	auraPayload.sections.SpamControl.auraTracking[1] = nil
+	-- Given an empty name rule in an imported profile.
+	auraPayload.sections.SpamControl.auraTracking["name:"] = false
+	-- When its key is validated, then the malformed entry is rejected.
+	assert(not auraTransfer:Validate(auraPayload))
+	auraPayload.sections.SpamControl.auraTracking["name:"] = nil
 
 	-- Given every event offered by the actual options list on this client.
 	for eventType in optionsSource:gmatch(
@@ -314,6 +326,8 @@ assert(profiles.currentProfile.lowManaSoundDisabled == false)
 assert(profiles.currentProfile.partialColoringDisabled)
 assert(profiles.currentProfile.auraTracking["1459"] == false)
 assert(profiles.currentProfile.auraTracking["17"] == true)
+assert(profiles.currentProfile.auraTracking["name:Arcane Intellect"] == false)
+assert(profiles.currentProfile.auraSettings["name:Arcane Intellect"].fontSize == 32)
 assert(profiles.currentProfile.auraSettings["17"].message == "Aura %sl")
 assert(profiles.currentProfile.damageColoringDisabled)
 assert(profiles.currentProfile.scrollAreas.Incoming.skillIconsDisabled)
