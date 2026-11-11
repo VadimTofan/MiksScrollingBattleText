@@ -1,4 +1,27 @@
-# Player and NPC killing blows
+# Duplicate killing-blow notifications
+
+Updated: 2026-11-11
+
+A melee kill with no damage report could emit both the normal PARTY_KILL alert
+and the delayed killing-swing fallback. Both paths now share a notification
+flag on the kill line. Whichever runs first sends the notification; the other
+still completes its bookkeeping without displaying another alert. Distinct
+kill lines retain independent notifications and the existing NPC/player routing.
+
+The regression test failed first for duplicate notifications. It now covers
+NPC and player victims, both timer orders, and a second distinct kill. The full
+suite ran 139 tests: 138 passed and the release-archive check was skipped.
+
+The Forever sync check found its reader still matched the version before
+player/NPC classification, despite the earlier installation note below. That
+file now matches the tested source, including classification and duplicate
+prevention. The installed reader passed the same Lua regression test. No push
+or release was requested.
+
+Next: run `/reload` in Forever and kill an NPC with a melee finishing blow;
+confirm only one notification appears. Live confirmation is still pending.
+
+## Player and NPC killing blows
 
 Updated: 2026-11-11
 

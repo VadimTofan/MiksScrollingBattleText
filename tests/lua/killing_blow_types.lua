@@ -171,16 +171,34 @@ assert(alerts[1].victimIsPlayer == nil)
 UnitExists = targetExists
 UnitIsUnit = function(left, right) return left == right end
 
--- Given a melee killing blow whose damage report never arrives.
-Start()
-victimPlayer = true
-Event("PLAYER_SWING", 2, 1)
-Line("SWING_DAMAGE")
-Line("PARTY_KILL")
--- When both the normal alert and the delayed killing-swing fallback fire.
-Advance(3)
--- Then both preserve the dying victim's player classification.
-assert(alerts[1].victimIsPlayer == true)
-assert(#outgoing == 1 and outgoing[1].event == "killed")
-assert(outgoing[1].victimIsPlayer == true)
+-- Given player and NPC melee kills with either notification timer firing first.
+for _, player in ipairs({ true, false }) do
+	for _, delay in ipairs({ 0, 0.5 }) do
+		Start()
+		victimPlayer = player
+		ns.mine.MeleeWindow = function() return 0, delay end
+		Event("PLAYER_SWING", 2, 1)
+		Line("SWING_DAMAGE")
+		Line("PARTY_KILL")
+
+		-- When the normal alert and missing-damage fallback both run.
+		Advance(3)
+
+		-- Then one notification retains the dying victim's classification.
+		assert(#alerts + #outgoing == 1,
+			"one melee kill produced duplicate killing-blow notifications")
+		local record = alerts[1] or outgoing[1]
+		assert(record.victimIsPlayer == player)
+
+		-- When another distinct kill arrives after the first.
+		Event("PLAYER_SWING", 2, 1)
+		Line("SWING_DAMAGE")
+		Line("PARTY_KILL")
+		Advance(3)
+
+		-- Then it gets its own notification rather than being suppressed.
+		assert(#alerts + #outgoing == 2,
+			"duplicate prevention suppressed a separate kill")
+	end
+end
 print("Killing-blow victim type tests passed")

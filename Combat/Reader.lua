@@ -1520,10 +1520,12 @@ local function DrawLine(line)
     local router = Router()
     if not router then return end
     local mine = MyActionsFilter()
-    if line.source == "kill" and mine and reader.sawGrey then
+    if line.source == "kill" and mine and reader.sawGrey
+        and not line.killNotified then
         local record = { kind = "kill", icon = KillIcon(line), text = "Killing blow",
             victimIsPlayer = ResolveKillVictim(line) }
 
+        line.killNotified = true
         router:Alert(record)
     end
     if line.kind and mine then KindAlert(router, line) end
@@ -1550,7 +1552,10 @@ function ns.WatchKillingSwing(at, killingLine)
                 line.hit = { at = Now(), record = record }
 
                 local router = Router()
-                if router then router:Out(record) end
+                if router and not (killingLine and killingLine.killNotified) then
+                    if killingLine then killingLine.killNotified = true end
+                    router:Out(record)
+                end
             end)
             return
         end
