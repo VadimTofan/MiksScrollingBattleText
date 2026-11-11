@@ -1140,6 +1140,21 @@ local function UpdateWand()
 end
 ns.UpdateWand = UpdateWand
 
+-- The combo points now on the target, and whether they are at their most
+-- (the most is read from UnitPowerMax: predicted, not yet seen in client).
+local COMBO_POINTS = Enum and Enum.PowerType and Enum.PowerType.ComboPoints or 4
+local function ReadComboPoints()
+    local _, points, most
+    if GetComboPoints then
+        _, points = pcall(GetComboPoints, "player", "target")
+    else
+        _, points = pcall(UnitPower, "player", COMBO_POINTS)
+    end
+    if not ns.Number(points, 0) then return end
+    _, most = pcall(UnitPowerMax, "player", COMBO_POINTS)
+    return points, ns.Number(most, 1) and points >= most
+end
+
 -- A combo point also comes through the combat text feed, as a resource gain
 -- like any other, and was shown twice: "1 - COMBO_POINTS" above the combo
 -- point notice, which is to replace that line. In a fight the feed hides the
@@ -1148,6 +1163,11 @@ ns.UpdateWand = UpdateWand
 -- it, so a hidden gain waits GAIN_HOLD and is dropped when combo points rise
 -- meanwhile, one line for each point (ShowComboPoints). Another hidden gain
 -- in that moment cannot be told from the point's and may go in its place.
+-- With the points at their most a strike can add none, and the feed reported
+-- that too: "0 - COMBO_POINTS" (seen on Forever with five points on the
+-- target). No notice comes to stand for that line, so a hidden gain that
+-- comes while the points are at their most is not held but dropped at once
+-- (OnCombatText), and any other hidden gain of that moment with it.
 local GAIN_HOLD = 0.3
 reader.heldGains = {}
 local function HoldGain(amount, powerToken)
@@ -1208,7 +1228,8 @@ local function OnCombatText(kind)
     elseif kind == "ENERGIZE" or kind == "PERIODIC_ENERGIZE" then
         local amount, powerToken = C_CombatText.GetCurrentEventInfo()
         if not ns.Public(powerToken) then
-            HoldGain(amount, powerToken)
+            local _, full = ReadComboPoints()
+            if not full then HoldGain(amount, powerToken) end
         elseif powerToken ~= "COMBO_POINTS" then
             router:Resource(amount, powerToken)
         end
@@ -1628,16 +1649,6 @@ end
 -- and compared with the last number read. Points found on a target are not a
 -- gain: the number is taken afresh when the target changes (predicted, not
 -- yet seen in client).
-local COMBO_POINTS = Enum and Enum.PowerType and Enum.PowerType.ComboPoints or 4
-local function ReadComboPoints()
-    local _, points
-    if GetComboPoints then
-        _, points = pcall(GetComboPoints, "player", "target")
-    else
-        _, points = pcall(UnitPower, "player", COMBO_POINTS)
-    end
-    if ns.Number(points, 0) then return points end
-end
 local function ShowComboPoints()
     local points = ReadComboPoints()
     if not points then return end

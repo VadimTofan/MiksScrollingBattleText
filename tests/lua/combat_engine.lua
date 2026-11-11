@@ -271,7 +271,24 @@ do
     -- Then a combo point is left to its own notice and any other gain is
     -- shown at once.
     assert(#resources == 3 and resources[3][2] == "MANA", "readable resource gains were misrouted")
-    GetComboPoints, C_CombatText = nil, nil
+
+    -- Given the points at their most, where a strike can add none and the
+    -- feed reports its gain all the same, as a gain of nothing.
+    UnitPowerMax = function(unit, kind)
+        assert(unit == "player" and kind == 4)
+        return 5
+    end
+    feedAmount, feedToken = {}, {}
+    issecretvalue = function(value) return value == feedAmount or value == feedToken end
+    -- When such a hidden gain comes.
+    Feed(1) Wait()
+    -- Then no line is shown for it.
+    assert(#resources == 3, "a gain that could add no combo point was shown")
+    -- When the points are spent and a hidden gain comes alone.
+    Gain(0) Feed(1) Wait()
+    -- Then it is shown as before.
+    assert(#resources == 4, "a hidden gain below the most combo points was lost")
+    GetComboPoints, C_CombatText, UnitPowerMax = nil, nil, nil
     issecretvalue = plainCheck
 end
 
