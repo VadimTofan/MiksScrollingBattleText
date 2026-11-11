@@ -1,5 +1,20 @@
 # Changelog
 
+## v12.050
+
+- Separated confirmed player killing blows from NPC killing blows. Kills with
+  an unknown victim type follow the NPC setting, including unclassified PvP
+  kills. Disable NPC Killing Blows to hide NPC and unclassified notifications.
+- Fixed duplicate killing-blow notifications from the delayed melee fallback.
+- Improved miss attribution so Hunter's Mark no longer takes pet parries or
+  ranged-shot dodges. Thanks to Gamooly for the contribution and testing.
+- Kept confirmed spell misses eligible while a pet attacks, and made ranged
+  parry rejection consistent between candidate ranking and final attribution.
+- Added an opt-in loot timing capture for investigating reported stutters.
+  Run `/msbt lootprofile`, reproduce the stutter for 10–20 seconds, then run
+  `/msbt lootprofile stop` and share the five report lines. Capture is off by
+  default and stops automatically after 30 seconds or 2,000 loot events.
+
 ## v12.049
 
 - Adding an aura by name now excludes all its ranks; adding a numeric ID

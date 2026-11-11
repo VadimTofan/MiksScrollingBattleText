@@ -1,4 +1,23 @@
-# Miss attribution follow-up
+# Release v12.050 preparation
+
+Updated: 2026-11-12
+
+The user requested push and release. Both manifests now identify v12.050;
+the changelog covers player/NPC killing-blow routing, duplicate prevention,
+Gamooly's miss attribution contribution and the local follow-up, plus the
+opt-in loot profiler. Restricted Windfury damage still displays separate
+amounts on one line; no secret-value summation change was made.
+
+The release will use the existing tag-triggered CurseForge workflow, which
+builds the archive with BigWigs and verifies it before upload. The actual
+workflow, upload response and downloadable artifact still need verification.
+Local checks passed: 139 tests passed, one actual-archive check skipped, and
+the diff has no whitespace errors. The remote v12.050 tag is unused.
+
+Next: finish release checks, push main and tag v12.050, then verify the
+CurseForge workflow and archive before reporting the release result.
+
+## Miss attribution follow-up
 
 Updated: 2026-11-11
 
