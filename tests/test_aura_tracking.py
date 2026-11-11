@@ -5,6 +5,16 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: custom aura checkboxes hide only the selected notifications.
 class AuraTrackingTests(unittest.TestCase):
+    def test_secret_name_exclusions_gate_rendering_without_reading_results(self):
+        # Given
+        script = "aura_secret_filter.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_custom_aura_styles_inherit_and_override_notification_settings(self):
         # Given
         script = "aura_styles.lua"

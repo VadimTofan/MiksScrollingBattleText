@@ -46,7 +46,13 @@ function DisplayService:DisplayEvent(eventSettings, message, texturePath, muteSo
 	end
 
 	isSticky = isSticky or eventSettings.alwaysSticky
-	self.config.display(
+	local display = self.config.display
+	if eventSettings.auraVisibility and self.config.displayWithVisibility then
+		display = function(...)
+			self.config.displayWithVisibility(eventSettings.auraVisibility, ...)
+		end
+	end
+	display(
 		message,
 		area,
 		isSticky,

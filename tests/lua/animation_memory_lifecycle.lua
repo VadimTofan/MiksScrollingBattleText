@@ -2,6 +2,9 @@ local frames = {}
 local object = {}
 local formattedText
 object.__index = function(_, key)
+	if key == "SetAlpha" then
+		return function(self, value) self.lastAlpha = value end
+	end
 	if key == "SetFormattedText" then
 		return function(_, ...) formattedText = { ... } end
 	end
@@ -91,3 +94,63 @@ assert(next(weakAreas) ~= nil, "active animation lost its scroll area")
 animationFrame:OnUpdate(4)
 collectgarbage("collect")
 assert(next(weakAreas) == nil, "last completed animation retained its area")
+
+-- Describe: native visibility controls text and icons without Lua arithmetic.
+-- Given a secret visibility boolean and native-only alpha selector.
+local opaqueVisibility, opaqueAlpha = {}, {}
+issecretvalue = function(value)
+	return value == opaqueVisibility or value == opaqueAlpha
+end
+local selectedAlpha
+C_CurveUtil = { EvaluateColorValueFromBoolean = function(gate, yes, no)
+	assert(gate == opaqueVisibility)
+	selectedAlpha = { yes, no }
+	return opaqueAlpha
+end }
+local gatedEvent
+MikSBT.Animations.RegisterAnimationStyle("Gated", function(event)
+	gatedEvent = event
+	event.animationHandler = function() end
+end)
+local gate = { visible = opaqueVisibility }
+local gatedArea = { animationStyle = "Gated" }
+-- When a gated notification animates, including its fade.
+assert(type(displayConfig.displayWithVisibility) == "function",
+	"animation renderer is missing native visibility support")
+displayConfig.displayWithVisibility(gate, "Aura", gatedArea, false,
+	1, 1, 1, 18, "font", 1, 80, "aura-icon")
+animationFrame:OnUpdate(0.1)
+-- Then native selection controls both regions with the same opaque alpha.
+assert(gatedEvent.fontString.lastAlpha == opaqueAlpha)
+assert(gatedEvent.texture.lastAlpha == opaqueAlpha)
+assert(selectedAlpha[1] == 0.8 and selectedAlpha[2] == 0)
+animationFrame:OnUpdate(2.5)
+assert(selectedAlpha[1] < 0.8 and selectedAlpha[1] > 0)
+assert(gatedEvent.fontString.lastAlpha == opaqueAlpha)
+animationFrame:OnUpdate(1)
+-- Then completed cached events release the secret visibility reference.
+assert(gatedEvent.visibility == nil)
+
+-- Given a normal event reusing a previously gated cache entry.
+-- When it animates without a filter.
+displayConfig.display("Normal", gatedArea, false,
+	1, 1, 1, 18, "font", 1, 80, "normal-icon")
+animationFrame:OnUpdate(0.1)
+-- Then no hidden gate leaks into the normal message or icon.
+assert(gatedEvent.fontString.lastAlpha == 0.8)
+assert(gatedEvent.texture.lastAlpha == 0.8)
+animationFrame:OnUpdate(4)
+
+-- Given a native selector that becomes unavailable after enqueueing.
+C_CurveUtil.EvaluateColorValueFromBoolean = function()
+	error("native selector unavailable")
+end
+-- When the queued secret aura animates.
+displayConfig.displayWithVisibility(gate, "Fallback", gatedArea, false,
+	1, 1, 1, 18, "font", 1, 80, "aura-icon")
+animationFrame:OnUpdate(0.1)
+-- Then its original visibility survives without repeated animation errors.
+assert(gatedEvent.fontString.lastAlpha == 0.8)
+assert(gatedEvent.texture.lastAlpha == 0.8)
+assert(gatedEvent.visibility == nil)
+animationFrame:OnUpdate(4)

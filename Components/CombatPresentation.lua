@@ -225,6 +225,14 @@ function Presentation:Aura(gained, harmful, name, icon, spellID)
 		end
 	end
 	if RestrictedValue:IsRestricted(name) then
+		local visibility = rules and MikSBT.Configuration.AuraTracking
+			:SecretVisibility(rules, name)
+		if visibility then
+			-- Native visibility cannot selectively suppress sound playback.
+			settings = setmetatable({
+				auraVisibility = visibility, soundFile = "",
+			}, { __index = settings })
+		end
 		local message = (settings.message or "%sl"):gsub("%%sl", "%%a")
 		self.config.displayRestricted(settings, name, icon, message)
 	else

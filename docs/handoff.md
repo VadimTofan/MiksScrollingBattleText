@@ -2,6 +2,40 @@
 
 Updated: 2026-11-11
 
+Native secret-name filtering is now implemented on `main`. Excluded name
+rules use `C_Intl.CompareStrings`, conditional string helpers, normalization,
+and native boolean selection to produce an opaque visibility boolean. The
+animation renderer uses it to select alpha for both text and icon, including
+fades. Lua never branches on the match result or extracts the secret name.
+Completed animations release their visibility reference. Missing helpers,
+invalid native returns, and selector errors preserve visible notifications.
+
+Secret aura notifications checked against active name exclusions are muted:
+sound playback cannot be selected with the secret match result. This also
+mutes unrelated secret aura sounds checked by the filter. Numeric exclusions
+still require a readable ID; secret names cannot establish a specific rank.
+Invisible events still occupy an animation slot until they expire.
+
+Verification: regression tests failed before implementation for native
+matching and animation visibility. The full suite ran 134 tests: 133 passed,
+with the release archive check skipped. Whitespace checks passed. All five
+installed runtime files parse as Lua 5.1; three aura tests also passed against
+the installed implementations. Actual combat behavior remains unverified.
+
+The five runtime changes were synced to Forever. Its presentation and display
+service files had pre-existing pet-icon and font-size differences, so only
+the aura sections were patched there. The other three files match the source
+byte-for-byte. A separate installed display test still rejects font sizes
+above 38; the same failure was reproduced without the aura changes.
+
+References: [native selector investigation](https://github.com/Questie/Questie/blob/master/docs/forever-object-tooltip-api-audit.md#native-string-based-selection-promising-primitives-unverified-composition),
+[secret-capable alpha API](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua).
+
+Next: run `/reload` in Forever, exclude an aura by its exact displayed name,
+and check that it stays hidden in combat while an unrelated aura stays visible.
+
+## Name and ID rule storage
+
 Adding an aura by name now creates an all-ranks rule. Adding a numeric ID
 creates an exact-ID rule. Existing saved rules remain exact-ID rules because
 their original input is unknown. Name rows display "all ranks"; ID rows keep
@@ -19,8 +53,8 @@ follow-up runtime files were synced to Forever with SHA-256 verification.
 
 Either matching exclusion hides the notification. When both matching rules
 are enabled, the exact-ID style takes priority. Name-only combat-text notices
-can match name rules, but cannot establish an exact rank for ID rules. If WoW
-hides both identity fields, the notification still displays.
+can match name rules, but cannot establish an exact rank for ID rules. Hidden
+names now use native rendering selection when its helpers are available.
 
 Regression tests failed before implementation for name resolution, the options
 row, and profile transfer. The full suite ran 133 tests: 132 passed and the
@@ -28,9 +62,6 @@ release archive check was skipped. Whitespace checks passed.
 
 The four changed runtime files were synced to Forever and verified by SHA-256.
 In-game behavior has not yet been checked.
-
-Next: run `/reload` in Forever and replace an old ID rule with a name entry to
-check gains and fades across ranks in game.
 
 ## Font size range
 
