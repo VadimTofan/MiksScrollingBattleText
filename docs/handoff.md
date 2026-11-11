@@ -1,4 +1,37 @@
-# Release v12.050
+# Adaptive melee swing window
+
+Updated: 2026-11-12
+
+At the user's request, Gamooly's PR #34 was merged as `f60031f` and pulled
+into main with `--ff-only`. The requested thank-you and refinement comment:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/34#issuecomment-6809621903
+GitHub validation passed for the merge. The local follow-up is not authorized
+for push or release yet.
+
+The follow-up keeps each hand's narrow median-based window when all recent
+confirmed delays fit inside it. When a sample falls outside those margins,
+that hand retains at least the initial 0.25–0.9 second range from Gamooly's
+fix. The aggregate window combines learned hands using the same calculation.
+Weapon-speed changes still invalidate that hand's samples. Variable hands
+still use a broad window, so group-combat ambiguity is not eliminated.
+
+The new stable-window and real-reader competing-hit regressions failed first.
+After the fix, 16 focused tests passed. The full suite ran 141 tests: 140
+passed and the actual release-archive check was skipped. Tests preserve the
+slow-weapon cases, check final attribution as samples change, ordinary timing
+jitter, hand independence, sample reset and a teammate hitting at 0.30 seconds
+before the player's learned 0.45-second hit.
+
+All 102 runtime files match Forever by SHA-256, with no extra installed files.
+All 70 installed Lua files compile as Lua 5.1. Four installed regression
+scripts passed: melee windows, the combat engine including competing hits,
+miss attribution, and killing-blow classification/deduplication.
+
+Next: run `/reload` in Forever and check a slow two-hander in solo and group
+combat. The adaptive refinement is saved locally only; live validation is
+pending. Public v12.050 predates this melee-window change.
+
+## Release v12.050
 
 Updated: 2026-11-12
 

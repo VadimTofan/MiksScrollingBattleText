@@ -140,24 +140,35 @@ function Mine:SwingDelay(hand)
     table.sort(sorted)
     return sorted[math.floor((#sorted + 1) / 2)]
 end
+local function LearnedMeleeWindow(tracker, hand)
+    local lag = tracker:SwingDelay(hand)
+    if not lag then return end
+    local early = math.max(0.05, lag - SWING_EARLY)
+    local late = lag + SWING_LATE
+    -- Variable two-hander delays can fall outside the median's window.
+    -- Preserve the initial range when recent samples show that variation;
+    -- stable hands stay tight so an earlier teammate hit cannot claim them.
+    for _, delay in ipairs(tracker.swingLags[hand]) do
+        if delay < early or delay > late then
+            return math.min(SWING_MIN, early), math.max(SWING_LINED, late)
+        end
+    end
+    return early, late
+end
+
 -- The delays a melee hit with a swing's line may come after it: for a hand,
 -- or with no hand (an extra attack, a killing swing) any hand's.
 function Mine:MeleeWindow(hand)
     if hand then
-        local lag = self:SwingDelay(hand)
-        if not lag then return SWING_MIN, SWING_LINED end
-        -- A two-hander's hits came 0.36, 0.46 or 0.73 s after its swing, in
-        -- no order (a 3.3 s axe, 1.60.1.70862): the middle delay kept moving
-        -- between them and its narrow window dropped the others, 16 of 32
-        -- swings. So the learned window never closes inside the unlearned one.
-        return math.min(SWING_MIN, math.max(0.05, lag - SWING_EARLY)), math.max(SWING_LINED, lag + SWING_LATE)
+        local early, late = LearnedMeleeWindow(self, hand)
+        return early or SWING_MIN, late or SWING_LINED
     end
     local early, late
     for _, each in ipairs({ "main", "off" }) do
-        local lag = self:SwingDelay(each)
-        if lag then
-            early = math.min(early or 99, math.min(SWING_MIN, math.max(0.05, lag - SWING_EARLY)))
-            late = math.max(late or 0, math.max(SWING_LINED, lag + SWING_LATE))
+        local handEarly, handLate = LearnedMeleeWindow(self, each)
+        if handEarly then
+            early = math.min(early or 99, handEarly)
+            late = math.max(late or 0, handLate)
         end
     end
     if not early then return SWING_MIN, SWING_LINED end

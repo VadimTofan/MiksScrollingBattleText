@@ -585,4 +585,42 @@ engine:MaintainLog()
 assert(next(ns.mine.rhythm) == nil, "idle target timings were retained")
 assert(next(ns.mine.casts) == nil, "idle cast histories were retained")
 engine:Stop()
+
+-- Given stable melee timing learned from three confirmed swings.
+unsupported.PLAYER_SWING = nil
+unsupported.COMBAT_LOG_MESSAGE = nil
+unsupported.SPELL_TEXT_UPDATE = nil
+petExists, targetIsPlayer = false, false
+engine:Start()
+Advance(1)
+for index = 1, 3 do
+	Event("PLAYER_SWING", 2, 0)
+	Event("COMBAT_LOG_MESSAGE", nil, "swing")
+	Advance(0.45)
+	Event("UNIT_COMBAT", "target", "WOUND", "", 40, 1)
+	Advance(0.01)
+	Advance(2)
+end
+assert(math.abs(ns.mine:SwingDelay("main") - 0.45) < 0.001)
+outgoing = {}
+
+-- When a teammate hits before the player's next confirmed swing lands.
+Event("PLAYER_SWING", 2, 0)
+Event("COMBAT_LOG_MESSAGE", nil, "swing")
+Advance(0.30)
+Event("UNIT_COMBAT", "target", "WOUND", "", 999, 1)
+Advance(0.01)
+Advance(0.14)
+Event("UNIT_COMBAT", "target", "WOUND", "", 40, 1)
+Advance(0.01)
+Advance(0.7)
+
+-- Then the teammate's hit cannot take the player's swing confirmation.
+assert(#outgoing == 2)
+assert(outgoing[1].amount == 999 and outgoing[1].result.who == "other",
+	"an early teammate hit stole a stable swing's confirmation")
+assert(outgoing[2].amount == 40 and outgoing[2].result.who == "you"
+	and outgoing[2].result.melee,
+	"the player's later melee hit lost its confirmation")
+engine:Stop()
 print("Adapted combat engine tests passed")
