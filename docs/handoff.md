@@ -1,17 +1,34 @@
-# Release v12.049 preparation
+# Release v12.049
 
 Updated: 2026-11-11
 
-The user requested committing, pushing, and releasing the changes on `main`.
-Both runtime manifests now report 12.049. The changelog covers name/ID aura
+Release commit `3fd11c4` and tag `v12.049` were pushed to origin from `main`.
+GitHub validation and the CurseForge release workflow succeeded. The archive
+gate passed before upload; CurseForge accepted file ID `9556335`. Public
+availability or moderation status has not been independently checked.
+
+Both runtime manifests report 12.049. The changelog covers name/ID aura
 rules, native protected-name visibility, the sound limitation, larger font
 sizes, and the pet melee icon change since v12.048.
 
-The full suite ran 134 tests: 133 passed and the actual-archive check was
-skipped until packaging. Whitespace checks passed and task logs are clean.
+The full suite ran 134 tests: 133 passed, with the actual-archive check skipped
+until packaging. The exact workflow ZIP then passed all six archive tests;
+all 69 packaged Lua files parsed as Lua 5.1. Both manifest versions and the
+native aura runtime match the released source. The ZIP contains 101 files and
+is 624,210 bytes. Tests, diagnostics, and development files are excluded;
+runtime dependencies, media, localizations, and notices remain included.
+Whitespace checks passed and task logs are clean.
 
-Next: commit the release metadata, push `main` and tag `v12.049`, and confirm
-the gated CurseForge workflow upload and exact release artifact.
+Artifact: `D:/Codex-Temp/msbt-v12.049-release/MikScrollingBattleText-v12.049.zip`.
+
+Workflow: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43011216698
+
+Forever has the five native aura changes from before release preparation,
+with its earlier pet-icon and font-size differences preserved. It has not been
+replaced with the complete v12.049 archive.
+
+Next: check CurseForge public availability and test the native aura filter in
+combat after `/reload` in Forever.
 
 ## Aura exclusions by name or ID
 
