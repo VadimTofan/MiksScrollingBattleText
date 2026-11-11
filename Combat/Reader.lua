@@ -263,10 +263,14 @@ ns.ActiveWindfurySpell = ActiveWindfurySpell
 
 reader.procSources = {}
 local function ProcSpell(at, school)
-    -- The enchant is a possible source, not a damage identity. Even an
-    -- "extra" log line exposes neither the granting spell nor attack count.
-    -- Do not choose Windfury or a competing physical proc without that data.
-    if ActiveWindfurySpell(school) then return nil end
+    -- Best guess for shamans: unresolved physical procs use active Windfury.
+    -- This chooses an icon; the damage source is not proven by the enchant.
+    local windfury = ActiveWindfurySpell(school)
+    if windfury then
+        local _, class = UnitClass("player")
+        if ns.Text(class) and class == "SHAMAN" then return windfury end
+        return nil
+    end
     local best
     for kind, source in pairs(reader.procSources) do
         local fresh = at - source.at <= (PROC_KEEP[kind] or 0)

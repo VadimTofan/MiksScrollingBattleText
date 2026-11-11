@@ -251,13 +251,15 @@ for _, forever in ipairs({ false, true }) do
 			C_Spell.GetSpellDescription = spellDescription
 		end
 
-		-- Given an active Windfury enchant and two unidentified physical procs.
+		-- Given a shaman with Windfury and two unidentified physical procs.
 		Advance(4)
 		local beforeBurst = #displayed
 		local firstProc, normalHit, delayedProc = {}, {}, {}
 		local secretCheck = issecretvalue
 		local meleeSettings = events.OUTGOING_DAMAGE
 		local weaponEnchantInfo = GetWeaponEnchantInfo
+		local unitClass = UnitClass
+		UnitClass = function() return "Shaman", "SHAMAN" end
 		GetWeaponEnchantInfo = function()
 			return true, 300000, 0, 283, false, 0, 0, 0
 		end
@@ -266,7 +268,7 @@ for _, forever in ipairs({ false, true }) do
 			return value == firstProc or value == normalHit or value == delayedProc
 		end
 		local melee = filter.colors.eventColoring.SWING_DAMAGE
-		local unknownIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
+		local windfuryIcon = "icon"
 
 		-- When their confirmations share a swing but their reports cross frames.
 		Dispatch("PLAYER_SWING", 3.8, 0)
@@ -288,14 +290,14 @@ for _, forever in ipairs({ false, true }) do
 			"the delayed Windfury hit did not reach the real display pipeline")
 		assert(displayed[beforeBurst + 1][4] == firstProc)
 		assert(displayed[beforeBurst + 1][1] == events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 1][3] == unknownIcon,
-			"an early unidentified proc received Windfury's icon")
+		assert(displayed[beforeBurst + 1][3] == windfuryIcon,
+			"an early shaman proc did not receive Windfury's icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
 		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 3][3] == unknownIcon,
-			"a delayed unidentified proc received Windfury's icon")
+		assert(displayed[beforeBurst + 3][3] == windfuryIcon,
+			"a delayed shaman proc did not receive Windfury's icon")
 
 		-- Given another burst with an unidentified extra-attack grant.
 		Advance(4)
@@ -325,11 +327,12 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
 		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
 		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
-		assert(displayed[beforeOffsetBurst + 2][3] == unknownIcon,
-			"an unidentified extra-attack grant supplied a guessed icon")
-		assert(displayed[beforeOffsetBurst + 3][3] == unknownIcon)
+		assert(displayed[beforeOffsetBurst + 2][3] == windfuryIcon,
+			"a shaman extra-attack proc lost the Windfury fallback")
+		assert(displayed[beforeOffsetBurst + 3][3] == windfuryIcon)
 		issecretvalue = secretCheck
 		GetWeaponEnchantInfo = weaponEnchantInfo
+		UnitClass = unitClass
 		events.OUTGOING_DAMAGE = meleeSettings
 	end
 

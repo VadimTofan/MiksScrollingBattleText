@@ -3,9 +3,9 @@ import unittest
 from tests.lua_test_runner import run_lua_test
 
 
-# Describe: an active Windfury enchant cannot identify a physical proc.
+# Describe: shamans use active Windfury as a physical proc best guess.
 class WindfuryIconTests(unittest.TestCase):
-    def test_active_enchants_do_not_supply_unproven_damage_identities(self):
+    def test_shaman_physical_procs_use_only_an_active_windfury_fallback(self):
         # Given
         script = "windfury_icons.lua"
 

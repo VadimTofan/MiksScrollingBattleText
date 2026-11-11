@@ -58,10 +58,9 @@ Confirmed outgoing damage with several equally plausible direct spells keeps
 its amount and uses a generic question-mark icon without a guessed spell name.
 Ambiguous direct matches do not teach the engine a spell's school or hit type.
 
-On Forever, an active Windfury enchant does not prove which spell caused a
-physical proc. Extra-attack messages also hide the granting spell and attack
-count. Confirmed proc damage remains visible with a question-mark icon when
-its source cannot be distinguished.
+On Forever, shamans with an active Windfury imbue use Windfury's icon for
+unidentified physical procs as a best guess. The imbue does not prove the
+damage source. Other unidentified procs keep the question-mark icon.
 
 Where combat-log messages are supported, MSBT initially asks for `/reload`.
 During logout it saves a dedicated **MSBT combat** filter; Blizzard activates
