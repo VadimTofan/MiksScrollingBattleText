@@ -74,6 +74,14 @@ presentation:Alert({ kind = "combat", entering = true })
 -- Then the existing configured combat notice is used.
 assert(displayed[#displayed][1] == profile.events.NOTIFICATION_COMBAT_ENTER)
 
+-- Given a harmful spell of yours that left its debuff on the target.
+profile.events.OUTGOING_DEBUFF = { message = "[%sl]", scrollArea = "My outgoing" }
+-- When the engine reports that it landed.
+presentation:Landed(770)
+-- Then the spell scrolls with its icon under the debuff settings.
+assert(displayed[#displayed][1] == profile.events.OUTGOING_DEBUFF)
+assert(displayed[#displayed][3] == "icon-770")
+
 -- Given a self heal identified by the shared reader.
 presentation:In({ event = "heal", amount = 15, selfHeal = true, spell = 103 })
 -- Then it retains the dedicated self-heal event and spell icon.

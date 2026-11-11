@@ -80,6 +80,12 @@ function Engine:CreateRouter()
 		end
 		return presentation:Out(record)
 	end
+	-- A landed debuff waits for the combat log filter as outgoing hits do.
+	router.Landed = function(_, spell)
+		if ns.EventAvailable("COMBAT_LOG_MESSAGE")
+			and not self.config.log:IsReady() then return end
+		return presentation:Landed(spell)
+	end
 	return router
 end
 

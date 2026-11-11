@@ -1334,6 +1334,55 @@ local function CastTarget(unit, spell, guid, now, consume)
     end
 end
 
+-- A harmful cast of yours that leaves an aura on your target and takes no
+-- hit or miss of its own has landed, and its name is shown (nothing had
+-- shown whether a Faerie Fire arrived; it reports nothing when it lands).
+-- The target's auras are secret in a fight (GetAuraDataByIndex is refused,
+-- addedAuras is a secret table), but their event still came in the frame of
+-- the cast, three times of three; a recast came with a plain payload and no
+-- added aura. So only the moment counts: an aura added or refreshed on the
+-- target within LAND_FRAME of the cast is taken to be its doing. A resisted
+-- cast takes its miss and a strike its hit within LAND_SETTLE (a miss waits
+-- MISS_SETTLE, a hit up to LATE_LINE for its line), and those speak for
+-- themselves; so does a hit left unnamed because it might be another cast's
+-- (a recipient the client hides, or two units of one name). A miss left
+-- unnamed for that reason marks no cast, so any spell's miss line of yours
+-- within LAND_FRAME of the cast speaks for it (SpellMissLine). A spell
+-- whose missile flies puts its aura there later and is left to its hit
+-- (the rule as a whole is predicted, not yet seen in client).
+local LAND_FRAME, LAND_SETTLE = 0.05, 0.2
+local function Present(list)
+    if not ns.Public(list) then return true end
+    return type(list) == "table" and #list > 0
+end
+local function SpellMissLine(at)
+    for _, line in ipairs(reader.logLines or {}) do
+        if line.source == "mine" and LineClass(line) == "miss" and LineRestrict(line) == "direct"
+            and math.abs(line.at - at) <= LAND_FRAME then return line end
+    end
+end
+local function OnTargetAura(info)
+    if ns.Public(info) then
+        if type(info) ~= "table" then return end
+        if not (Present(info.addedAuras) or Present(info.updatedAuraInstanceIDs)) then return end
+    end
+    local now = Now()
+    reader.targetAuraAt = now
+    local watch = reader.landing
+    if watch and now - watch.at <= LAND_FRAME then watch.aura = true end
+end
+local function WatchLanding(spell, cast, now)
+    local auraAt = reader.targetAuraAt
+    local watch = { at = now, aura = auraAt ~= nil and now - auraAt <= LAND_FRAME }
+    reader.landing = watch
+    C_Timer.After(LAND_SETTLE, function()
+        if not watch.aura or cast.directUsed or cast.ambiguous then return end
+        if SpellMissLine(watch.at) then return end
+        local router = Router()
+        if router then router:Landed(spell) end
+    end)
+end
+
 local lastCast
 local WINDFURY_ATTACK_SPELL_ID = 439440
 local MAX_WINDFURY_NOTICES = 16
@@ -1433,7 +1482,10 @@ local function OnCast(unit, spell, guid)
     if TracksOutcomes() then
         reader.lastCastTarget.observed = observed == true
     end
-    ns.mine:Cast(unit, spell, key, now, uncertain)
+    -- A harmful cast of the player's is watched for its landing.
+    local harmful = C_Spell and C_Spell.IsSpellHarmful and C_Spell.IsSpellHarmful(spell)
+    local cast = ns.mine:Cast(unit, spell, key, now, uncertain)
+    if unit == "player" and cast and ns.Bool(harmful) and harmful then WatchLanding(spell, cast, now) end
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     if ns.windfuryInference and unit == "player" then
         local certain = observed == true and uncertain ~= true
@@ -2370,6 +2422,8 @@ local function OnEvent(_, event, ...)
         local unit, info = ...
         if unit == "player" then
             OnPlayerAura(info)
+        elseif unit == "target" then
+            OnTargetAura(info)
         end
     elseif event == "COMBAT_TEXT_UPDATE" then
         OnCombatText(...)
@@ -2437,7 +2491,7 @@ function ns.StartReader()
         end
     end
     if ns.EventAvailable("UNIT_AURA") then
-        frame:RegisterUnitEvent("UNIT_AURA", "player")
+        frame:RegisterUnitEvent("UNIT_AURA", "player", "target")
     end
     local presentation = MikSBT.Components.CombatPresentation
     reader.comboTotals = type(UnitPower) == "function"

@@ -24,7 +24,11 @@ CreateFrame = function()
 		assert(not unsupported[event], "registered unsupported event " .. event)
 		self.events[event] = true
 	end
-	function frame:RegisterUnitEvent(event) self:RegisterEvent(event) end
+	function frame:RegisterUnitEvent(event, ...)
+		self.units = self.units or {}
+		self.units[event] = { ... }
+		self:RegisterEvent(event)
+	end
 	function frame:SetScript(_, callback) self.callback = callback end
 	function frame:UnregisterAllEvents() self.events = {} end
 	frames[#frames + 1] = frame
@@ -129,6 +133,146 @@ Advance(0.02)
 local record = outgoing[#outgoing]
 assert(record and record.result.who == "you" and record.result.spell == 101)
 assert(record.amount == 100 and record.crit)
+
+do
+    local landed = {}
+    engine.config.presentation.Landed = function(_, spell) landed[#landed + 1] = spell end
+    -- Given a harmful spell that leaves an aura on the target and reports
+    -- nothing else. The aura's event comes in the cast's frame with its
+    -- payload hidden, as in a fight.
+    assert(frame.units.UNIT_AURA[1] == "player" and frame.units.UNIT_AURA[2] == "target",
+        "the target's auras are not heard")
+    local missLine = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring.SPELL_MISSED
+    local hiddenAuras, hiddenHarm, hiddenRecipient = {}, {}, {}
+    local plainSecretCheck = issecretvalue
+    issecretvalue = function(value)
+        return value == hiddenAuras or value == hiddenHarm or value == hiddenRecipient
+    end
+    C_Spell.IsSpellHarmful = function(id)
+        if id == 506 then return hiddenHarm end
+        return true
+    end
+    local function Settle() Advance(0.016) Advance(0.05) Advance(0.2) end
+    local function Lands(unit, spell, info)
+        Advance(4)
+        Event("UNIT_SPELLCAST_SUCCEEDED", unit, nil, spell)
+        if info then Event("UNIT_AURA", "target", info) end
+        Settle()
+        return #landed
+    end
+    local describe = C_Spell.GetSpellDescription
+    C_Spell.GetSpellDescription = function(id) return id ~= 505 and describe(id) or "" end
+    -- When the wait for a hit or a miss of its own is over.
+    -- Then the spell is shown as landed: one with no description read, one
+    -- whose aura was only refreshed, one whose aura came just before its cast.
+    assert(Lands("player", 505, { isFullUpdate = false, addedAuras = hiddenAuras }) == 1,
+        "landed debuff was not shown")
+    assert(landed[1] == 505, "another spell was shown as landed")
+    assert(Lands("player", 503, { isFullUpdate = false, updatedAuraInstanceIDs = { 7 } }) == 2,
+        "refreshed debuff was not shown")
+    Advance(4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Settle()
+    assert(#landed == 3, "an aura just before its cast was not counted")
+
+    -- Given casts that left nothing of their own on the target: no aura event,
+    -- one that only took an aura away, a full update, a spell that does not
+    -- harm, a spell whose harm the client hides, and a cast of the pet's.
+    -- When the wait is over.
+    -- Then none of them is shown as landed.
+    assert(Lands("player", 503) == 3, "a cast without an aura was shown as landed")
+    assert(Lands("player", 503, { isFullUpdate = false, addedAuras = {}, removedAuraInstanceIDs = { 7 } }) == 3,
+        "a faded aura counted as landed")
+    assert(Lands("player", 503, { isFullUpdate = true }) == 3, "a full update counted as landed")
+    C_Spell.IsSpellHarmful = function(id)
+        if id == 506 then return hiddenHarm end
+        return id ~= 504
+    end
+    assert(Lands("player", 504, { isFullUpdate = false, addedAuras = hiddenAuras }) == 3,
+        "a harmless spell was shown as landed")
+    assert(Lands("player", 506, { isFullUpdate = false, addedAuras = hiddenAuras }) == 3,
+        "a spell with hidden harm was shown as landed")
+    petExists = true
+    assert(Lands("pet", 503, { isFullUpdate = false, addedAuras = hiddenAuras }) == 3,
+        "a pet's cast was shown as landed")
+    petExists = false
+
+    -- Given a spell that is resisted and a spell that hits, each with an aura
+    -- event in its frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 8)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    -- Then the miss and the hit speak for themselves.
+    assert(#landed == 3, "a spell with a result of its own was shown as landed")
+    -- Given a spell that hits a recipient the client hides, with an aura
+    -- event in its frame: its hit is shown without a name.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", hiddenRecipient, "hidden-recipient", 101)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "hidden-recipient", 101)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    assert(outgoing[#outgoing].result.who == "you" and not outgoing[#outgoing].result.spell,
+        "the hit on a hidden recipient was named")
+    -- Then its hit, though unnamed, speaks for it.
+    assert(#landed == 3, "a spell with an unnamed hit of its own was shown as landed")
+    -- Given a spell resisted by a recipient the client hides, with an aura
+    -- event in its frame: its miss is shown without a name.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", hiddenRecipient, "hidden-resist", 503)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "hidden-resist", 503)
+    engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 8)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    assert(outgoing[#outgoing].result.missed and not outgoing[#outgoing].result.spell,
+        "the miss on a hidden recipient was named")
+    -- Then its miss, though unnamed, speaks for it.
+    assert(#landed == 3, "a spell with an unnamed miss of its own was shown as landed")
+
+    -- Given a spell of yours resisted a moment before a debuff, then a swing
+    -- of yours parried and an aura event in the debuff's frame.
+    local before = #landed
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 4)
+    Settle()
+    Advance(0.5)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("COMBAT_LOG_MESSAGE", nil, "swingMiss", 0, 0, 1)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    -- Then neither miss is taken for the debuff's own.
+    assert(#landed == before + 1, "an earlier miss or a swing's miss hid a landing")
+    -- Given the combat log filter not set up, and a debuff landing.
+    before = #landed
+    local currentFilter = Blizzard_CombatLog_Filters.currentFilter
+    Blizzard_CombatLog_Filters.currentFilter = nil
+    -- When the wait is over.
+    local shown = Lands("player", 503, { isFullUpdate = false, addedAuras = hiddenAuras })
+    Blizzard_CombatLog_Filters.currentFilter = currentFilter
+    -- Then the landing waits for the filter, as outgoing hits do.
+    assert(shown == before, "a landing was shown before the combat log filter was ready")
+    issecretvalue = plainSecretCheck
+    C_Spell.GetSpellDescription = describe
+    C_Spell.IsSpellHarmful = nil
+end
 
 -- Chaos Bolt's tooltip says Chaos; its damage uses 124, not always 127.
 for _, example in ipairs({ { spell = 401, school = 106 },
