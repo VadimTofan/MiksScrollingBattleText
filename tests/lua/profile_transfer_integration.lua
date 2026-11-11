@@ -82,6 +82,19 @@ for _, classic in ipairs({ false, true }) do
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
 
+	-- Given the loaded loot diagnostic and its command entry point.
+	local lootCommands = {}
+	MikSBT.Loot = { ProfileCommand = function(command)
+		lootCommands[#lootCommands + 1] = command or ""
+	end }
+	translations.COMMAND_USAGE = {}
+	-- When the actual slash handler receives capture start and stop commands.
+	SlashCmdList.MSBT("lootprofile")
+	SlashCmdList.MSBT("lootprofile stop")
+	-- Then it delegates both commands without opening options or changing profiles.
+	assert(#lootCommands == 2 and lootCommands[1] == ""
+		and lootCommands[2] == "stop", "loot profile command is not routed")
+
 	-- Given defaults on either client branch and an existing saved profile.
 	local defaults = profiles.masterProfile
 	assert(defaults.lowHealthSoundDisabled == false,

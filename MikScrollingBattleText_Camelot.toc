@@ -52,6 +52,7 @@ MSBTMedia.lua
 Display\AnimationEngine.lua
 MSBTTriggers.lua
 MSBTCooldowns.lua
+Components\LootProfiler.lua
 Components\LootNotifications.lua
 MSBTMain.lua
 Display\AnimationStyles.lua

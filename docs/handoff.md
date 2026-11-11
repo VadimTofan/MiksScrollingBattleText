@@ -1,4 +1,45 @@
-# Release v12.049
+# Loot stutter investigation
+
+Updated: 2026-11-11
+
+Users report stutter when repeatedly clicking corpses with loot, but not empty
+corpses. The cause is not confirmed. MSBT has no direct loot-window or mouse
+handler. Item notifications do item-info and inventory-count lookups even when
+their alert is disabled; counts also run for templates without `%t`. Those
+paths remain unchanged so timing can identify the actual cost before a fix.
+
+The approved temporary diagnostic is implemented on `main` and installed in
+Forever. After `/reload`, `/msbt lootprofile` starts a capture; spam-loot for
+10–20 seconds, then `/msbt lootprofile stop` prints five report lines. Capture
+also stops automatically after 30 seconds or 2,000 self-loot parser events.
+
+The header identifies the addon/client build and loot event count. Four rows
+report call count, total, average, maximum milliseconds, and errors:
+`handler` (full loot callback), `metadata` (item/currency lookup), `count`
+(inventory total), and `display` (synchronous notification setup, including
+sound). Handler time includes its child phases; do not add the totals together.
+The timings exclude chat parsing, later animation frames, GPU work, and other
+addons' loot-window or target-change handlers.
+
+Capture is off by default and makes no profiling-clock reads while inactive.
+It uses `GetTimePreciseSec`, or `debugprofilestop` without resetting the shared
+timer. It does not enable global CPU profiling, change notification decisions,
+or retain item data/history in SavedVariables. Captures keep fixed aggregates;
+stale timers cannot stop a later capture. Callback results, nil returns, and
+errors are preserved.
+
+Verification: new tests failed first for missing capture, command routing,
+and manifest integration. The full suite ran 137 tests: 136 passed and the
+actual release-archive check was skipped. Whitespace checks passed. The three
+installed Lua changes match the tested source; both Forever manifest edits
+only add the profiler before LootNotifications and retain version 12.048.
+This diagnostic has not been pushed or released, and no live timing capture
+has been collected yet.
+
+Next: reproduce the stutter with capture enabled and paste the five report
+lines. Use the maximum phase times to select the next investigation.
+
+## Release v12.049
 
 Updated: 2026-11-11
 

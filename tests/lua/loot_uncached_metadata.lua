@@ -6,6 +6,7 @@ local profile = {
 	events = {NOTIFICATION_LOOT = {message = "%e x%a (%t)"}},
 }
 MikSBT = {
+	Components = {},
 	Profiles = {currentProfile = profile},
 	Parser = {RegisterHandler = function(handler) callback = handler end},
 	Animations = {DisplayEvent = function(_, message, texture)
@@ -24,6 +25,7 @@ LE_ITEM_CLASS_QUESTITEM = 12
 ITEM_QUALITY_COLORS = {[1] = {r = 1, g = 1, b = 1}}
 GOLD_AMOUNT, SILVER_AMOUNT, COPPER_AMOUNT = "%d Gold", "%d Silver", "%d Copper"
 UNKNOWN = "Unknown"
+dofile("Components/LootProfiler.lua")
 local file = assert(io.open("Components/LootNotifications.lua", "rb"))
 local source = file:read("*a"):gsub("^\239\187\191", "")
 file:close()
