@@ -330,6 +330,38 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 2][3] == windfuryIcon,
 			"a shaman extra-attack proc lost the Windfury fallback")
 		assert(displayed[beforeOffsetBurst + 3][3] == windfuryIcon)
+
+		-- Given stacking is enabled for a shaman's next Windfury burst.
+		local previousStacking = MikSBT.Profiles.currentProfile.stackSimilarHits
+		MikSBT.Profiles.currentProfile.stackSimilarHits = true
+		Advance(4)
+		local beforeStackedBurst = #displayed
+		Dispatch("PLAYER_SWING", 3.8, 0)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", melee.r, melee.g, melee.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+
+		-- When the two opaque procs arrive across the normal batch window.
+		Advance(0.213)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+		Advance(0.01)
+		Advance(0.362)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+		Advance(0.01)
+		Advance(0.414)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", delayedProc, 1)
+		Advance(1.1)
+
+		-- Then one Windfury line holds both values, separate from the swing.
+		assert(#displayed == beforeStackedBurst + 2,
+			"stacking did not combine the restricted Windfury burst")
+		local stacked = displayed[#displayed]
+		assert(stacked[2] == "%s + %s [2 hits]",
+			"restricted Windfury group lost its native format placeholders")
+		assert(stacked[3] == windfuryIcon)
+		assert(stacked[4] == firstProc and stacked[5] == delayedProc,
+			"stacked Windfury changed or dropped restricted damage")
+		MikSBT.Profiles.currentProfile.stackSimilarHits = previousStacking
 		issecretvalue = secretCheck
 		GetWeaponEnchantInfo = weaponEnchantInfo
 		UnitClass = unitClass

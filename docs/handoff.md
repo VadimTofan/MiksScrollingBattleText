@@ -1,19 +1,24 @@
-# Shaman Windfury icon fallback
+# Windfury stacking
 
 Updated: 2026-11-11
 
-On Forever, shamans with an active Windfury imbue use Windfury's icon for
-unidentified physical procs as a best guess. Other classes, damage schools,
-expired imbues, and unreadable enchant data retain the existing behavior.
-Damage amounts and hit matching are unchanged. The independent 10-second
-low-health and low-mana sound cooldowns remain in place.
+With Stack Similar Hits enabled, Windfury damage uses a one-second grouping
+window. Readable hits are summed; groups containing restricted damage pass
+each value to native text formatting on one line, such as
+`120 + 150 [2 Hits]`. No restricted damage is inspected or added in Lua.
+Normal and critical hits retain separate settings and batches.
 
-Verification: the proc fallback and main runtime tests failed before
-implementation and passed afterward. The full suite ran 130 tests: 129 passed
+Other spells and disabled stacking retain their previous behavior. Resetting
+the batcher clears pending output. Toggling stacking cannot mix a pending
+ordinary batch with a restricted Windfury group.
+
+Verification: the new batcher and main runtime regressions failed before
+implementation and passed afterward. The full suite ran 131 tests: 130 passed
 and the release archive check was skipped because no archive was supplied.
 Lua 5.1 checks used the existing Lupa runner. `git diff --check` passed.
 
 The Forever installation was synced and all 101 runtime/supporting files
 matched the branch byte-for-byte.
 
-Next: run `/reload` in Forever and check the Windfury icon on shaman procs.
+Next: run `/reload` in Forever, enable Stack Similar Hits, and check Windfury
+bursts. Native rendering still needs in-game verification.
