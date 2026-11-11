@@ -218,6 +218,63 @@ do
     GetComboPoints, UnitPower = nil, nil
 end
 
+do
+    -- Given the combat text feed, which reports a combo point like any other
+    -- resource gain and hides its amount and its resource in a fight.
+    local combo, resources = {}, {}
+    engine.config.presentation.ComboPoints = function(_, gained, total) combo[#combo + 1] = { gained, total } end
+    engine.config.presentation.Resource = function(_, amount, token) resources[#resources + 1] = { amount, token } end
+    local points, feedAmount, feedToken = 0, {}, {}
+    local plainCheck = issecretvalue
+    issecretvalue = function(value) return value == feedAmount or value == feedToken end
+    GetComboPoints = function() return points end
+    C_CombatText = { GetCurrentEventInfo = function() return feedAmount, feedToken end }
+    local function Feed(count)
+        for _ = 1, count do Event("COMBAT_TEXT_UPDATE", "ENERGIZE") end
+    end
+    local function Gain(to)
+        points = to
+        Event("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+    end
+    local function Wait() Advance(0.02) Advance(0.3) end
+    Event("PLAYER_TARGET_CHANGED")
+    local shown = #combo
+
+    -- When a hidden gain comes alone.
+    Feed(1)
+    Advance(0.02)
+    assert(#resources == 0, "a hidden resource gain did not wait")
+    Advance(0.3)
+    -- Then it is shown once the wait for combo points is over.
+    assert(#resources == 1 and resources[1][1] == feedAmount and resources[1][2] == feedToken,
+        "a hidden resource gain was lost")
+
+    -- When hidden gains come with combo points: one in the frame of its
+    -- point, one a moment before its point, two with two points.
+    Feed(1) Gain(1) Wait()
+    Feed(1) Advance(0.11) Gain(2) Wait()
+    Feed(2) Gain(3) Gain(4) Wait()
+    -- Then the combo point notice stands for each of them.
+    assert(#resources == 1, "a combo point was shown as a resource gain too")
+    -- When two hidden gains come with one point.
+    Feed(2) Gain(5) Wait()
+    -- Then only one of them is taken to be the point's.
+    assert(#resources == 2, "a resource gain beside a combo point was lost")
+    assert(#combo == shown + 4, "combo points were not shown")
+
+    -- When the resource can be read.
+    issecretvalue = plainCheck
+    feedAmount, feedToken = 1, "COMBO_POINTS"
+    Feed(1)
+    feedToken = "MANA"
+    Feed(1)
+    -- Then a combo point is left to its own notice and any other gain is
+    -- shown at once.
+    assert(#resources == 3 and resources[3][2] == "MANA", "readable resource gains were misrouted")
+    GetComboPoints, C_CombatText = nil, nil
+    issecretvalue = plainCheck
+end
+
 -- Given an Eye Beam-like channel: a Chaos tooltip with school-124 hits.
 Advance(4)
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 403)

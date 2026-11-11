@@ -1140,6 +1140,31 @@ local function UpdateWand()
 end
 ns.UpdateWand = UpdateWand
 
+-- A combo point also comes through the combat text feed, as a resource gain
+-- like any other, and was shown twice: "1 - COMBO_POINTS" above the combo
+-- point notice, which is to replace that line. In a fight the feed hides the
+-- amount and the resource, so such a gain cannot be told by what it says. It
+-- came in the frame of its point's UNIT_POWER_UPDATE or up to 0.11 s before
+-- it, so a hidden gain waits GAIN_HOLD and is dropped when combo points rise
+-- meanwhile, one line for each point (ShowComboPoints). Another hidden gain
+-- in that moment cannot be told from the point's and may go in its place.
+local GAIN_HOLD = 0.3
+reader.heldGains = {}
+local function HoldGain(amount, powerToken)
+    local gain = {}
+    reader.heldGains[#reader.heldGains + 1] = gain
+    C_Timer.After(GAIN_HOLD, function()
+        for index, waiting in ipairs(reader.heldGains) do
+            if waiting == gain then
+                table.remove(reader.heldGains, index)
+                local router = Router()
+                if router then router:Resource(amount, powerToken) end
+                return
+            end
+        end
+    end)
+end
+
 local function OnCombatText(kind)
     if not ns.Text(kind) or not C_CombatText or not C_CombatText.GetCurrentEventInfo then return end
     local router = Router()
@@ -1182,7 +1207,11 @@ local function OnCombatText(kind)
         router:Healer(name)
     elseif kind == "ENERGIZE" or kind == "PERIODIC_ENERGIZE" then
         local amount, powerToken = C_CombatText.GetCurrentEventInfo()
-        router:Resource(amount, powerToken)
+        if not ns.Public(powerToken) then
+            HoldGain(amount, powerToken)
+        elseif powerToken ~= "COMBO_POINTS" then
+            router:Resource(amount, powerToken)
+        end
     elseif kind == "SPELL_ACTIVE" then
         if reader.anyGlow and Now() - reader.anyGlow < 0.5 then return end
         local name = C_CombatText.GetCurrentEventInfo()
@@ -1615,6 +1644,8 @@ local function ShowComboPoints()
     local before = reader.comboPoints or 0
     reader.comboPoints = points
     if points <= before then return end
+    -- The notice stands for the feed's line of each point (HoldGain).
+    for _ = 1, points - before do table.remove(reader.heldGains, 1) end
     local router = Router()
     if router then router:ComboPoints(points - before, points) end
 end

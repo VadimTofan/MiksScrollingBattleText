@@ -421,11 +421,14 @@ for _, forever in ipairs({ false, true }) do
 	assert(displayed[#displayed][4] == secretResource)
 	assert(displayed[#displayed][5] == "MANA")
 
-	-- When the resource token is hidden too, then its label reaches rendering.
+	-- When the resource token is hidden too, then its label reaches rendering
+	-- once the wait for combo points is over.
 	resourceToken = secretToken
 	beforeResource = #displayed
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(#displayed == beforeResource, "hidden resource type did not wait")
+	Advance(0.31)
 	assert(#displayed == beforeResource + 2, "hidden resource type dropped a gain")
 	assert(displayed[#displayed][2] == "%s - %s")
 	assert(displayed[#displayed][4] == secretResource)
@@ -436,6 +439,7 @@ for _, forever in ipairs({ false, true }) do
 	resourceSettings.message = "%p: %a (%p) 100%"
 	-- When the same opaque values arrive, then template order is preserved.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Advance(0.31)
 	local resource = displayed[#displayed]
 	assert(resource[2] == "%s: %s (%s) 100%%")
 	assert(resource[4] == secretToken and resource[5] == secretResource)
