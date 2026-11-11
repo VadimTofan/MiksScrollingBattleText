@@ -1,21 +1,34 @@
-# Release v12.050 preparation
+# Release v12.050
 
 Updated: 2026-11-12
 
-The user requested push and release. Both manifests now identify v12.050;
-the changelog covers player/NPC killing-blow routing, duplicate prevention,
-Gamooly's miss attribution contribution and the local follow-up, plus the
-opt-in loot profiler. Restricted Windfury damage still displays separate
-amounts on one line; no secret-value summation change was made.
+Release commit `4e49e69` and tag `v12.050` were pushed from main, including
+the attribution follow-up `921e3b8`. Both manifests identify v12.050. The
+changelog covers killing-blow routing and duplicates, Gamooly's miss attribution
+contribution and the follow-up, and the opt-in loot profiler. Restricted
+Windfury damage still displays separate amounts; no summation change was made.
 
-The release will use the existing tag-triggered CurseForge workflow, which
-builds the archive with BigWigs and verifies it before upload. The actual
-workflow, upload response and downloadable artifact still need verification.
-Local checks passed: 139 tests passed, one actual-archive check skipped, and
-the diff has no whitespace errors. The remote v12.050 tag is unused.
+Both GitHub validation runs and the CurseForge workflow succeeded:
+https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43117600919
+The upload response accepted CurseForge file `9566384`. Public processing or
+moderation status was not independently verified.
 
-Next: finish release checks, push main and tag v12.050, then verify the
-CurseForge workflow and archive before reporting the release result.
+The exact workflow artifact is retained at
+`D:/Codex-Temp/msbt-v12.050-release/MikScrollingBattleText-v12.050.zip`.
+It contains 102 files, 628,059 compressed bytes and 1,932,696 uncompressed bytes.
+All six actual-archive tests passed with no skips. All 70 packaged Lua files
+compile as Lua 5.1. Runtime files and binary media match the release source,
+apart from expected line endings and LibDeflate comment metadata substitutions.
+The profiler, both client manifests, locales, libraries, fonts, sounds and
+artwork are present; development files are excluded by the existing .pkgmeta.
+
+The full local suite passed 139 tests with one actual-archive check skipped
+before packaging. Whitespace checks passed. Forever's 102 runtime files match
+the source, including both v12.050 manifests.
+
+Next: obtain a loot timing capture from a user who experiences the stutter.
+Run `/msbt lootprofile`, reproduce for 10–20 seconds, and collect the five
+lines from `/msbt lootprofile stop`. The stutter cause is still unconfirmed.
 
 ## Miss attribution follow-up
 
