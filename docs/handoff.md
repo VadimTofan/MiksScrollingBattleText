@@ -1,4 +1,4 @@
-# Spell tracking merged into main
+# v12.048 release preparation
 
 Updated: 2026-11-11
 
@@ -15,8 +15,11 @@ Verification: the merged suite ran 132 tests: 131 passed and the release
 archive check was skipped because no archive was supplied. Lua 5.1 checks
 used the existing Lupa runner. Conflict markers and whitespace were checked.
 
-The Forever installation still has the feature branch version from before
-this merge. Its earlier sync does not include main's additional changes.
+Both client manifests and the README now report version 12.048. The changelog
+describes the merged spell matching, Windfury, sound, and killing-blow changes.
+The release tag will trigger the existing CurseForge workflow, which verifies
+the actual package before upload.
 
-Next: sync main to Forever before checking Windfury bursts and killing blows
-in game.
+The Forever installation still has the feature branch version from before
+the merge. Next: verify the release workflow, then install v12.048 in Forever
+and check Windfury bursts and killing blows in game.

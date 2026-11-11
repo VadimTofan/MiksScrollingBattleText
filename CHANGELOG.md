@@ -1,5 +1,17 @@
 # Changelog
 
+## v12.048
+
+- Improved spell matching and kept uncertain direct hits visible without
+  assigning an unproven spell name.
+- Added a Windfury icon fallback for shamans with an active Windfury imbue.
+- Fixed Stack Similar Hits for delayed Windfury bursts. Readable damage shows
+  a total; restricted damage shares one line, such as `120 + 150 [2 Hits]`.
+  Normal and critical hits remain separate.
+- Increased the low-health and low-mana sound cooldowns to 10 seconds.
+- Preserved late damage reports after a target disappears, including killing
+  blows reported shortly after target loss.
+
 ## v12.047
 
 - Added a Sounds tab with the master sound switch and custom sound registration.
