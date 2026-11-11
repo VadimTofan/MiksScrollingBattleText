@@ -1,4 +1,19 @@
-# Aura exclusions by name or ID
+# Release v12.049 preparation
+
+Updated: 2026-11-11
+
+The user requested committing, pushing, and releasing the changes on `main`.
+Both runtime manifests now report 12.049. The changelog covers name/ID aura
+rules, native protected-name visibility, the sound limitation, larger font
+sizes, and the pet melee icon change since v12.048.
+
+The full suite ran 134 tests: 133 passed and the actual-archive check was
+skipped until packaging. Whitespace checks passed and task logs are clean.
+
+Next: commit the release metadata, push `main` and tag `v12.049`, and confirm
+the gated CurseForge workflow upload and exact release artifact.
+
+## Aura exclusions by name or ID
 
 Updated: 2026-11-11
 

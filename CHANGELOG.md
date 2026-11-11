@@ -1,5 +1,19 @@
 # Changelog
 
+## v12.049
+
+- Adding an aura by name now excludes all its ranks; adding a numeric ID
+  excludes only that ID. Existing rules remain ID-specific, and name entries
+  are labeled "all ranks". Both types survive profile export and import.
+- Name exclusions can now hide matching protected aura text and icons during
+  combat on clients with the required native helpers. Unrelated auras stay
+  visible; unavailable helpers preserve the original display.
+- Sounds are muted for all protected aura notifications checked against name
+  exclusions, including unrelated ones. ID exclusions need a readable spell ID.
+- Expanded normal and critical font sizes to 4–100 in Master Fonts, scroll
+  areas, event overrides, and the public display helper.
+- Pet melee hits and misses now use the pet family's icon when available.
+
 ## v12.048
 
 - Improved spell matching and kept uncertain direct hits visible without
