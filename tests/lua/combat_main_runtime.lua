@@ -251,13 +251,15 @@ for _, forever in ipairs({ false, true }) do
 			C_Spell.GetSpellDescription = spellDescription
 		end
 
-		-- Given Windfury's two opaque proc hits and its ordinary melee hit.
+		-- Given a shaman with Windfury and two unidentified physical procs.
 		Advance(4)
 		local beforeBurst = #displayed
 		local firstProc, normalHit, delayedProc = {}, {}, {}
 		local secretCheck = issecretvalue
 		local meleeSettings = events.OUTGOING_DAMAGE
 		local weaponEnchantInfo = GetWeaponEnchantInfo
+		local unitClass = UnitClass
+		UnitClass = function() return "Shaman", "SHAMAN" end
 		GetWeaponEnchantInfo = function()
 			return true, 300000, 0, 283, false, 0, 0, 0
 		end
@@ -266,6 +268,7 @@ for _, forever in ipairs({ false, true }) do
 			return value == firstProc or value == normalHit or value == delayedProc
 		end
 		local melee = filter.colors.eventColoring.SWING_DAMAGE
+		local windfuryIcon = "icon"
 
 		-- When their confirmations share a swing but their reports cross frames.
 		Dispatch("PLAYER_SWING", 3.8, 0)
@@ -287,21 +290,23 @@ for _, forever in ipairs({ false, true }) do
 			"the delayed Windfury hit did not reach the real display pipeline")
 		assert(displayed[beforeBurst + 1][4] == firstProc)
 		assert(displayed[beforeBurst + 1][1] == events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 1][3] == "icon",
-			"early Windfury proc reached the display without its icon")
+		assert(displayed[beforeBurst + 1][3] == windfuryIcon,
+			"an early shaman proc did not receive Windfury's icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
 		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 3][3] == "icon",
-			"delayed Windfury proc reached the display without its icon")
+		assert(displayed[beforeBurst + 3][3] == windfuryIcon,
+			"a delayed shaman proc did not receive Windfury's icon")
 
-		-- Given the next capture's confirmations arrive after the swing frame.
+		-- Given another burst with an unidentified extra-attack grant.
 		Advance(4)
 		local beforeOffsetBurst = #displayed
 		Dispatch("PLAYER_SWING", 3.8, 0)
 		Dispatch("COMBAT_LOG_MESSAGE", "opaque", melee.r, melee.g, melee.b, 1)
 		Advance(0.099)
+		local extra = filter.colors.eventColoring.SPELL_EXTRA_ATTACKS
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", extra.r, extra.g, extra.b, 1)
 		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
 		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
 
@@ -322,10 +327,44 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
 		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
 		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
-		assert(displayed[beforeOffsetBurst + 2][3] == "icon")
-		assert(displayed[beforeOffsetBurst + 3][3] == "icon")
+		assert(displayed[beforeOffsetBurst + 2][3] == windfuryIcon,
+			"a shaman extra-attack proc lost the Windfury fallback")
+		assert(displayed[beforeOffsetBurst + 3][3] == windfuryIcon)
+
+		-- Given stacking is enabled for a shaman's next Windfury burst.
+		local previousStacking = MikSBT.Profiles.currentProfile.stackSimilarHits
+		MikSBT.Profiles.currentProfile.stackSimilarHits = true
+		Advance(4)
+		local beforeStackedBurst = #displayed
+		Dispatch("PLAYER_SWING", 3.8, 0)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", melee.r, melee.g, melee.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+
+		-- When the two opaque procs arrive across the normal batch window.
+		Advance(0.213)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+		Advance(0.01)
+		Advance(0.362)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+		Advance(0.01)
+		Advance(0.414)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", delayedProc, 1)
+		Advance(1.1)
+
+		-- Then one Windfury line holds both values, separate from the swing.
+		assert(#displayed == beforeStackedBurst + 2,
+			"stacking did not combine the restricted Windfury burst")
+		local stacked = displayed[#displayed]
+		assert(stacked[2] == "%s + %s [2 hits]",
+			"restricted Windfury group lost its native format placeholders")
+		assert(stacked[3] == windfuryIcon)
+		assert(stacked[4] == firstProc and stacked[5] == delayedProc,
+			"stacked Windfury changed or dropped restricted damage")
+		MikSBT.Profiles.currentProfile.stackSimilarHits = previousStacking
 		issecretvalue = secretCheck
 		GetWeaponEnchantInfo = weaponEnchantInfo
+		UnitClass = unitClass
 		events.OUTGOING_DAMAGE = meleeSettings
 	end
 
@@ -637,6 +676,62 @@ for _, forever in ipairs({ false, true }) do
 	end
 	UnitIsUnit = unitIsUnit
 	C_Spell.IsSpellHelpful = function() return false end
+
+	-- Given two indistinguishable direct casts and visible spell names.
+	local activeProfile = MikSBT.Profiles.currentProfile
+	local previousHideSkills = activeProfile.hideSkills
+	local previousMessage = events.OUTGOING_SPELL_DAMAGE.message
+	local previousSecretCheck = issecretvalue
+	local opaqueHit = {}
+	issecretvalue = function(value) return value == opaqueHit end
+	activeProfile.hideSkills = false
+	events.OUTGOING_SPELL_DAMAGE.message = "Hit %a - %sl"
+	for _, amount in ipairs({ 42, opaqueHit }) do
+		Advance(4)
+		local beforeAmbiguous = #displayed
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 1001)
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 1002)
+		-- When one confirmed hit reaches the real matcher and display pipeline.
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", amount, 4)
+		Advance(0.02)
+		Advance(0.31)
+		-- Then the hit appears once with a generic icon and no guessed name.
+		assert(#displayed == beforeAmbiguous + 1,
+			"ambiguous confirmed damage was dropped or displayed twice")
+		local output = displayed[#displayed]
+		assert(output[3] == "Interface\\Icons\\INV_Misc_QuestionMark")
+		if amount == opaqueHit then
+			assert(output[4] == amount, "opaque damage was changed")
+			assert(not output[2]:find("Test spell", 1, true))
+		else
+			assert(output[2] == "Hit 42", "ambiguous damage kept a guessed label")
+		end
+	end
+	issecretvalue = previousSecretCheck
+	activeProfile.hideSkills = previousHideSkills
+	events.OUTGOING_SPELL_DAMAGE.message = previousMessage
+
+	-- Given one direct cast and two competing reports for one confirmation.
+	Advance(4)
+	local previousDescription = C_Spell.GetSpellDescription
+	C_Spell.GetSpellDescription = function(id)
+		if id == 1003 then return "Deals 50 Fire damage." end
+		return previousDescription(id)
+	end
+	local beforeRanked = #displayed
+	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 1003)
+	-- When only the second report fits the cast after accounting for crits.
+	Dispatch("UNIT_COMBAT", "target", "WOUND", "", 75, 4)
+	Dispatch("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 100, 4)
+	Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+	Advance(0.02)
+	Advance(0.31)
+	-- Then the reader spends the confirmation on the matching critical hit.
+	assert(#displayed == beforeRanked + 1)
+	assert(displayed[#displayed][2]:find("100", 1, true),
+		"ownership ranking did not pass the critical flag to matching")
+	C_Spell.GetSpellDescription = previousDescription
 
 	-- Given the active filter was changed to include another player's lines.
 	local before = #displayed

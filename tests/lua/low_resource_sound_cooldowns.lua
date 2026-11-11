@@ -67,14 +67,14 @@ ManaChanged(0.2)
 -- Then mana plays immediately using its own cooldown.
 assert(#played == 2 and played[2]:match("LowMana%.ogg$"))
 
--- Given another health threshold crossing just before eight seconds.
-now = 7.999
+-- Given another health threshold crossing just before ten seconds.
+now = 9.999
 HealthChanged(1)
 HealthChanged(0.2)
-assert(#played == 2, "health sound replayed before eight seconds")
+assert(#played == 2, "health sound replayed before ten seconds")
 
 -- When health crosses again at the exact cooldown boundary.
-now = 8
+now = 10
 HealthChanged(1)
 HealthChanged(0.2)
 
@@ -82,13 +82,13 @@ HealthChanged(0.2)
 assert(#played == 3 and played[3]:match("LowHealth%.ogg$"))
 
 -- Given mana's cooldown started one second after health's.
-now = 8.999
+now = 10.999
 ManaChanged(1)
 ManaChanged(0.2)
 assert(#played == 3, "mana reused health's cooldown")
 
--- When mana crosses at its own eight-second boundary.
-now = 9
+-- When mana crosses at its own ten-second boundary.
+now = 11
 ManaChanged(1)
 ManaChanged(0.2)
 
@@ -107,7 +107,7 @@ assert(#displayed == 9 and #played == 4,
     "runtime toggle bypassed a resource sound cooldown")
 
 -- Given both cooldowns have elapsed while the profile is muted.
-now = 20
+now = 22
 profile.soundsDisabled = true
 HealthChanged(1)
 ManaChanged(1)
@@ -126,7 +126,7 @@ ManaChanged(0.2)
 assert(#played == 6, "muted alerts consumed a sound cooldown")
 
 -- Given notifications are disabled after both cooldowns expire.
-now = 30
+now = 32
 profile.msbtNotificationsDisabled = true
 HealthChanged(1)
 ManaChanged(1)
@@ -155,7 +155,7 @@ service:DisplayEvent(otherEvent, "Other")
 assert(#played == 10 and played[9] == "Bell" and played[10] == "Bell")
 
 -- Given only the low-health sound is disabled and both cooldowns expired.
-now = 40
+now = 42
 profile.lowHealthSoundDisabled = true
 local beforeText = #displayed
 HealthChanged(1)
@@ -171,7 +171,7 @@ assert(#played == 11 and played[11]:match("LowMana%.ogg$"),
     "disabling low-health sound also muted mana or left health audible")
 
 -- Given health is enabled and only the low-mana sound is disabled.
-now = 40.1
+now = 42.1
 profile.lowHealthSoundDisabled = false
 profile.lowManaSoundDisabled = true
 beforeText = #displayed

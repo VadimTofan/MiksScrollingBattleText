@@ -55,6 +55,18 @@ hit reports, spell descriptions, damage-over-time timing, and available
 combat-log message colours. MSBT still owns the scrolling windows, animations,
 fonts, sounds, crit styling, event settings, and profiles.
 
+Confirmed outgoing damage with several equally plausible direct spells keeps
+its amount and uses a generic question-mark icon without a guessed spell name.
+Ambiguous direct matches do not teach the engine a spell's school or hit type.
+
+On Forever, shamans with an active Windfury imbue use Windfury's icon for
+unidentified physical procs as a best guess. The imbue does not prove the
+damage source. Other unidentified procs keep the question-mark icon.
+
+With Stack Similar Hits enabled, Windfury hits within one second share a line.
+Readable amounts show a total; restricted amounts show each value on that
+line, such as `120 + 150 [2 Hits]`. Normal and critical hits stay separate.
+
 Where combat-log messages are supported, MSBT initially asks for `/reload`.
 During logout it saves a dedicated **MSBT combat** filter; Blizzard activates
 it on the next load. Keep it selected in the Combat Log. Changing its sources,

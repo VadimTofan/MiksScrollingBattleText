@@ -99,7 +99,7 @@ assert(#played == 1 and played[1]:match("LowMana%.ogg$"))
 mana = 0.35
 PowerChanged()
 -- When it crosses below the threshold again.
-now = 8
+now = 10
 mana = 0.349
 PowerChanged()
 -- Then the warning is rearmed.
@@ -167,7 +167,7 @@ assert(next(manaFrame.events) == nil, "disabled tracker retained events")
 assert(#displayed == 4 and #played == 2, "disabled runtime emitted an alert")
 
 -- Given a re-enabled runtime at low mana.
-now = 16
+now = 20
 triggers.Enable()
 triggers.Enable()
 -- When the health warning is shown and a power event arrives.
@@ -178,7 +178,7 @@ assert(manaFrame.events.UNIT_HEALTH, "health event was not registered")
 assert(#displayed == 6 and #played == 4)
 
 -- Given a non-mana form followed by a mana form.
-now = 24
+now = 30
 powerType = 3
 PowerChanged()
 powerType = 0
@@ -188,7 +188,7 @@ manaFrame.scripts.OnEvent(manaFrame, "UNIT_DISPLAYPOWER", "player")
 assert(#displayed == 7 and #played == 5)
 
 -- Given recovered mana followed by an empty mana bar on world entry.
-now = 32
+now = 40
 mana = 1
 PowerChanged()
 mana = 0

@@ -1,17 +1,22 @@
-# Killing-blow damage
+# Spell tracking merged into main
 
-Updated: 2026-11-09
+Updated: 2026-11-11
 
-The reader keeps a lost target's key for 500 ms for late damage reports.
-Existing ownership checks and batching still apply. Selecting a new target,
-changing worlds, or restarting the reader clears the fallback.
+The merge combines conservative direct spell matching, the shaman Windfury
+icon fallback, and Windfury stacking with main's Sounds settings and late-hit
+handling after target loss. Windfury stacking uses a one-second window;
+restricted amounts share a line without being added in Lua. Critical and
+normal hits remain separate.
 
-Regression coverage includes player and pet spells, target/nameplate removal
-order, a nameplate added after casting, duplicate reports, expiry, and restart.
+Low-health and low-mana sounds each use the requested 10-second cooldown.
+The separate sound toggles and immediate text alerts from main are retained.
 
-Verification: the full unittest suite ran 130 tests successfully, with the
-release-ZIP check skipped because no release archive was supplied. Lua 5.1
-checks used the existing local Lupa runner. `git diff --check` passed.
+Verification: the merged suite ran 132 tests: 131 passed and the release
+archive check was skipped because no archive was supplied. Lua 5.1 checks
+used the existing Lupa runner. Conflict markers and whitespace were checked.
 
-Next: run `/reload` in game and check killing blows with nameplates enabled
-and disabled. Client event delivery still needs in-game verification.
+The Forever installation still has the feature branch version from before
+this merge. Its earlier sync does not include main's additional changes.
+
+Next: sync main to Forever before checking Windfury bursts and killing blows
+in game.

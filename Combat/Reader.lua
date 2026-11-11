@@ -289,13 +289,18 @@ local function ActiveWindfurySpell(school)
     if ns.Bool(hasOff) and hasOff and ns.Number(offID, 1)
         and WINDFURY_ENCHANTS[offID] then return WINDFURY_WEAPON_SPELL_ID end
 end
+ns.ActiveWindfurySpell = ActiveWindfurySpell
 
 reader.procSources = {}
 local function ProcSpell(at, school)
-    -- Inspect the current enchant rather than a cast cache: reloads,
-    -- expiration, replacements and weapon swaps must not leave stale icons.
+    -- Best guess for shamans: unresolved physical procs use active Windfury.
+    -- This chooses an icon; the damage source is not proven by the enchant.
     local windfury = ActiveWindfurySpell(school)
-    if windfury then return windfury end
+    if windfury then
+        local _, class = UnitClass("player")
+        if ns.Text(class) and class == "SHAMAN" then return windfury end
+        return nil
+    end
     local best
     for kind, source in pairs(reader.procSources) do
         local fresh = at - source.at <= (PROC_KEEP[kind] or 0)
@@ -720,7 +725,8 @@ function DecideGroup(group, frameLines, decided)
             local kind = record.event == "miss" and "miss" or record.event
             local amount = ns.Number(record.amount) and record.amount or nil
             ranked[#ranked + 1] = { hit = hit, index = index,
-                fit = ns.mine:Fit(hit.key, kind, record.school, hit.at, amount, restrict) }
+                fit = ns.mine:Fit(hit.key, kind, record.school, hit.at,
+                    amount, restrict, record.crit) }
         end
         -- Observed on Forever: a queued strike reports zero before its
         -- physical hit in the cast's frame, with one spell confirmation.
