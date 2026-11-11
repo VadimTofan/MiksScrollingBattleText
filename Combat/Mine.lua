@@ -720,6 +720,32 @@ end
 -- ticks stay open to it), "tick" a DoT's or HoT's tick, "swing" melee,
 -- "shot" a wand or bow; nil: unknown. Each opens only the steps below that
 -- can make such a hit.
+-- Whether a miss on key can be this spell's answer. A spell that cannot be
+-- dodged, parried or blocked (Spells.lua, SpellCanAvoid) never takes one;
+-- and a magic spell never takes a plain miss while your pet is attacking
+-- that unit or a swing or shot of yours could have missed, since those are
+-- far likelier (Hunter's Mark had shown your pet's parries and your Auto
+-- Shot's misses as its own).
+local function PhysicalSourceNear(self, key, now, pet)
+    if pet then return true end
+    for _, swing in ipairs(self.swings) do
+        local since = now - swing.at
+        if not swing.used and swing.key == key and since >= 0 and since <= SwingWindow(swing, self.lineNow) then
+            return true
+        end
+    end
+    return false
+end
+local function CastTakesMiss(self, spell, key, now, avoid, pet)
+    if not avoid then return true end
+    if ns.SpellCanAvoid and not ns.SpellCanAvoid(spell, avoid) then return false end
+    if avoid == "MISS" and ns.SpellReach and ns.SpellReach(spell) == "spell"
+        and PhysicalSourceNear(self, key, now, pet) then
+        return false
+    end
+    return true
+end
+
 local function Allowed(restrict)
     return {
         ticks = restrict == nil or restrict == "tick" or restrict == "direct",
@@ -786,7 +812,9 @@ local function Yours(self, key, kind, school, now)
     for _, entry in ipairs(kind == "miss" and allowed.casts
         and self.pending or {}) do
         if not entry.used and entry.key == key and now >= entry.at and now - entry.at <= DIRECT_WINDOW then
-            exact = exact or entry
+            if CastTakesMiss(self, entry.spell, key, now, self.avoidNow, self.petNow) then
+                exact = exact or entry
+            end
         end
     end
     local function Direct(entry)
@@ -855,6 +883,7 @@ local function Yours(self, key, kind, school, now)
             local paired = self.pairedNow == swing
             if not swing.used and swing.key == key and (paired or since <= SwingWindow(swing, self.lineNow))
                 and (self.pairedNow == nil or paired)
+                and not (ranged and self.avoidNow == "PARRY")
                 and (ranged and allowed.ranged or not ranged and allowed.melee)
                 and (kind == "miss" or (ranged and since >= 0.1 and not DotDue(self, school, now)
                         and SchoolFits(self.wandSchool, school))
@@ -922,7 +951,7 @@ end
 
 -- restrict (0.3.48): what the frame's lines say made their hits; only what
 -- could have made such a hit counts.
-function Mine:Fit(key, kind, school, now, amount, restrict, crit)
+function Mine:Fit(key, kind, school, now, amount, restrict, crit, avoid, pet)
     local best
     -- A damage shield's line fits any hit on an enemy (0.3.49).
     if restrict == "shield" then return (kind == "damage" or kind == "miss") and 0.7 or nil end
@@ -935,7 +964,8 @@ function Mine:Fit(key, kind, school, now, amount, restrict, crit)
     end
     for _, entry in ipairs(allowed.casts and self.pending or {}) do
         if not entry.used and entry.key == key and now >= entry.at - 0.05 and now - entry.at <= DIRECT_WINDOW then
-            if kind == "miss" then Take(0.5)
+            if kind == "miss" then
+                if CastTakesMiss(self, entry.spell, key, now, avoid, pet) then Take(0.5) end
             else
                 local score = DirectCandidateScore(self, entry, key, school,
                     now, amount, crit)
@@ -1093,9 +1123,12 @@ end
 -- restrict (0.3.48): what made it, from its line's colour (Allowed, above).
 -- leech (0.3.49): true when a heal on you of the hit's amount came in its
 -- moment, false when heals on you were read and none matched, nil unknown.
-function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, restrict, leech)
+-- avoid: the game's word for a miss ("PARRY", "DODGE", "MISS", ...), nil unknown.
+function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, restrict, leech, avoid)
     self:Tidy(now)
     self.amountNow, self.lineNow, self.ambiguous, self.critNow = amount, line, false, crit == true
+    -- Which avoid a miss was, and whether your pet attacks its unit (CastTakesMiss).
+    self.avoidNow, self.petNow = kind == "miss" and avoid or nil, petAttacking == true
     -- 0.6.1: the swing whose own line the reader paired with this hit.
     self.pairedNow, self.pairedSwing = line == true and self.pairedSwing or nil, nil
     -- 0.6.2: a swing line of yours with no swing of yours in its frame,
@@ -1169,7 +1202,8 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, rest
             local helpful = type(facts) == "table" and (facts.helpful == true or facts.healthCost ~= nil)
             for _, cast in ipairs(list) do
                 local since = now - cast.at
-                if not helpful and since >= -0.05 and since <= DIRECT_WINDOW and (not bestSince or since < bestSince) then
+                if not helpful and since >= -0.05 and since <= DIRECT_WINDOW and (not bestSince or since < bestSince)
+                    and CastTakesMiss(self, spell, key, now, self.avoidNow, self.petNow) then
                     best, bestSince = { spell = spell, caster = cast.caster }, since
                 end
             end

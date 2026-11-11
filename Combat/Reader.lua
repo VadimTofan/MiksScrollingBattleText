@@ -148,12 +148,14 @@ local function Describe(event, flag, amount, school)
     if not ns.Text(event) then return nil end
     flag = ns.Text(flag) and flag or ""
     school = ns.Number(school, 1, 255) and school or nil
+    -- avoid keeps the game's own word ("PARRY") so the engine can tell which
+    -- of your actions could have been avoided so (Mine.lua, CastTakesMiss).
     if event == "WOUND" then
         if ns.Number(amount) and amount == 0 then
             if flag == "ABSORB" or flag == "BLOCK" or flag == "RESIST" then
-                return { event = "miss", missWord = ns.MissWord(flag), school = school }
+                return { event = "miss", missWord = ns.MissWord(flag), school = school, avoid = flag }
             end
-            return { event = "miss", missWord = ns.MissWord("MISS"), school = school }
+            return { event = "miss", missWord = ns.MissWord("MISS"), school = school, avoid = "MISS" }
         end
         return {
             event = "damage", amount = amount, school = school,
@@ -162,7 +164,7 @@ local function Describe(event, flag, amount, school)
     elseif event == "HEAL" then
         return { event = "heal", amount = amount, school = school, crit = flag == "CRITICAL" }
     elseif FEEDBACK[event] then
-        return { event = "miss", missWord = ns.MissWord(event), school = school }
+        return { event = "miss", missWord = ns.MissWord(event), school = school, avoid = event }
     end
 end
 ns.DescribeCombat = Describe
@@ -345,7 +347,7 @@ function ns.DecideHit(hit, line, restrict)
             or { who = "other" }
     else
         result = ns.mine:Hit(hit.key, kind, record.school, hit.at, hit.petOn, line,
-            ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech)
+            ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech, record.avoid)
     end
     if result.proc and not result.drain and not result.spell then result.procSpell = ProcSpell(hit.at, record.school) end
     record.result = result
@@ -748,7 +750,7 @@ function DecideGroup(group, frameLines, decided)
             local amount = ns.Number(record.amount) and record.amount or nil
             ranked[#ranked + 1] = { hit = hit, index = index,
                 fit = ns.mine:Fit(hit.key, kind, record.school, hit.at,
-                    amount, restrict, record.crit) }
+                    amount, restrict, record.crit, record.avoid, hit.petOn) }
         end
         -- Observed on Forever: a queued strike reports zero before its
         -- physical hit in the cast's frame, with one spell confirmation.
