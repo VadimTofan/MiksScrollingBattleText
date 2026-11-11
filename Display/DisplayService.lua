@@ -114,7 +114,7 @@ function DisplayService:DisplayMessage(
 	colorB = NormalizeColor(colorB)
 
 	local profile = self.config.getProfile()
-	if fontSize == nil or fontSize < 4 or fontSize > 38 then
+	if fontSize == nil or fontSize < 4 or fontSize > 100 then
 		fontSize = area.normalFontSize or profile.normalFontSize
 	end
 

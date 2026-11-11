@@ -1,6 +1,21 @@
-# v12.048 release
+# Font size range
 
 Updated: 2026-11-11
+
+Normal and critical font sliders now support sizes 4–100 with one-point steps.
+The shared editor applies this range to Master Fonts, scroll areas, and event
+overrides. The public display helper accepts the same range. Existing font
+inheritance and out-of-range fallback behavior are preserved.
+
+The popup and display regression tests failed before implementation and passed
+afterward. The full suite ran 132 tests: 131 passed and the release archive
+check was skipped. Whitespace checks passed. The two changed runtime files
+were synced to Forever and verified by SHA-256.
+
+Next: run `/reload` in Forever and check larger normal and critical sizes in
+Master Fonts. This change has not been included in a new release.
+
+## Previous release: v12.048
 
 The merge combines conservative direct spell matching, the shaman Windfury
 icon fallback, and Windfury stacking with main's Sounds settings and late-hit

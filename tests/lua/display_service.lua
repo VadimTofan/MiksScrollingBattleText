@@ -90,6 +90,26 @@ assert(calls[2][4] == 1 and calls[2][5] == 128 / 255,
 	"public message colors were not normalized")
 assert(calls[2][7] == 20, "public message font size changed")
 
+-- Given explicit font sizes above the old maximum, including the new limit.
+for _, size in ipairs({39, 64, 100}) do
+	-- When a public message requests the larger font size.
+	DisplayService:DisplayMessage("Large", "Outgoing", false,
+		255, 255, 255, size, "Area Normal", 1)
+
+	-- Then the requested size reaches the renderer without falling back.
+	assert(calls[#calls][7] == size, "larger font size was rejected")
+end
+
+-- Given values outside the supported range.
+for _, size in ipairs({3, 101}) do
+	-- When a message requests an unsupported size.
+	DisplayService:DisplayMessage("Fallback", "Outgoing", false,
+		255, 255, 255, size, "Area Normal", 1)
+
+	-- Then the existing area default remains the fallback.
+	assert(calls[#calls][7] == 20, "invalid font size lost its fallback")
+end
+
 -- Describe: category switches apply independently of custom scroll areas.
 for _, category in ipairs({ "Outgoing", "Incoming", "Notifications" }) do
 	-- Given one muted category routed to a shared custom area.

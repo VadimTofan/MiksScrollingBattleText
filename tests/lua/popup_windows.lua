@@ -59,6 +59,10 @@ local function NewFrame(parent, template)
 	function frame:Clear() self.items = {} end
 	function frame:SetValue(value) self.value = value end
 	function frame:GetValue() return self.value end
+	function frame:SetMinMaxValues(minimum, maximum)
+		self.minimum, self.maximum = minimum, maximum
+	end
+	function frame:SetValueStep(step) self.step = step end
 	function frame:SetColor(r, g, b) self.r, self.g, self.b = r, g, b end
 	function frame:GetNormalTexture() return self end
 	function frame:GetStringWidth() return #self.text * 6 end
@@ -183,10 +187,10 @@ config.inheritedNormalOutlineIndex = 1
 config.inheritedNormalFontSize = 18
 config.inheritedNormalFontAlpha = 100
 config.critFontName, config.critOutlineIndex = "Default", 2
-config.critFontSize, config.critFontAlpha = 24, 75
+config.critFontSize, config.critFontAlpha = 100, 75
 config.saveHandler = function(result)
 	assert(result.normalFontName == nil and result.normalFontSize == nil)
-	assert(result.critFontName == "Default" and result.critFontSize == 24)
+	assert(result.critFontName == "Default" and result.critFontSize == 100)
 	assert(result.critFontAlpha == 75)
 	saves = saves + 1
 end
@@ -196,10 +200,33 @@ P.ShowFont(config)
 local font = popups[#popups]
 CheckWindow(font, UIParent)
 assert(font.normalFrame.points[1][5] <= -85)
+-- Then both size controls offer the expanded range with one-point steps.
+for _, slider in ipairs({font.normalFontSizeSlider, font.critFontSizeSlider}) do
+	assert(slider.minimum == 4 and slider.maximum == 100,
+		"font size slider still caps larger text sizes")
+	assert(slider.step == 1, "font size increments changed")
+end
 Click(font, MikSBT.translations.BUTTONS.genericSave.label)
 
 -- Then font inheritance and explicit values are preserved.
 assert(saves == 2 and not font.shown)
+
+-- Given explicit larger normal and critical font sizes.
+config.normalFontName, config.normalOutlineIndex = "Default", 1
+config.normalFontSize, config.normalFontAlpha = 64, 100
+local largerSaved = false
+config.saveHandler = function(result)
+	assert(result.normalFontSize == 64 and result.critFontSize == 100,
+		"larger font sizes were not preserved when saving")
+	largerSaved = true
+end
+
+-- When the cached font editor is opened and saved again.
+P.ShowFont(config)
+Click(font, MikSBT.translations.BUTTONS.genericSave.label)
+
+-- Then both explicit larger sizes survive the edit/save flow.
+assert(largerSaved and not font.shown)
 
 -- Given an item list with a nested Add Item dialog.
 config = Config()
