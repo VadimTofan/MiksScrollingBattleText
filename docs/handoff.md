@@ -32,3 +32,14 @@ Workflow: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/429
 The Forever installation still has the feature branch version from before
 the merge. Next: install v12.048 in Forever and check Windfury bursts and
 killing blows in game.
+
+## Pet swing icon: PR #33
+
+Merged Gamooly's pet icon change with the existing unknown-proc handling.
+When GetPetIcon supplies a readable icon, pet melee damage and misses use it.
+The user accepted the assumption that the API supplies a usable pet icon;
+the previously identified downstream no-icon fallback remains unchanged.
+
+The integration suite ran 133 tests: 132 passed and the release archive check
+was skipped. Whitespace checks passed. Next: pull the integration into local
+main while preserving the separate local font-size commit, then verify it.

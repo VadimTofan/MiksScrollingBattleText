@@ -9,6 +9,16 @@ local MISS_TYPES = {
 	"IMMUNE", "DEFLECT", "ABSORB", "REFLECT",
 }
 
+-- A pet's swing: its family's icon when the client gives one. Auto Attack's
+-- icon (6603) is the player's own weapon.
+local function PetIcon()
+	local get = _G.GetPetIcon
+	if type(get) ~= "function" then return nil end
+	local ok, icon = pcall(get)
+	if ok and icon and RestrictedValue:CanAccess(icon) then return icon end
+	return nil
+end
+
 local function MissAction(word)
 	for _, action in ipairs(MISS_TYPES) do
 		if word == action or word == _G[action]
@@ -170,6 +180,10 @@ function Presentation:Out(record)
 	local spell = result.spell or result.procSpell
 	if result.melee then spell = result.hand == "ranged" and 5019 or 6603 end
 	local icon = record.icon or (spell and self.config.getSpellTexture(spell))
+	if result.melee and result.who == "pet" and result.hand ~= "ranged"
+		and not record.icon then
+		icon = PetIcon()
+	end
 	if result.ambiguous or (result.proc and not spell) then
 		spell, icon = nil, GENERIC_SPELL_ICON
 	end
