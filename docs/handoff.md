@@ -1,13 +1,14 @@
-# Separate player, NPC and unclassified killing blows
+# Player and NPC killing blows
 
 Updated: 2026-11-11
 
 The approved routing change is implemented on `main` and installed in Forever.
-Matched player kills use Player Killing Blows; matched NPC kills use NPC Killing
-Blows. An independent Unclassified Killing Blows row under Events > Notifications
-handles ambiguous or unavailable victim types. It is enabled by default and
-has its own message, font, color, sound and toggle. Existing player/NPC settings
-are retained. The delayed melee killing-blow fallback forwards the same type.
+Matched player kills use Player Killing Blows. NPC and unclassified kills share
+NPC Killing Blows, including its message, font, color, sound and toggle. The
+separate unclassified control and defaults are removed; profile transfer ignores
+its obsolete setting. Existing player/NPC settings are retained. The delayed
+melee killing-blow fallback follows the same routing. Unclassified PvP kills
+also follow the NPC setting.
 
 Victim classification uses public `UnitIsPlayer` and `UnitIsDead` observations
 attached to damage reports or player swings. A kill must have one matching
@@ -18,11 +19,11 @@ flags, and unavailable death evidence remain unclassified. This is conservative
 correlation: the formatted combat-log event still has no direct victim flag,
 so not every PvP or NPC kill can be classified.
 
-Verification: the new tests failed first for missing victim classification
-and player alerts using NPC settings. The full suite ran 139 tests: 138 passed
+Verification: regression tests failed first for unknown kills using the generic
+setting and separate generic defaults remaining. The full suite ran 139 tests: 138 passed
 and the actual release-archive check was skipped. Tests cover target changes,
 mixed victims, token reuse, restricted/missing/erroring predicates, delayed
-melee alerts, independent settings and defaults on both client branches.
+melee alerts, shared NPC/unclassified settings and defaults on both client branches.
 Whitespace checks passed. Five runtime files were installed in Forever; only
 the killing-blow sections of its presentation file were patched, preserving
 its earlier pet-icon difference. Live PvP/NPC testing is still required.
@@ -32,8 +33,8 @@ this killing-blow change has been pushed or included in a new release.
 
 Reference: [Blizzard unit predicate declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua).
 
-Next: run `/reload` in Forever and test player and NPC kills with their toggles
-independently. Check Unclassified Killing Blows for kills without enough evidence.
+Next: run `/reload` in Forever, enable Player Killing Blows and disable NPC
+Killing Blows. Check that NPC and unknown kills stay hidden, then test PvP kills.
 The five-line loot timing report is also still pending.
 
 ## Loot stutter investigation

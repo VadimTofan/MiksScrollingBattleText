@@ -975,11 +975,6 @@ if IsClassic then
 				alwaysSticky	= true,
 				fontSize		= 26,
 			},
-			NOTIFICATION_KILLING_BLOW = {
-				colorR = 0.333, colorG = 0.333,
-				message = L.MSG_KILLING_BLOW .. "!",
-				alwaysSticky = true, fontSize = 26,
-			},
 			NOTIFICATION_EXTRA_ATTACK = {
 				colorB		= 0,
 				message		= "%sl!",
@@ -2028,11 +2023,6 @@ else
 				message			= L.MSG_KILLING_BLOW .. "! (%n)",
 				alwaysSticky	= true,
 				fontSize		= 26,
-			},
-			NOTIFICATION_KILLING_BLOW = {
-				colorR = 0.333, colorG = 0.333,
-				message = L.MSG_KILLING_BLOW .. "!",
-				alwaysSticky = true, fontSize = 26,
 			},
 			NOTIFICATION_EXTRA_ATTACK = {
 				colorB		= 0,

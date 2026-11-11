@@ -101,9 +101,8 @@ for _, classic in ipairs({ false, true }) do
 		"low-health sounds are not enabled by default")
 	assert(defaults.lowManaSoundDisabled == false,
 		"low-mana sounds are not enabled by default")
-	assert(defaults.events.NOTIFICATION_KILLING_BLOW.message
-		== translations.MSG_KILLING_BLOW .. "!")
-	assert(not defaults.events.NOTIFICATION_KILLING_BLOW.disabled)
+	assert(defaults.events.NOTIFICATION_KILLING_BLOW == nil,
+		"separate unclassified killing-blow default remains")
 	-- Category identity includes critical self-heals and pet events.
 	assert(defaults.events.SELF_HEAL_CRIT.textCategory == "Incoming")
 	assert(defaults.events.SELF_HOT_CRIT.textCategory == "Incoming")
@@ -152,12 +151,17 @@ for _, classic in ipairs({ false, true }) do
 		profiles.currentProfile[key] = value
 	end
 	-- When that profile is exported using the current schema.
+	profiles.currentProfile.events.NOTIFICATION_KILLING_BLOW = {
+		message = "Old generic", disabled = false,
+	}
 	local legacyTransfer = MikSBT.Configuration.ProfileTransfer:New({
 		masterProfile = profiles.masterProfile,
 		version = "12.035", client = 120100, locale = "enUS",
 	})
 	local legacyExport = assert(profiles.ExportProfile("Default"))
 	local legacyPayload = assert(legacyTransfer:Decode(legacyExport))
+	-- Then retired generic settings cannot reintroduce a third kill toggle.
+	assert(legacyPayload.sections.Events.NOTIFICATION_KILLING_BLOW == nil)
 	-- Then retired settings stay saved but are absent from the portable profile.
 	for key, value in pairs(retiredSettings) do
 		assert(profiles.currentProfile[key] == value)

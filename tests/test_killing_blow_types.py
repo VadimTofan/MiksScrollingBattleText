@@ -15,7 +15,7 @@ class KillingBlowTypeTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
-    def test_kill_alerts_respect_independent_player_npc_and_generic_settings(self):
+    def test_unknown_kills_share_npc_settings_without_enabling_player_alerts(self):
         # Given
         script = "killing_blow_presentation.lua"
 

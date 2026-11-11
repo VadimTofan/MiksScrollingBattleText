@@ -432,11 +432,7 @@ obj["NOTIFICATION_REP_LOSS"]			= { label="Reputation Losses", tooltip="Enable wh
 obj["NOTIFICATION_SKILL_GAIN"]			= { label="Skill Gains", tooltip="Enable when you gain skill points."}
 obj["NOTIFICATION_EXPERIENCE_GAIN"]		= { label="Experience Gains", tooltip="Enable when you gain experience points."}
 obj["NOTIFICATION_PC_KILLING_BLOW"]		= { label="Player Killing Blows", tooltip="Enable when you get a killing blow against a hostile player."}
-obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="NPC Killing Blows", tooltip="Enable when you get a killing blow against an NPC."}
-obj["NOTIFICATION_KILLING_BLOW"] = {
-	label = "Unclassified Killing Blows",
-	tooltip = "Show generic killing-blow alerts when the victim cannot be identified as a player or NPC.",
-}
+obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="NPC Killing Blows", tooltip="Enable NPC killing blows and kills whose victim type is unknown."}
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="Extra Attacks", tooltip="Enable when you gain extra attacks such as windfury, thrash, sword spec, etc."}
 obj["NOTIFICATION_PROC"] = { label="Ability Procs", tooltip="Show highlighted ability procs." }
 obj["NOTIFICATION_REACTIVE"] = { label="Reactive Abilities", tooltip="Show abilities becoming available in combat." }
