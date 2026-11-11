@@ -1,4 +1,30 @@
-# Adaptive melee swing window
+# Hunter shot descriptions merged
+
+Updated: 2026-11-12
+
+At the user's request, the adaptive melee-window checkpoint `9c677a1` was
+pushed to main. Gamooly's hunter-shot description PR #32 was merged as
+`3078189` and pulled with `--ff-only`. A familiar thank-you was posted:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/32#issuecomment-6809878211
+
+The parser now recognizes Aimed Shot's ranged-damage wording and Multi-Shot's
+missile wording as physical direct damage. It retains Hunter's Mark's
+non-damaging classification and explicit damage schools. Multi-Shot hits on
+other targets remain outside this change. Strict YAGNI review found all four
+added parsing checks necessary: removing each breaks its regression test.
+
+The merged main suite ran 142 tests: 141 passed and the actual release-archive
+check was skipped. GitHub validation also passed:
+https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43121478549
+Installed hunter-description, adaptive melee-window and
+miss-attribution regression scripts passed. All 102 runtime files match
+Forever by SHA-256, with no destination extras. No release was requested;
+public v12.050 predates these hunter-description and melee-window changes.
+
+Next: run `/reload` in Forever and check Aimed Shot and Multi-Shot attribution
+on the targeted enemy, plus slow-weapon behavior in solo and group combat.
+
+## Adaptive melee swing window
 
 Updated: 2026-11-12
 
