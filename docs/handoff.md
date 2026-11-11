@@ -1,4 +1,42 @@
-# Loot stutter investigation
+# Separate player, NPC and unclassified killing blows
+
+Updated: 2026-11-11
+
+The approved routing change is implemented on `main` and installed in Forever.
+Matched player kills use Player Killing Blows; matched NPC kills use NPC Killing
+Blows. An independent Unclassified Killing Blows row under Events > Notifications
+handles ambiguous or unavailable victim types. It is enabled by default and
+has its own message, font, color, sound and toggle. Existing player/NPC settings
+are retained. The delayed melee killing-blow fallback forwards the same type.
+
+Victim classification uses public `UnitIsPlayer` and `UnitIsDead` observations
+attached to damage reports or player swings. A kill must have one matching
+victim in its frame and an observed death. Target epochs and nameplate
+generations prevent a later target or recycled token from supplying that
+death. Multiple victims, multiple same-frame kill lines, missing APIs, secret
+flags, and unavailable death evidence remain unclassified. This is conservative
+correlation: the formatted combat-log event still has no direct victim flag,
+so not every PvP or NPC kill can be classified.
+
+Verification: the new tests failed first for missing victim classification
+and player alerts using NPC settings. The full suite ran 139 tests: 138 passed
+and the actual release-archive check was skipped. Tests cover target changes,
+mixed victims, token reuse, restricted/missing/erroring predicates, delayed
+melee alerts, independent settings and defaults on both client branches.
+Whitespace checks passed. Five runtime files were installed in Forever; only
+the killing-blow sections of its presentation file were patched, preserving
+its earlier pet-icon difference. Live PvP/NPC testing is still required.
+
+The loot diagnostic checkpoint remains separate and unchanged. Neither it nor
+this killing-blow change has been pushed or included in a new release.
+
+Reference: [Blizzard unit predicate declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua).
+
+Next: run `/reload` in Forever and test player and NPC kills with their toggles
+independently. Check Unclassified Killing Blows for kills without enough evidence.
+The five-line loot timing report is also still pending.
+
+## Loot stutter investigation
 
 Updated: 2026-11-11
 

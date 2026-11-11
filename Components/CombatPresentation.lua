@@ -173,7 +173,8 @@ function Presentation:Out(record)
 	local result = record.result
 	if not result or (result.who ~= "you" and result.who ~= "pet") then return end
 	if record.event == "killed" then
-		self:Alert({ kind = "kill", icon = record.icon })
+		self:Alert({ kind = "kill", icon = record.icon,
+			victimIsPlayer = record.victimIsPlayer })
 		return
 	end
 	local key = EventKey("OUTGOING", record, result)
@@ -247,11 +248,15 @@ local ALERT_EVENTS = {
 	cc = "NOTIFICATION_CROWD_CONTROL",
 	proc = "NOTIFICATION_PROC",
 	reactive = "NOTIFICATION_REACTIVE",
-	kill = "NOTIFICATION_NPC_KILLING_BLOW",
+	kill = "NOTIFICATION_KILLING_BLOW",
 }
 function Presentation:Alert(record)
 	local key = ALERT_EVENTS[record.kind]
-	if record.kind == "combat" then
+	if record.kind == "kill" then
+		local player = RestrictedValue:Boolean(record.victimIsPlayer)
+		if player == true then key = "NOTIFICATION_PC_KILLING_BLOW"
+		elseif player == false then key = "NOTIFICATION_NPC_KILLING_BLOW" end
+	elseif record.kind == "combat" then
 		key = record.entering and "NOTIFICATION_COMBAT_ENTER"
 			or "NOTIFICATION_COMBAT_LEAVE"
 	end

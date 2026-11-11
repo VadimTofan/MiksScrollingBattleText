@@ -101,6 +101,9 @@ for _, classic in ipairs({ false, true }) do
 		"low-health sounds are not enabled by default")
 	assert(defaults.lowManaSoundDisabled == false,
 		"low-mana sounds are not enabled by default")
+	assert(defaults.events.NOTIFICATION_KILLING_BLOW.message
+		== translations.MSG_KILLING_BLOW .. "!")
+	assert(not defaults.events.NOTIFICATION_KILLING_BLOW.disabled)
 	-- Category identity includes critical self-heals and pet events.
 	assert(defaults.events.SELF_HEAL_CRIT.textCategory == "Incoming")
 	assert(defaults.events.SELF_HOT_CRIT.textCategory == "Incoming")
