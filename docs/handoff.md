@@ -1,4 +1,24 @@
-# Duplicate killing-blow notifications
+# Forever runtime sync
+
+Updated: 2026-11-11
+
+The user requested that Forever match this workspace after `/msbt lootprofile`
+printed usage. Its profiler file, command handler and manifest entries were
+missing. The complete runtime file set selected by the existing `.pkgmeta`
+exclusions was synced, replacing earlier partial installs. All 102 runtime
+files match by SHA-256, with no extra files in the destination addon folder.
+Development files and Git metadata stay in this workspace.
+
+Verification: all 70 installed Lua files compile as Lua 5.1. Five regression
+scripts ran against the installed files: profiler, loot integration, profile
+command integration, kill classification/deduplication, and kill presentation.
+The workspace suite ran 139 tests: 138 passed, one release-archive check skipped.
+No push or release was requested.
+
+Next: run `/reload`, start `/msbt lootprofile`, loot for 10–20 seconds, run
+`/msbt lootprofile stop`, and collect the five report lines.
+
+## Duplicate killing-blow notifications
 
 Updated: 2026-11-11
 
