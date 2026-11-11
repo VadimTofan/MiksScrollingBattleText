@@ -722,9 +722,9 @@ end
 -- can make such a hit.
 -- Whether a miss on key can be this spell's answer. A spell that cannot be
 -- dodged, parried or blocked (Spells.lua, SpellCanAvoid) never takes one;
--- and a magic spell never takes a plain miss while your pet is attacking
--- that unit or a swing or shot of yours could have missed, since those are
--- far likelier (Hunter's Mark had shown your pet's parries and your Auto
+-- and a magic spell without direct-spell confirmation never takes a plain
+-- miss while your pet attacks that unit or a swing or shot could have missed.
+-- Those are likelier (Hunter's Mark had shown your pet's parries and your Auto
 -- Shot's misses as its own).
 local function PhysicalSourceNear(self, key, now, pet)
     if pet then return true end
@@ -736,10 +736,11 @@ local function PhysicalSourceNear(self, key, now, pet)
     end
     return false
 end
-local function CastTakesMiss(self, spell, key, now, avoid, pet)
+local function CastTakesMiss(self, spell, key, now, avoid, pet, restrict)
     if not avoid then return true end
     if ns.SpellCanAvoid and not ns.SpellCanAvoid(spell, avoid) then return false end
-    if avoid == "MISS" and ns.SpellReach and ns.SpellReach(spell) == "spell"
+    if restrict ~= "direct" and avoid == "MISS"
+        and ns.SpellReach and ns.SpellReach(spell) == "spell"
         and PhysicalSourceNear(self, key, now, pet) then
         return false
     end
@@ -812,7 +813,8 @@ local function Yours(self, key, kind, school, now)
     for _, entry in ipairs(kind == "miss" and allowed.casts
         and self.pending or {}) do
         if not entry.used and entry.key == key and now >= entry.at and now - entry.at <= DIRECT_WINDOW then
-            if CastTakesMiss(self, entry.spell, key, now, self.avoidNow, self.petNow) then
+            if CastTakesMiss(self, entry.spell, key, now,
+                self.avoidNow, self.petNow, self.restrictNow) then
                 exact = exact or entry
             end
         end
@@ -965,7 +967,8 @@ function Mine:Fit(key, kind, school, now, amount, restrict, crit, avoid, pet)
     for _, entry in ipairs(allowed.casts and self.pending or {}) do
         if not entry.used and entry.key == key and now >= entry.at - 0.05 and now - entry.at <= DIRECT_WINDOW then
             if kind == "miss" then
-                if CastTakesMiss(self, entry.spell, key, now, avoid, pet) then Take(0.5) end
+                if CastTakesMiss(self, entry.spell, key, now,
+                    avoid, pet, restrict) then Take(0.5) end
             else
                 local score = DirectCandidateScore(self, entry, key, school,
                     now, amount, crit)
@@ -990,7 +993,9 @@ function Mine:Fit(key, kind, school, now, amount, restrict, crit, avoid, pet)
         if not swing.used and swing.key == key then
             local since = now - swing.at
             if swing.hand == "ranged" then
-                if allowed.ranged and since >= 0.1 and since <= RANGED_WINDOW and SchoolFits(self.wandSchool, school) then Take(0.6) end
+                if allowed.ranged and not (kind == "miss" and avoid == "PARRY")
+                    and since >= 0.1 and since <= RANGED_WINDOW
+                    and SchoolFits(self.wandSchool, school) then Take(0.6) end
             elseif allowed.melee and since <= SWING_WINDOW and (kind == "miss" or SchoolFits(PHYSICAL, school)) then
                 Take(0.6)
             end
@@ -1203,7 +1208,8 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, rest
             for _, cast in ipairs(list) do
                 local since = now - cast.at
                 if not helpful and since >= -0.05 and since <= DIRECT_WINDOW and (not bestSince or since < bestSince)
-                    and CastTakesMiss(self, spell, key, now, self.avoidNow, self.petNow) then
+                    and CastTakesMiss(self, spell, key, now,
+                        self.avoidNow, self.petNow, self.restrictNow) then
                     best, bestSince = { spell = spell, caster = cast.caster }, since
                 end
             end

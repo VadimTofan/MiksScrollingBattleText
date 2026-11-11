@@ -113,3 +113,59 @@ mine:Cast("player", 1978, "target", 80)
 
 -- When it lands, then hits are decided as before.
 assert(Is(mine:Hit("target", "damage", 8, 83, false, nil, 4, false), "you", 1978))
+
+-- Given a spell miss confirmed by a direct-spell line, with competing physical activity.
+for _, pet in ipairs({ true, false }) do
+    mine = New()
+    mine:Cast("player", 1130, "target", 90)
+    if not pet then mine:Swing("ranged", "target", 90.1, 2.8) end
+
+    -- When the reader ranks and attributes that confirmed spell miss.
+    local fit = mine:Fit("target", "miss", 1, 90.4,
+        nil, "direct", false, "MISS", pet)
+    local result = mine:Hit("target", "miss", 1, 90.4,
+        pet, true, nil, false, "direct", nil, "MISS")
+
+    -- Then pet activity or a recent shot cannot remove the confirmed spell.
+    assert(fit ~= nil, "confirmed spell miss was rejected during ranking")
+    assert(Is(result, "you", 1130),
+        "confirmed spell miss lost its attribution to physical activity")
+end
+
+-- Given a confirmed spell miss on a unit whose cast target was unavailable.
+mine = New()
+mine:Cast("player", 1130, "other-target", 100)
+
+-- When the recent-cast fallback resolves it while a pet attacks.
+local fallback = mine:Hit("target", "miss", 1, 100.4,
+    true, true, nil, false, "direct", nil, "MISS")
+
+-- Then that fallback also respects the direct-spell confirmation.
+assert(Is(fallback, "you", 1130), "confirmed fallback spell miss lost its icon")
+
+-- Given a recent ranged shot with no pet or spell to explain a parry.
+for _, restrict in ipairs({ "shot", "unknown" }) do
+    mine = New()
+    mine:Swing("ranged", "target", 110, 2.8)
+    local source = restrict == "shot" and "shot" or nil
+
+    -- When ranking a parry beside a valid ranged hit in a crowded frame.
+    local parryFit = mine:Fit("target", "miss", 1, 110.4,
+        nil, source, false, "PARRY", false)
+    local damageFit = mine:Fit("target", "damage", 1, 110.4,
+        100, source, false, nil, false)
+    local dodgeFit = mine:Fit("target", "miss", 1, 110.4,
+        nil, source, false, "DODGE", false)
+
+    -- Then the parry cannot consume the confirmation needed by the valid shot.
+    assert(parryFit == nil, "ranking still accepts an impossible ranged parry")
+    assert(damageFit ~= nil and dodgeFit ~= nil,
+        "valid ranged damage or dodge was excluded")
+
+    -- When final attribution sees the same parry.
+    local parry = mine:Hit("target", "miss", 1, 110.4,
+        false, true, nil, false, source, nil, "PARRY")
+
+    -- Then it agrees with ranking and leaves the shot available.
+    assert(parry.who == "other" and not mine.swings[1].used)
+end

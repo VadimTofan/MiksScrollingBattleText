@@ -1,4 +1,34 @@
-# Forever runtime sync
+# Miss attribution follow-up
+
+Updated: 2026-11-11
+
+At the user's request, the five local checkpoints through `6d400bc` were pushed
+to main. Gamooly's PR #35 was merged as `b4e6c06` and pulled with `--ff-only`.
+The requested thank-you and follow-up comment was posted:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/35#issuecomment-6809046602
+GitHub validation passed for the merge. No release was requested.
+
+The local follow-up preserves a miss confirmed by a direct-spell line when a
+pet or recent ranged shot is present. The ambiguous-miss preference from the
+PR remains intact. Candidate ranking now also rejects ranged parries, matching
+the final attribution rule so an impossible candidate cannot take a scarce
+confirmation. The recent-cast fallback uses the same confirmation rule.
+
+Both regressions failed first and passed after their fixes. Fourteen focused
+combat tests passed. The full suite ran 140 tests: 139 passed and the actual
+release-archive check was skipped. All 70 installed Lua files compile as Lua
+5.1; miss attribution, kill classification/deduplication, and kill presentation
+regressions passed against the installed files. All 102 runtime files match
+Forever by SHA-256, with no destination extras.
+
+This follow-up is a local checkpoint only; the push authorization covered the
+pre-existing changes. Live combat confirmation is still pending.
+
+Next: run `/reload` in Forever and check Hunter's Mark with pet parries, ranged
+misses, and confirmed spell misses. The affected-user loot timing report is
+still pending.
+
+## Forever runtime sync
 
 Updated: 2026-11-11
 
