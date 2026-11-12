@@ -1,3 +1,31 @@
+# Windfury one-attack investigation
+
+Updated: 2026-11-13
+
+The user reports Windfury sometimes showing only one attack and wants both
+outcomes accounted for. No damage count or combat attribution was changed.
+The batcher currently separates normal and critical hits, and uses a
+one-second grouping window. An independent probe reproduced two separate
+single-hit lines for a mixed normal/critical pair. Existing delayed-reader
+cases pass; a live report is needed to distinguish splitting, misses,
+rejected reports, and display gates in the user's case.
+
+The existing opt-in Windfury diagnostics are temporarily enabled in the
+installed _forever_ addon. Combat/WindfuryTrace.lua, WindfuryCapture.lua, and
+Trace.lua were copied and appended to both installed client manifests.
+The source manifests and release packaging remain unchanged. Previous
+installed files are backed up under
+D:/Codex-Temp/msbt-windfury-check-20261113-000346.
+
+Nineteen focused tests passed. Five regression scripts also passed against
+the installed runtime; the three diagnostic files parsed with Lua 5.1.
+No live combat report has been captured yet.
+
+Next: /reload, run /msbttrace wf, reproduce a one-attack proc, then run
+/msbttrace report and copy the report for investigation. /msbttrace pause
+stops collection. Restore backed-up files and remove only newly added
+diagnostic files when this investigation is finished.
+
 # Targetless Mend Pet follow-up
 
 Updated: 2026-11-12
