@@ -64,6 +64,7 @@ end
 function Engine:CreateRouter()
 	local presentation = self.config.presentation
 	local router = {}
+	router.Effect = function(_, ...) return presentation:Effect(...) end
 	for _, name in ipairs({
 		"In", "Alert", "Aura", "Healer", "Resource", "ComboPoints",
 	}) do

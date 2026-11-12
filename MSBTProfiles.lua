@@ -500,6 +500,13 @@ if IsClassic then
 				scrollArea	= "Outgoing",
 				isCrit		= true,
 			},
+			OUTGOING_EFFECT = {
+				colorR		= 0.5,
+				colorG		= 0.5,
+				colorB		= 1,
+				message		= "<%sl>",
+				scrollArea	= "Outgoing",
+			},
 			OUTGOING_DISPEL = {
 				colorB		= 0.5,
 				message		= L.MSG_DISPEL .. "! (%s)",
@@ -1549,6 +1556,13 @@ else
 				message		= "+%a (%s - %n)",
 				scrollArea	= "Outgoing",
 				isCrit		= true,
+			},
+			OUTGOING_EFFECT = {
+				colorR		= 0.5,
+				colorG		= 0.5,
+				colorB		= 1,
+				message		= "<%sl>",
+				scrollArea	= "Outgoing",
 			},
 			OUTGOING_DISPEL = {
 				colorB		= 0.5,
