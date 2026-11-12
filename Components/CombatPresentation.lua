@@ -55,7 +55,15 @@ function Presentation:Emit(key, record, eventSettings)
 	local icon = record.icon or (record.spell
 		and self.config.getSpellTexture(record.spell))
 	if RestrictedValue:IsRestricted(record.amount) then
-		self.config.displayRestricted(settings, record.amount, icon, record.message)
+		local message = record.message
+		if record.event == "heal" then
+			-- Format public spell metadata while leaving %a for native rendering.
+			local metadata = {}
+			for field, value in pairs(record) do metadata[field] = value end
+			metadata.amount = nil
+			message = self.config.formatMessage(settings, metadata, message)
+		end
+		self.config.displayRestricted(settings, record.amount, icon, message)
 		return
 	end
 	local message

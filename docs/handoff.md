@@ -1,4 +1,26 @@
-# Outgoing self and pet healing
+# Healing skill names with restricted amounts
+
+Updated: 2026-11-12
+
+Restricted healing amounts bypassed normal message formatting, so public
+spell names were removed by the native amount display path. Healing now
+formats public metadata with the amount omitted, then passes the original
+opaque amount to native rendering. Skill visibility settings still apply.
+This shared healing presentation path also preserves available incoming
+metadata; damage rendering is unchanged.
+
+The new full-runtime regression failed with "Healed %s" instead of the
+spell label before the fix. Direct heals and HoTs now retain their names,
+icons, and opaque amount identity on Retail and Forever; Hide Skills is
+also covered. Full suite: 144 tests, 143 passed and one release-archive
+check skipped. Installed Forever runtime tests passed, and the changed
+runtime file matches source by SHA-256. Its previous copy is saved under
+D:/Codex-Temp/msbt-heal-skill-names-20261112.
+
+Saved locally; no push or release. Next: run /reload and test an outgoing
+self-heal with skill names enabled.
+
+## Outgoing self and pet healing
 
 Updated: 2026-11-12
 

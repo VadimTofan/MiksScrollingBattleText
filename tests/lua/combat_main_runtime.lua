@@ -814,6 +814,35 @@ for _, forever in ipairs({ false, true }) do
 		assert(outgoingHeal and outgoingHeal[2] == "Healed 93 (Test spell)"
 			and outgoingHeal[3] == "icon", "outgoing self-heal settings lost")
 	end
+	-- Given known outgoing heals with restricted combat amounts.
+	local secretCheck = issecretvalue
+	local hiddenHeal = {}
+	issecretvalue = function(value) return value == hiddenHeal end
+	local savedHideSkills = profile.hideSkills
+	local savedHot = events.OUTGOING_HOT
+	events.OUTGOING_HOT = { message = "Tick %a (%sl)",
+		scrollArea = "Outgoing heals" }
+	for _, hideSkills in ipairs({ false, true }) do
+		profile.hideSkills = hideSkills
+		for _, tick in ipairs({ false, true }) do
+			-- When direct and periodic heals enter the real display pipeline.
+			MikSBT.CombatEngine.liveRouter:Out({
+				event = "heal", amount = hiddenHeal,
+				result = { who = "you", spell = 201, tick = tick },
+			})
+			local output = displayed[#displayed]
+			local prefix = tick and "Tick " or "Healed "
+			local expected = prefix .. "%s"
+			if not hideSkills then expected = expected .. " (Spell 201)" end
+			-- Then the name setting applies and the opaque amount is untouched.
+			assert(output[2] == expected,
+				"restricted outgoing heal lost its skill name: " .. output[2])
+			assert(output[3] == "icon" and output[4] == hiddenHeal)
+		end
+	end
+	profile.hideSkills = savedHideSkills
+	events.OUTGOING_HOT = savedHot
+	issecretvalue = secretCheck
 	UnitIsUnit = unitIsUnit
 	C_Spell.IsSpellHelpful = function() return false end
 
