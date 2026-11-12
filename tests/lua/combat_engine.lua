@@ -86,6 +86,7 @@ local function Event(event, ...)
     if event == "COMBAT_LOG_MESSAGE" then
         local _, kind = ...
         local eventName = kind == "heal" and "SPELL_HEAL"
+            or (kind == "hot" and "SPELL_PERIODIC_HEAL")
             or (kind == "swing" and "SWING_DAMAGE")
             or (kind == "swingMiss" and "SWING_MISSED")
             or (kind == "spell" and "SPELL_DAMAGE" or "SPELL_PERIODIC_DAMAGE")
@@ -261,17 +262,148 @@ assert(record.result.spell == 201 and record.amount == 90)
 -- Given the player explicitly targets themselves for a helpful spell.
 targetIsPlayer = true
 Event("PLAYER_TARGET_CHANGED")
+local beforeSelfOutgoing = #outgoing
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 201)
 -- When its heal is reported on the player.
 Event("UNIT_COMBAT", "player", "HEAL", "CRITICAL", 91, 2)
+Event("COMBAT_LOG_MESSAGE", nil, "heal")
 Advance(0)
+Advance(0.13)
 -- Then the self heal keeps the player's spell and its real icon.
 record = incoming[#incoming]
 assert(record.event == "heal" and record.amount == 91 and record.crit)
 assert(record.selfHeal and record.spell == 201 and record.icon == "icon-201",
     "self heal lost its cast's spell icon")
+-- Then the same matched heal is also outgoing, with its original crit/amount.
+assert(#outgoing == beforeSelfOutgoing + 1,
+    "self heal was not sent to outgoing")
+assert(outgoing[#outgoing].result.who == "you"
+    and outgoing[#outgoing].result.spell == 201
+    and outgoing[#outgoing].amount == 91 and outgoing[#outgoing].crit)
 targetIsPlayer = false
 Event("PLAYER_TARGET_CHANGED")
+
+do
+    -- Given a helpful player cast while their pet is selected.
+    local ns = MikSBT.CombatEngine
+    local isUnit = UnitIsUnit
+    petExists = true
+    UnitIsUnit = function(a, b)
+        return (a == "target" and b == "pet") or isUnit(a, b)
+    end
+    ns.ResetHealing()
+    local beforeOut, beforeIn = #outgoing, #incoming
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 201)
+
+    -- When the pet receives that heal.
+    Event("UNIT_COMBAT", "pet", "HEAL", "", 92, 2)
+    Event("UNIT_COMBAT", "target", "HEAL", "", 92, 2)
+    Event("COMBAT_LOG_MESSAGE", nil, "heal")
+    Advance(0)
+    Advance(0.13)
+
+    -- Then it is your outgoing heal and retains the pet's incoming record.
+    assert(#outgoing == beforeOut + 1, "pet heal was not sent to outgoing")
+    assert(outgoing[#outgoing].result.who == "you"
+        and outgoing[#outgoing].result.spell == 201
+        and not outgoing[#outgoing].pet, "pet recipient became pet caster")
+    assert(#incoming == beforeIn + 1 and incoming[#incoming].pet)
+    UnitIsUnit, petExists = isUnit, false
+    ns.ResetHealing()
+end
+
+do
+    -- Given self/pet heal bindings while an unrelated enemy remains selected.
+    local ns = MikSBT.CombatEngine
+    local unitName = UnitName
+    UnitName = function(unit)
+        if unit == "player" then return "Healer", "Realm" end
+        if unit == "pet" then return "Wolf" end
+        return "Enemy"
+    end
+    for _, case in ipairs({
+        { unit = "player", name = "Healer-Realm", guid = "self-cast" },
+        { unit = "pet", name = "Wolf", guid = "pet-cast" },
+    }) do
+        ns.ResetHealing()
+        Advance(4)
+        local before = #outgoing
+        -- When a successful heal's actual recipient receives the heal.
+        Event("UNIT_SPELLCAST_SENT", "player", case.name, case.guid, 201)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", case.guid, 201)
+        Event("UNIT_COMBAT", case.unit, "HEAL", "", 94, 2)
+        Event("COMBAT_LOG_MESSAGE", nil, "heal")
+        Advance(0)
+        Advance(0.13)
+        -- Then targeting the enemy does not hide your outgoing heal.
+        assert(#outgoing == before + 1,
+            "actual self/pet cast recipient was not used for outgoing heal")
+        assert(outgoing[#outgoing].result.who == "you"
+            and outgoing[#outgoing].result.spell == 201)
+    end
+
+    -- Given one pet HoT cast while an enemy remains selected.
+    ns.ResetHealing()
+    Event("UNIT_SPELLCAST_SENT", "player", "Wolf", "pet-hot", 201)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pet-hot", 201)
+    for tick = 1, 2 do
+        Advance(1)
+        local before = #outgoing
+        -- When each periodic heal has its own confirmation.
+        Event("UNIT_COMBAT", "pet", "HEAL", "", 20, 2)
+        Event("COMBAT_LOG_MESSAGE", nil, "hot")
+        Advance(0)
+        Advance(0.13)
+        -- Then even the first two ticks use outgoing HoT presentation.
+        assert(#outgoing == before + 1, "early pet HoT tick was lost")
+        assert(outgoing[#outgoing].result.tick
+            and outgoing[#outgoing].result.spell == 201)
+    end
+
+    -- Given no matching local cast, or a hidden recipient that cannot be read.
+    ns.ResetHealing()
+    local before = #outgoing
+    Event("UNIT_COMBAT", "player", "HEAL", "", 95, 2)
+    Advance(0)
+    local secretCheck, hiddenName = issecretvalue, {}
+    issecretvalue = function(value) return value == hiddenName end
+    Event("UNIT_SPELLCAST_SENT", "player", hiddenName, "hidden-cast", 201)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "hidden-cast", 201)
+    Event("UNIT_COMBAT", "pet", "HEAL", "", 96, 2)
+    Advance(0)
+    -- Then received heals are not guessed to be your outgoing heals.
+    assert(#outgoing == before, "another healer's spell was claimed as yours")
+    issecretvalue = secretCheck
+
+    -- Given recipient data that is cleared before a later cast succeeds.
+    ns.NoteHealTarget("player", "Wolf", "stale-cast", 201, now)
+    ns.ResetHealing()
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "stale-cast", 201)
+    Event("UNIT_COMBAT", "pet", "HEAL", "", 97, 2)
+    Advance(0)
+    -- Then reset cannot lend stale recipient information to the next session.
+    assert(#outgoing == before, "reset retained a stale healing recipient")
+    UnitName = unitName
+    ns.ResetHealing()
+end
+
+do
+    -- Given a recent helpful self cast but no confirming heal line of ours.
+    local ns = MikSBT.CombatEngine
+    ns.ResetHealing()
+    targetIsPlayer = true
+    local before = #outgoing
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 201)
+    -- When an incoming heal has no evidence that the player caused it.
+    Event("UNIT_COMBAT", "player", "HEAL", "", 98, 2)
+    Advance(0)
+    Advance(0.13)
+    -- Then it must not become an outgoing heal merely due to cast timing.
+    assert(#outgoing == before,
+        "unconfirmed received healing was claimed as outgoing")
+    targetIsPlayer = false
+    ns.ResetHealing()
+end
 
 -- Describe: Windfury reports a proc before the swing hit and another after it.
 local windfuryCompatibility = MikSBT.Compatibility

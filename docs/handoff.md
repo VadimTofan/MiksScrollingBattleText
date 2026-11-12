@@ -1,4 +1,36 @@
-# Damage palette top spacing
+# Outgoing self and pet healing
+
+Updated: 2026-11-12
+
+Matched player heals on self or pet now reach outgoing healing presentation
+while retaining incoming display. The outgoing copy preserves amounts and
+crits and treats the pet as recipient, rather than caster. Duplicate target
+reports for a selected pet are ignored. Periodic heal confirmation identifies
+the first HoT ticks without waiting for a rhythm to form.
+
+Readable UNIT_SPELLCAST_SENT recipient data is paired to cast success by GUID
+and spell, supporting self/pet bindings while another target remains selected.
+Hidden or ambiguous recipient names are not inspected or guessed. Helpful
+casts alone cannot confirm outgoing healing when combat-log confirmation is
+available: an unused own heal line is required within the existing timing
+window. Existing cast matching remains the fallback on clients without that
+event. Passive or unidentifiable heals without a matched cast remain outside
+this change.
+
+Regressions failed first for missing outgoing heals, actual cast recipients,
+and unconfirmed received healing. The full suite ran 144 tests: 143 passed,
+with the release-archive check skipped. Installed Forever engine and complete
+runtime regressions passed; all 102 runtime files match source by SHA-256.
+The two runtime files were backed up under
+D:/Codex-Temp/msbt-self-pet-heals-20261112 before installation.
+
+API payload reference:
+https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua
+
+Saved locally; no push or release. Next: reload in game and test a self-heal,
+a pet heal, and a HoT while an enemy is selected.
+
+## Damage palette top spacing
 
 Updated: 2026-11-12
 

@@ -97,6 +97,37 @@ local function LineRestrict(line)
     local info = line.kind and ns.LINE_KINDS and ns.LINE_KINDS[line.kind]
     return info and info.restrict
 end
+local EARLY_LINE, LATE_LINE = 0.35, 0.12
+
+local function OutgoingLocalHeal(record, unit, at, result)
+    local best, distance
+    for _, line in ipairs(reader.logLines or {}) do
+        local gap = line.at - at
+        if line.source == "mine" and LineClass(line) == "heal"
+            and not line.claimed and not line.hit
+            and gap >= -EARLY_LINE and gap <= LATE_LINE
+            and (not distance or math.abs(gap) < distance) then
+            best, distance = line, math.abs(gap)
+        end
+    end
+    if not best and ns.EventAvailable("COMBAT_LOG_MESSAGE") then return end
+    local tick = record.tick
+    if best then tick = LineRestrict(best) == "tick" end
+    result = result or ns.MatchHealing(unit, at, tick, true)
+    if not result then return end
+    local live = Router()
+    if not live then return end
+    local outgoing = {}
+    for field, value in pairs(record) do outgoing[field] = value end
+    -- Pet here describes the recipient, not the caster.
+    outgoing.pet, outgoing.selfHeal = nil, nil
+    outgoing.tick = tick
+    outgoing.result = { who = result.who, spell = result.spell, tick = tick }
+    if best then
+        best.claimed, best.hit = true, { at = at, record = outgoing }
+    end
+    live:Out(outgoing)
+end
 local function RecordClass(record) return record and (record.event == "miss" and "miss" or record.event) end
 -- Whether a line of yours may be the one of this hit (any hit without one):
 -- a grey line (no kinds) any; a coloured one only a hit of its class.
@@ -208,9 +239,14 @@ local function OnUnitCombat(unit, event, flag, amount, school)
             -- A heal can arrive before its cast succeeds in the same frame.
             -- Resolve the spell before presentation copies the record.
             C_Timer.After(0, function()
-                ns.TagIncomingHeal(record, unit, now)
+                local result = ns.TagIncomingHeal(record, unit, now)
                 local live = Router()
-                if live then live:In(record) end
+                if live then
+                    live:In(record)
+                    C_Timer.After(LATE_LINE, function()
+                        OutgoingLocalHeal(record, unit, now, result)
+                    end)
+                end
             end)
         else
             router:In(record)
@@ -219,6 +255,10 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     end
     local key, token
     if unit == "target" then
+        if record.event == "heal" then
+            local pet = UnitIsUnit("target", "pet")
+            if ns.Bool(pet) and pet then return end
+        end
         key, token = ns.TargetKey(), "target"
         -- Death can remove the target before its final damage report.
         -- Keep this fallback out of TargetKey so new casts cannot use it.
@@ -389,8 +429,6 @@ end
 -- The hits of a frame against the lines of yours that came in it
 -- (DecideGroup, below).
 reader.frameHits = {}
--- How far a spare line of yours may be from a bolt's hit (ns.DecideLate).
-local EARLY_LINE, LATE_LINE = 0.35, 0.12
 local MISS_SETTLE = 0.03 -- a miss with its line waits this for its cast (DecideGroup)
 -- Melee swing lines (0.6.1 to 0.6.3, 1.60.1.70450, 19 October 2026,
 -- laptop). A melee blow is reported a while after its combat log line, never
@@ -913,7 +951,7 @@ end
 
 -- Your casts and swings -----------------------------------------------------------
 local lastCast
-local function OnCast(unit, spell)
+local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
     local key
@@ -924,7 +962,7 @@ local function OnCast(unit, spell)
         -- cast is taken to be at your target and its line decides (0.3.18).
         if PetAttacking("target") or (ns.mine.petLines and LinesRunning and LinesRunning()) then key = ns.TargetKey() end
     end
-    if ns.NoteHealCast then ns.NoteHealCast(unit, spell, key, now) end
+    if ns.NoteHealCast then ns.NoteHealCast(unit, spell, key, now, guid) end
     ns.mine:Cast(unit, spell, key, now)
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     -- Your pet's casts and your own with no target to hit (Life Tap) are
@@ -1687,6 +1725,7 @@ local EVENTS = {
     "UNIT_COMBAT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "PLAYER_SWING", "PLAYER_TARGET_CHANGED",
     "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOSS_OF_CONTROL_ADDED", "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",
     "COMBAT_TEXT_UPDATE",
+    "UNIT_SPELLCAST_SENT",
     "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP",
     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
     "PLAYER_ENTERING_WORLD", "COMBAT_LOG_MESSAGE", "SPELL_TEXT_UPDATE",
@@ -1697,9 +1736,12 @@ ns.READER_EVENTS = EVENTS
 local function OnEvent(_, event, ...)
     if event == "UNIT_COMBAT" then
         OnUnitCombat(...)
+    elseif event == "UNIT_SPELLCAST_SENT" then
+        local unit, target, guid, spell = ...
+        ns.NoteHealTarget(unit, target, guid, spell, Now())
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-        local unit, _, spell = ...
-        if unit == "player" or unit == "pet" then OnCast(unit, spell) end
+        local unit, guid, spell = ...
+        if unit == "player" or unit == "pet" then OnCast(unit, spell, guid) end
     elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
         local unit, _, spell = ...
         if (unit == "player" or unit == "pet") and ns.Number(spell, 1) then

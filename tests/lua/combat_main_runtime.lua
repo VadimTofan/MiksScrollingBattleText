@@ -783,6 +783,8 @@ for _, forever in ipairs({ false, true }) do
 	end
 	C_Spell.IsSpellHelpful = function(id) return id == 201 end
 	events.SELF_HEAL = { message = "Self %a", scrollArea = "Custom heals" }
+	events.OUTGOING_HEAL = { message = "Healed %a (%s)",
+		scrollArea = "Outgoing heals" }
 	for _, healFirst in ipairs({ true, false }) do
 		MikSBT.CombatEngine.ResetHealing()
 		local beforeHeal = #displayed
@@ -794,13 +796,23 @@ for _, forever in ipairs({ false, true }) do
 		if not healFirst then
 			Dispatch("UNIT_COMBAT", "player", "HEAL", "", 93, 2)
 		end
-		Advance(0.21)
-		-- Then exactly one self-heal keeps the actual spell's icon.
-		heal = displayed[#displayed]
-		assert(#displayed == beforeHeal + 1)
-		assert(heal[1] == events.SELF_HEAL)
+		local healRGB = filter.colors.eventColoring.SPELL_HEAL
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque",
+			healRGB.r, healRGB.g, healRGB.b, 1)
+		Advance(0.25)
+		-- Then incoming and outgoing each show one correctly attributed heal.
+		assert(#displayed == beforeHeal + 2,
+			"self healing did not display once in each direction")
+		local outgoingHeal
+		for index = beforeHeal + 1, #displayed do
+			local item = displayed[index]
+			if item[1] == events.SELF_HEAL then heal = item end
+			if item[1] == events.OUTGOING_HEAL then outgoingHeal = item end
+		end
 		assert(heal[2] == "Self 93" and heal[3] == "icon",
 			"self-target heal lost its spell icon")
+		assert(outgoingHeal and outgoingHeal[2] == "Healed 93 (Test spell)"
+			and outgoingHeal[3] == "icon", "outgoing self-heal settings lost")
 	end
 	UnitIsUnit = unitIsUnit
 	C_Spell.IsSpellHelpful = function() return false end
