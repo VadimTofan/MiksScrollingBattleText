@@ -746,7 +746,7 @@ end
 
 -- Typed periodic lines can recover a cast even when its tooltip is unavailable
 -- or a learned school/kind/interval is stale. Fitting never changes the tracker.
-local function PeriodicCandidate(self, key, school, now, amount)
+local function PeriodicCandidate(self, key, school, now, amount, leech)
     local best, bestScore, count
     local function Consider(spell, cast, dot)
         local at = dot and dot.castAt or cast.at
@@ -762,6 +762,8 @@ local function PeriodicCandidate(self, key, school, now, amount)
         local known = dot and dot.school or self.learned("school", spell)
         local period = dot and dot.period or self.learned("period", spell)
         local score = AmountFit(self, spell, amount, period)
+        local drains = type(facts) == "table" and facts.leech == true
+        if leech ~= nil and drains ~= leech then score = score + 1 end
         if dot and dot.next and math.abs(now - dot.next) <= TICK_SLACK then
             score = score + math.abs(now - dot.next) / TICK_SLACK * 0.3
         else
@@ -904,7 +906,8 @@ end
 local function Yours(self, key, kind, school, now)
     local allowed, sure = Allowed(self.restrictNow), self.restrictNow == "tick"
     if kind == "damage" and sure then
-        local candidate, _, count = PeriodicCandidate(self, key, school, now, self.amountNow)
+        local candidate, _, count = PeriodicCandidate(self, key, school, now,
+            self.amountNow, self.leechNow)
         if candidate then
             self.ambiguous = count > 1
             return ConfirmTick(self, candidate, key, school, now)
@@ -1274,8 +1277,9 @@ end
 
 -- Read-only fit for a tick on this unit, including the first tick. A typed
 -- periodic confirmation may bypass an unknown cast's wait for a direct hit.
-function Mine:TickFit(key, school, now, amount)
-    local candidate, score = PeriodicCandidate(self, key, school, now, amount)
+function Mine:TickFit(key, school, now, amount, leech)
+    local candidate, score =
+        PeriodicCandidate(self, key, school, now, amount, leech)
     local dot = candidate and candidate.dot
     return score, dot and dot.next and math.abs(now - dot.next) <= TICK_SLACK
 end

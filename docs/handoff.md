@@ -1,4 +1,32 @@
-# Periodic damage PR integration
+# Periodic damage merge and local healing follow-up
+
+Updated: 2026-11-12
+
+At the user's request, ameNiku's PR #29 was merged as `07e44e6` and pulled
+into main with `--ff-only`. The conflict resolution preserves main's direct
+attribution safeguards. GitHub validation passed:
+https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43184533453
+The requested thank-you and follow-up explanation were posted:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/29#issuecomment-6818842622
+
+The local follow-up passes matching-heal evidence explicitly into periodic
+candidate scoring, both when the reader fits a report and when the engine
+chooses its spell. A draining tick no longer takes a simultaneous non-draining
+DoT's identity when the other evidence ties. Without healing evidence, the
+existing score is unchanged; read-only fits cannot inherit a previous heal.
+
+Both regressions failed first: wrong displayed icon and ignored healing
+evidence during fitting. After the fix, 16 focused tests passed. The full suite
+ran 143 tests: 142 passed and the actual release-archive check was skipped.
+All 60 periodic Lua scenarios passed, including the contributor's original 58.
+Whitespace checks passed. The follow-up is saved locally only; no push or
+release was requested for it.
+
+Next: run `/reload` and check overlapping same-school DoTs with a matching
+self-heal, along with Serpent Sting's delayed ticks. In-game validation is
+pending.
+
+## Periodic damage PR integration
 
 Updated: 2026-11-12
 

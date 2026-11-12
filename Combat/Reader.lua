@@ -450,7 +450,7 @@ local function TickFit(hit)
     local record = hit.record
     if record.event ~= "damage" then return nil end
     local amount = ns.Number(record.amount) and record.amount or nil
-    return ns.mine:TickFit(hit.key, record.school, hit.at, amount)
+    return ns.mine:TickFit(hit.key, record.school, hit.at, amount, Leech(hit))
 end
 local NonPeriodicPair
 

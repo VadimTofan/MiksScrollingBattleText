@@ -83,6 +83,7 @@ local function reset(learned)
     ns.reader.epoch, ns.reader.plates, ns.reader.targetPlate = 0, {}, nil
     ns.reader.frameHits, ns.reader.held, ns.reader.logLines = {}, {}, {}
     ns.reader.yourHits, ns.reader.swingHits, ns.reader.swingTimes = {}, {}, {}
+    ns.reader.playerHeals = {}
     ns.reader.sawGrey = true
     ns.ReaderEvent(nil, "NAME_PLATE_UNIT_ADDED", "nameplate1")
     return learned
@@ -499,5 +500,51 @@ test("foreign sources invalidate the confirmation filter", function()
     equal(log:IsReady(), false, "foreign source rejected")
     part.sourceFlags[3] = nil
     equal(log:IsReady(), true, "own-only restored")
+end)
+
+-- Describe: healing evidence distinguishes simultaneous periodic spells.
+test("a matching heal keeps the draining tick's spell identity", function()
+    -- Given two Shadow DoTs due together, only spell 2 drains health.
+    reset({ school = { [1] = 32, [2] = 32 },
+        direct = { [1] = 2, [2] = 2 }, period = { [1] = 3, [2] = 3 } })
+    descriptions[1] = "Causes 120 Shadow damage over 18 sec."
+    descriptions[2] = "Causes 120 Shadow damage over 18 sec. "
+        .. "Transfers health to the caster."
+    cast(1)
+    cast(2)
+    clock = 3
+    ns.reader.playerHeals = { { at = clock, amount = 20 } }
+
+    -- When a confirmed tick has a same-frame heal of the same amount.
+    hit(20, 32)
+    after(0.05, function() combatLine("tick") end)
+    flush()
+
+    -- Then the real reader/display pipeline retains the draining identity.
+    equal(#shown, 1, "one confirmed tick displayed")
+    assertDot("20", 2)
+    equal(ns.mine:Dots()[1].ticks, 0, "non-draining DoT not advanced")
+    equal(ns.mine:Dots()[2].ticks, 1, "draining DoT advanced")
+end)
+
+test("periodic fits use only the current hit's healing evidence", function()
+    -- Given a non-draining DoT due now, with no learned damage amounts.
+    beginDot({ school = { [1] = 32 }, direct = { [1] = 2 },
+        period = { [1] = 3 } })
+    local dot = ns.mine:Dots()[1]
+
+    -- When the same hit is fitted with and without a matching heal.
+    local ordinary = ns.mine:TickFit("nameplate1", 32, 3, 20)
+    local draining = ns.mine:TickFit("nameplate1", 32, 3, 20, true)
+    ns.mine:Hit("nameplate1", "damage", 32, 3, false, true,
+        20, false, "tick", true)
+    local nextOrdinary = ns.mine:TickFit("nameplate1", 32, 6, 20)
+    local nextDraining = ns.mine:TickFit("nameplate1", 32, 6, 20, true)
+
+    -- Then mismatches score worse and old healing evidence cannot leak.
+    assert(draining > ordinary, "matching heal ignored during fitting")
+    assert(nextDraining > nextOrdinary, "previous heal leaked into fitting")
+    equal(dot.ticks, 1, "read-only fits did not consume another tick")
+    equal(dot.next, 6, "read-only fits did not advance the rhythm")
 end)
 print("PASS: " .. count .. " tests")
