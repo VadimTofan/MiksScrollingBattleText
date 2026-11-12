@@ -426,11 +426,13 @@ for _, forever in ipairs({ false, true }) do
 	assert(displayed[#displayed][4] == secretResource)
 	assert(displayed[#displayed][5] == "MANA")
 
-	-- When the resource token is hidden too, then its label reaches rendering.
+	-- When the resource token is hidden too and no power update names it,
+	-- then its label reaches rendering at the end of the frame.
 	resourceToken = secretToken
 	beforeResource = #displayed
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Advance(0)
 	assert(#displayed == beforeResource + 2, "hidden resource type dropped a gain")
 	assert(displayed[#displayed][2] == "%s - %s")
 	assert(displayed[#displayed][4] == secretResource)
@@ -441,11 +443,55 @@ for _, forever in ipairs({ false, true }) do
 	resourceSettings.message = "%p: %a (%p) 100%"
 	-- When the same opaque values arrive, then template order is preserved.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Advance(0)
 	local resource = displayed[#displayed]
 	assert(resource[2] == "%s: %s (%s) 100%%")
 	assert(resource[4] == secretToken and resource[5] == secretResource)
 	assert(resource[6] == secretToken)
 	resourceSettings.message = "%a - %p"
+
+	-- Given a hidden token and the power update that follows it in its frame.
+	COMBO_POINTS = "Combo Points"
+	beforeResource = #displayed
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Dispatch("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+	Dispatch("UNIT_POWER_UPDATE", "pet", "FOCUS")
+	-- When the frame ends, then the gain is named after the power that changed.
+	Advance(0)
+	assert(#displayed == beforeResource + 1, "named resource gain was lost or repeated")
+	assert(displayed[#displayed][4] == secretResource)
+	assert(displayed[#displayed][5] == "Combo Points",
+		"hidden resource token was not named by its power update")
+
+	-- Given a power with no Blizzard label, then its token is put in words.
+	Advance(2)
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Dispatch("UNIT_POWER_UPDATE", "player", "SOUL_SHARDS")
+	Advance(0)
+	assert(displayed[#displayed][5] == "Soul Shards")
+
+	-- Given a combo point gained in the frame of an energy tick.
+	local unitPowerType = UnitPowerType
+	UnitPowerType = function() return 3, "ENERGY" end
+	Advance(2)
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Dispatch("UNIT_POWER_UPDATE", "player", "ENERGY")
+	Dispatch("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+	-- When the frame ends, then the power that is not the main one names it.
+	Advance(0)
+	assert(displayed[#displayed][5] == "Combo Points")
+
+	-- Given three powers changing in one frame, then nothing is guessed.
+	Advance(2)
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	Dispatch("UNIT_POWER_UPDATE", "player", "ENERGY")
+	Dispatch("UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+	Dispatch("UNIT_POWER_UPDATE", "player", "MANA")
+	Advance(0)
+	assert(displayed[#displayed][5] == secretToken,
+		"an unclear power change named a hidden resource gain")
+	UnitPowerType = unitPowerType
+	COMBO_POINTS = nil
 	issecretvalue = previousSecretCheck
 
 	-- Given zero, negative, missing, and invalid amounts.

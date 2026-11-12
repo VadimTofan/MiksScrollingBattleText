@@ -8,7 +8,7 @@ local C_Timer = ns.Timer
 
 local reader = {
     epoch = 0, plateGeneration = 0, plates = {}, held = {},
-    lastGlow = {}, lastCC = {}, swingTimes = {},
+    lastGlow = {}, lastCC = {}, swingTimes = {}, powerChanges = {},
 }
 ns.reader = reader
 
@@ -1267,6 +1267,49 @@ local function UpdateWand()
 end
 ns.UpdateWand = UpdateWand
 
+-- A resource gain whose power the game hides. In combat on Forever the
+-- combat text's power token is a protected value, so the gain showed the raw
+-- token ("1 - COMBO_POINTS") and nothing could look its name up.
+-- UNIT_POWER_UPDATE names the power that changed in plain text, in the same
+-- frame and after the gain, so the gain waits for the frame's end and takes
+-- the name of the power that changed with it (1.60.1.70862: 18 of a rogue's
+-- 18 gains, combo points and energy).
+local function PowerLabel(token)
+    if not ns.Text(token) then return nil end
+    local label = _G[token]
+    if ns.Text(label) then return label end
+    return (token:lower():gsub("_", " "):gsub("(%a)(%w*)", function(first, rest)
+        return first:upper() .. rest
+    end))
+end
+
+local function NotePowerChange(unit, token)
+    if unit ~= "player" or not ns.Text(token) then return end
+    local list, now = reader.powerChanges, Now()
+    list[#list + 1] = { at = now, token = token }
+    while list[1] and (now - list[1].at > 1 or #list > 16) do table.remove(list, 1) end
+end
+
+-- The power that changed in the frame at "at": the only one, or of two, the
+-- one that is not your main power (a combo point beside an energy tick).
+local function PowerChangedAt(at)
+    local seen, tokens = {}, {}
+    for _, change in ipairs(reader.powerChanges) do
+        if math.abs(change.at - at) <= 0.01 and not seen[change.token] then
+            seen[change.token] = true
+            tokens[#tokens + 1] = change.token
+        end
+    end
+    if #tokens == 1 then return tokens[1] end
+    if #tokens == 2 and UnitPowerType then
+        local _, main = UnitPowerType("player")
+        if ns.Text(main) then
+            if tokens[1] == main then return tokens[2] end
+            if tokens[2] == main then return tokens[1] end
+        end
+    end
+end
+
 local function OnCombatText(kind)
     if not ns.Text(kind) or not C_CombatText or not C_CombatText.GetCurrentEventInfo then return end
     local router = Router()
@@ -1309,7 +1352,19 @@ local function OnCombatText(kind)
         router:Healer(name)
     elseif kind == "ENERGIZE" or kind == "PERIODIC_ENERGIZE" then
         local amount, powerToken = C_CombatText.GetCurrentEventInfo()
-        router:Resource(amount, powerToken)
+        if ns.Public(powerToken) then
+            router:Resource(amount, powerToken)
+            return
+        end
+        -- Hidden token: wait for this frame's power updates to name it. With
+        -- none, the hidden token goes to the renderer as before.
+        local at = Now()
+        C_Timer.After(0, function()
+            local live = Router()
+            if live then
+                live:Resource(amount, PowerLabel(PowerChangedAt(at)) or powerToken)
+            end
+        end)
     elseif kind == "SPELL_ACTIVE" then
         if reader.anyGlow and Now() - reader.anyGlow < 0.5 then return end
         local name = C_CombatText.GetCurrentEventInfo()
@@ -1836,6 +1891,8 @@ local function OnEvent(_, event, ...)
         end
     elseif event == "COMBAT_TEXT_UPDATE" then
         OnCombatText(...)
+    elseif event == "UNIT_POWER_UPDATE" then
+        NotePowerChange(...)
     elseif event == "PLAYER_REGEN_DISABLED" then
         OnCombat(true)
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -1881,6 +1938,9 @@ function ns.StartReader()
     end
     if ns.EventAvailable("UNIT_AURA") then
         frame:RegisterUnitEvent("UNIT_AURA", "player")
+    end
+    if ns.EventAvailable("UNIT_POWER_UPDATE") then
+        frame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
     end
     reader.auras = {}
     frame:SetScript("OnEvent", function(_, event, ...)
