@@ -22,8 +22,15 @@ local batcher = OutgoingBatcher:New({
 	formatAmount = function(amount)
 		return tostring(amount)
 	end,
+	formatEventMessage = function(_, amount)
+		return tostring(amount)
+	end,
 	display = function(settings, message, texture)
 		displayed = { settings, message, texture }
+		outputs[#outputs + 1] = displayed
+	end,
+	displayRestricted = function(settings, amount, texture, message)
+		displayed = { settings, amount, texture, message }
 		outputs[#outputs + 1] = displayed
 	end,
 	after = function(_, callback)
@@ -113,3 +120,40 @@ callbacks[#callbacks]()
 -- Then damage falls back to enabled normal event settings.
 assert(displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE
 	and displayed[2] == "90", "disabled critical event fallback changed")
+
+-- Given normal skill hits are disabled while skill crits are enabled.
+profile.events.OUTGOING_SPELL_DAMAGE_CRIT.disabled = nil
+profile.events.OUTGOING_SPELL_DAMAGE.disabled = true
+
+-- When a critical hit arrives with melee hits still enabled (fallback path).
+batcher:Queue(1234, 110, true)
+callbacks[#callbacks]()
+
+-- Then it uses OUTGOING_SPELL_DAMAGE_CRIT rather than falling back to melee crits.
+assert(displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
+	and displayed[2] == "110", "skill crit fell back to melee crit when skill hits disabled")
+
+-- When both normal skill hits and melee hits are disabled and eventKey is provided.
+profile.events.OUTGOING_DAMAGE.disabled = true
+local beforeCount = #outputs
+batcher:Queue(1234, 60, false, nil, true, false, false, "OUTGOING_SPELL_DAMAGE")
+callbacks[#callbacks]()
+assert(#outputs == beforeCount, "disabled skill hit was still displayed")
+
+batcher:Queue(1234, 125, true, nil, true, false, false, "OUTGOING_SPELL_DAMAGE")
+callbacks[#callbacks]()
+assert(#outputs == beforeCount + 1
+	and displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
+	and displayed[2] == "125",
+	"skill crit was suppressed when skill hits were disabled")
+
+-- When a restricted critical hit arrives with skill hits disabled.
+beforeCount = #outputs
+batcher:DisplayRestricted(1234, "secret", false, nil, true, false, false, "OUTGOING_SPELL_DAMAGE")
+assert(#outputs == beforeCount, "restricted disabled skill hit was still displayed")
+
+batcher:DisplayRestricted(1234, "secret", true, nil, true, false, false, "OUTGOING_SPELL_DAMAGE")
+assert(#outputs == beforeCount + 1
+	and displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
+	and displayed[2] == "secret",
+	"restricted skill crit was suppressed when skill hits were disabled")
