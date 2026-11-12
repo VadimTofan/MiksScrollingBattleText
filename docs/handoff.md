@@ -1,4 +1,22 @@
-# Baseline damage school colors
+# Damage palette top spacing
+
+Updated: 2026-11-12
+
+The first damage-school row was anchored to the scroll content's bottom edge.
+Increasing that content's height to fit the school list therefore moved the
+first row down by the full list height, leaving a large empty area above it.
+The first row now anchors to the content's top with 10 pixels of padding;
+subsequent rows retain their existing spacing and scrolling.
+
+The layout regression failed first, then passed with the fix. Six focused
+popup, settings, menu and Lua 5.1 parse tests passed. The installed Forever
+popup regression passed, and all 102 runtime files match source by SHA-256.
+The fix is saved locally; no push or release was requested.
+
+Next: run `/reload` in Forever and reopen General > Damage Colors to check the
+first row starts near the top of the palette content.
+
+## Baseline damage school colors
 
 Updated: 2026-11-12
 

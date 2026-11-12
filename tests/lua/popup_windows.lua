@@ -275,6 +275,19 @@ for _, show in ipairs({ P.ShowAcknowledge, P.ShowScrollAreaSelection,
 		end
 		for _, child in ipairs(frame.children) do
 			if child.scrollChild then
+				-- Given the full-height school list inside its scroll viewport.
+				local firstRow
+				for school = 1, 32 do
+					local swatch = frame["school" .. school .. "Colorswatch"]
+					local point = swatch.points[1]
+					if point[2] == child.scrollChild then firstRow = point end
+				end
+				-- When the first row is placed, it must start near the list top.
+				-- Then the content height cannot become empty space above it.
+				assert(firstRow and firstRow[3] == "TOPLEFT",
+					"school list height became blank space above the first row")
+				assert(firstRow[5] <= 0 and firstRow[5] >= -16,
+					"first school row has excessive top padding")
 				assert(child.scrollChild:GetHeight() > frame:GetHeight(),
 					"all damage schools must remain reachable by scrolling")
 				local labels = 0

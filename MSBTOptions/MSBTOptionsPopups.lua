@@ -912,7 +912,11 @@ local function CreateDamageColors()
 	local colorswatch, fontString
 	for damageType, profileKey in pairs(MSBTMain.damageColorProfileEntries) do
 		colorswatch = MSBTControls.CreateColorswatch(content)
-		colorswatch:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", anchor == content and 20 or 0, anchor == content and -10 or -5)
+		if anchor == content then
+			colorswatch:SetPoint("TOPLEFT", content, "TOPLEFT", 20, -10)
+		else
+			colorswatch:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -5)
+		end
 		colorswatch:SetColorChangedHandler(function(this)
 			MSBTProfiles.SetOption(profileKey, "colorR", this.r)
 			MSBTProfiles.SetOption(profileKey, "colorG", this.g)
