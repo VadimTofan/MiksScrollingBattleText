@@ -1,18 +1,31 @@
-# v12.051 release preparation
+# v12.051 published
 
 Updated: 2026-11-12
 
-The user authorized pushing main and publishing a release. Both root TOCs
-are set to 12.051; CHANGELOG.md covers all changes since v12.050, including
-contributor combat fixes, baseline school colors, palette spacing, outgoing
-self/pet heals, and restricted healing spell names. The user confirmed the
-school colors and healing name fix work in game.
+The user authorized pushing main and publishing a release. Release commit
+is ddac17896cc511508b53c69cb69622237801f994; tag v12.051 points to it.
+Both root TOCs and CHANGELOG.md agree on version 12.051.
 
-Verification: 144 tests ran; 143 passed and the actual release ZIP check
-was skipped pending the CI artifact. Whitespace checks passed.
+Local suite: 144 tests, 143 passed and the archive check initially skipped.
+GitHub main and tag validation passed. Package-only run 43267606425 passed;
+its actual ZIP passed all six packaging tests and all 70 Lua files parsed.
 
-Next: push main and run the existing package-only workflow. Inspect the real BigWigs ZIP before pushing tag v12.051; then
-verify the CurseForge upload response. Preserve existing upload metadata.
+Publication run:
+https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43267797548
+
+The rebuilt upload ZIP passed all six packaging checks before upload.
+CurseForge accepted the upload with file ID 9577779. Public listing and
+processing status were not independently checked. The published workflow
+artifact was downloaded and passed all six archive tests locally again:
+102 files, 631898 bytes, with runtime manifests, media, libraries, locales,
+and licensing retained; development files excluded by .pkgmeta.
+
+Published artifact:
+D:/Codex-Temp/msbt-v12.051-release/published/MikScrollingBattleText-v12.051.zip
+
+All 102 Forever runtime files match source by SHA-256, including version
+metadata. The user confirmed school colors and healing skill names in game.
+No implementation work remains for this release.
 
 ## Healing skill names with restricted amounts
 
