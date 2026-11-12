@@ -467,7 +467,7 @@ local function DecideReports(group, at, settled)
     end
     local decided = {}
     if not kinded then
-        DecideGroup(group, frameLines, decided)
+        DecideGroup(group, frameLines, decided, settled)
     else
         local byClass, wild = { damage = {}, miss = {}, heal = {} }, {}
         for _, line in ipairs(frameLines) do
@@ -485,7 +485,7 @@ local function DecideReports(group, at, settled)
                 for _, line in ipairs(wild) do
                     if not line.claimed then pool[#pool + 1] = line end
                 end
-                DecideGroup(hitsOf, pool, decided)
+                DecideGroup(hitsOf, pool, decided, settled)
             end
         end
     end
@@ -707,7 +707,7 @@ end
 -- yours that may be theirs: as many lines as hits (or more: a DoT of yours
 -- on an enemy without a plate also sends one) and every hit is yours; none
 -- and none is; fewer, and the engine decides as it would without lines.
-function DecideGroup(group, frameLines, decided)
+function DecideGroup(group, frameLines, decided, settled)
     local function Claim(count)
         for index = 1, math.min(count, #frameLines) do frameLines[index].claimed = true end
     end
@@ -800,7 +800,12 @@ function DecideGroup(group, frameLines, decided)
                 ns.mine.procSwing = true
                 Decide(hit, true, LineRestrict(procLine))
             elseif record.event == "damage" and ns.mine:InFlight(hit.key, record.school, hit.at) then
-                C_Timer.After(LATE_LINE, function() ns.DecideLate(hit) end)
+                if settled then
+                    -- Periodic matching already waited for this hit's line.
+                    ns.DecideLate(hit)
+                else
+                    C_Timer.After(LATE_LINE, function() ns.DecideLate(hit) end)
+                end
             elseif FlightProcLine(hit) then
                 local flight = FlightProcLine(hit)
                 flight.claimed, flight.hit = true, { at = hit.at, record = record }

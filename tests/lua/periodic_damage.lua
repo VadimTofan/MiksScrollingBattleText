@@ -547,4 +547,143 @@ test("periodic fits use only the current hit's healing evidence", function()
     equal(dot.ticks, 1, "read-only fits did not consume another tick")
     equal(dot.next, 6, "read-only fits did not advance the rhythm")
 end)
+
+-- Describe: periodic channels share confirmations with established DoTs.
+test("Drain Life cannot take a due Siphon Life tick", function()
+    -- Given a known draining DoT and an active draining channel.
+    reset({ school = { [1] = 32 }, direct = { [1] = 2 },
+        period = { [1] = 3 } })
+    descriptions[1] = "Causes 80 Shadow damage over 12 sec. "
+        .. "Transfers health to the caster."
+    descriptions[2] = "Transfers 10 health every 1 sec "
+        .. "from the target to the caster. Lasts 5 sec."
+    cast(1)
+    ns.mine.amounts[1] = { n = 1, [20] = true }
+    clock = 1
+    ns.mine:StartChannel("you", 2, "nameplate1", clock)
+    clock = 3
+    ns.reader.playerHeals = { { at = clock, amount = 20 } }
+
+    -- When the DoT's confirmed tick also heals the player.
+    hit(20, 32)
+    combatLine("tick")
+    flush()
+
+    -- Then its identity and next tick remain attached to the DoT.
+    equal(#shown, 1, "one confirmed tick")
+    assertDot("20", 1)
+    equal(ns.mine:Dots()[1].next, 6, "draining DoT rhythm advanced")
+end)
+
+test("a channel cannot flatten competing DoT amount evidence", function()
+    -- Given a known DoT amount and a same-school periodic channel.
+    reset({ school = { [1] = 32 }, direct = { [1] = 2 },
+        period = { [1] = 3 } })
+    descriptions[1] = "Causes 80 Shadow damage over 12 sec."
+    descriptions[2] = "Drains the soul of the target, "
+        .. "causing 55 Shadow damage over 15 sec."
+    cast(1)
+    ns.mine.amounts[1] = { n = 1, [20] = true }
+    clock = 1
+    ns.mine:StartChannel("you", 2, "nameplate1", clock)
+    clock = 3
+
+    -- When a foreign hit precedes a partial-resist tick, with one own line.
+    local foreignFit = ns.mine:Fit("nameplate1", "damage", 32, 3,
+        99, "tick")
+    local ownFit = ns.mine:Fit("nameplate1", "damage", 32, 3,
+        10, "tick")
+    hit(99, 32)
+    hit(10, 32)
+    combatLine("tick")
+    flush()
+
+    -- Then fitting and the real display both retain the DoT's evidence.
+    assert(ownFit < foreignFit, "channel erased the amount distinction")
+    equal(#shown, 1, "one confirmed tick displayed")
+    assertDot("10", 1)
+end)
+
+for _, healed in ipairs({ false, true }) do
+    local name = "delayed channel confirmation reaches display "
+        .. tostring(healed)
+    test(name, function()
+        -- Given an isolated Drain Life channel with no ordinary cast record.
+        reset()
+        descriptions[2] = "Transfers 10 health every 1 sec "
+            .. "from the target to the caster. Lasts 5 sec."
+        ns.mine:StartChannel("you", 2, "nameplate1", 0)
+        clock = 1
+        if healed then
+            ns.reader.playerHeals = { { at = clock, amount = 10 } }
+        end
+
+        -- When its periodic confirmation arrives in the following frame.
+        hit(10, 32)
+        after(0.05, function() combatLine("tick") end)
+        flush()
+
+        -- Then the tick reaches the display with its channel identity.
+        equal(#shown, 1, "channel tick displayed once")
+        assertDot("10", 2)
+        assert(ns.mine.amounts[2] and ns.mine.amounts[2][10],
+            "confirmed channel amount not retained")
+    end)
+end
+
+for _, scenario in ipairs({
+    { channelFirst = false, gap = 0 },
+    { channelFirst = true, gap = 0 },
+    { channelFirst = false, gap = 0.05 },
+    { channelFirst = true, gap = 0.05 },
+}) do
+    local channelFirst, gap = scenario.channelFirst, scenario.gap
+    test("simultaneous draining amounts stay separate "
+        .. tostring(channelFirst) .. " gap " .. gap, function()
+        -- Given a 20-damage draining DoT and Drain Life due together.
+        reset({ school = { [1] = 32 }, direct = { [1] = 2 },
+            period = { [1] = 3 } })
+        descriptions[1] = "Causes 80 Shadow damage over 12 sec. "
+            .. "Transfers health to the caster."
+        descriptions[2] = "Transfers 10 health every 1 sec "
+            .. "from the target to the caster. Lasts 5 sec."
+        cast(1)
+        ns.mine.amounts[1] = { n = 1, [20] = true }
+        ns.mine.amounts[2] = { n = 1, [10] = true }
+        ns.mine:StartChannel("you", 2, "nameplate1", 1)
+        clock = 3
+        ns.reader.playerHeals = {
+            { at = clock, amount = channelFirst and 10 or 20 },
+        }
+
+        -- When both confirmed, healing ticks arrive in either order.
+        hit(channelFirst and 10 or 20, 32)
+        combatLine("tick")
+        local function secondTick()
+            ns.reader.playerHeals[#ns.reader.playerHeals + 1] = {
+                at = clock, amount = channelFirst and 20 or 10,
+            }
+            hit(channelFirst and 20 or 10, 32)
+            combatLine("tick")
+        end
+        if gap == 0 then secondTick() else after(gap, secondTick) end
+        flush()
+
+        -- Then each actual amount keeps its spell and the DoT advances once.
+        equal(#shown, 2, "both draining ticks displayed")
+        local dot, channel
+        for _, item in ipairs(shown) do
+            if item.icon == 1 then dot = item end
+            if item.icon == 2 then channel = item end
+        end
+        assert(dot, "draining DoT identity missing")
+        assert(channel, "channel tick identity missing")
+        equal(dot.message, "20", "DoT retained its amount")
+        equal(channel.message, "10", "channel retained its amount")
+        equal(ns.mine:Dots()[1].next, 6 + (channelFirst and gap or 0),
+            "DoT rhythm follows its actual impact")
+        equal(ns.mine:Dots()[1].ticks, 1, "DoT advanced once")
+    end)
+end
+
 print("PASS: " .. count .. " tests")

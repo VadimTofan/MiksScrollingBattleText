@@ -35,6 +35,16 @@ class CombatEngineTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
+    def test_periodic_channel_ticks_keep_their_drain_spell(self):
+        # Given
+        script = "drain_channel_attribution.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_cleanup_avoids_allocation_churn_during_repeated_combat_events(self):
         # Given
         script = "combat_cleanup_allocations.lua"

@@ -748,6 +748,7 @@ end
 -- or a learned school/kind/interval is stale. Fitting never changes the tracker.
 local function PeriodicCandidate(self, key, school, now, amount, leech)
     local best, bestScore, count
+    local dueDot, unknownDot, drainingDotScore = false, false, nil
     local function Consider(spell, cast, dot)
         local at = dot and dot.castAt or cast.at
         local since = now - at
@@ -764,9 +765,13 @@ local function PeriodicCandidate(self, key, school, now, amount, leech)
         local score = AmountFit(self, spell, amount, period)
         local drains = type(facts) == "table" and facts.leech == true
         if leech ~= nil and drains ~= leech then score = score + 1 end
-        if dot and dot.next and math.abs(now - dot.next) <= TICK_SLACK then
+        local onBeat = dot and dot.next
+            and math.abs(now - dot.next) <= TICK_SLACK
+        if onBeat then
+            dueDot = true
             score = score + math.abs(now - dot.next) / TICK_SLACK * 0.3
         else
+            if dot and not dot.period then unknownDot = true end
             score = score + 0.8
         end
         if not SchoolFits(known, school) then score = score + 2 end
@@ -774,6 +779,9 @@ local function PeriodicCandidate(self, key, school, now, amount, leech)
         if dot then target = dot.key else target = cast.key end
         if target ~= key then score = score + (target == false and 0.4 or 1.5) end
         if self.learned("direct", spell) == DIRECT_ONLY then score = score + 1 end
+        if onBeat and drains then
+            drainingDotScore = math.min(drainingDotScore or math.huge, score)
+        end
         if not bestScore or score < bestScore - 0.1 then
             best, bestScore, count = { spell = spell, cast = cast, dot = dot }, score, 1
         elseif math.abs(score - bestScore) <= 0.1 then
@@ -800,6 +808,32 @@ local function PeriodicCandidate(self, key, school, now, amount, leech)
                 if not tracked then Consider(spell, cast, nil) end
             end
         end
+    end
+    -- A heal may identify a drain channel, but Siphon Life also heals:
+    -- keep a due draining DoT unless the channel's amount fits clearly better.
+    -- Other channels follow due or not-yet-timed DoTs.
+    local channelBest, channelScore, channelCount
+    for _, channel in pairs(self.channels) do
+        local facts = self.facts(channel.spell)
+        local drains = type(facts) == "table" and facts.leech == true
+        local ticks = type(facts) == "table" and facts.ticks == true
+        local healedChannel = drains and leech == true
+        local fallback = not dueDot and not unknownDot
+            and (drains or leech ~= true)
+        if (ticks or drains) and ChannelFits(channel, key, school, now)
+            and (healedChannel or fallback) then
+            local score = AmountFit(self, channel.spell, amount, facts.period)
+            if not drainingDotScore or score < drainingDotScore - 0.1 then
+                if not channelScore or score < channelScore - 0.1 then
+                    channelBest, channelScore, channelCount = channel, score, 1
+                elseif math.abs(score - channelScore) <= 0.1 then
+                    channelCount = channelCount + 1
+                end
+            end
+        end
+    end
+    if channelBest then
+        return { channel = channelBest }, channelScore, channelCount
     end
     return best, bestScore, count
 end
@@ -910,6 +944,11 @@ local function Yours(self, key, kind, school, now)
             self.amountNow, self.leechNow)
         if candidate then
             self.ambiguous = count > 1
+            if candidate.channel then
+                local channel = candidate.channel
+                RememberAmount(self, channel.spell)
+                return Result(channel.caster, channel.spell, true)
+            end
             return ConfirmTick(self, candidate, key, school, now)
         end
         return nil
@@ -1106,6 +1145,10 @@ end
 -- restrict (0.3.48): what the frame's lines say made their hits; only what
 -- could have made such a hit counts.
 function Mine:Fit(key, kind, school, now, amount, restrict, crit, avoid, pet)
+    if kind == "damage" and restrict == "tick" then
+        local score = self:TickFit(key, school, now, amount)
+        return score
+    end
     local best
     -- A damage shield's line fits any hit on an enemy (0.3.49).
     if restrict == "shield" then return (kind == "damage" or kind == "miss") and 0.7 or nil end

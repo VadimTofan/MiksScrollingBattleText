@@ -1,3 +1,33 @@
+# Drain channel PR integration
+
+Updated: 2026-11-12
+
+At the user's request, ky0jr's PR #28 is integrated with current main after
+fixing its overlap regressions. The contributor received the agreed friendly
+thank-you and explanation; no changes were requested from them:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/28#issuecomment-6819278037
+
+Periodic channels now participate in the shared periodic matcher used by the
+reader and engine. Due DoTs retain rhythm and amount evidence rather than
+being overridden by a flat channel fit. Matching heals favor drain channels,
+while due Siphon Life ticks retain their identity unless learned channel
+amounts fit clearly better. Confirmed, unambiguous channel amounts are retained
+for later comparisons. Already-settled reports avoid a second line wait, so
+rapid direct channels continue to work.
+
+The original regression probes now retain Siphon Life's identity and next tick,
+and display the actual 10-damage DoT report instead of a competing 99-damage
+foreign hit. Regressions were observed failing before their fixes. The
+17 focused tests passed. The full suite ran 144 tests: 143 passed and the actual
+release-archive check was skipped. All 68 periodic pipeline scenarios passed.
+The contributor's drain-channel cases and the added engine-only Siphon Life
+case passed. Lua 5.1 parse checks and whitespace checks passed.
+
+Next: publish the verified merge, pull it into the addon workspace, and check
+GitHub validation. Then run `/reload` and check Drain Life and Drain Soul,
+including overlap with Siphon Life and Corruption. In-game validation is
+pending. No release was requested.
+
 # Periodic damage merge and local healing follow-up
 
 Updated: 2026-11-12
