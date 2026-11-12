@@ -87,6 +87,7 @@ local function Event(event, ...)
         local _, kind = ...
         local eventName = kind == "heal" and "SPELL_HEAL"
             or (kind == "swing" and "SWING_DAMAGE")
+            or (kind == "swingMiss" and "SWING_MISSED")
             or (kind == "spell" and "SPELL_DAMAGE" or "SPELL_PERIODIC_DAMAGE")
         local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[eventName]
         engine:HandleEvent(event, "opaque message", rgb.r, rgb.g, rgb.b, 1)
@@ -380,6 +381,53 @@ for _, example in ipairs({
 	assert(outgoing[#outgoing].amount == 323)
 	assert(outgoing[#outgoing].result.who == "other",
 		"delayed-proc matching claimed an unsupported report")
+end
+
+-- Given a native swing and its melee line, with no other line of yours.
+Advance(4)
+MikSBT.Compatibility.Client.isForever = true
+local beforeMagicHit = #outgoing
+Event("PLAYER_SWING", 3.8, 0)
+Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+
+-- When someone else's magic hit lands just before the swing's own hit.
+Advance(0.5)
+Event("UNIT_COMBAT", "target", "WOUND", "", 324, 4)
+Advance(0.085)
+Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+Advance(0.5)
+
+-- Then the swing keeps its line and the magic hit stays someone else's.
+local magicHit, swingHit
+for index = beforeMagicHit + 1, #outgoing do
+	local hit = outgoing[index]
+	if hit.amount == 324 then magicHit = hit end
+	if hit.amount == normalHit then swingHit = hit end
+end
+assert(magicHit and magicHit.result.who == "other",
+	"a magic hit took a melee swing's line")
+assert(swingHit and swingHit.result.who == "you" and swingHit.result.melee,
+	"a melee swing lost its line to a magic hit")
+
+for _, example in ipairs({
+	{ line = "swing", report = "WOUND", amount = 325 },
+	{ line = "swingMiss", report = "DODGE", amount = 0, school = 4 },
+}) do
+	-- Given a native swing and its melee line.
+	Advance(4)
+	local beforeReport = #outgoing
+	Event("PLAYER_SWING", 3.8, 0)
+	Event("COMBAT_LOG_MESSAGE", nil, example.line, 0, 0, 1)
+
+	-- When its own report has no readable school, or is a miss of any school.
+	Advance(0.585)
+	Event("UNIT_COMBAT", "target", example.report, "", example.amount, example.school)
+	Advance(0.5)
+
+	-- Then that report still takes the swing's line.
+	local result = #outgoing == beforeReport + 1 and outgoing[#outgoing].result
+	assert(result and result.who == "you" and result.melee,
+		"a swing's own report lost its line over its school")
 end
 
 -- Given the later capture: proc confirmations trail the swing by 0.099 s.
