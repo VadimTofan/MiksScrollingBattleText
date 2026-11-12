@@ -1,4 +1,36 @@
-# Drain channel PR integration
+# Outgoing damage school colors
+
+Updated: 2026-11-12
+
+The approved change colors outgoing damage numbers by their readable school,
+using the existing Damage Colors palette, global toggle and per-school
+toggles. Spell names and hit counts retain the event color. Normal, critical,
+periodic and pet damage use the same school path. Unknown or restricted
+schools keep the event color; no school is guessed from a spell identity.
+
+Presentation forwards the school through batching and formatting. Different
+schools cannot share a damage batch. Hidden amounts remain separate native
+display arguments; only their placeholders receive color codes, including
+restricted Windfury groups. Incoming damage and healing retain their existing
+event styling.
+
+The full runtime regression failed first on missing outgoing school color.
+After the fix, 18 focused tests passed. The full suite ran 144 tests: 143
+passed and the actual release-archive check was skipped. Both Retail and
+Forever fixtures cover school colors, names, criticals, DoTs, pets, disabled
+settings, unknown/hidden schools, hidden amounts and separate school batches.
+
+Four runtime files were backed up and synced to Forever. All 102 runtime files
+match the source by SHA-256, and all 70 installed Lua files compile as Lua 5.1.
+Installed main-runtime, combat-engine, 68-scenario periodic, Windfury stacking
+and formatter scripts passed. The change is saved locally; no push or release
+was requested.
+
+Next: run `/reload` in Forever, open `/msbt` > General > Damage Colors, and
+check Color Damage Amounts and the desired schools. Verify Frost and Shadow
+damage numbers in-game before release.
+
+## Drain channel PR integration
 
 Updated: 2026-11-12
 

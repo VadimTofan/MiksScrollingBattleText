@@ -190,11 +190,16 @@ function Presentation:Out(record)
 	end
 	if record.event == "damage" then
 		local isSpell = not result.melee or result.hand == "ranged"
-		local method = RestrictedValue:IsRestricted(record.amount)
-			and "DisplayRestricted" or "Queue"
-		self.config.batcher[method](self.config.batcher,
-			spell, record.amount, record.crit, icon, isSpell,
-			result.who == "pet", result.tick, key)
+		local school = RestrictedValue:Number(record.school)
+		if RestrictedValue:IsRestricted(record.amount) then
+			self.config.batcher:DisplayRestricted(
+				spell, record.amount, record.crit, icon, isSpell,
+				result.who == "pet", result.tick, key, school)
+		else
+			self.config.batcher:Queue(
+				spell, record.amount, record.crit, icon, isSpell,
+				result.who == "pet", result.tick, key, nil, school)
+		end
 		return
 	end
 	local displayRecord = {}

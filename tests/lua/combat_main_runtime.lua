@@ -126,6 +126,7 @@ end
 
 for _, forever in ipairs({ false, true }) do
 	swingEventsSupported = forever
+	MikSBT.Profiles.currentProfile.damageColoringDisabled = true
 	-- Given a modern client and the player's existing event configuration.
 	timers, displayed = {}, {}
 	Blizzard_CombatLog_Filters = { filters = {}, currentFilter = 1 }
@@ -560,6 +561,127 @@ for _, forever in ipairs({ false, true }) do
 	-- Given incoming heals have their own styling and damage-school colours are on.
 	profile.damageColoringDisabled = false
 
+	do
+		-- Given custom school colors and templates with spell names.
+		local savedFrost, savedShadow = profile.frost, profile.shadow
+		local savedStacking = profile.stackSimilarHits
+		local keys = { "OUTGOING_SPELL_DAMAGE", "OUTGOING_SPELL_DAMAGE_CRIT",
+			"OUTGOING_SPELL_DOT", "PET_OUTGOING_SPELL_DAMAGE" }
+		local savedEvents = {}
+		for _, key in ipairs(keys) do
+			savedEvents[key] = events[key]
+			events[key] = { message = "Hit %a (%s)", scrollArea = "Outgoing" }
+		end
+		profile.frost = { colorR = 0, colorG = 0, colorB = 1 }
+		profile.shadow = { colorR = 1, colorG = 0, colorB = 1 }
+		profile.stackSimilarHits = false
+		local function Out(amount, school, result, crit)
+			MikSBT.CombatEngine.liveRouter:Out({ event = "damage",
+				amount = amount, school = school, crit = crit, result = result
+					or { who = "you", spell = 123 } })
+		end
+
+		-- When normal, critical, periodic and pet spell damage is displayed.
+		for _, case in ipairs({
+			{ school = 16, color = "0000ff", who = "you" },
+			{ school = 32, color = "ff00ff", who = "you", crit = true },
+			{ school = 32, color = "ff00ff", who = "you", tick = true },
+			{ school = 16, color = "0000ff", who = "pet" },
+		}) do
+			Out(42, case.school, { who = case.who, spell = 123,
+				tick = case.tick }, case.crit)
+			Advance(0.31)
+			-- Then only the number has the configured school color.
+			assert(displayed[#displayed][2]
+				== "Hit |cFF" .. case.color .. "42|r (Spell 123)",
+				"outgoing school color missing or applied to spell name")
+		end
+
+		-- Given disabled coloring, a disabled school, or an unknown school.
+		for _, mode in ipairs({ "global", "school", "unknown" }) do
+			profile.damageColoringDisabled = mode == "global"
+			profile.frost.disabled = mode == "school"
+			-- When another outgoing hit is rendered.
+			Out(42, mode == "unknown" and 255 or 16)
+			Advance(0.31)
+			-- Then its number retains the normal event color.
+			assert(displayed[#displayed][2] == "Hit 42 (Spell 123)",
+				"disabled or unknown school coloring changed the message")
+		end
+		profile.damageColoringDisabled, profile.frost.disabled = false, false
+
+		-- Given a damage amount or school which Lua must not inspect.
+		local opaque = {}
+		local secretCheck, largeNumbers = issecretvalue, BreakUpLargeNumbers
+		issecretvalue = function(value) return value == opaque end
+		BreakUpLargeNumbers = nil
+		-- When the amount is hidden but Frost remains readable.
+		Out(opaque, 16)
+		local hidden = displayed[#displayed]
+		-- Then color surrounds its placeholder and the original amount survives.
+		assert(hidden[2] == "Hit |cFF0000ff%s|r" and hidden[4] == opaque,
+			"school coloring inspected or lost restricted damage")
+		-- When only the school is hidden, then no school color is guessed.
+		Out(42, opaque)
+		Advance(0.31)
+		assert(displayed[#displayed][2] == "Hit 42 (Spell 123)",
+			"restricted school was inspected or assigned a color")
+		issecretvalue, BreakUpLargeNumbers = secretCheck, largeNumbers
+
+		-- Given two hits with one inferred spell identity but different schools.
+		profile.stackSimilarHits = true
+		local beforeSchools = #displayed
+		-- When both are queued inside one grouping window.
+		Out(42, 16)
+		Out(43, 32)
+		Advance(0.31)
+		-- Then their amounts remain separate and each retains its own color.
+		assert(#displayed == beforeSchools + 2,
+			"different damage schools were combined into one colored amount")
+		assert(displayed[beforeSchools + 1][2]
+			== "Hit |cFF0000ff42|r (Spell 123)")
+		assert(displayed[beforeSchools + 2][2]
+			== "Hit |cFFff00ff43|r (Spell 123)")
+
+		-- When two hits of the same school are grouped instead.
+		Out(42, 16)
+		Out(43, 16)
+		Advance(0.31)
+		-- Then the total is colored while the name and hit count are not.
+		assert(displayed[#displayed][2]
+			== "Hit |cFF0000ff85|r (Spell 123) [2 hits]",
+			"same-school stacking lost number-only coloring")
+
+		-- Given hidden Windfury amounts that must remain separate native values.
+		issecretvalue = function(value) return value == opaque end
+		BreakUpLargeNumbers = nil
+		local beforeHiddenGroup = #displayed
+		-- When an existing stacked burst uses the restricted-group path.
+		Out(opaque, 32, { who = "you", spell = 8232 })
+		Out(opaque, 32, { who = "you", spell = 8232 })
+		Advance(1.1)
+		-- Then each placeholder is colored without formatting or summing damage.
+		local group = displayed[#displayed]
+		assert(#displayed == beforeHiddenGroup + 1)
+		assert(group[2]
+			== "|cFFff00ff%s|r + |cFFff00ff%s|r [2 hits]",
+			"restricted group lost per-number school coloring")
+		assert(group[4] == opaque and group[5] == opaque,
+			"restricted group changed its damage values")
+		profile.damageColoringDisabled = true
+		events.OUTGOING_SPELL_DAMAGE.message = "100% Hit %a (%s)"
+		Out(opaque, 16)
+		assert(displayed[#displayed][2] == "100%% Hit %s",
+			"disabled restricted coloring or literal percent escaping changed")
+		profile.damageColoringDisabled = false
+		issecretvalue, BreakUpLargeNumbers = secretCheck, largeNumbers
+
+		-- Restore the profile before the incoming-style regressions below.
+		profile.frost, profile.shadow = savedFrost, savedShadow
+		profile.stackSimilarHits = savedStacking
+		for _, key in ipairs(keys) do events[key] = savedEvents[key] end
+	end
+
 	-- Given incoming damage uses red text and a negative amount template.
 	local incomingMessage = events.INCOMING_DAMAGE.message
 	local incomingSpellSettings = events.INCOMING_SPELL_DAMAGE
@@ -705,7 +827,8 @@ for _, forever in ipairs({ false, true }) do
 			assert(output[4] == amount, "opaque damage was changed")
 			assert(not output[2]:find("Test spell", 1, true))
 		else
-			assert(output[2] == "Hit 42", "ambiguous damage kept a guessed label")
+			assert(output[2] == "Hit |cFFff7f0042|r",
+				"ambiguous damage lost its school color or kept a guessed label")
 		end
 	end
 	issecretvalue = previousSecretCheck
