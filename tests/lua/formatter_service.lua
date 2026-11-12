@@ -86,3 +86,19 @@ profile.shortenNumbers = true
 -- When / Then
 assert(Formatter:FormatDisplayAmount(4500) == "4.5k",
 	"short number formatting changed")
+
+-- Given an older profile that disabled all school coloring and this school.
+profile.damageColoringDisabled = true
+profile.physical.disabled = true
+
+-- When readable and hidden damage numbers use their school palette.
+local baseline = Formatter:FormatEvent({ message = "Hit %a", amount = 4500,
+	damageType = 1 })
+local hiddenTemplate = Formatter:BuildRestrictedTemplate("Hit %a", nil, 1)
+
+-- Then school coloring is baseline, while unknown schools keep event colors.
+assert(baseline == "Hit |cFFff00004.5k|r",
+	"legacy disabled flags suppressed baseline school coloring")
+assert(hiddenTemplate == "Hit |cFFff0000%s|r",
+	"legacy disabled flags suppressed hidden school coloring")
+assert(Formatter:ColorDamageAmount("42", 999) == "42")

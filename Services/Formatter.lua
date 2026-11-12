@@ -55,8 +55,7 @@ function Formatter:ColorDamageAmount(amount, damageType)
 	local entries = self.config.damageColorEntries
 	local entry = damageType and entries and entries[damageType]
 	local settings = entry and profile[entry]
-	if settings and not profile.damageColoringDisabled
-		and not settings.disabled then
+	if settings then
 		return ColorText(settings, amount)
 	end
 	return amount

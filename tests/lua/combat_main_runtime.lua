@@ -127,6 +127,10 @@ end
 for _, forever in ipairs({ false, true }) do
 	swingEventsSupported = forever
 	MikSBT.Profiles.currentProfile.damageColoringDisabled = true
+	-- Isolate each client's fixture from palette edits in the previous run.
+	for _, key in pairs(MikSBT.Main.damageColorProfileEntries) do
+		MikSBT.Profiles.currentProfile[key] = nil
+	end
 	-- Given a modern client and the player's existing event configuration.
 	timers, displayed = {}, {}
 	Blizzard_CombatLog_Filters = { filters = {}, currentFilter = 1 }
@@ -597,16 +601,18 @@ for _, forever in ipairs({ false, true }) do
 				"outgoing school color missing or applied to spell name")
 		end
 
-		-- Given disabled coloring, a disabled school, or an unknown school.
+		-- Given old disabled flags or an unknown school.
 		for _, mode in ipairs({ "global", "school", "unknown" }) do
 			profile.damageColoringDisabled = mode == "global"
 			profile.frost.disabled = mode == "school"
 			-- When another outgoing hit is rendered.
 			Out(42, mode == "unknown" and 255 or 16)
 			Advance(0.31)
-			-- Then its number retains the normal event color.
-			assert(displayed[#displayed][2] == "Hit 42 (Spell 123)",
-				"disabled or unknown school coloring changed the message")
+			-- Then old flags cannot suppress a known school's baseline color.
+			local expected = mode == "unknown" and "Hit 42 (Spell 123)"
+				or "Hit |cFF0000ff42|r (Spell 123)"
+			assert(displayed[#displayed][2] == expected,
+				"baseline or unknown school coloring changed the message")
 		end
 		profile.damageColoringDisabled, profile.frost.disabled = false, false
 
@@ -671,8 +677,8 @@ for _, forever in ipairs({ false, true }) do
 		profile.damageColoringDisabled = true
 		events.OUTGOING_SPELL_DAMAGE.message = "100% Hit %a (%s)"
 		Out(opaque, 16)
-		assert(displayed[#displayed][2] == "100%% Hit %s",
-			"disabled restricted coloring or literal percent escaping changed")
+		assert(displayed[#displayed][2] == "100%% Hit |cFF0000ff%s|r",
+			"baseline hidden coloring or literal percent escaping changed")
 		profile.damageColoringDisabled = false
 		issecretvalue, BreakUpLargeNumbers = secretCheck, largeNumbers
 

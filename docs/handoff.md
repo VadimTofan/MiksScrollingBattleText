@@ -1,4 +1,33 @@
-# Outgoing damage school colors
+# Baseline damage school colors
+
+Updated: 2026-11-12
+
+The user requested school coloring as baseline behavior rather than an
+enable/disable option. Known damage schools now always use their configured
+palette color. Legacy global and per-school disabled flags are ignored;
+existing custom colors and profile-transfer compatibility are preserved.
+Unknown or restricted schools keep the event color, and incoming damage and
+heals retain their existing event styling.
+
+The Damage Colors window is now a palette editor with labeled swatches only.
+The global and per-school checkboxes and their obsolete localized strings
+were removed. Tooltips now describe color customization in all eight locales.
+
+Formatter, runtime and popup regressions failed first, then passed after the
+change. The full suite ran 144 tests: 143 passed and the actual release-archive
+check was skipped. The tests verify old disabled flags cannot suppress either
+readable or hidden amount colors, and palette labels/swatches remain usable
+without enable/disable controls.
+
+Ten runtime files were backed up and synced to Forever. All 102 runtime files
+match the source by SHA-256, and all 70 installed Lua files compile as Lua 5.1.
+Installed main-runtime, formatter and popup scripts passed. Both school-color
+checkpoints are local only; no push or release was requested.
+
+Next: run `/reload` in Forever and verify school colors are present without
+enabling an option. General > Damage Colors is only for changing the palette.
+
+## Outgoing damage school colors
 
 Updated: 2026-11-12
 
@@ -26,9 +55,8 @@ Installed main-runtime, combat-engine, 68-scenario periodic, Windfury stacking
 and formatter scripts passed. The change is saved locally; no push or release
 was requested.
 
-Next: run `/reload` in Forever, open `/msbt` > General > Damage Colors, and
-check Color Damage Amounts and the desired schools. Verify Frost and Shadow
-damage numbers in-game before release.
+The optional-toggle design above was superseded by the baseline follow-up.
+Verify Frost and Shadow damage numbers in-game before release.
 
 ## Drain channel PR integration
 

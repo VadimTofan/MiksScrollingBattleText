@@ -265,10 +265,23 @@ for _, show in ipairs({ P.ShowAcknowledge, P.ShowScrollAreaSelection,
 	-- Then it uses the same menu header and stacking as the editors.
 	CheckWindow(frame, UIParent)
 	if show == P.ShowDamageColors then
+		assert(frame.colorCheckbox == nil,
+			"baseline damage colors still have an enable checkbox")
+		for school = 1, 32 do
+			assert(frame["school" .. school .. "Checkbox"] == nil,
+				"baseline damage school still has an enable checkbox")
+			assert(frame["school" .. school .. "Colorswatch"],
+				"school color customization was removed")
+		end
 		for _, child in ipairs(frame.children) do
 			if child.scrollChild then
 				assert(child.scrollChild:GetHeight() > frame:GetHeight(),
 					"all damage schools must remain reachable by scrolling")
+				local labels = 0
+				for _, row in ipairs(child.scrollChild.children) do
+					if row.text:match("^School %d+$") then labels = labels + 1 end
+				end
+				assert(labels == 32, "school color swatches lost their labels")
 			end
 		end
 	end
