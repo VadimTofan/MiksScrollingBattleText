@@ -1,3 +1,21 @@
+# Periodic damage PR integration
+
+Updated: 2026-11-12
+
+At the user's request, ameNiku's PR #29 is integrated with current main.
+The conflict resolution preserves direct-hit confidence, cast consumption,
+and target restrictions alongside cross-frame periodic confirmations and
+recovery from stale learned values. Duplicate target-history loops from the
+automatic merge were removed.
+
+The merged suite ran 143 tests: 142 passed and the actual release-archive
+check was skipped. The contributor's 58 periodic scenarios pass. In-game
+validation is pending.
+
+Next: pull this merge into the addon workspace, add a failing regression for
+same-school draining ticks, and restore healing-aware periodic scoring there.
+The user requested this follow-up locally; no release was requested.
+
 # Hunter shot descriptions merged
 
 Updated: 2026-11-12
