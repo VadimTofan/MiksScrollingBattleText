@@ -1,4 +1,20 @@
-# Healing skill names with restricted amounts
+# v12.051 release preparation
+
+Updated: 2026-11-12
+
+The user authorized pushing main and publishing a release. Both root TOCs
+are set to 12.051; CHANGELOG.md covers all changes since v12.050, including
+contributor combat fixes, baseline school colors, palette spacing, outgoing
+self/pet heals, and restricted healing spell names. The user confirmed the
+school colors and healing name fix work in game.
+
+Verification: 144 tests ran; 143 passed and the actual release ZIP check
+was skipped pending the CI artifact. Whitespace checks passed.
+
+Next: push main and run the existing package-only workflow. Inspect the real BigWigs ZIP before pushing tag v12.051; then
+verify the CurseForge upload response. Preserve existing upload metadata.
+
+## Healing skill names with restricted amounts
 
 Updated: 2026-11-12
 

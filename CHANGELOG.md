@@ -1,5 +1,19 @@
 # Changelog
 
+## v12.051
+
+- Outgoing damage numbers now use their magic-school colors by default.
+  Customize the colors in General > Damage Colors; the palette now starts
+  near the top of the window.
+- Matched self-heals and heals on your pet now also appear as outgoing
+  healing, including HoT ticks. Incoming healing remains visible.
+- Fixed missing healing spell names when combat amounts are restricted.
+  The skill-name visibility setting still applies.
+- Improved periodic damage attribution and restored Drain Life and Drain
+  Soul ticks. Healing evidence is retained for periodic spell matching.
+- Improved hunter shot recognition and melee swing timing, and prevented
+  hits from another damage school from taking a melee swing confirmation.
+
 ## v12.050
 
 - Separated confirmed player killing blows from NPC killing blows. Kills with
