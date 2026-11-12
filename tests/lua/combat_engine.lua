@@ -360,6 +360,50 @@ do
             and outgoing[#outgoing].result.spell == 201)
     end
 
+    -- Given a pet heal sent with no target (Mend Pet) while an enemy remains
+    -- selected.
+    ns.ResetHealing()
+    local describe = C_Spell.GetSpellDescription
+    C_Spell.GetSpellDescription = function()
+        return "Heals your pet 68 health every second while you focus."
+    end
+    Event("UNIT_SPELLCAST_SENT", "player", "", "mend-pet", 201)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "mend-pet", 201)
+    for tick = 1, 2 do
+        Advance(1)
+        local before = #outgoing
+        -- When each of its ticks heals the pet with its own confirmation.
+        Event("UNIT_COMBAT", "pet", "HEAL", "", 68, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "hot")
+        Advance(0)
+        Advance(0.13)
+        -- Then the cast is bound to the pet and shown as your outgoing heal.
+        assert(#outgoing == before + 1,
+            "a heal sent with no target was not shown as outgoing")
+        assert(outgoing[#outgoing].result.who == "you"
+            and outgoing[#outgoing].result.spell == 201)
+    end
+
+    -- Given a helpful spell that does not heal, sent with no target.
+    ns.ResetHealing()
+    C_Spell.GetSpellDescription = function()
+        return "Increases ranged attack power by 20."
+    end
+    Event("UNIT_SPELLCAST_SENT", "player", "", "aspect", 201)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "aspect", 201)
+    Advance(1)
+    local beforeBuff = #outgoing
+    -- When another healer's tick lands on the pet.
+    Event("UNIT_COMBAT", "pet", "HEAL", "", 40, 2)
+    Event("COMBAT_LOG_MESSAGE", nil, "hot")
+    Advance(0)
+    Advance(0.13)
+    -- Then the buff is not taken for the heal's cast.
+    assert(#outgoing == beforeBuff, "a buff sent with no target was shown as a heal")
+    C_Spell.GetSpellDescription = describe
+    -- Its unclaimed line must not confirm a later heal.
+    Advance(1)
+
     -- Given no matching local cast, or a hidden recipient that cannot be read.
     ns.ResetHealing()
     local before = #outgoing
