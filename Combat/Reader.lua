@@ -520,7 +520,26 @@ function ns.DecideFrame()
         if waitForTick then
             -- A periodic confirmation may precede or follow UNIT_COMBAT in
             -- another frame. Never substitute a coincident shot/spell line.
-            C_Timer.After(LATE_LINE, function() DecideReports(group, at, true) end)
+            -- Each hit keeps one line of its class from its own frame while
+            -- it waits: a teammate's blow a frame before a strike had taken
+            -- the strike's line looking for a bolt's (DecideLate), and the
+            -- strike went to someone else. A tick's line stays free for a
+            -- tick reported a frame earlier (predicted, not yet seen in
+            -- client).
+            local own = {}
+            for _, hit in ipairs(group) do
+                for _, line in ipairs(reader.logLines or {}) do
+                    if line.at == at and not line.claimed and not MeleeLine(line)
+                        and not PeriodicLine(line) and Pairs(line, hit.record) then
+                        line.claimed, own[#own + 1] = true, line
+                        break
+                    end
+                end
+            end
+            C_Timer.After(LATE_LINE, function()
+                for _, line in ipairs(own) do line.claimed = nil end
+                DecideReports(group, at, true)
+            end)
         else
             DecideReports(group, at, false)
         end
