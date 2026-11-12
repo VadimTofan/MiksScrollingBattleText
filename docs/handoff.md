@@ -2,9 +2,10 @@
 
 Updated: 2026-11-12
 
-At the user's request, ky0jr's PR #28 is integrated with current main after
-fixing its overlap regressions. The contributor received the agreed friendly
-thank-you and explanation; no changes were requested from them:
+At the user's request, ky0jr's PR #28 was merged as `ad8ccd7` and pulled into
+main with `--ff-only` after fixing its overlap regressions. The contributor
+received the agreed thank-you and explanation; no changes were requested
+from them:
 https://github.com/VadimTofan/MiksScrollingBattleText/pull/28#issuecomment-6819278037
 
 Periodic channels now participate in the shared periodic matcher used by the
@@ -23,8 +24,11 @@ release-archive check was skipped. All 68 periodic pipeline scenarios passed.
 The contributor's drain-channel cases and the added engine-only Siphon Life
 case passed. Lua 5.1 parse checks and whitespace checks passed.
 
-Next: publish the verified merge, pull it into the addon workspace, and check
-GitHub validation. Then run `/reload` and check Drain Life and Drain Soul,
+GitHub validation passed for the merge:
+https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43189256037
+The pulled workspace's drain-channel and 68-scenario periodic scripts passed.
+
+Next: run `/reload` and check Drain Life and Drain Soul,
 including overlap with Siphon Life and Corruption. In-game validation is
 pending. No release was requested.
 
