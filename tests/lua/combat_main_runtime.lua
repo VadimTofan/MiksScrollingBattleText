@@ -846,6 +846,48 @@ for _, forever in ipairs({ false, true }) do
 	UnitIsUnit = unitIsUnit
 	C_Spell.IsSpellHelpful = function() return false end
 
+	-- Given localized ranked Mend Pet while an enemy remains selected.
+	local mendName = C_Spell.GetSpellName
+	local mendDescription = C_Spell.GetSpellDescription
+	C_Spell.IsSpellHelpful = function(id) return id == 3661 end
+	C_Spell.GetSpellName = function(id)
+		if id == 136 or id == 3661 then return "Guérison du familier" end
+		return mendName(id)
+	end
+	C_Spell.GetSpellDescription = function(id)
+		if id == 3661 then return "Rend des points de vie au familier." end
+		return mendDescription(id)
+	end
+	local mendHot = events.OUTGOING_HOT
+	events.OUTGOING_HOT = { message = "Pet tick %a", scrollArea = "Outgoing" }
+	MikSBT.CombatEngine.ResetHealing()
+	Advance(4)
+	Dispatch("UNIT_SPELLCAST_SENT", "player", "", "ranked-mend", 3661)
+	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "ranked-mend", 3661)
+
+	-- When an unrelated self-heal precedes the confirmed pet tick.
+	Dispatch("UNIT_COMBAT", "player", "HEAL", "", 14, 2)
+	Advance(0.25)
+	local beforeMend = #displayed
+	Dispatch("UNIT_COMBAT", "pet", "HEAL", "", 68, 1)
+	local hotRGB = filter.colors.eventColoring.SPELL_PERIODIC_HEAL
+	Dispatch("COMBAT_LOG_MESSAGE", "opaque", hotRGB.r, hotRGB.g, hotRGB.b, 1)
+	Advance(0.25)
+
+	-- Then the real reader and renderer retain one outgoing Mend Pet tick.
+	local mendTicks = 0
+	for index = beforeMend + 1, #displayed do
+		if displayed[index][1] == events.OUTGOING_HOT then
+			assert(displayed[index][2] == "Pet tick 68")
+			mendTicks = mendTicks + 1
+		end
+	end
+	assert(mendTicks == 1, "localized targetless Mend Pet lost its outgoing tick")
+	events.OUTGOING_HOT = mendHot
+	C_Spell.GetSpellName = mendName
+	C_Spell.GetSpellDescription = mendDescription
+	C_Spell.IsSpellHelpful = function() return false end
+
 	-- Given two indistinguishable direct casts and visible spell names.
 	local activeProfile = MikSBT.Profiles.currentProfile
 	local previousHideSkills = activeProfile.hideSkills

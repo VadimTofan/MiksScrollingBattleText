@@ -57,9 +57,12 @@ C_Spell = {
 		if id == 403 then return "Deals 100 Chaos damage over 2 sec." end
 		return "Forces the target to speak in Demonic."
 	end,
-	IsSpellHelpful = function(id) return id == 201 end,
+	IsSpellHelpful = function(id) return id == 201 or id == 3661 end,
 	GetSpellTexture = function(id) return "icon-" .. id end,
-	GetSpellName = function(id) return "Spell " .. id end,
+	GetSpellName = function(id)
+		if id == 136 or id == 3661 then return "Mend Pet" end
+		return "Spell " .. id
+	end,
 }
 COMBATLOG_FILTER_MINE, COMBATLOG_FILTER_MY_PET = 1, 2
 Blizzard_CombatLog_Filters = { filters = {} }
@@ -367,8 +370,17 @@ do
     C_Spell.GetSpellDescription = function()
         return "Heals your pet 68 health every second while you focus."
     end
-    Event("UNIT_SPELLCAST_SENT", "player", "", "mend-pet", 201)
-    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "mend-pet", 201)
+    Event("UNIT_SPELLCAST_SENT", "player", "", "mend-pet", 3661)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "mend-pet", 3661)
+    local beforeUnrelated = #outgoing
+    -- When another healer heals the player before Mend Pet's first tick.
+    Event("UNIT_COMBAT", "player", "HEAL", "", 14, 2)
+    Advance(0)
+    Advance(0.13)
+    -- Then this incoming heal cannot consume or be labeled as Mend Pet.
+    assert(#outgoing == beforeUnrelated)
+    assert(incoming[#incoming].spell == nil,
+        "unrelated incoming self-heal was labeled as Mend Pet")
     for tick = 1, 2 do
         Advance(1)
         local before = #outgoing
@@ -381,7 +393,7 @@ do
         assert(#outgoing == before + 1,
             "a heal sent with no target was not shown as outgoing")
         assert(outgoing[#outgoing].result.who == "you"
-            and outgoing[#outgoing].result.spell == 201)
+            and outgoing[#outgoing].result.spell == 3661)
     end
 
     -- Given a helpful spell that does not heal, sent with no target.

@@ -5,6 +5,16 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: the adapted engine feeds MSBT without replacing its display.
 class CombatEngineTests(unittest.TestCase):
+    def test_targetless_mend_pet_preserves_recipient_and_localized_identity(self):
+        # Given a targetless pet heal and unrelated incoming healing.
+        script = "targetless_healing.lua"
+
+        # When confirmed ticks arrive with localized spell metadata.
+        result = run_lua_test(script)
+
+        # Then only the known pet-healing cast can claim those ticks.
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_late_killing_hits_keep_the_lost_target_without_reusing_it(self):
         # Given
         script = "killing_blow_target_lifecycle.lua"

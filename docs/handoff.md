@@ -1,3 +1,33 @@
+# Targetless Mend Pet follow-up
+
+Updated: 2026-11-12
+
+PR #50 was merged as 7e61e68 and main was pulled with --ff-only.
+The contributor thank-you comment is posted at:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/50#issuecomment-6837902569
+
+Targetless Mend Pet now uses its known pet recipient. Its base spell ID and
+matching localized names identify ranked versions without parsing English
+descriptions. The general open-cast fallback was removed: unrelated incoming
+self-heals cannot take Mend Pet's cast, and helpful buffs mentioning healing
+cannot become healing casts. Unknown targetless spells receive no inferred
+recipient. Named recipients and the existing outgoing confirmation gate stay
+in place; hidden recipients are still ignored.
+
+The new regression failed first on the merged implementation. Full suite:
+145 tests, 144 passed and one release-archive check skipped. The full-runtime
+regression covers a localized ranked Mend Pet after an unrelated self-heal
+on Retail and Forever. GitHub's PR and post-merge validation passed.
+
+The installed _forever_ runtime matches all 102 source files by SHA-256.
+Three installed healing/runtime regressions passed and all 70 runtime Lua
+files parsed with Lua 5.1. Its previous healing file is backed up under
+D:/Codex-Temp/msbt-targetless-healing-fix-20261112-234631.
+
+The follow-up fix is saved locally on main; it has not been pushed or
+released. Next: /reload and test Mend Pet with an enemy selected while the
+player receives an unrelated heal.
+
 # v12.051 published
 
 Updated: 2026-11-12
