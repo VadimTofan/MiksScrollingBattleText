@@ -553,11 +553,17 @@ end
 local function SwingLine(hit)
     local record = hit.record
     if record.event ~= "damage" and record.event ~= "miss" then return nil end
+    -- A melee swing's hit is physical (Mine.lua, Yours), so a hit whose school
+    -- reads otherwise leaves a melee line to the swing's own hit: a teammate's
+    -- spell landing between a swing and its hit had taken the line, was shown
+    -- as a proc of yours, and the swing's hit went unshown (predicted, not
+    -- yet seen in client).
+    local otherSchool = record.event == "damage" and record.school ~= nil and record.school ~= ns.SCHOOL_PHYSICAL
     for _, swing in ipairs(ns.mine:SwingsBefore(hit.key, hit.at)) do
         for _, line in ipairs(reader.logLines or {}) do
             if not line.claimed and not line.hit and Pairs(line, record) and math.abs(line.at - swing.at) <= SWING_FRAME then
                 if line.kind == nil and swing.hand ~= "ranged" then return line, swing end
-                if MeleeLine(line) and Role(line) == "swing" then return line, swing end
+                if MeleeLine(line) and Role(line) == "swing" and not otherSchool then return line, swing end
             end
         end
     end
