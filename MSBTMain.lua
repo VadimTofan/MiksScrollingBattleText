@@ -719,7 +719,9 @@ if Client.isMainline or Client.isForever then
 			local hasRestrictedValues = RestrictedValue:IsRestricted(amount)
 				or RestrictedValue:IsRestricted(powerName)
 			local arguments = {}
-			local template = (settings.message or "%a - %p"):gsub(
+			local message = settings.message or "%a %p"
+			if message == "%a - %p" then message = "%a %p" end
+			local template = message:gsub(
 				"%%([ap])", function(token)
 					if token == "a" then
 						arguments[#arguments + 1] = amount

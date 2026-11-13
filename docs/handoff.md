@@ -1,3 +1,21 @@
+# Resource notification spacing
+
+Updated: 2026-11-13
+
+Resource defaults now use `%a %p`: `1 Combo Point`, `8 Mana`.
+The Retail/Forever formatter also renders the previous exact default
+`%a - %p` with a single space so existing profiles receive the change.
+Other custom message templates remain unchanged; hidden amounts and names
+still reach native rendering without Lua inspection.
+
+Verification: the regression failed on the old separator before the fix.
+The full suite ran 148 tests: 147 passed, one archive check skipped.
+Seven installed Forever regression scripts passed; both changed production
+files match their source hashes. Backups are in
+`D:/Codex-Temp/msbt-resource-spacing-20261113`.
+
+Next: `/reload` in Forever and confirm resource gains display with one space.
+
 # Class, specialization, and form resource filtering
 
 Updated: 2026-11-13

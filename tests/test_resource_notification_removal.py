@@ -31,7 +31,7 @@ class ResourceNotificationRemovalTests(unittest.TestCase):
 
         # Then both clients and the settings UI offer the event.
         self.assertEqual(profiles.count(event + " = {"), 2)
-        self.assertEqual(profiles.count('message = "%a - %p"'), 2)
+        self.assertEqual(profiles.count('message = "%a %p"'), 2)
         self.assertIn('EventsTab_AddEvent(category, "' + event + '"', tabs)
         self.assertIn('obj["' + event + '"]', locale)
 

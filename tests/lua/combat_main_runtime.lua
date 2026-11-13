@@ -395,8 +395,8 @@ for _, forever in ipairs({ false, true }) do
 
 	-- Then the amount, resource name, and configured area reach the display.
 	assert(#displayed == beforeResource + 2, "resource gains were delayed")
-	assert(displayed[beforeResource + 1][2] == "20 - Mana")
-	assert(displayed[beforeResource + 2][2] == "1 - Holy Power")
+	assert(displayed[beforeResource + 1][2] == "20 Mana")
+	assert(displayed[beforeResource + 2][2] == "1 Holy Power")
 	assert(displayed[#displayed][1] == resourceSettings)
 
 	-- Given a readable combo-point gain on either modern client.
@@ -404,7 +404,19 @@ for _, forever in ipairs({ false, true }) do
 	-- When it reaches the real reader, presentation, and template formatter.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	-- Then it immediately displays the requested resource label.
-	assert(displayed[#displayed][2] == "1 - Combo Point")
+	assert(displayed[#displayed][2] == "1 Combo Point")
+
+	-- Given the simple template or no configured resource template.
+	for _, message in ipairs({ "%a %p", false }) do
+		resourceSettings.message = message or nil
+		-- When a mana gain reaches the real formatter.
+		resourceAmount, resourceToken = 8, "MANA"
+		Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+		-- Then amount and resource use one space without a separator.
+		assert(displayed[#displayed][2] == "8 Mana")
+	end
+	resourceSettings.message = "%a - %p"
+	resourceAmount, resourceToken = 1, "COMBO_POINTS"
 
 	-- Given the resource editor has unchecked combo points in this profile.
 	MikSBT.Profiles.currentProfile.resourceExclusions = { COMBO_POINTS = true }
@@ -415,7 +427,7 @@ for _, forever in ipairs({ false, true }) do
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	-- Then only energy is displayed on both Retail and Forever.
 	assert(#displayed == beforeResource + 1)
-	assert(displayed[#displayed][2] == "20 - Energy")
+	assert(displayed[#displayed][2] == "20 Energy")
 	MikSBT.Profiles.currentProfile.resourceExclusions = {}
 
 	-- Given Blizzard supplies the amount as text, as its own renderer supports.
@@ -424,7 +436,7 @@ for _, forever in ipairs({ false, true }) do
 	-- When the gain arrives, then its numeric text is displayed as an amount.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	assert(#displayed == beforeResource + 1, "numeric text dropped a resource gain")
-	assert(displayed[#displayed][2] == "25 - Mana")
+	assert(displayed[#displayed][2] == "25 Mana")
 
 	-- Given number shortening is enabled and Blizzard supplies a custom label.
 	local previousShortening = MikSBT.Profiles.currentProfile.shortenNumbers
@@ -432,7 +444,7 @@ for _, forever in ipairs({ false, true }) do
 	resourceAmount, resourceToken = "001250", "Energy supplied by Blizzard"
 	-- When the gain is displayed, then both supplied strings stay unchanged.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
-	assert(displayed[#displayed][2] == "001250 - Energy supplied by Blizzard")
+	assert(displayed[#displayed][2] == "001250 Energy supplied by Blizzard")
 	MikSBT.Profiles.currentProfile.shortenNumbers = previousShortening
 
 	-- Given a druid currently using energy in cat form.
@@ -450,12 +462,12 @@ for _, forever in ipairs({ false, true }) do
 	assert(#displayed == beforeResource)
 	resourceToken = "ENERGY"
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
-	assert(displayed[#displayed][2] == "9 - Energy")
+	assert(displayed[#displayed][2] == "9 Energy")
 	-- When the player shifts to bear, rage becomes valid immediately.
 	UnitPowerType = function() return 1, "RAGE" end
 	resourceToken = "RAGE"
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
-	assert(displayed[#displayed][2] == "9 - Rage")
+	assert(displayed[#displayed][2] == "9 Rage")
 	UnitClass, UnitPowerType = resourceClass, resourcePower
 
 	-- Given a restricted amount and a restricted resource token in combat.
@@ -469,7 +481,7 @@ for _, forever in ipairs({ false, true }) do
 
 	-- When only the amount is hidden, then the resource name stays visible.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
-	assert(displayed[#displayed][2] == "%s - %s")
+	assert(displayed[#displayed][2] == "%s %s")
 	assert(displayed[#displayed][4] == secretResource)
 	assert(displayed[#displayed][5] == "Mana")
 
@@ -479,7 +491,7 @@ for _, forever in ipairs({ false, true }) do
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	assert(#displayed == beforeResource + 2, "hidden resource type dropped a gain")
-	assert(displayed[#displayed][2] == "%s - %s")
+	assert(displayed[#displayed][2] == "%s %s")
 	assert(displayed[#displayed][4] == secretResource)
 	assert(displayed[#displayed][5] == secretToken,
 		"hidden resource name was replaced by a generic label")
