@@ -686,4 +686,161 @@ for _, scenario in ipairs({
     end)
 end
 
+-- Describe: a frame waiting for a periodic confirmation keeps its own lines.
+local function runUntil(time)
+    while true do
+        table.sort(callbacks, function(a, b) return a.at < b.at end)
+        local next = callbacks[1]
+        if not next or next.at > time then break end
+        table.remove(callbacks, 1)
+        clock = math.max(clock, next.at)
+        next.run()
+    end
+    clock = time
+end
+for _, gap in ipairs({ 0.017, 0.05, 0.1 }) do
+    test("an earlier hit cannot take the line of a waiting attack, " .. gap .. " s", function()
+        -- Given a taunt and a strike learned as physical blows, and no
+        -- description read, so the taunt might still be a DoT.
+        locale = "deDE"
+        reset({ school = { [1] = 1, [2] = 1 }, direct = { [1] = 1, [2] = 1 }, period = {} })
+        profile.events.OUTGOING_DAMAGE = { key = "OUTGOING_DAMAGE" }
+        cast(1)
+
+        -- When someone else's blow lands just before the strike, its hit and
+        -- its line.
+        runUntil(1 - gap)
+        hit(30, 1)
+        runUntil(1)
+        cast(2)
+        hit(40, 1)
+        combatLine("direct")
+        flush()
+
+        -- Then the strike keeps its line and the earlier blow stays hidden.
+        local own, other
+        for _, item in ipairs(shown) do
+            if item.message == "40" then own = item end
+            if item.message == "30" then other = item end
+        end
+        assert(own, "the strike lost its line to an earlier hit")
+        assert(not other, "an earlier hit took the strike's line")
+        profile.events.OUTGOING_DAMAGE = nil
+        locale = "enUS"
+    end)
+end
+test("a waiting frame keeps only its own lines", function()
+    -- Given a taunt, then a bolt whose line came before its hit.
+    locale = "deDE"
+    reset({ school = { [1] = 1, [2] = 1, [3] = 4 }, direct = { [1] = 1, [2] = 1, [3] = 1 }, period = {} })
+    cast(1)
+    runUntil(0.7)
+    cast(3)
+    combatLine("direct")
+
+    -- When the bolt lands in a frame of its own, and a strike in the frame
+    -- after waits for a periodic confirmation.
+    runUntil(0.85)
+    hit(50, 4)
+    runUntil(0.9)
+    cast(2)
+    hit(40, 1)
+    combatLine("direct")
+    runUntil(0.95)
+
+    -- Then, while the strike waits, only the line of its frame is kept.
+    for _, line in ipairs(ns.reader.logLines) do
+        equal(not not line.claimed, line.at == 0.9, "line at " .. line.at .. " kept")
+    end
+    flush()
+
+    -- Then the bolt still finds its line, and the strike keeps its own.
+    local bolt, strike
+    for _, item in ipairs(shown) do
+        if item.message == "50" then bolt = item end
+        if item.message == "40" then strike = item end
+    end
+    assert(bolt and bolt.icon == 3, "a waiting frame kept a bolt's line from another frame")
+    assert(strike, "the strike lost its line")
+    locale = "enUS"
+end)
+for _, gap in ipairs({ 0.03, 0.08 }) do
+    test("a waiting frame keeps no more lines than its hits, " .. gap .. " s", function()
+        -- Given a taunt, then a bolt reported with no line of its own.
+        locale = "deDE"
+        reset({ school = { [1] = 1, [2] = 1, [3] = 4 }, direct = { [1] = 1, [2] = 1, [3] = 1 }, period = {} })
+        cast(1)
+        runUntil(0.7)
+        cast(3)
+        runUntil(1 - gap)
+        hit(50, 4)
+
+        -- When a strike in a later frame waits with two lines in its frame.
+        runUntil(1)
+        cast(2)
+        hit(40, 1)
+        combatLine("direct")
+        combatLine("direct")
+        flush()
+
+        -- Then the spare line still serves the bolt.
+        local bolt, strike
+        for _, item in ipairs(shown) do
+            if item.message == "50" then bolt = item end
+            if item.message == "40" then strike = item end
+        end
+        assert(bolt and bolt.icon == 3, "a waiting frame kept a line its hits cannot use")
+        assert(strike, "the strike lost its line")
+        locale = "enUS"
+    end)
+    test("a waiting frame leaves a miss line to an earlier miss, " .. gap .. " s", function()
+        -- Given a taunt, then a resist reported with no line of its own.
+        locale = "deDE"
+        reset({ school = { [1] = 1, [2] = 1, [3] = 4 }, direct = { [1] = 1, [2] = 1, [3] = 1 }, period = {} })
+        local missed
+        ns.MissWord = ns.MissWord or function(token) return token end
+        presentation.config.getProfile = function() return profile end
+        ns.traceCombat = function(stage, hit)
+            if stage == "decision" and hit and hit.record.event == "miss" then missed = hit.record.result end
+        end
+        cast(1)
+        runUntil(0.7)
+        cast(3)
+        runUntil(1 - gap)
+        ns.ReaderEvent(nil, "UNIT_COMBAT", "target", "RESIST", "", 0, 4)
+
+        -- When a strike in a later frame waits, with a spell's miss line and
+        -- its own line in its frame.
+        runUntil(1)
+        cast(2)
+        hit(40, 1)
+        ns.ReaderEvent(nil, "COMBAT_LOG_MESSAGE", "not inspected", 0.6, 0.65, 0.8, 1)
+        combatLine("direct")
+        flush()
+        ns.traceCombat, presentation.config.getProfile = nil, nil
+
+        -- Then the resist still finds its line.
+        assert(missed and missed.who == "you", "a waiting frame kept a miss line from an earlier miss")
+        locale = "enUS"
+    end)
+    test("a waiting frame leaves a tick's line to a tick reported before it, " .. gap .. " s", function()
+        -- Given a DoT whose tick is reported a moment before its line.
+        beginDot()
+        clock = 3
+        hit(20, 32)
+
+        -- When another report of its school lands in the line's frame.
+        runUntil(3 + gap)
+        hit(33, 32)
+        combatLine("tick")
+        flush()
+
+        -- Then the tick keeps its line and the other report stays hidden.
+        assertDot()
+        for _, item in ipairs(shown) do
+            assert(item.message ~= "33", "a later report took a tick's line")
+        end
+    end)
+end
+
 print("PASS: " .. count .. " tests")
