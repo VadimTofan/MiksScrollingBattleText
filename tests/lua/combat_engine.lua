@@ -92,6 +92,7 @@ local function Event(event, ...)
             or (kind == "hot" and "SPELL_PERIODIC_HEAL")
             or (kind == "swing" and "SWING_DAMAGE")
             or (kind == "swingMiss" and "SWING_MISSED")
+            or (kind == "shield" and "DAMAGE_SHIELD")
             or (kind == "spell" and "SPELL_DAMAGE" or "SPELL_PERIODIC_DAMAGE")
         local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[eventName]
         engine:HandleEvent(event, "opaque message", rgb.r, rgb.g, rgb.b, 1)
@@ -1081,5 +1082,116 @@ assert(outgoing[1].amount == 999 and outgoing[1].result.who == "unknown",
 assert(outgoing[2].amount == 40 and outgoing[2].result.who == "you"
 	and outgoing[2].result.melee,
 	"the player's later melee hit lost its confirmation")
+
+-- Describe: a damage shield's hit takes its shield's name and icon only when
+-- no other line of yours in its frame can be the hit's.
+do
+    -- Given Thorns and a permanent Retribution Aura among your buffs, read
+    -- out of combat, and the client's damage shields with their school.
+    MikSBT.DAMAGE_SHIELDS = { [467] = 8, [7294] = 2, [1213834] = 8 }
+    local function Buff(id, spell, expires)
+        Event("UNIT_AURA", "player", { isFullUpdate = false, addedAuras = { { auraInstanceID = id,
+            isHarmful = false, spellId = spell, icon = "icon-" .. spell, name = "Spell " .. spell,
+            expirationTime = expires } } })
+    end
+    -- An enemy strikes you, a line of the given kind comes, and a hit lands
+    -- on the enemy; with a cast, a Fire spell of yours lands in the same frame.
+    local function Struck(school, kind, cast)
+        Advance(4)
+        local before, hit = #outgoing, {}
+        if cast then
+            Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+            Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+            Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
+        end
+        Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, kind, 0, 0, 1)
+        Event("UNIT_COMBAT", "target", "WOUND", "", 3, school)
+        Advance(0.02) Advance(0.5)
+        for index = before + 1, #outgoing do
+            if outgoing[index].amount == 3 then hit = outgoing[index].result end
+        end
+        return hit
+    end
+    -- Every report of the school sent since before (count of them) is yours,
+    -- and none is shown as a shield's.
+    local function NoShield(before, school, count, message)
+        local seen = 0
+        for index = before + 1, #outgoing do
+            local record = outgoing[index]
+            if record.school == school then
+                seen = seen + 1
+                assert(record.result.who == "you" and not record.result.shield
+                    and record.result.procSpell == nil, message)
+            end
+        end
+        assert(seen == count, "a hit beside a damage shield's line went unshown")
+    end
+    Buff(901, 467, now + 600)
+    Buff(902, 7294, 0)
+    for _, example in ipairs({ { school = 8, spell = 467 }, { school = 2, spell = 7294 } }) do
+        -- When a shield's line comes with the hit alone.
+        local result = Struck(example.school, "shield")
+        -- Then the hit is the shield's of its school, shown as a damage shield.
+        assert(result.who == "you" and result.shield and result.procSpell == example.spell,
+            "a damage shield's hit was not named after its shield")
+    end
+    for _, amounts in ipairs({ { 9, 35 }, { 35, 9 } }) do
+        -- When your Nature spell and its line come in the frame of an enemy's
+        -- blow that sets off Thorns, Thorns' report first or the spell's.
+        Advance(4)
+        local before = #outgoing
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 301)
+        Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+        Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "shield", 0, 0, 1)
+        Event("UNIT_COMBAT", "target", "WOUND", "", amounts[1], 8)
+        Event("UNIT_COMBAT", "target", "WOUND", "", amounts[2], 8)
+        Advance(0.02) Advance(0.5)
+        -- Then either line can be either report's, and neither is Thorns'.
+        NoShield(before, 8, 2, "a Nature hit beside a Nature spell's line was named after Thorns")
+    end
+    for _, count in ipairs({ 2, 1 }) do
+        -- When your swing's seal lands with its line in the frame of an
+        -- enemy's blow that sets off Retribution Aura, with the aura's own
+        -- report or without it.
+        Advance(4)
+        local before = #outgoing
+        Event("PLAYER_SWING", 3.5, 0)
+        Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+        Event("UNIT_COMBAT", "target", "WOUND", "", 30, 2)
+        Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "shield", 0, 0, 1)
+        if count == 2 then Event("UNIT_COMBAT", "target", "WOUND", "", 5, 2) end
+        Advance(0.02) Advance(0.5)
+        -- Then either line can be a Holy report's, and none is the aura's.
+        NoShield(before, 2, count, "a Holy hit beside the seal's line was named after Retribution Aura")
+    end
+    -- When a shield's line comes beside the line of your Fire spell.
+    local beside = Struck(8, "shield", true)
+    -- Then lines of two kinds do not say which is the hit's: it stays
+    -- yours, unnamed.
+    assert(beside.who == "you" and not beside.shield and beside.procSpell == nil,
+        "a hit beside a spell's line was named after a shield")
+    -- When a hit of no shield's school, or of no school read, comes with a
+    -- shield's line while a buff that is no shield is on too.
+    Buff(904, 1126, now + 600)
+    local other, unread = Struck(4, "shield"), Struck(nil, "shield")
+    -- Then neither is named after a shield or a buff.
+    assert(other.shield and other.procSpell == nil, "a hit was named after a shield of another school")
+    assert(unread.shield and unread.procSpell == nil, "a hit of no school was named after a buff")
+    -- When Thorns has run out, or a second Nature shield is on, its time
+    -- left unread.
+    Buff(901, 467, now + 1)
+    local expired = Struck(8, "shield")
+    Buff(901, 467, now + 600)
+    Buff(903, 1213834)
+    local twice = Struck(8, "shield")
+    -- Then the hit is named after none.
+    assert(expired.shield and expired.procSpell == nil, "a hit was named after a shield that had run out")
+    assert(twice.shield and twice.procSpell == nil, "a hit was named after one of two shields of its school")
+    MikSBT.DAMAGE_SHIELDS = nil
+end
 engine:Stop()
 print("Adapted combat engine tests passed")

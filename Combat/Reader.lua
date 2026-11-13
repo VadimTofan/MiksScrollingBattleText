@@ -441,6 +441,28 @@ local function ActiveWindfurySpell(school)
 end
 ns.ActiveWindfurySpell = ActiveWindfurySpell
 
+-- A damage shield's hit (Thorns, Retribution Aura, an item's) comes with a
+-- line of its own kind, but nothing in a fight says which shield struck,
+-- and no call tells a damage shield from another buff. The client's spell
+-- data lists the damage shields with their school (DamageShields.lua), and
+-- your buffs are read out of combat (reader.auras, below): a hit takes the
+-- one shield of its school you have on, none when there are several
+-- (predicted, not yet seen in client). Only a hit whose frame brought
+-- shield lines alone is a shield's (Mine.lua, Hit): beside a line of
+-- another kind either line can be the hit's, and it stays unnamed.
+local function ShieldSpell(at, school)
+    local shields, found = MikSBT.DAMAGE_SHIELDS or {}
+    for _, entry in pairs(reader.auras or {}) do
+        local shieldSchool = entry.spell and shields[entry.spell]
+        local on = not entry.expires or entry.expires == 0 or entry.expires > at
+        if shieldSchool and shieldSchool == school and on then
+            if found then return nil end
+            found = entry.spell
+        end
+    end
+    return found
+end
+
 reader.procSources = {}
 local PERIODIC_PROC_AMBIGUITY_WINDOW = 0.5
 
@@ -543,6 +565,9 @@ function ns.DecideHit(hit, line, restrict)
         and ProcCandidate(hit.at, record.school, hit.key)
             == WINDFURY_WEAPON_SPELL_ID then
         result.proc = true
+    end
+    if result.shield then
+        result.procSpell = ShieldSpell(hit.at, record.school)
     end
     TagProcCandidate(result, hit.at, record.school, hit.key)
     record.result = result

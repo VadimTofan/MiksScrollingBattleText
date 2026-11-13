@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from tests.lua_test_runner import run_lua_test
 
@@ -134,6 +135,38 @@ class CombatEngineTests(unittest.TestCase):
 
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_damage_shields_come_from_the_client_spell_data(self):
+        # Given
+        from scripts import generate_damage_shields as generator
+
+        root = Path(__file__).resolve().parents[1]
+        table = (root / "Combat" / "DamageShields.lua").read_text(encoding="utf-8")
+        effects = [
+            {"SpellID": "467", "EffectAura": "15", "DifficultyID": "0"},
+            {"SpellID": "774", "EffectAura": "8", "DifficultyID": "0"},
+            {"SpellID": "9999", "EffectAura": "15", "DifficultyID": "1"},
+        ]
+        misc = [
+            {"SpellID": "467", "SchoolMask": "8", "DifficultyID": "0"},
+            {"SpellID": "467", "SchoolMask": "4", "DifficultyID": "2"},
+            {"SpellID": "774", "SchoolMask": "8", "DifficultyID": "0"},
+            {"SpellID": "9999", "SchoolMask": "4", "DifficultyID": "0"},
+        ]
+
+        # When
+        found = generator.shields(effects, misc)
+
+        # Then
+        self.assertEqual(found, {467: 8})
+        self.assertIn("\t[467]=8,\n", generator.render(found, "test"))
+        self.assertIn("[467]=8,", table)
+        for toc in ("MikScrollingBattleText.toc", "MikScrollingBattleText_Camelot.toc"):
+            lines = (root / toc).read_text(encoding="utf-8-sig").splitlines()
+            self.assertEqual(
+                lines.index("Combat\\DamageShields.lua") + 1,
+                lines.index("Combat\\Reader.lua"),
+            )
 
     def test_engine_records_keep_msbt_event_settings_and_restricted_values(self):
         # Given
