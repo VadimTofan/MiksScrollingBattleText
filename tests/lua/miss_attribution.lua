@@ -169,3 +169,34 @@ for _, restrict in ipairs({ "shot", "unknown" }) do
     -- Then it agrees with ranking and leaves the shot available.
     assert(parry.who == "other" and not mine.swings[1].used)
 end
+
+-- Given a spell cast from afar, then a dodge that came with a spell's miss
+-- line of yours.
+mine = New()
+mine:Cast("player", 1130, "target", 200)
+
+-- When the frame is ranked and the dodge is attributed.
+local confirmedFit = mine:Fit("target", "miss", 1, 200.3,
+    nil, "direct", false, "DODGE", false)
+local confirmed = mine:Hit("target", "miss", 1, 200.3,
+    false, true, nil, false, "direct", nil, "DODGE")
+
+-- Then the miss stays yours, without the name of a spell it cannot answer.
+assert(confirmedFit ~= nil, "ranking dropped a miss its own line confirmed")
+assert(confirmed.who == "you" and confirmed.spell == nil and confirmed.missed
+    and not confirmed.melee, "a confirmed miss was hidden or misnamed")
+
+-- When the same dodge comes with a line that names no spell's miss, or with
+-- a spell's miss line but no cast of yours.
+mine = New()
+mine:Cast("player", 1130, "target", 210)
+local unsureFit = mine:Fit("target", "miss", 1, 210.3,
+    nil, nil, false, "DODGE", false)
+local unsure = mine:Hit("target", "miss", 1, 210.3,
+    false, true, nil, false, nil, nil, "DODGE")
+mine = New()
+local castless = mine:Hit("target", "miss", 1, 220.3,
+    false, true, nil, false, "direct", nil, "DODGE")
+
+-- Then it is left to someone else as before.
+assert(unsureFit == nil and unsure.who == "other" and castless.who == "other")

@@ -1163,7 +1163,9 @@ function Mine:Fit(key, kind, school, now, amount, restrict, crit, avoid, pet)
         if not entry.used and entry.key == key and now >= entry.at - 0.05 and now - entry.at <= DIRECT_WINDOW then
             if kind == "miss" then
                 if CastTakesMiss(self, entry.spell, key, now,
-                    avoid, pet, restrict) then Take(0.5) end
+                    avoid, pet, restrict) then Take(0.5)
+                -- A spell's miss line still makes the miss yours (Hit).
+                elseif restrict == "direct" then Take(0.9) end
             else
                 local score = DirectCandidateScore(self, entry, key, school,
                     now, amount, crit)
@@ -1415,7 +1417,7 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, rest
         return Result("you", nil, true, { missed = true })
     end
     if line == true and kind == "miss" and allowed.casts then
-        local best, bestSince
+        local best, bestSince, refused
         for spell, list in pairs(self.casts) do
             local facts = self.facts(spell)
             -- 0.3.50: nor a spell cast on yourself (Life Tap, which costs
@@ -1424,14 +1426,24 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, rest
             local helpful = type(facts) == "table" and (facts.helpful == true or facts.healthCost ~= nil)
             for _, cast in ipairs(list) do
                 local since = now - cast.at
-                if not helpful and since >= -0.05 and since <= DIRECT_WINDOW and (not bestSince or since < bestSince)
-                    and CastTakesMiss(self, spell, key, now,
+                if not helpful and since >= -0.05 and since <= DIRECT_WINDOW then
+                    if not CastTakesMiss(self, spell, key, now,
                         self.avoidNow, self.petNow, self.restrictNow) then
-                    best, bestSince = { spell = spell, caster = cast.caster }, since
+                        refused = refused or cast.caster
+                    elseif not bestSince or since < bestSince then
+                        best, bestSince = { spell = spell, caster = cast.caster }, since
+                    end
                 end
             end
         end
         if best then return Result(best.caster, best.spell, false, { missed = true }) end
+        -- A spell's miss line of yours came with it, so the miss is yours
+        -- even when its word fits no cast: a strike the reach reads as a
+        -- spell (a thrown weapon, a charge) had its dodge hidden. It is shown
+        -- without a spell's name (predicted, not yet seen in client).
+        if refused and self.restrictNow == "direct" then
+            return Result(refused, nil, false, { missed = true })
+        end
     end
     if line == true and self.petLines and self.petOut and (kind == "damage" or kind == "miss") and allowed.melee
         and (school == nil or school == PHYSICAL) then
