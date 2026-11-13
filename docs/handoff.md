@@ -1,3 +1,33 @@
+# Druid cat-form resource filtering
+
+Updated: 2026-11-13
+
+Resource gains for Rage and Lunar Power are now hidden while the player is a
+druid using energy (cat form). Public UnitClass/UnitPowerType results establish
+the form; secret or unavailable form information is not guessed. The check is
+performed for each gain, so leaving cat form restores the existing behavior
+immediately. Energy, combo points, and mana retain their existing behavior.
+
+The form exclusions are temporary and combine with the user's resource
+checkboxes without changing saved choices. Hidden resource tokens use the
+existing native string-matching visibility path and its sound limitations.
+Other classes are unaffected.
+
+The regression failed first because cat-form Rage was displayed. All 146 tests
+ran: 145 passed and the actual release-archive check was skipped. Coverage
+includes readable/hidden tokens, user exclusions, form changes, other classes,
+numeric power identification, and unavailable or secret form information.
+
+Forever's Components/CombatPresentation.lua matches the tested source by
+SHA-256. Nine related installed files parsed with Lua 5.1 and five installed
+regression scripts passed, including the full Retail/Forever runtime and new
+cat-form cases. The previous presentation file is backed up under
+D:/Codex-Temp/msbt-forever-cat-resources-20261113.
+The source change has not been pushed; in-game behavior has not been checked.
+
+Next: /reload in Forever and check that cat form shows no Rage or Lunar Power
+gains, then shift to bear and verify its Rage gains remain visible.
+
 # Current combo-point totals and maximum alert
 
 Updated: 2026-11-13

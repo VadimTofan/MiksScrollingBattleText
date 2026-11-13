@@ -205,6 +205,79 @@ presentation:Resource(amount, Secret("COMBO_POINTS"))
 -- Then the master switch suppresses both paths.
 assert(#displayed == before)
 
+-- Describe: druid cat form hides resources belonging to other forms.
+settings.disabled = nil
+profile.resourceExclusions = {}
+local oldUnitClass, oldPowerType = UnitClass, UnitPowerType
+local playerClass, activePower = "DRUID", "ENERGY"
+UnitClass = function(unit)
+	assert(unit == "player")
+	return "Localized class", playerClass
+end
+UnitPowerType = function(unit)
+	assert(unit == "player")
+	local types = { ENERGY = 3, RAGE = 1, MANA = 0, LUNAR_POWER = 8 }
+	return types[activePower], activePower
+end
+-- Given every resource checkbox is enabled and cat form is active.
+for _, token in ipairs({ "RAGE", "LUNAR_POWER", "ENERGY", "COMBO_POINTS", "MANA" }) do
+	local excluded = token == "RAGE" or token == "LUNAR_POWER"
+	before = #displayed
+	-- When readable resource gains arrive.
+	presentation:Resource(5, token)
+	-- Then only rage and lunar power are suppressed for cat form.
+	assert(#displayed == before + (excluded and 0 or 1),
+		"cat form resource filter failed for " .. token)
+	-- When the token and amount are hidden, the same rule stays native.
+	presentation:Resource(amount, Secret(token))
+	local event = displayed[#displayed]
+	assert(event.amount == amount)
+	assert(Read(event.settings.auraVisibility.visible) == not excluded)
+end
+assert(next(profile.resourceExclusions) == nil,
+	"cat form changed the user's resource checkboxes")
+
+-- Given the user has also disabled energy explicitly.
+profile.resourceExclusions = { ENERGY = true }
+before = #displayed
+-- When an energy gain arrives in cat form, then the checkbox still applies.
+presentation:Resource(5, "ENERGY")
+assert(#displayed == before)
+presentation:Resource(amount, Secret("ENERGY"))
+assert(not Read(displayed[#displayed].settings.auraVisibility.visible))
+assert(profile.resourceExclusions.RAGE == nil)
+profile.resourceExclusions = {}
+
+-- Given a shapeshift changes which power is active.
+for _, power in ipairs({ "RAGE", "LUNAR_POWER", "MANA" }) do
+	activePower = power
+	before = #displayed
+	-- When the current form gains its own resource, it remains visible.
+	presentation:Resource(5, power)
+	assert(#displayed == before + 1)
+end
+-- Given a different class, then the druid-only filter does not apply.
+playerClass, activePower = "WARRIOR", "ENERGY"
+before = #displayed
+presentation:Resource(5, "RAGE")
+assert(#displayed == before + 1)
+-- Given unreadable form information, then it is not inspected or guessed.
+playerClass = "DRUID"
+UnitPowerType = function() return Secret(3), Secret("ENERGY") end
+before = #displayed
+presentation:Resource(5, "RAGE")
+assert(#displayed == before + 1)
+-- Given only the readable numeric power type identifies cat energy.
+UnitPowerType = function() return 3, nil end
+before = #displayed
+presentation:Resource(5, "RAGE")
+assert(#displayed == before)
+-- Given the power getter fails, then existing checkbox behavior is retained.
+UnitPowerType = function() error("power type unavailable") end
+presentation:Resource(5, "RAGE")
+assert(#displayed == before + 1)
+UnitClass, UnitPowerType = oldUnitClass, oldPowerType
+
 -- Describe: current combo-point totals replace gain amounts and mark the cap.
 settings.disabled = nil
 profile.resourceExclusions = {}

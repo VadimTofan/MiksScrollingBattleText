@@ -152,6 +152,25 @@ local function ResourceLabel(token)
 	return token
 end
 
+local function ResourceExclusionsForForm(exclusions)
+	if type(UnitClass) ~= "function" or type(UnitPowerType) ~= "function" then
+		return exclusions
+	end
+	local classOK, _, class = pcall(UnitClass, "player")
+	if not classOK or not RestrictedValue:Equals(class, "DRUID") then
+		return exclusions
+	end
+	local powerOK, power, token = pcall(UnitPowerType, "player")
+	if not powerOK or not (RestrictedValue:Equals(token, "ENERGY")
+		or RestrictedValue:Equals(power, 3)) then return exclusions end
+	-- Cat form uses energy. Other forms' gains must not become cat notices.
+	local filtered = { RAGE = true, LUNAR_POWER = true }
+	for name, excluded in pairs(exclusions or {}) do
+		if excluded == true then filtered[name] = true end
+	end
+	return filtered
+end
+
 function Presentation:Resource(amount, powerToken, ignoreComboPoints)
 	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
 	if not settings then return end
@@ -160,7 +179,8 @@ function Presentation:Resource(amount, powerToken, ignoreComboPoints)
 		local readableAmount = RestrictedValue:Number(amount) or tonumber(amountText)
 		if not readableAmount or readableAmount <= 0 then return end
 	end
-	local exclusions = self.config.getProfile().resourceExclusions
+	local exclusions = ResourceExclusionsForForm(
+		self.config.getProfile().resourceExclusions)
 	if type(exclusions) == "table" or ignoreComboPoints then
 		if not RestrictedValue:IsRestricted(powerToken) then
 			if ignoreComboPoints and powerToken == "COMBO_POINTS" then return end

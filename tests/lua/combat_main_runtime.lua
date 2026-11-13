@@ -430,6 +430,29 @@ for _, forever in ipairs({ false, true }) do
 	assert(displayed[#displayed][2] == "001250 - Energy supplied by Blizzard")
 	MikSBT.Profiles.currentProfile.shortenNumbers = previousShortening
 
+	-- Given a druid currently using energy in cat form.
+	local resourceClass, resourcePower = UnitClass, UnitPowerType
+	UnitClass = function() return "Druide", "DRUID" end
+	UnitPowerType = function() return 3, "ENERGY" end
+	beforeResource = #displayed
+	resourceAmount = 9
+	-- When gains belonging to other forms arrive through the real reader.
+	for _, token in ipairs({ "RAGE", "LUNAR_POWER" }) do
+		resourceToken = token
+		Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	end
+	-- Then neither is shown, while a cat energy gain remains visible.
+	assert(#displayed == beforeResource)
+	resourceToken = "ENERGY"
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(displayed[#displayed][2] == "9 - ENERGY")
+	-- When the player shifts to bear, rage becomes valid immediately.
+	UnitPowerType = function() return 1, "RAGE" end
+	resourceToken = "RAGE"
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	assert(displayed[#displayed][2] == "9 - RAGE")
+	UnitClass, UnitPowerType = resourceClass, resourcePower
+
 	-- Given a restricted amount and a restricted resource token in combat.
 	local secretResource, secretToken = {}, {}
 	local previousSecretCheck = issecretvalue
