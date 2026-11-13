@@ -199,6 +199,28 @@ end
 
 print("Profile transfer tests passed")
 
+-- Describe: individual resource choices survive portable profile transfer.
+do
+	-- Given a profile with two excluded resources and an explicit enabled entry.
+	local profile = { resourceExclusions = {
+		MANA = true, COMBO_POINTS = true, ENERGY = false,
+	} }
+	-- When exported and imported into another profile.
+	local exported = assert(transfer:Export("Resources", profile, {}))
+	local profiles = {}
+	local name = assert(transfer:Import(exported, "Resources", profiles, {}))
+	-- Then the choices remain independent and preserve boolean values.
+	assert(profiles[name].resourceExclusions.MANA == true)
+	assert(profiles[name].resourceExclusions.COMBO_POINTS == true)
+	assert(profiles[name].resourceExclusions.ENERGY == false)
+	local payload = assert(transfer:Decode(exported))
+	payload.sections.SpamControl.resourceExclusions.MANA = "disabled"
+	assert(not transfer:Decode(encode(payload)), "invalid resource state was accepted")
+	payload.sections.SpamControl.resourceExclusions.MANA = true
+	payload.sections.SpamControl.resourceExclusions[1] = true
+	assert(not transfer:Decode(encode(payload)), "numeric resource key was accepted")
+end
+
 -- Describe: profiles exported before retiring unused spam settings still import.
 do
 	-- Given an older portable profile containing the retired settings.

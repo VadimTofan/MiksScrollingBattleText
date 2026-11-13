@@ -401,6 +401,18 @@ for _, forever in ipairs({ false, true }) do
 	-- Then it immediately displays the requested resource label.
 	assert(displayed[#displayed][2] == "1 - Combo Point")
 
+	-- Given the resource editor has unchecked combo points in this profile.
+	MikSBT.Profiles.currentProfile.resourceExclusions = { COMBO_POINTS = true }
+	beforeResource = #displayed
+	-- When a combo point and a separate energy gain reach the real runtime.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	resourceAmount, resourceToken = 20, "ENERGY"
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	-- Then only energy is displayed on both Retail and Forever.
+	assert(#displayed == beforeResource + 1)
+	assert(displayed[#displayed][2] == "20 - ENERGY")
+	MikSBT.Profiles.currentProfile.resourceExclusions = {}
+
 	-- Given Blizzard supplies the amount as text, as its own renderer supports.
 	resourceAmount, resourceToken = "25", "MANA"
 	beforeResource = #displayed

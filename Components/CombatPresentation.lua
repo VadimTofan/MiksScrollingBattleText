@@ -142,6 +142,27 @@ function Presentation:Resource(amount, powerToken)
 		local readableAmount = RestrictedValue:Number(amount) or tonumber(amountText)
 		if not readableAmount or readableAmount <= 0 then return end
 	end
+	local exclusions = self.config.getProfile().resourceExclusions
+	if type(exclusions) == "table" then
+		if not RestrictedValue:IsRestricted(powerToken) then
+			if exclusions[powerToken] == true then return end
+		else
+			local rules = {}
+			for token, excluded in pairs(exclusions) do
+				if excluded == true and type(token) == "string" then
+					rules["name:" .. token] = false
+				end
+			end
+			if next(rules) then
+				local visibility = MikSBT.Configuration.AuraTracking
+					:SecretVisibility(rules, powerToken)
+				-- A hidden match can select native alpha, but cannot gate sound.
+				settings = setmetatable({
+					auraVisibility = visibility, soundFile = "",
+				}, { __index = settings })
+			end
+		end
+	end
 	self.config.displayResource(settings, amount, ResourceLabel(powerToken))
 end
 

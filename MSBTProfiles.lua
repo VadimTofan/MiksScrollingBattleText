@@ -1112,6 +1112,7 @@ if IsClassic then
 		abilitySubstitutions			= {},
 		auraTracking = {},
 		auraSettings = {},
+		resourceExclusions = {},
 		abilitySuppressions				= {
 
 		},
@@ -2266,6 +2267,7 @@ else
 		abilitySubstitutions			= {},
 		auraTracking = {},
 		auraSettings = {},
+		resourceExclusions = {},
 		abilitySuppressions				= {
 			[SPELL_UNDYING_RESOLVE]		= true,
 		},

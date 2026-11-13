@@ -422,3 +422,64 @@ classicSwatch.scripts.OnClick(classicSwatch)
 -- Then the legacy picker is also visible above its owner.
 assert(ColorPickerFrame:GetFrameStrata() == "FULLSCREEN_DIALOG")
 assert(ColorPickerFrame:GetFrameLevel() > classicSwatch:GetFrameLevel())
+
+-- Describe: the resource event editor stages a checkbox for every resource.
+MSBTOptions.Sounds = {
+	CreateEventControls = function(frame)
+		frame.controls.soundDropdown = NewFrame(frame)
+	end,
+	PopulateEventSound = function(frame, sound)
+		frame.controls.soundDropdown:SetSelectedID(sound or "")
+	end,
+}
+-- Given a resource configuration with mana excluded.
+config = Config()
+config.title, config.message = "Resource Gains", "%a - %p"
+config.scrollArea = "Incoming"
+config.showResources = true
+config.resourceExclusions = { MANA = true }
+local savedResources
+config.saveHandler = function(result)
+	savedResources = result.resourceExclusions
+	assert(result.message == "%a - %p", "shared message was lost")
+end
+-- When its existing configure popup opens.
+P.ShowEvent(config)
+local resourcePopup = popups[#popups]
+-- Then every resource has an independent checkbox in a scrollable panel.
+assert(resourcePopup.resourceCheckboxes, "resource checkbox panel is missing")
+local count = 0
+for _, checkbox in pairs(resourcePopup.resourceCheckboxes) do
+	count = count + 1
+	assert(checkbox.label and checkbox.label ~= "")
+end
+assert(count == 30, "some resource types are missing")
+assert(not resourcePopup.resourceCheckboxes.MANA.checked)
+assert(resourcePopup.resourceCheckboxes.COMBO_POINTS.checked)
+assert(resourcePopup.resourceCheckboxes.COMBO_POINTS.label == "Combo Point")
+assert(resourcePopup.resourceContent:GetHeight()
+	> resourcePopup:GetHeight(), "resource list cannot reach its last row")
+resourcePopup.resourceCheckboxes.ENERGY.clickHandler(
+	resourcePopup.resourceCheckboxes.ENERGY, false)
+-- Then edits stay local until saved, including after cancellation.
+assert(config.resourceExclusions.ENERGY == nil)
+Click(resourcePopup, MikSBT.translations.BUTTONS.genericCancel.label)
+assert(savedResources == nil)
+P.ShowEvent(config)
+assert(resourcePopup.resourceCheckboxes.ENERGY.checked)
+-- When mana is enabled and combo points are disabled, then Save returns both.
+resourcePopup.resourceCheckboxes.MANA.clickHandler(
+	resourcePopup.resourceCheckboxes.MANA, true)
+resourcePopup.resourceCheckboxes.COMBO_POINTS.clickHandler(
+	resourcePopup.resourceCheckboxes.COMBO_POINTS, false)
+Click(resourcePopup, MikSBT.translations.BUTTONS.genericSave.label)
+assert(savedResources.MANA == nil and savedResources.COMBO_POINTS == true)
+assert(config.resourceExclusions.MANA == true, "editing mutated saved choices")
+
+-- Given another event using the cached editor.
+config.showResources = false
+-- When it opens, then resource controls disappear and normal sizing returns.
+P.ShowEvent(config)
+assert(not resourcePopup.resourcePanel.shown)
+assert(resourcePopup:GetWidth() == 380)
+Click(resourcePopup, MikSBT.translations.BUTTONS.genericCancel.label)

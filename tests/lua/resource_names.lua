@@ -32,8 +32,8 @@ C_Intl = {
 	end,
 }
 C_CurveUtil = { EvaluateColorValueFromBoolean = function(gate, yes, no)
-	if Read(gate) then return Secret(yes) end
-	return Secret(no)
+	if Read(gate) then return Secret(Read(yes)) end
+	return Secret(Read(no))
 end }
 C_StringUtil = {
 	TruncateWhenZero = function(number)
@@ -63,12 +63,13 @@ string.format = function(template, ...)
 end
 local displayed = {}
 local settings = { message = "%a - %p" }
+local profile = { events = { NOTIFICATION_RESOURCE_GAIN = settings } }
 local presentation = Presentation:New({
-	getProfile = function()
-		return { events = { NOTIFICATION_RESOURCE_GAIN = settings } }
-	end,
-	displayResource = function(_, amount, name)
-		displayed[#displayed + 1] = { amount = amount, name = name }
+	getProfile = function() return profile end,
+	displayResource = function(eventSettings, amount, name)
+		displayed[#displayed + 1] = {
+			amount = amount, name = name, settings = eventSettings,
+		}
 	end,
 	after = function() error("resource label required a timer") end,
 })
@@ -117,5 +118,91 @@ for _, library in ipairs({ C_Intl, C_StringUtil, C_CurveUtil }) do
 		library[key] = helper
 	end
 end
+
+-- Describe: resource checkboxes filter individual tokens in the active profile.
+MikSBT.Configuration = {}
+dofile("Configuration/AuraTracking.lua")
+-- Given combo points and mana are unchecked, with shared sound settings.
+profile.resourceExclusions = { COMBO_POINTS = true, MANA = true, ENERGY = false }
+settings.soundFile = "resource.ogg"
+local before = #displayed
+-- When readable gains for excluded and enabled resources arrive.
+presentation:Resource(1, "COMBO_POINTS")
+presentation:Resource(10, "MANA")
+presentation:Resource(20, "ENERGY")
+-- Then only the enabled gain reaches display, with its usual shared settings.
+assert(#displayed == before + 1, "unchecked readable resources were displayed")
+assert(displayed[#displayed].settings == settings)
+
+-- Given hidden tokens for the same three resources and an unknown token.
+for _, name in ipairs({ "COMBO_POINTS", "MANA", "ENERGY", "FUTURE_POWER" }) do
+	-- When they arrive with an opaque amount.
+	presentation:Resource(amount, Secret(name))
+	local event = displayed[#displayed]
+	-- Then visibility is selected natively without inspecting the token in Lua.
+	assert(event.amount == amount)
+	assert(event.settings.auraVisibility, "hidden resource has no visibility gate")
+	assert(issecretvalue(event.settings.auraVisibility.visible))
+	assert(Read(event.settings.auraVisibility.visible)
+		== not (name == "COMBO_POINTS" or name == "MANA"))
+	assert(event.settings.soundFile == "", "hidden filtered resources played sound")
+end
+assert(settings.soundFile == "resource.ogg" and settings.auraVisibility == nil,
+	"resource filtering mutated the shared event settings")
+
+-- Given the real display service receiving a resource's native visibility.
+local Service = dofile("Display/DisplayService.lua")
+local rendered, sounds = {}, 0
+Service:Configure({
+	getProfile = function() return profile end,
+	isModDisabled = function() return false end,
+	scrollAreas = { Resolve = function() return {} end }, fonts = {},
+	displayWithVisibility = function(visibility, ...)
+		rendered[#rendered + 1] = { visibility = visibility, args = { ... } }
+	end,
+	display = function() error("resource visibility was dropped by display") end,
+	playSound = function() sounds = sounds + 1 end,
+})
+-- When excluded and enabled hidden resources reach the display boundary.
+for _, name in ipairs({ "COMBO_POINTS", "ENERGY" }) do
+	presentation:Resource(amount, Secret(name))
+	local event = displayed[#displayed]
+	Service:DisplayEvent(event.settings, "%s - %s", nil, nil,
+		event.amount, event.name)
+end
+-- Then the entire notification is gated and its original amount is untouched.
+assert(not Read(rendered[1].visibility.visible))
+assert(Read(rendered[2].visibility.visible))
+assert(rendered[1].args[12] == amount and rendered[2].args[12] == amount)
+assert(sounds == 0)
+
+-- Given a helper is unavailable while a hidden resource is filtered.
+local compare = C_Intl.CompareStrings
+C_Intl.CompareStrings = nil
+local hidden = Secret("COMBO_POINTS")
+-- When a native match cannot be computed.
+presentation:Resource(amount, hidden)
+-- Then the original display remains available and sound stays muted.
+assert(displayed[#displayed].name == hidden)
+assert(displayed[#displayed].settings.auraVisibility == nil)
+assert(displayed[#displayed].settings.soundFile == "")
+C_Intl.CompareStrings = compare
+
+-- Given a second profile without resource exclusions.
+profile.resourceExclusions = {}
+-- When combo points arrive again.
+presentation:Resource(1, "COMBO_POINTS")
+-- Then they are enabled with the shared sound and requested label.
+assert(displayed[#displayed].name == "Combo Point")
+assert(displayed[#displayed].settings == settings)
+
+-- Given the master resource checkbox is disabled.
+settings.disabled = true
+before = #displayed
+-- When either readable or hidden gains arrive.
+presentation:Resource(1, "ENERGY")
+presentation:Resource(amount, Secret("COMBO_POINTS"))
+-- Then the master switch suppresses both paths.
+assert(#displayed == before)
 string.format = format
 print("Resource token label tests passed")

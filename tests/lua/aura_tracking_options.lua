@@ -351,3 +351,36 @@ assert(MikSBT.Profiles.currentProfile.auraTracking[
     "name:Unlearned Aura"] == false, "unresolved name was rejected")
 assert(#messages == errorsBefore)
 assert(list.items[1] == "name:Unlearned Aura")
+
+-- Describe: only the resource notification config exposes resource choices.
+-- Given the existing notification rows and profile-specific exclusions.
+MikSBT.Profiles.currentProfile.resourceExclusions = { MANA = true }
+local resourceRow, combatRow
+for _, line in ipairs(list.lines) do
+	if line.eventType == "NOTIFICATION_RESOURCE_GAIN" then resourceRow = line end
+	if line.eventType == "NOTIFICATION_COMBAT_ENTER" then combatRow = line end
+end
+-- When the user presses Configure on Resource Gains.
+resourceRow.settingsButton:click()
+-- Then the popup receives the profile's individual choices.
+assert(eventPopup.showResources, "Resource Gains config omitted resource controls")
+assert(eventPopup.resourceExclusions.MANA == true)
+-- When its shared settings and a changed checkbox map are saved together.
+local setOption = MikSBT.Profiles.SetOption
+MikSBT.Profiles.SetOption = function(path, key, value)
+	if path == "events.NOTIFICATION_RESOURCE_GAIN" then return end
+	if key == "resourceExclusions" then
+		MikSBT.Profiles.currentProfile.resourceExclusions = value
+		return
+	end
+	return setOption(path, key, value)
+end
+eventPopup.saveHandler({ message = "%a - %p", scrollArea = "Notification",
+	resourceExclusions = { COMBO_POINTS = true } }, eventPopup.saveArg1)
+-- Then the saved profile contains the new map rather than the old checkbox state.
+assert(MikSBT.Profiles.currentProfile.resourceExclusions.COMBO_POINTS == true)
+assert(MikSBT.Profiles.currentProfile.resourceExclusions.MANA == nil)
+MikSBT.Profiles.SetOption = setOption
+-- When another notification is configured, then the resource panel is omitted.
+combatRow.settingsButton:click()
+assert(not eventPopup.showResources)

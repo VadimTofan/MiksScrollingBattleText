@@ -1,3 +1,38 @@
+# Individual resource notification checkboxes
+
+Updated: 2026-11-13
+
+Events > Notifications > Resource Gains > Configure now includes a scrollable
+resource list with individual checkboxes. All start enabled. The existing
+Resource Gains checkbox remains the master switch; message, color, font,
+sound, and scroll-area settings stay shared. Save applies the resource choices
+with the other event settings; Cancel and the header close discard edits.
+The popup restores its usual size and hides the resource list for other events.
+
+Profiles store unchecked tokens in resourceExclusions. Both profile defaults
+include the empty map, and portable exports/imports retain validated boolean
+choices. Readable gains are filtered by their exact token. Hidden tokens reuse
+the existing native string-matching visibility path, without power-update
+correlation or Lua inspection. Unknown tokens remain visible. Missing native
+helpers leave the original display visible. Hidden filtered notices still
+occupy animation slots until expiration, as with the existing aura filter.
+
+When exclusions are active, all hidden-token resource sounds are muted because
+the native match cannot control Lua sound playback. Readable enabled resources
+retain their sound. The configuration popup explains the combat sound limit.
+
+Regression tests first failed for filtering, profile transfer, and the missing
+checkbox UI. Verification: all 146 tests ran, 145 passed and the actual release
+archive check was skipped. Coverage includes Save/Cancel, configuration wiring,
+profile transfer, readable filtering on Retail and Forever, and opaque native
+visibility reaching the real display service. In-game layout and combat
+behavior have not been verified. These changes have not been pushed or copied
+to the separate Forever installation.
+
+Next: reload the source installation and open Resource Gains > Configure to
+check the list, then disable one resource and compare its gains with an enabled
+resource in combat.
+
 # Combo Point resource label
 
 Updated: 2026-11-13
