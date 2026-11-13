@@ -260,7 +260,10 @@ local function ParserEventsHandler(parserEvent)
 	local effectTexture
 	if not currentProfile.skillIconsDisabled
 		and IsScrollAreaIconShown(eventSettings.scrollArea) and effectName then
-		_, _, effectTexture = GetSpellInfo(effectName)
+		if eventTypeString == "NOTIFICATION_SKILL_GAIN" then
+			effectTexture = parserNotifications:SkillIcon(effectName)
+		end
+		if not effectTexture then _, _, effectTexture = GetSpellInfo(effectName) end
 	end
 	local outputMessage = Formatter:FormatLegacyEvent(
 		eventSettings.message, parserEvent.amount, nil, nil, nil, nil,

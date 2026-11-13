@@ -31,3 +31,30 @@ for _, case in ipairs(cases) do
 	-- Then the player notification is suppressed.
 	assert(otherEvent == nil, case[1] .. " routed another unit")
 end
+
+-- Describe: a skill gain takes its skill line's own icon.
+-- Given the player's skill lines and the icons of known lines.
+MikSBT.SKILL_LINE_ICONS = { [165] = 136247, [185] = 133971 }
+local lines = {
+	{ skillID = 0, name = "Berufe", isHeader = true },
+	{ skillID = 165, name = "Lederverarbeitung" },
+	{ skillID = 185, name = "Kochkunst" },
+	{ skillID = 173, name = "Dolche" },
+}
+C_SkillInfo = {
+	GetNumSkillLines = function() return #lines end,
+	GetSkillLineInfo = function(index) return lines[index] end,
+}
+
+-- When skill gains are named, for lines with and without an icon.
+-- Then each finds its own line's icon, and nothing else is guessed.
+assert(notifications:SkillIcon("Lederverarbeitung") == 136247, "profession icon missing")
+assert(notifications:SkillIcon("Kochkunst") == 133971, "second line's icon missing")
+assert(notifications:SkillIcon("Dolche") == nil, "a line with no icon got one")
+assert(notifications:SkillIcon("Bergbau") == nil, "a line the player lacks got an icon")
+
+-- When the client refuses the skill lines or has none of the functions.
+C_SkillInfo.GetSkillLineInfo = function() error("refused") end
+assert(notifications:SkillIcon("Kochkunst") == nil, "a refused read was not caught")
+C_SkillInfo = nil
+assert(notifications:SkillIcon("Kochkunst") == nil, "a missing API was not caught")
