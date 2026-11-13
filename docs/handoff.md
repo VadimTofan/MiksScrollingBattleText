@@ -1,3 +1,36 @@
+# PR #45 merged: confirmed unnamed misses stay visible
+
+Updated: 2026-11-13
+
+The user authorized approving the reviewed CI run and merging CornyMaster's
+fix/confirmed-miss-stays-shown. Reviewed head:
+`c79ca11cac32600b6667139116697efc230d6f16`. The unchanged validation workflow
+uses contents:read, references no secrets, and only runs the test suite.
+Run `43178014744` was approved and passed before the merge.
+
+PR #45 was merged remotely as `56310cd084e95c483e8ca577f095e5ebc3f294af`.
+PR: https://github.com/VadimTofan/MiksScrollingBattleText/pull/45
+Author thank-you:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/45#issuecomment-6860424412
+
+The direct-confirmation fallback preserves an unnamed miss when available
+casts are ruled out by reach. Eligible spell matches rank ahead of it. It
+does not invent a spell name or icon. The documented crowded-frame attribution
+limits and lack of live combat verification remain applicable.
+
+Review: PR head ran 142 tests, 141 passed and one archive check skipped.
+Applied cleanly to local main including PR #51 and the unpublished hunter and
+localization fixes. Extra replays verified the confirmation gate, valid-cast
+priority, and unnamed rendering. Current main reproduced the original dropped
+miss; the PR passed. Replays: `D:/Codex-Temp/msbt-pr45-review`.
+
+Merged origin/main into local main without rebasing or publishing existing
+local commits. Final combined suite: 152 tests ran, 151 passed, one archive
+check skipped. The local merge includes this handoff. No release was requested.
+
+Next: push/release the remaining local changes when requested and check these
+attribution changes in live combat.
+
 # PR #51 merged: waiting frames retain their own lines
 
 Updated: 2026-11-13
