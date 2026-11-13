@@ -1,3 +1,35 @@
+# PR #51 merged: waiting frames retain their own lines
+
+Updated: 2026-11-13
+
+The user authorized merging CornyMaster's fix/waiting-frame-keeps-its-lines
+and thanking the author. Reviewed head:
+`682fbd13325793ed5453e9ddba7b59abf7b5cb8f`. GitHub validation passed.
+PR #51 was merged remotely as `d72f7ca5999ea20730c3794cdd7320fc4de69ebe`.
+
+PR: https://github.com/VadimTofan/MiksScrollingBattleText/pull/51
+Author thank-you:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/51#issuecomment-6860057081
+
+The change reserves each waiting frame's own non-periodic confirmation lines
+until its reports are decided. Typed periodic damage lines remain free for
+neighboring ticks. The author documents the timing trade-offs; live combat
+verification remains outstanding.
+
+Review verification: the PR head ran 144 tests, 143 passed and one archive
+check skipped. The patch applied cleanly to local main with all four
+unpublished commits. An additional disposable healing replay failed on main
+and passed on the PR: an earlier incoming heal cannot take the waiting frame's
+own heal confirmation. Replays: `D:/Codex-Temp/msbt-pr51-review`.
+
+Merged origin/main locally without rebasing or rewriting the four unpublished
+commits. Final combined suite: 152 tests ran, 151 passed, one archive check
+skipped. The local merge also includes this handoff. The earlier hunter and
+localization fixes remain unpublished. No release was requested.
+
+Next: request a push/release when the unpublished changes are ready to ship;
+the waiting-frame attribution change still needs a live combat check.
+
 # Recent feature localization installed in Forever
 
 Updated: 2026-11-13
