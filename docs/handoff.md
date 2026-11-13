@@ -1,3 +1,19 @@
+# Release v12.052 preparation
+
+Updated: 2026-11-13
+
+The user authorized committing, pushing, and releasing the current changes.
+Both root TOCs now declare 12.052. CHANGELOG.md describes all user-visible
+changes since v12.051. Temporary diagnostics remain outside release manifests
+and packages. No workflow credentials or upload targets were changed.
+
+Local verification ran 150 tests: 149 passed, one actual-archive check skipped.
+Whitespace checks passed. No generated workspace log files remain.
+
+Next: commit release metadata, push main, run the package-only release
+workflow, then tag v12.052 after validation succeeds.
+The tag workflow must verify its actual archive before uploading to CurseForge.
+
 # Outgoing melee attack colors
 
 Updated: 2026-11-13

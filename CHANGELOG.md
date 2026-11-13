@@ -1,5 +1,20 @@
 # Changelog
 
+## v12.052
+
+- Added individual resource checkboxes under Configure Resources. Notifications
+  now show only resources used by your class, specialization, or druid form.
+  Restricted resource notifications are silent when native filtering is needed.
+- Combo points now show your current total, hide zero, and display a red
+  "Finish Him!" alert at maximum points, twice the normal text size.
+- Resource messages now use readable names and a single space, such as
+  `1 Combo Point`, `8 Mana`, and `12 Lunar Power`.
+- Preserved incoming healer names when combat values are restricted. Improved
+  matching for heals cast without a target, including Mend Pet.
+- Outgoing melee swings are white and direct physical abilities are yellow,
+  including crits and pet attacks. Magic and periodic damage keep their school
+  colors. Skill crits remain visible when normal skill hits are disabled.
+
 ## v12.051
 
 - Outgoing damage numbers now use their magic-school colors by default.
