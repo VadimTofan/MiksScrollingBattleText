@@ -41,6 +41,7 @@ Components\CombatLogFilter.lua
 Components\CombatPresentation.lua
 Components\CombatEngine.lua
 Components\OutgoingCombat.lua
+Components\SkillLineIcons.lua
 Components\ParserNotifications.lua
 Components\UtilityNotifications.lua
 Components\ItemCooldownTracker.lua
