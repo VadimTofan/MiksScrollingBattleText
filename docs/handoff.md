@@ -1,3 +1,47 @@
+# Resource source investigation (live capture pending)
+
+Updated: 2026-11-13
+
+The user requested checking whether resource gains can show their source spell
+icon, such as Mana Spring Totem or Judgement. The current reader consumes only
+amount and resource token from `C_CombatText.GetCurrentEventInfo`. No source
+attribution or icons have been added without live evidence.
+
+Added the opt-in `Diagnostics/ResourceCapture.lua`. It captures all returned
+fields, including nil holes and extra fields, for ENERGIZE/PERIODIC_ENERGIZE;
+marks secret values without inspecting them; records nearby player spell IDs
+as context only; and counts combat-log messages without copying their text.
+It keeps at most 120 rows, samples only the first 20 log messages, and stops
+after 30 seconds or when its report opens. It does not change resource output,
+enable combat-log filters, or persist captures across reloads.
+
+Installed in Forever and appended to both installed manifests, preserving
+their existing content and temporary Windfury diagnostic entries. Repository
+release manifests do not load the diagnostic, and `.pkgmeta` already excludes
+the Diagnostics folder. Installation backups:
+`D:/Codex-Temp/msbt-resource-source-capture-20261113`.
+
+Live procedure:
+1. `/reload` in Forever, then `/msbtresources start`.
+2. Trigger a single known mana source while missing mana.
+3. `/msbtresources report`, then copy the report with Ctrl+A / Ctrl+C.
+4. Repeat separately for another source. Opening Blizzard's combat-log tab
+   can provide log samples; absent log samples do not establish API absence.
+
+Next unfinished action: collect a report for Mana Spring Totem or Judgement
+and inspect any extra resource fields. Nearby casts alone are insufficient
+for assigning an icon to an individual gain.
+
+Verification: the new diagnostic regression first failed because the module
+was missing. A separate failing case caught log traffic displacing the mana
+gain; log sampling now preserves it. The full suite ran 150 tests: 149 passed,
+one archive check skipped. The installed diagnostic matches source, compiles
+with Lua 5.1, and passes the same regression script.
+
+API references inspected:
+- https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/CombatTextDocumentation.lua
+- https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/CombatLogSecureDocumentation.lua
+
 # Resource notification spacing
 
 Updated: 2026-11-13
