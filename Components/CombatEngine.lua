@@ -65,7 +65,7 @@ function Engine:CreateRouter()
 	local presentation = self.config.presentation
 	local router = {}
 	for _, name in ipairs({
-		"In", "Alert", "Aura", "Healer", "Resource", "ComboPoints",
+		"In", "Alert", "Aura", "Healer", "Resource", "ComboPoints", "ComboPointGain",
 	}) do
 		local method = name
 		router[method] = function(_, ...)

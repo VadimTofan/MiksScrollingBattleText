@@ -250,6 +250,7 @@ obj["SHADOW_ORBS_AMOUNT"]	= "%a - Amount of shadow orbs you have.\n"
 obj["HONOR_AMOUNT"]			= "%a - Amount of honor.\n"
 obj["RESOURCE_AMOUNT"] = "%a - Amount of resource gained.\n"
 obj["RESOURCE_NAME"] = "%p - Resource name.\n"
+obj["RESOURCE_TOTAL"] = "%t - Amount of the resource you now have."
 obj["REP_AMOUNT"]			= "%a - Amount of reputation.\n"
 obj["ITEM_AMOUNT"]			= "%a - Amount of the item looted.\n"
 obj["SKILL_AMOUNT"]			= "%a - Amount of points you have in the skill.\n"
@@ -431,6 +432,10 @@ obj["NOTIFICATION_HONOR_GAIN"]			= { label="Honor Gains", tooltip="Enable when y
 obj["NOTIFICATION_RESOURCE_GAIN"] = {
 	label = "Resource Gains",
 	tooltip = "Show resource gains reported by abilities and effects.",
+}
+obj["NOTIFICATION_COMBO_POINTS"] = {
+	label = "Combo Point Gains",
+	tooltip = "Show combo points you gain as the gain with the points you now have, in place of the total alone.",
 }
 L.RESOURCE_CHECKBOX_TITLE = "Resources"
 L.RESOURCE_CHECKBOX_HELP = "Show gains for this resource when used by your class, specialization, or form."

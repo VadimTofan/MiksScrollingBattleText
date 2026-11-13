@@ -1804,6 +1804,17 @@ local function OnCombatText(kind)
     end
 end
 
+-- A rise of your combo points can also show as the gain with the points you
+-- now have (NOTIFICATION_COMBO_POINTS), one line a frame: a strike that gives
+-- two points comes as two updates in one frame (seen on Forever). At the
+-- most the maximum alert stands for it instead.
+local function ShowComboGain()
+    local gain = reader.comboGain
+    reader.comboGain = nil
+    local router = Router()
+    if gain and router then router:ComboPointGain(gain.gained, gain.total) end
+end
+
 local function OnComboPoints(unit, token)
     if not reader.comboTotals or not ns.Text(unit) or unit ~= "player"
         or not ns.Text(token) or token ~= "COMBO_POINTS" then return end
@@ -1813,14 +1824,27 @@ local function OnComboPoints(unit, token)
     if not ok or not maxOK then return end
     if ns.Public(count) and not ns.Number(count, 0) then return end
     if ns.Public(maximum) and not ns.Number(maximum, 1) then return end
+    local rose
     if ns.Number(count, 0) and ns.Number(maximum, 1) then
         if count == reader.comboCount and maximum == reader.comboMaximum then return end
+        local before = reader.comboCount or 0
         reader.comboCount, reader.comboMaximum = count, maximum
+        rose = count > before and count < maximum
+        if rose then
+            if not reader.comboGain then
+                reader.comboGain = { gained = 0 }
+                C_Timer.After(0, ShowComboGain)
+            end
+            reader.comboGain.gained = reader.comboGain.gained + count - before
+            reader.comboGain.total = count
+        elseif count >= maximum then
+            reader.comboGain = nil
+        end
     else
         reader.comboCount, reader.comboMaximum = nil, nil
     end
     local router = Router()
-    if router then router:ComboPoints(count, maximum) end
+    if router then router:ComboPoints(count, maximum, rose) end
 end
 
 -- Combat-state notifications use MSBT's configured events.

@@ -318,7 +318,17 @@ local function FinishSettings(settings, visibility)
 	return setmetatable(alert, { __index = settings })
 end
 
-function Presentation:ComboPoints(count, maximum)
+-- Combo points gained, shown as the gain with the points you now have
+-- (Combat/Reader.lua, ShowComboGain), when that notice is on.
+function Presentation:ComboPointGain(gained, total)
+	local settings = self:Settings("NOTIFICATION_COMBO_POINTS")
+	if not settings then return end
+	local message = settings.message:gsub("%%a", gained):gsub("%%t", total)
+		:gsub("%%p", _G.COMBO_POINTS or "Combo Points")
+	self.config.display(settings, message)
+end
+
+function Presentation:ComboPoints(count, maximum, rose)
 	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
 	local exclusions = self.config.getProfile().resourceExclusions
 	local allowed = AllowedResources()
@@ -333,6 +343,8 @@ function Presentation:ComboPoints(count, maximum)
 		if count == maximum then
 			self.config.display(FinishSettings(settings), finish)
 		else
+			-- A rise shows as a gain instead, when that notice is on.
+			if rose and self:Settings("NOTIFICATION_COMBO_POINTS") then return end
 			local name = ComboLabel(count == 1)
 			self.config.displayResource(settings, count, name)
 		end

@@ -193,3 +193,27 @@ do
 	-- Then the total is not guessed.
 	assert(shown[2] == "-20 <blocked>", "a partly unknown total was guessed")
 end
+
+-- Describe: a combo point gain can show as the gain with the points now had.
+-- Given the gain notice on in its default format.
+local shown = {}
+local finish = (MikSBT.translations or {}).CP_FULL or "Finish Him!"
+presentation.config.display = function(_, message) shown[#shown + 1] = message end
+presentation.config.displayResource = function(_, amount, name) shown[#shown + 1] = amount .. " " .. name end
+profile.events.NOTIFICATION_COMBO_POINTS = { message = "+%a %p (%t)" }
+-- When two points are gained up to four, and then the most is reached.
+presentation:ComboPointGain(2, 4)
+presentation:ComboPoints(4, 5, true)
+presentation:ComboPoints(5, 5, true)
+-- Then the gain stands for the total, and the maximum alert shows as before.
+assert(#shown == 2 and shown[1] == "+2 Combo Points (4)" and shown[2] == finish,
+	"a combo point gain did not stand for its total")
+-- When the gain notice is off, or a total did not rise.
+profile.events.NOTIFICATION_COMBO_POINTS.disabled = true
+presentation:ComboPointGain(1, 3)
+presentation:ComboPoints(3, 5, true)
+profile.events.NOTIFICATION_COMBO_POINTS.disabled = nil
+presentation:ComboPoints(2, 5, false)
+-- Then the totals show as before.
+assert(#shown == 4 and shown[3] == "3 Combo Points" and shown[4] == "2 Combo Points",
+	"a combo point total was lost")

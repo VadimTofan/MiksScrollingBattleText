@@ -435,6 +435,7 @@ ns.ResetHealing, ns.KeepCombatLog = function() end, function() end
 Enum.PowerType = { ComboPoints = 4 }
 GetTime = function() return 10 end
 C_EventUtils = { IsEventValid = function() return true end }
+C_Timer = { After = function() end }
 CreateFrame = function()
 	local frame = { events = {} }
 	function frame:RegisterEvent(event) self.events[event] = true end
@@ -508,6 +509,32 @@ before = #displayed
 C_CombatText = { GetCurrentEventInfo = function() return 1, "COMBO_POINTS" end }
 ns.ReaderEvent(nil, "COMBAT_TEXT_UPDATE", "ENERGIZE")
 assert(#displayed == before)
+-- Given readable totals again, a frame's rises are gathered into one gain.
+local gains, rises, nextFrame, plainTimer, plainActive = {}, {}, {}, C_Timer, ns.active
+C_Timer = { After = function(_, callback) nextFrame[#nextFrame + 1] = callback end }
+ns.active = true -- the engine runs
+local plainTotals = ns.liveRouter.ComboPoints
+ns.liveRouter.ComboPoints = function(_, _, _, rose) rises[#rises + 1] = rose and "r" or "-" end
+ns.liveRouter.ComboPointGain = function(_, gained, total) gains[#gains + 1] = gained .. "/" .. total end
+maximum = 5
+-- When one point comes, then two in one frame, then a spend and a point,
+-- then three more and the last one in one frame.
+for _, frame in ipairs({ { 1 }, { 2, 3 }, { 0, 1 }, { 4, 5 } }) do
+	for _, count in ipairs(frame) do
+		current = count
+		ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+	end
+	local due = nextFrame
+	nextFrame = {}
+	for _, callback in ipairs(due) do callback() end
+end
+-- Then each frame's rise shows once with the points now had, the totals
+-- know which updates rose, and at the most the maximum alert stands alone.
+assert(table.concat(gains, " ") == "1/1 2/3 1/1",
+	"combo point gains were not gathered by frame: " .. table.concat(gains, " "))
+assert(table.concat(rises) == "rrr-rr-", "combo point rises were misreported: " .. table.concat(rises))
+ns.liveRouter.ComboPoints, ns.liveRouter.ComboPointGain, C_Timer = plainTotals, nil, plainTimer
+ns.active = plainActive
 -- When disabled, then the power subscription is removed.
 ns.StopReader()
 assert(next(ns.reader.frame.events) == nil)
