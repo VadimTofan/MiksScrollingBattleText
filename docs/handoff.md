@@ -1,4 +1,4 @@
-# Release v12.052 preparation
+# Release v12.052 published
 
 Updated: 2026-11-13
 
@@ -7,12 +7,29 @@ Both root TOCs now declare 12.052. CHANGELOG.md describes all user-visible
 changes since v12.051. Temporary diagnostics remain outside release manifests
 and packages. No workflow credentials or upload targets were changed.
 
-Local verification ran 150 tests: 149 passed, one actual-archive check skipped.
-Whitespace checks passed. No generated workspace log files remain.
+Release commit `7cd02c4a95c51b8b0192327dd45edf08c9494de3` and annotated tag
+`v12.052` were pushed to origin. Main and tag validation both passed.
+Package-only run `43418603030` passed before tagging; its real ZIP passed
+all six archive checks and all 71 packaged Lua files compiled with Lua 5.1.
 
-Next: commit release metadata, push main, run the package-only release
-workflow, then tag v12.052 after validation succeeds.
-The tag workflow must verify its actual archive before uploading to CurseForge.
+Publication workflow:
+https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43418732431
+
+The workflow validated its rebuilt ZIP before upload. CurseForge accepted
+file ID `9589815`. Public listing and processing status were not independently
+checked. The exact uploaded workflow artifact was downloaded and verified:
+103 files, 638200 bytes compressed, 1971367 bytes uncompressed. Both packaged
+TOCs declare 12.052; all 71 Lua files compile. Runtime dependencies, media,
+libraries, locales, and licensing are retained; development files and temporary
+diagnostics are excluded.
+
+Published artifact:
+`D:/Codex-Temp/msbt-v12.052-release/MikScrollingBattleText-v12.052.zip`.
+
+The final full suite ran with this real archive: all 150 tests passed, with
+no skips. Whitespace checks passed. No generated workspace log files remain.
+No release implementation work remains. Live resource-source capture and
+in-game verification described below remain separate follow-ups.
 
 # Outgoing melee attack colors
 
