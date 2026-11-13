@@ -1,3 +1,41 @@
+# PR #47 merged: profession skill gains use their own icons
+
+Updated: 2026-11-13
+
+The user authorized merging PR #47 and thanking CornyMaster after the review
+of the remaining open PRs. Reviewed head:
+`2f76970b336aeca073811be9b31971dfc62f9b4b`. GitHub Validate run
+`43250186517` passed. A fresh local run of the PR head ran 145 tests:
+144 passed and one release-archive check skipped.
+
+PR #47 was merged remotely as `c55e4ec3154b076d4bc2a4df3e21d5360898e6c0`.
+PR: https://github.com/VadimTofan/MiksScrollingBattleText/pull/47
+Author thank-you:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/47#issuecomment-6865108024
+
+Skill gains first resolve the player's skill-line ID by its localized name,
+then use the generated skill-line icon table. Missing data or API errors
+preserve the previous spell-name lookup. Both addon manifests load the table.
+The table records Forever build 1.60.1.70888 and needs regeneration when
+relevant client skill-line data changes. Live verification here is pending;
+the author reports successful German-client testing.
+
+Integrated origin/main into local main without rewriting or publishing the
+six existing local commits. Local merge commit: `756432c`. The combined suite
+ran 153 tests: 152 passed, one release-archive check skipped. This handoff is
+saved in a separate documentation commit after the merge.
+
+The other reviewed PRs remain open. Prefer #43 over #39 for same-frame hit
+naming; #43 still needs CI approval. Extra replay checks found that #39
+clears ambiguity between two player spells when a pet cast shares the frame,
+#40 classifies a real offhand swing as pet damage, and #41 reuses aura timing
+across target switches. These findings have not been posted to GitHub.
+Review copies: `D:/Codex-Temp/msbt-remaining-prs-20261113`.
+
+Next: approve and run #43's reviewed validation before considering its merge.
+Local hunter and localization changes remain unpublished; no release or
+Forever installation sync was requested for this merge.
+
 # PR #45 merged: confirmed unnamed misses stay visible
 
 Updated: 2026-11-13
