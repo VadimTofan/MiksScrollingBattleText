@@ -755,6 +755,22 @@ if Client.isMainline or Client.isForever then
 			end
 			return message
 		end,
+		displayHeal = function(settings, amount, healer, icon, message)
+			-- Public formatting leaves \002 for the healer and %a for the amount.
+			local arguments = {}
+			local template = message:gsub("%%a", "\001")
+			template = template:gsub("%%", "%%%%")
+			template = template:gsub("[\001\002]", function(token)
+				local value = healer
+				if token == "\001" then
+					value = Formatter:FormatRestrictedAmount(amount,
+						MSBTProfiles.currentProfile)
+				end
+				arguments[#arguments + 1] = value
+				return "%s"
+			end)
+			DisplayEvent(settings, template, icon, nil, unpack(arguments))
+		end,
 		display = DisplayEvent,
 		displayRestricted = DisplayRestrictedAmount,
 	})

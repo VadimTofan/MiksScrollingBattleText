@@ -1,3 +1,28 @@
+# Incoming healing with hidden healer names
+
+Updated: 2026-11-13
+
+Incoming healing now preserves a supplied hidden healer name for native
+rendering when the event message includes %n. Public spell metadata and
+readable amounts still pass through the existing formatter. Hidden names and
+amounts remain separate native format arguments; Lua never inspects the name.
+Repeated/reordered name placeholders and literal percent text are preserved.
+Templates without %n remain amount-only, and Hide Skills still applies.
+
+The full-runtime regression failed first because the hidden name did not
+reach rendering. Verification: 146 tests ran, 145 passed and the actual release
+archive check was skipped. Tests cover readable and hidden amounts, both
+event orders on Retail and Forever, spell metadata, icons, and omitted names.
+
+The existing 200 ms healer/amount association is unchanged; this change does
+not establish reliable attribution for simultaneous heals or recover missing
+source/ability information. Incoming damage is unchanged. In-game behavior
+has not been checked. The change is local and has not been pushed or copied
+to the separate Forever installation.
+
+Next: reload the source installation and receive a heal in combat with %n in
+the Incoming Heals message; verify the healer name appears beside the amount.
+
 # Individual resource notification checkboxes
 
 Updated: 2026-11-13

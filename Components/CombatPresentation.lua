@@ -54,6 +54,24 @@ function Presentation:Emit(key, record, eventSettings)
 	if not settings then return end
 	local icon = record.icon or (record.spell
 		and self.config.getSpellTexture(record.spell))
+	if record.event == "heal" and self.config.displayHeal
+		and RestrictedValue:IsRestricted(record.sourceName) then
+		local template = record.message or settings.message or ""
+		if template:find("%n", 1, true) then
+			local metadata = {}
+			for field, value in pairs(record) do metadata[field] = value end
+			metadata.sourceName = nil
+			if RestrictedValue:IsRestricted(record.amount) then
+				metadata.amount = nil
+			end
+			-- Keep the hidden name outside public formatting and cleanup.
+			local message = self.config.formatMessage(settings, metadata,
+				(template:gsub("%%n", "\002")))
+			self.config.displayHeal(settings, record.amount, record.sourceName,
+				icon, message)
+			return
+		end
+	end
 	if RestrictedValue:IsRestricted(record.amount) then
 		local message = record.message
 		if record.event == "heal" then

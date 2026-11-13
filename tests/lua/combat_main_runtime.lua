@@ -795,6 +795,79 @@ for _, forever in ipairs({ false, true }) do
 	heal = displayed[#displayed]
 	assert(heal[2] == "+42 (Late healer)" and heal[3] == nil)
 
+	-- Describe: incoming healer names stay opaque through native rendering.
+	local hiddenName = setmetatable({}, {
+		__tostring = function() error("hidden healer converted to text") end,
+		__concat = function() error("hidden healer concatenated in Lua") end,
+	})
+	local hiddenAmount = setmetatable({}, {
+		__tostring = function() error("hidden heal amount converted to text") end,
+	})
+	local oldSecretCheck, oldLargeNumbers = issecretvalue, BreakUpLargeNumbers
+	issecretvalue = function(value)
+		return value == hiddenName or value == hiddenAmount
+			or (oldSecretCheck and oldSecretCheck(value)) or false
+	end
+	BreakUpLargeNumbers = nil
+	for _, amount in ipairs({ 43, hiddenAmount }) do
+		for _, nameFirst in ipairs({ true, false }) do
+			-- Given a hidden healer and a message with repeated names and percent text.
+			Advance(4)
+			events.INCOMING_HEAL.message = "%n: +%a (%n) 100%"
+			local beforeHeal = #displayed
+			C_CombatText.GetCurrentEventInfo = function() return hiddenName, amount end
+			-- When the healer notice and amount arrive in either order.
+			if nameFirst then Dispatch("COMBAT_TEXT_UPDATE", "HEAL") end
+			Dispatch("UNIT_COMBAT", "player", "HEAL", "", amount, 2)
+			Advance(0.05)
+			if not nameFirst then Dispatch("COMBAT_TEXT_UPDATE", "HEAL") end
+			Advance(0.21)
+			-- Then one native template retains each original opaque argument in order.
+			heal = displayed[#displayed]
+			assert(#displayed == beforeHeal + 1, "hidden healer duplicated a heal")
+			assert(heal[1] == events.INCOMING_HEAL and heal[3] == nil)
+			assert(heal[4] == hiddenName, "hidden healer did not reach native rendering")
+			if amount == hiddenAmount then
+				assert(heal[2] == "%s: +%s (%s) 100%%")
+				assert(heal[5] == hiddenAmount and heal[6] == hiddenName)
+			else
+				assert(heal[2] == "%s: +43 (%s) 100%%")
+				assert(heal[5] == hiddenName)
+			end
+		end
+	end
+	-- Given a known heal spell alongside a hidden healer and hidden amount.
+	local hideHealSkills = profile.hideSkills
+	for _, hideSkills in ipairs({ false, true }) do
+		Advance(4)
+		profile.hideSkills = hideSkills
+		events.INCOMING_HEAL.message = "+%a (%s - %n)"
+		-- When the enriched heal uses the native name path.
+		MikSBT.CombatEngine.liveRouter:In({ event = "heal", amount = hiddenAmount,
+			sourceName = hiddenName, spell = 201 })
+		Advance(0.21)
+		heal = displayed[#displayed]
+		-- Then public spell metadata respects Hide Skills and the healer survives.
+		local expected = hideSkills and "+%s (%s)" or "+%s (Spell 201 - %s)"
+		assert(heal[2] == expected, "hidden healer disrupted spell formatting")
+		assert(heal[3] == "icon" and heal[4] == hiddenAmount
+			and heal[5] == hiddenName)
+	end
+	profile.hideSkills = hideHealSkills
+
+	-- Given the user intentionally omits the healer placeholder.
+	Advance(4)
+	events.INCOMING_HEAL.message = "+%a"
+	-- When a hidden healer accompanies a readable heal amount.
+	MikSBT.CombatEngine.liveRouter:In({ event = "heal", amount = 44,
+		sourceName = hiddenName })
+	Advance(0.21)
+	-- Then the message remains amount-only, without adding a source label.
+	heal = displayed[#displayed]
+	assert(heal[2] == "+44" and heal[4] == nil)
+	issecretvalue, BreakUpLargeNumbers = oldSecretCheck, oldLargeNumbers
+	events.INCOMING_HEAL.message = "+%a (%n)"
+
 	-- Given a helpful spell cast while the player explicitly targets themselves.
 	local unitIsUnit = UnitIsUnit
 	UnitIsUnit = function(a, b)
