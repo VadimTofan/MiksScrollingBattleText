@@ -1,3 +1,40 @@
+# Hunter report fixes installed in Forever
+
+Updated: 2026-11-13
+
+The user authorized fixes following the investigation below. The first
+checkpoint, `2869afb`, preserves known skill names beside restricted damage,
+including grouped Windfury, pet abilities, DoTs, and Chinese names.
+
+Combat/Spells.lua now obtains readable helpfulness metadata in every locale.
+Simplified/Traditional Chinese descriptions can provide a damage school when
+a numeric damage phrase uses the client's own localized school label.
+Missing labels, mixed schools, and unrecognized wording remain unknown;
+damage bonuses and resistances are not treated as damage-dealing phrases.
+English keeps its complete parser. Chinese school extraction does not invent
+direct/periodic classification, tick periods, or damage amounts.
+
+The matching regression now rejects a physical Hawk spell for a Nature tick
+and identifies the Nature sting when both casts are tracked. Helpful spells
+cannot claim damage, including on locales without description parsing.
+Tests cover all seven basic schools in zhCN/zhTW, helpful API failures/secret
+values, missing descriptions and labels, retry after spell data loads, mixed
+schools, harmless damage-bonus text, and existing English behavior.
+
+Verification: new school and harmless-bonus assertions failed before their
+respective fixes. Final suite ran 151 tests: 150 passed, one archive check
+skipped. All three changed installed files match source and compile with
+Lua 5.1; eight installed Forever regression scripts passed.
+
+Installed files: MSBTMain.lua, Components/OutgoingBatcher.lua, Combat/Spells.lua.
+Backups: `D:/Codex-Temp/msbt-hunter-report-fixes-20261113/backup`.
+Existing installed manifests and temporary diagnostic entries were preserved.
+No release or push was requested for these fixes.
+
+Next: `/reload` in Forever and test skill names in combat. A Chinese-client
+live check is still needed. Distinguishing a summoned Hawk's individual swings
+from permanent-pet swings remains unresolved; no source identity was guessed.
+
 # Hunter report: restricted damage skill names fixed
 
 Updated: 2026-11-13
