@@ -1,6 +1,8 @@
 -- Reuse the full legacy runtime regression fixture before exercising both
 -- modern clients through the real main module and real adapted reader.
 dofile("tests/lua/notification_runtime.lua")
+MikSBT.Configuration = MikSBT.Configuration or {}
+dofile("Configuration/ResourcePolicy.lua")
 
 local createFrame = CreateFrame
 local frames, timers, displayed = {}, {}, {}
@@ -374,6 +376,9 @@ for _, forever in ipairs({ false, true }) do
 	end
 
 	-- Given resource notifications and the resource labels supplied by Blizzard.
+	-- Generic template cases intentionally have no class context.
+	local genericResourceClass = UnitClass
+	UnitClass = nil
 	local resourceSettings = { message = "%a - %p", scrollArea = "Notification" }
 	events.NOTIFICATION_RESOURCE_GAIN = resourceSettings
 	MANA, HOLY_POWER = "Mana", "Holy Power"
@@ -509,6 +514,7 @@ for _, forever in ipairs({ false, true }) do
 	assert(#displayed == beforeResource)
 	assert(resourceSettings.message == "%a - %p", "resource template was mutated")
 	resourceSettings.disabled = nil
+	UnitClass = genericResourceClass
 
 	-- Given absorb templates for player and pet melee and spell attacks.
 	for _, case in ipairs({

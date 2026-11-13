@@ -1,3 +1,72 @@
+# Class, specialization, and form resource filtering
+
+Updated: 2026-11-13
+
+Resource notifications now use Configuration/ResourcePolicy.lua to allow only
+resources appropriate to the player's class and current form/spec. Both client
+manifests load the policy before combat presentation. The user's resource
+checkboxes remain an additional restriction and are not rewritten.
+
+Implemented notification rules:
+
+| Class | Allowed resources |
+| --- | --- |
+| Druid | Cat: Energy + Combo Points; Bear/Dire Bear: Rage; Moonkin: Lunar Power; no form/travel/tree/flight: Mana |
+| Rogue | Energy + Combo Points |
+| Warrior | Rage |
+| Hunter | Current Focus or Mana, supporting Forever's mana-based hunters |
+| Mage | Mana; confirmed modern Arcane specialization also allows Arcane Charges |
+| Warlock | Mana + Soul Shards on modern clients; Mana on Forever/Vanilla |
+| Priest | Current Mana or Insanity |
+| Paladin | Mana + Holy Power on modern clients; Mana on Forever/Vanilla |
+| Shaman | Current Mana or Maelstrom |
+| Monk | Brewmaster: Energy; Windwalker: Energy + Chi; Mistweaver: Mana |
+| Death Knight | Runes + Runic Power |
+| Demon Hunter | Current Fury or legacy Pain |
+| Evoker | Mana + Essence |
+
+Druid form ID takes precedence over primary power, including Moonkin whose
+client reports Mana and unshifted Balance whose client reports Lunar Power.
+If form data is absent, readable primary power supplies the fallback. Arcane
+Charges and Chi require a confirmed Arcane or Windwalker specialization;
+characters without a selected spec do not gain those secondary notifications.
+
+Readable tokens are checked directly. Hidden tokens use native matching
+against the allowed resource names, with unchecked resources removed first.
+Unknown resource tokens are hidden when class context is known. If native
+eligibility cannot be computed, the hidden notice is suppressed. If class
+identity itself is unavailable, existing user filtering remains available;
+unreadable druid form/power context falls back to the druid resource family.
+Combo-point totals and Finish Him use the same eligibility check, so other
+druid forms and other classes cannot display those alerts. No new sources
+for resource gains were added.
+
+Native-gated notices still occupy animation slots until they expire, and their
+sounds are muted because the match cannot gate Lua playback. The resource
+configuration help now explains both automatic eligibility and sound behavior.
+
+Research references: [Blizzard class descriptions](https://worldofwarcraft.blizzard.com/en-us/game/classes),
+[unit API declarations](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua),
+and [specialization API declarations](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpecializationInfoDocumentation.lua).
+The explicit druid notification rules above follow the user's requested policy.
+
+Regressions first failed for the missing policy, then for Mana leaking into
+cat form and secondary resources appearing without a spec. Verification:
+148 tests ran, 147 passed and the actual release-archive check was skipped.
+Coverage includes 37 class/form/spec cases, namespace/legacy spec APIs,
+secret context, hidden-token allowlists, unknown resources, manual exclusions,
+form switching, and combo alert eligibility. Both manifest load orders pass.
+
+Forever has the three Lua changes matched to source by SHA-256. Both installed
+manifests received only the policy entry; their diagnostic entries were
+preserved. Eleven related installed Lua files parsed and seven installed
+regression scripts passed. Backups and the verifier are under
+D:/Codex-Temp/msbt-forever-class-resource-policy-20261113.
+The source change has not been pushed; live testing across classes is pending.
+
+Next: /reload in Forever and switch druid forms; verify each form only shows
+the resource notifications listed above.
+
 # Resource display names and maximum combo alert styling
 
 Updated: 2026-11-13

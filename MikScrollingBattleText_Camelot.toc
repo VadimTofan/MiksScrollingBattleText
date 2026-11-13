@@ -26,6 +26,7 @@ API\Units.lua
 API\Cooldowns.lua
 Compatibility\LegacyAPI.lua
 Configuration\AuraTracking.lua
+Configuration\ResourcePolicy.lua
 Services\Formatter.lua
 Services\EventRouter.lua
 Components\IncomingCombat.lua

@@ -187,23 +187,26 @@ local function ResourceLabel(token)
 	return token
 end
 
-local function ResourceExclusionsForForm(exclusions)
-	if type(UnitClass) ~= "function" or type(UnitPowerType) ~= "function" then
-		return exclusions
-	end
-	local classOK, _, class = pcall(UnitClass, "player")
-	if not classOK or not RestrictedValue:Equals(class, "DRUID") then
-		return exclusions
-	end
-	local powerOK, power, token = pcall(UnitPowerType, "player")
-	if not powerOK or not (RestrictedValue:Equals(token, "ENERGY")
-		or RestrictedValue:Equals(power, 3)) then return exclusions end
-	-- Cat form uses energy. Other forms' gains must not become cat notices.
-	local filtered = { RAGE = true, LUNAR_POWER = true }
-	for name, excluded in pairs(exclusions or {}) do
-		if excluded == true then filtered[name] = true end
-	end
-	return filtered
+local function AllowedResources()
+	local configuration = MikSBT.Configuration
+	local policy = configuration and configuration.ResourcePolicy
+	return policy and policy:Allowed()
+end
+
+local function ResourceVisibility(rules, token, allowlist)
+	local visibility = MikSBT.Configuration.AuraTracking:SecretVisibility(rules, token)
+	if not visibility or not allowlist then return visibility end
+	-- The existing matcher hides listed names. Invert it to show only allowed names.
+	local ok, visible = pcall(function()
+		local unmatched = NativeResourceValue(
+			C_CurveUtil.EvaluateColorValueFromBoolean(visibility.visible, 1, 0), "number")
+		local text = NativeResourceValue(C_StringUtil.TruncateWhenZero(unmatched), "string")
+		local marker = NativeResourceValue(
+			C_StringUtil.WrapString(text, "e\204\129", ""), "string")
+		return NativeResourceValue(C_Intl.IsNormalized(
+			marker, Enum.NormalizationForm.Nfc), "boolean")
+	end)
+	if ok then return { visible = visible } end
 end
 
 function Presentation:Resource(amount, powerToken, ignoreComboPoints)
@@ -214,28 +217,37 @@ function Presentation:Resource(amount, powerToken, ignoreComboPoints)
 		local readableAmount = RestrictedValue:Number(amount) or tonumber(amountText)
 		if not readableAmount or readableAmount <= 0 then return end
 	end
-	local exclusions = ResourceExclusionsForForm(
-		self.config.getProfile().resourceExclusions)
-	if type(exclusions) == "table" or ignoreComboPoints then
-		if not RestrictedValue:IsRestricted(powerToken) then
-			if ignoreComboPoints and powerToken == "COMBO_POINTS" then return end
-			if exclusions and exclusions[powerToken] == true then return end
+	local exclusions = self.config.getProfile().resourceExclusions or {}
+	local allowed = AllowedResources()
+	if not RestrictedValue:IsRestricted(powerToken) then
+		if allowed and not allowed[powerToken] then return end
+		if ignoreComboPoints and powerToken == "COMBO_POINTS" then return end
+		if exclusions[powerToken] == true then return end
+	else
+		local rules = {}
+		if allowed then
+			for token in pairs(allowed) do
+				if exclusions[token] ~= true
+					and not (ignoreComboPoints and token == "COMBO_POINTS") then
+					rules["name:" .. token] = false
+				end
+			end
+			if not next(rules) then return end
 		else
-			local rules = {}
 			if ignoreComboPoints then rules["name:COMBO_POINTS"] = false end
-			for token, excluded in pairs(exclusions or {}) do
+			for token, excluded in pairs(exclusions) do
 				if excluded == true and type(token) == "string" then
 					rules["name:" .. token] = false
 				end
 			end
-			if next(rules) then
-				local visibility = MikSBT.Configuration.AuraTracking
-					:SecretVisibility(rules, powerToken)
-				-- A hidden match can select native alpha, but cannot gate sound.
-				settings = setmetatable({
-					auraVisibility = visibility, soundFile = "",
-				}, { __index = settings })
-			end
+		end
+		if next(rules) then
+			local visibility = ResourceVisibility(rules, powerToken, allowed ~= nil)
+			if allowed and not visibility then return end
+			-- A hidden match can select native alpha, but cannot gate sound.
+			settings = setmetatable({
+				auraVisibility = visibility, soundFile = "",
+			}, { __index = settings })
 		end
 	end
 	self.config.displayResource(settings, amount, ResourceLabel(powerToken))
@@ -293,6 +305,8 @@ end
 function Presentation:ComboPoints(count, maximum)
 	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
 	local exclusions = self.config.getProfile().resourceExclusions
+	local allowed = AllowedResources()
+	if allowed and not allowed.COMBO_POINTS then return end
 	if not settings or (exclusions and exclusions.COMBO_POINTS == true) then return end
 	local publicCount = not RestrictedValue:IsRestricted(count)
 	local publicMaximum = not RestrictedValue:IsRestricted(maximum)

@@ -134,6 +134,7 @@ end
 -- Describe: resource checkboxes filter individual tokens in the active profile.
 MikSBT.Configuration = {}
 dofile("Configuration/AuraTracking.lua")
+dofile("Configuration/ResourcePolicy.lua")
 -- Given combo points and mana are unchecked, with shared sound settings.
 profile.resourceExclusions = { COMBO_POINTS = true, MANA = true, ENERGY = false }
 settings.soundFile = "resource.ogg"
@@ -233,11 +234,11 @@ UnitPowerType = function(unit)
 end
 -- Given every resource checkbox is enabled and cat form is active.
 for _, token in ipairs({ "RAGE", "LUNAR_POWER", "ENERGY", "COMBO_POINTS", "MANA" }) do
-	local excluded = token == "RAGE" or token == "LUNAR_POWER"
+	local excluded = token ~= "ENERGY" and token ~= "COMBO_POINTS"
 	before = #displayed
 	-- When readable resource gains arrive.
 	presentation:Resource(5, token)
-	-- Then only rage and lunar power are suppressed for cat form.
+	-- Then cat form only shows energy and combo points, including hidden tokens.
 	assert(#displayed == before + (excluded and 0 or 1),
 		"cat form resource filter failed for " .. token)
 	-- When the token and amount are hidden, the same rule stays native.
@@ -258,15 +259,50 @@ assert(#displayed == before)
 presentation:Resource(amount, Secret("ENERGY"))
 assert(not Read(displayed[#displayed].settings.auraVisibility.visible))
 assert(profile.resourceExclusions.RAGE == nil)
+-- Given every cat resource is unchecked, no hidden notice is eligible.
+profile.resourceExclusions.COMBO_POINTS = true
+before = #displayed
+presentation:Resource(amount, Secret("ENERGY"))
+presentation:Resource(amount, Secret("FUTURE_POWER"))
+presentation:ComboPoints(Secret(5), Secret(5))
+assert(#displayed == before)
 profile.resourceExclusions = {}
 
 -- Given a shapeshift changes which power is active.
+local allowedCompare = C_Intl.CompareStrings
+C_Intl.CompareStrings = nil
+before = #displayed
+-- A hidden token cannot be displayed if its class eligibility cannot be proven.
+presentation:Resource(amount, Secret("ENERGY"))
+assert(#displayed == before)
+C_Intl.CompareStrings = allowedCompare
+
 for _, power in ipairs({ "RAGE", "LUNAR_POWER", "MANA" }) do
 	activePower = power
 	before = #displayed
 	-- When the current form gains its own resource, it remains visible.
 	presentation:Resource(5, power)
 	assert(#displayed == before + 1)
+	-- Other forms' resources and unknown tokens are excluded in both paths.
+	for _, token in ipairs({ "ENERGY", "COMBO_POINTS", "MANA", "RAGE",
+		"LUNAR_POWER", "FOCUS", "FUTURE_POWER" }) do
+		local allowed = token == power
+		before = #displayed
+		presentation:Resource(5, token)
+		assert(#displayed == before + (allowed and 1 or 0))
+		presentation:Resource(amount, Secret(token))
+		assert(Read(displayed[#displayed].settings.auraVisibility.visible) == allowed,
+			"form allowlist failed for hidden " .. token)
+	end
+	-- Combo totals and their max alert must also respect the current form.
+	presentation.config.display = function(eventSettings, message)
+		displayed[#displayed + 1] = { settings = eventSettings, message = message }
+	end
+	before = #displayed
+	presentation:ComboPoints(4, 5)
+	presentation:ComboPoints(5, 5)
+	presentation:ComboPoints(Secret(5), Secret(5))
+	assert(#displayed == before, "combo totals escaped the active form policy")
 end
 -- Given a different class, then the druid-only filter does not apply.
 playerClass, activePower = "WARRIOR", "ENERGY"

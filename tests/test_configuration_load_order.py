@@ -8,6 +8,24 @@ TOC_FILE = REPOSITORY_ROOT / "MikScrollingBattleText.toc"
 
 # Describe: configuration runtime load order
 class ConfigurationLoadOrderTests(unittest.TestCase):
+    def test_resource_policy_loads_before_presentation_on_both_clients(self):
+        # Given both runtime manifests and the new class/form policy.
+        manifests = [
+            TOC_FILE,
+            REPOSITORY_ROOT / "MikScrollingBattleText_Camelot.toc",
+        ]
+
+        # When checking their production load order.
+        for manifest in manifests:
+            lines = manifest.read_text(encoding="utf-8-sig").splitlines()
+
+            # Then the policy has its API available before presentation loads.
+            self.assertIn("Configuration\\ResourcePolicy.lua", lines)
+            self.assertLess(lines.index("API\\RestrictedValue.lua"),
+                            lines.index("Configuration\\ResourcePolicy.lua"))
+            self.assertLess(lines.index("Configuration\\ResourcePolicy.lua"),
+                            lines.index("Components\\CombatPresentation.lua"))
+
     def test_configuration_loads_after_namespace_and_before_profile_facades(self):
         # Given
         toc_lines = [
