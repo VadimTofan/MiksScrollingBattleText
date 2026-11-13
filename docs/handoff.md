@@ -1,3 +1,43 @@
+# Current combo-point totals and maximum alert
+
+Updated: 2026-11-13
+
+Combo-point notifications now use player UNIT_POWER_UPDATE events and read
+UnitPower/UnitPowerMax. Nonzero totals appear immediately through the existing
+Resource Gains settings, including decreases. At the actual maximum, "Finish
+Him!" uses the existing sticky animation path (Pow by default). Zero produces
+no visible notification. The resource master switch and combo-point exclusion
+still apply; normal resource gains keep their existing behavior.
+
+When totals are active, readable Blizzard combo-point gain messages are
+discarded and hidden-token combo gains are suppressed through native string
+matching, preventing a second visible gain line. Hidden current and maximum
+counts use native comparisons to select normal/full visibility and singular
+or plural labels. Neither count is inspected in Lua. Hidden totals create two
+gated animation entries; zero hides both. Their sounds are muted because the
+native decision cannot gate Lua sound playback. Unchanged readable totals
+are deduplicated; hidden values are never compared in Lua for deduplication.
+
+If the required native display helpers or power APIs are absent at startup,
+the original resource-gain feed remains active. A failed native decision while
+tracking totals emits no total rather than risking zero or a false max alert.
+
+The regression failed first for the missing ComboPoints method. Verification:
+146 tests ran, 145 passed and the actual release-archive check was skipped.
+Coverage includes 1/2/4 totals, a seven-point cap, zero, hidden counts and caps,
+resource exclusions, duplicate gain suppression, event lifecycle, and fallback.
+
+Forever was updated with nine related runtime/configuration files, all matching
+source by SHA-256 and parsing with Lua 5.1. Five installed regression scripts
+passed: resources/combo totals, full combat runtime, popup controls, profile
+transfer, and healer pairing. This also installs the prior individual resource
+checkbox feature there. Backups and the verifier are under
+D:/Codex-Temp/msbt-forever-combo-totals-20261113.
+The source changes have not been pushed; in-game combat has not been checked.
+
+Next: /reload in Forever, build combo points to maximum, then use a finisher;
+confirm the current totals, sticky Finish Him alert, and no zero notification.
+
 # Incoming healing with hidden healer names
 
 Updated: 2026-11-13
@@ -25,8 +65,9 @@ files parsed with Lua 5.1, and five regressions passed against installed
 production files: full-runtime healing, attribution, timer reset, combat
 transitions, and healer pairing. The runtime test used Forever's older
 resource baseline with the exact new healing regression added. MSBTMain.lua
-matches the source by SHA-256; presentation retains its existing resource
-implementation. The installed patch passed a reverse applicability check.
+matches the source by SHA-256. Presentation retained its previous resource
+implementation at that checkpoint; the combo-point sync above updates it too.
+The installed healing patch passed a reverse applicability check.
 Backups and the verifier are under
 D:/Codex-Temp/msbt-forever-healer-names-20261113.
 
@@ -61,8 +102,8 @@ checkbox UI. Verification: all 146 tests ran, 145 passed and the actual release
 archive check was skipped. Coverage includes Save/Cancel, configuration wiring,
 profile transfer, readable filtering on Retail and Forever, and opaque native
 visibility reaching the real display service. In-game layout and combat
-behavior have not been verified. These changes have not been pushed or copied
-to the separate Forever installation.
+behavior have not been verified. These changes have not been pushed. The
+combo-point sync above also installs these resource controls in Forever.
 
 Next: reload the source installation and open Resource Gains > Configure to
 check the list, then disable one resource and compare its gains with an enabled
@@ -86,7 +127,8 @@ readable label through the full Retail and Forever runtime. Actual combat use
 of the native label selector has not been verified in game.
 
 PR #49 was closed with the two review findings and a thank-you. This replacement
-is saved locally; it has not been pushed or copied to the Forever installation.
+is saved locally and installed in Forever by the combo-point sync above; it
+has not been pushed.
 Next: load this change in Forever and verify a combo-point gain reads
 "1 - Combo Point" while an energy gain keeps its own label.
 

@@ -204,5 +204,171 @@ presentation:Resource(1, "ENERGY")
 presentation:Resource(amount, Secret("COMBO_POINTS"))
 -- Then the master switch suppresses both paths.
 assert(#displayed == before)
+
+-- Describe: current combo-point totals replace gain amounts and mark the cap.
+settings.disabled = nil
+profile.resourceExclusions = {}
+presentation.config.display = function(eventSettings, message)
+	displayed[#displayed + 1] = { settings = eventSettings, message = message }
+end
+-- Given current totals that can jump by more than one point.
+for _, count in ipairs({ 1, 2, 4 }) do
+	-- When a total below the current cap is reported.
+	presentation:ComboPoints(count, 5)
+	-- Then it displays that total, rather than the size of the gain.
+	local event = displayed[#displayed]
+	assert(event.amount == count)
+	assert(event.name == (count == 1 and "Combo Point" or "Combo Points"))
+end
+-- Given a finisher spends all points.
+before = #displayed
+-- When the total becomes zero, then no notification appears.
+presentation:ComboPoints(0, 5)
+assert(#displayed == before, "zero combo points were displayed")
+-- Given a character with a higher cap.
+presentation:ComboPoints(5, 7)
+assert(displayed[#displayed].amount == 5, "five points assumed the wrong cap")
+-- When the actual maximum is reached, then the existing sticky path is used.
+presentation:ComboPoints(7, 7)
+assert(displayed[#displayed].message == "Finish Him!")
+assert(displayed[#displayed].settings.alwaysSticky)
+assert(not settings.alwaysSticky, "maximum alert mutated shared settings")
+
+-- Given current and maximum counts that are both opaque.
+for _, count in ipairs({ 0, 1, 4, 5 }) do
+	local current = Secret(count)
+	before = #displayed
+	-- When native display selection handles zero, ordinary totals, and the cap.
+	presentation:ComboPoints(current, Secret(5))
+	local normal, full = displayed[before + 1], displayed[before + 2]
+	-- Then exactly the appropriate animation is visible; zero hides both.
+	assert(#displayed == before + 2)
+	assert(Read(normal.settings.auraVisibility.visible) == (count > 0 and count < 5))
+	assert(Read(full.settings.auraVisibility.visible) == (count == 5))
+	assert(normal.amount == current)
+	assert(Read(normal.name) == (count == 1 and "Combo Point" or "Combo Points"))
+	assert(full.message == "Finish Him!" and full.settings.alwaysSticky)
+	assert(normal.settings.soundFile == "" and full.settings.soundFile == "")
+end
+
+-- Given the combo-point checkbox is unchecked.
+profile.resourceExclusions = { COMBO_POINTS = true }
+before = #displayed
+-- When ordinary or full totals arrive, neither path may emit a notification.
+presentation:ComboPoints(4, 5)
+presentation:ComboPoints(5, 5)
+presentation:ComboPoints(Secret(5), Secret(5))
+assert(#displayed == before)
+profile.resourceExclusions = {}
+
+-- Given totals are active and Blizzard also sends a gain for the same points.
+before = #displayed
+-- When readable combo gains arrive, then they are suppressed completely.
+presentation:Resource(1, "COMBO_POINTS", true)
+assert(#displayed == before)
+-- When gain tokens are opaque, then only combo-point gains are hidden natively.
+presentation:Resource(amount, Secret("COMBO_POINTS"), true)
+assert(not Read(displayed[#displayed].settings.auraVisibility.visible))
+presentation:Resource(amount, Secret("ENERGY"), true)
+assert(Read(displayed[#displayed].settings.auraVisibility.visible))
+
+-- Given the real reader and a minimal frame/event boundary.
+dofile("Combat/Context.lua")
+local ns = MikSBT.CombatEngine
+ns.NewMine = function() return {} end
+ns.ResetHealing, ns.KeepCombatLog = function() end, function() end
+Enum.PowerType = { ComboPoints = 4 }
+GetTime = function() return 10 end
+C_EventUtils = { IsEventValid = function() return true end }
+CreateFrame = function()
+	local frame = { events = {} }
+	function frame:RegisterEvent(event) self.events[event] = true end
+	function frame:RegisterUnitEvent(event, unit)
+		assert(unit == "player")
+		self.events[event] = true
+	end
+	function frame:SetScript() end
+	function frame:UnregisterAllEvents() self.events = {} end
+	return frame
+end
+local current, maximum, reads = 1, 5, 0
+UnitPower = function(unit, power)
+	assert(unit == "player" and power == 4)
+	reads = reads + 1
+	return current
+end
+UnitPowerMax = function(unit, power)
+	assert(unit == "player" and power == 4)
+	return maximum
+end
+ns.liveRouter = {
+	ComboPoints = function(_, count, cap) presentation:ComboPoints(count, cap) end,
+	Resource = function(_, count, token, ignored)
+		presentation:Resource(count, token, ignored)
+	end,
+}
+dofile("Combat/Reader.lua")
+-- When the reader starts, it subscribes to player power changes.
+ns.StartReader()
+assert(ns.reader.frame.events.UNIT_POWER_UPDATE,
+	"combo-point totals were not registered")
+-- Then only the player's combo-point updates query their current total.
+before = #displayed
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "pet", "COMBO_POINTS")
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "ENERGY")
+assert(reads == 0 and #displayed == before)
+for _, count in ipairs({ 1, 2, 4 }) do
+	current = count
+	ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+	assert(displayed[#displayed].amount == count)
+end
+-- Given repeated unchanged updates, then they do not repeat public totals.
+before = #displayed
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+assert(#displayed == before)
+-- Given a cap increase, then the reader uses the new maximum.
+current, maximum = 7, 7
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+assert(displayed[#displayed].message == "Finish Him!")
+current = 0
+before = #displayed
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+assert(#displayed == before)
+-- Given the live count and cap become hidden during combat.
+current, maximum = Secret(4), Secret(5)
+before = #displayed
+-- When the real reader forwards the untouched values.
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+-- Then normal totals remain visible and the maximum alert remains hidden.
+assert(displayed[before + 1].amount == current)
+assert(Read(displayed[before + 1].settings.auraVisibility.visible))
+assert(not Read(displayed[before + 2].settings.auraVisibility.visible))
+current = Secret(0)
+before = #displayed
+ns.ReaderEvent(nil, "UNIT_POWER_UPDATE", "player", "COMBO_POINTS")
+assert(not Read(displayed[before + 1].settings.auraVisibility.visible))
+assert(not Read(displayed[before + 2].settings.auraVisibility.visible))
+-- When a duplicate combat-text gain arrives, then it is not shown again.
+before = #displayed
+C_CombatText = { GetCurrentEventInfo = function() return 1, "COMBO_POINTS" end }
+ns.ReaderEvent(nil, "COMBAT_TEXT_UPDATE", "ENERGIZE")
+assert(#displayed == before)
+-- When disabled, then the power subscription is removed.
+ns.StopReader()
+assert(next(ns.reader.frame.events) == nil)
+-- Given a missing native helper, then totals cannot safely hide zero or duplicates.
+local nativeCompare = C_Intl.CompareStrings
+C_Intl.CompareStrings = nil
+ns.StartReader()
+assert(not ns.reader.frame.events.UNIT_POWER_UPDATE)
+ns.ReaderEvent(nil, "COMBAT_TEXT_UPDATE", "ENERGIZE")
+assert(displayed[#displayed].amount == 1, "missing helpers lost the fallback gain")
+ns.StopReader()
+C_Intl.CompareStrings = nativeCompare
+-- Given a missing power API, the existing gain feed also remains available.
+UnitPower = nil
+ns.StartReader()
+assert(not ns.reader.frame.events.UNIT_POWER_UPDATE)
+ns.StopReader()
 string.format = format
 print("Resource token label tests passed")

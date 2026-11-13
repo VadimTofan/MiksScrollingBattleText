@@ -5,7 +5,7 @@ from tests.lua_test_runner import run_lua_test
 
 # Describe: resource gains display immediately.
 class ResourceNotificationTests(unittest.TestCase):
-    def test_combo_point_names_match_the_token_without_reading_secrets(self):
+    def test_resource_names_and_combo_point_totals_preserve_hidden_values(self):
         # Given
         script = "resource_names.lua"
 

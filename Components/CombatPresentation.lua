@@ -152,7 +152,7 @@ local function ResourceLabel(token)
 	return token
 end
 
-function Presentation:Resource(amount, powerToken)
+function Presentation:Resource(amount, powerToken, ignoreComboPoints)
 	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
 	if not settings then return end
 	if not RestrictedValue:IsRestricted(amount) then
@@ -161,12 +161,14 @@ function Presentation:Resource(amount, powerToken)
 		if not readableAmount or readableAmount <= 0 then return end
 	end
 	local exclusions = self.config.getProfile().resourceExclusions
-	if type(exclusions) == "table" then
+	if type(exclusions) == "table" or ignoreComboPoints then
 		if not RestrictedValue:IsRestricted(powerToken) then
-			if exclusions[powerToken] == true then return end
+			if ignoreComboPoints and powerToken == "COMBO_POINTS" then return end
+			if exclusions and exclusions[powerToken] == true then return end
 		else
 			local rules = {}
-			for token, excluded in pairs(exclusions) do
+			if ignoreComboPoints then rules["name:COMBO_POINTS"] = false end
+			for token, excluded in pairs(exclusions or {}) do
 				if excluded == true and type(token) == "string" then
 					rules["name:" .. token] = false
 				end
@@ -182,6 +184,76 @@ function Presentation:Resource(amount, powerToken)
 		end
 	end
 	self.config.displayResource(settings, amount, ResourceLabel(powerToken))
+end
+
+local function NativeCountMatches(left, right)
+	local comparison = NativeResourceValue(C_Intl.CompareStrings(
+		string.format("%d", left), string.format("%d", right),
+		Enum.CollationStrength.Identical), "number")
+	local difference = NativeResourceValue(
+		C_StringUtil.TruncateWhenZero(comparison), "string")
+	local marker = NativeResourceValue(
+		C_StringUtil.WrapString(difference, "e\204\129", ""), "string")
+	return NativeResourceValue(C_Intl.IsNormalized(
+		marker, Enum.NormalizationForm.Nfc), "boolean")
+end
+
+local function SelectComboValue(matches, yes, no)
+	return NativeResourceValue(
+		C_CurveUtil.EvaluateColorValueFromBoolean(matches, yes, no), "number")
+end
+
+-- All decisions remain native when either count is hidden, including zero.
+local function ComboPointDisplay(count, maximum)
+	local zero = NativeCountMatches(count, 0)
+	local full = NativeCountMatches(count, maximum)
+	local one = NativeCountMatches(count, 1)
+	local normal = SelectComboValue(zero, 0, SelectComboValue(full, 0, 1))
+	local ready = SelectComboValue(zero, 0, SelectComboValue(full, 1, 0))
+	return {
+		normal = { visible = NativeCountMatches(normal, 1) },
+		full = { visible = NativeCountMatches(ready, 1) },
+		label = string.format("%s%s",
+			ResourceLabelFragment(SelectComboValue(one, 1, 0), "Combo Point"),
+			ResourceLabelFragment(SelectComboValue(one, 0, 1), "Combo Points")),
+	}
+end
+
+function Presentation:CanTrackComboPoints()
+	local ok, selected = pcall(ComboPointDisplay, 1, 5)
+	return ok and type(selected) == "table"
+end
+
+function Presentation:ComboPoints(count, maximum)
+	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
+	local exclusions = self.config.getProfile().resourceExclusions
+	if not settings or (exclusions and exclusions.COMBO_POINTS == true) then return end
+	local publicCount = not RestrictedValue:IsRestricted(count)
+	local publicMaximum = not RestrictedValue:IsRestricted(maximum)
+	if publicCount and (type(count) ~= "number" or count <= 0) then return end
+	if publicMaximum and (type(maximum) ~= "number" or maximum <= 0) then return end
+	local finish = (MikSBT.translations or {}).CP_FULL or "Finish Him!"
+	if publicCount and publicMaximum then
+		if count == maximum then
+			local sticky = setmetatable({ alwaysSticky = true }, { __index = settings })
+			self.config.display(sticky, finish)
+		else
+			local name = count == 1 and "Combo Point" or "Combo Points"
+			self.config.displayResource(settings, count, name)
+		end
+		return
+	end
+	local ok, selected = pcall(ComboPointDisplay, count, maximum)
+	-- Without a native decision, do not risk showing zero or a false maximum.
+	if not ok then return end
+	local normal = setmetatable({
+		auraVisibility = selected.normal, soundFile = "",
+	}, { __index = settings })
+	local sticky = setmetatable({
+		auraVisibility = selected.full, soundFile = "", alwaysSticky = true,
+	}, { __index = settings })
+	self.config.displayResource(normal, count, selected.label)
+	self.config.display(sticky, finish)
 end
 
 function Presentation:RememberIncomingHeal(record)
