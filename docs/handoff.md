@@ -17,10 +17,20 @@ event orders on Retail and Forever, spell metadata, icons, and omitted names.
 The existing 200 ms healer/amount association is unchanged; this change does
 not establish reliable attribution for simultaneous heals or recover missing
 source/ability information. Incoming damage is unchanged. In-game behavior
-has not been checked. The change is local and has not been pushed or copied
-to the separate Forever installation.
+has not been checked. The source change is local and has not been pushed.
 
-Next: reload the source installation and receive a heal in combat with %n in
+The user requested installation in Forever. The healing-only sections were
+applied to Components/CombatPresentation.lua and MSBTMain.lua there. Both
+files parsed with Lua 5.1, and five regressions passed against installed
+production files: full-runtime healing, attribution, timer reset, combat
+transitions, and healer pairing. The runtime test used Forever's older
+resource baseline with the exact new healing regression added. MSBTMain.lua
+matches the source by SHA-256; presentation retains its existing resource
+implementation. The installed patch passed a reverse applicability check.
+Backups and the verifier are under
+D:/Codex-Temp/msbt-forever-healer-names-20261113.
+
+Next: reload Forever and receive a heal in combat with %n in
 the Incoming Heals message; verify the healer name appears beside the amount.
 
 # Individual resource notification checkboxes
