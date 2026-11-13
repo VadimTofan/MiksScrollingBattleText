@@ -1,3 +1,25 @@
+# Combo Point resource label
+
+Updated: 2026-11-13
+
+Resource presentation now replaces the exact COMBO_POINTS token with
+"Combo Point". Readable tokens use direct string equality. Hidden tokens use
+native comparison, normalization, and conditional text selection; the result
+stays opaque and reaches native rendering. Each gain is processed immediately
+without power-update correlation. Unavailable or failing native helpers retain
+the original token. Other resource tokens keep their existing labels.
+
+The regression failed first for the missing readable label. All 146 tests ran:
+145 passed and the release-archive check was skipped. Coverage includes hidden
+combo points alongside energy, exact matching, native helper failures, and the
+readable label through the full Retail and Forever runtime. Actual combat use
+of the native label selector has not been verified in game.
+
+PR #49 was closed with the two review findings and a thank-you. This replacement
+is saved locally; it has not been pushed or copied to the Forever installation.
+Next: load this change in Forever and verify a combo-point gain reads
+"1 - Combo Point" while an energy gain keeps its own label.
+
 # Windfury one-attack investigation
 
 Updated: 2026-11-13

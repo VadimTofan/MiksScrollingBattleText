@@ -78,6 +78,62 @@ function Presentation:Emit(key, record, eventSettings)
 	end
 end
 
+local function NativeResourceValue(value, expectedType)
+	if not RestrictedValue:IsRestricted(value)
+		and type(value) ~= expectedType then
+		error("Native resource label selection unavailable")
+	end
+	return value
+end
+
+-- The hyperlink carries the conditional numeric gate in its hidden target.
+-- Stripping it leaves only the selected label, without changing text colors.
+local function ResourceLabelFragment(gate, label)
+	local text = NativeResourceValue(C_StringUtil.TruncateWhenZero(gate), "string")
+	local suffix = string.format("|h%s|h", label)
+	local link = NativeResourceValue(
+		C_StringUtil.WrapString(text, "|Hmsbt-resource:", suffix), "string")
+	return NativeResourceValue(C_StringUtil.StripHyperlinks(link), "string")
+end
+
+local function ResourceLabel(token)
+	if not RestrictedValue:IsRestricted(token) then
+		if token == "COMBO_POINTS" then return "Combo Point" end
+		return token
+	end
+	if not C_Intl or not C_StringUtil or not C_CurveUtil
+		or not Enum or not Enum.CollationStrength or not Enum.NormalizationForm
+		or not Enum.CollationStrength.Identical or not Enum.NormalizationForm.Nfc
+		or type(C_Intl.CompareStrings) ~= "function"
+		or type(C_Intl.IsNormalized) ~= "function"
+		or type(C_StringUtil.TruncateWhenZero) ~= "function"
+		or type(C_StringUtil.WrapString) ~= "function"
+		or type(C_StringUtil.StripHyperlinks) ~= "function"
+		or type(C_CurveUtil.EvaluateColorValueFromBoolean) ~= "function" then
+		return token
+	end
+	local ok, label = pcall(function()
+		local comparison = NativeResourceValue(C_Intl.CompareStrings(
+			token, "COMBO_POINTS", Enum.CollationStrength.Identical), "number")
+		local difference = NativeResourceValue(
+			C_StringUtil.TruncateWhenZero(comparison), "string")
+		-- Equality becomes empty NFC text; a mismatch keeps a decomposed marker.
+		local marker = NativeResourceValue(
+			C_StringUtil.WrapString(difference, "e\204\129", ""), "string")
+		local matches = NativeResourceValue(C_Intl.IsNormalized(
+			marker, Enum.NormalizationForm.Nfc), "boolean")
+		local matched = NativeResourceValue(
+			C_CurveUtil.EvaluateColorValueFromBoolean(matches, 1, 0), "number")
+		local unmatched = NativeResourceValue(
+			C_CurveUtil.EvaluateColorValueFromBoolean(matches, 0, 1), "number")
+		return string.format("%s%s",
+			ResourceLabelFragment(matched, "Combo Point"),
+			ResourceLabelFragment(unmatched, token))
+	end)
+	if ok then return label end
+	return token
+end
+
 function Presentation:Resource(amount, powerToken)
 	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
 	if not settings then return end
@@ -86,7 +142,7 @@ function Presentation:Resource(amount, powerToken)
 		local readableAmount = RestrictedValue:Number(amount) or tonumber(amountText)
 		if not readableAmount or readableAmount <= 0 then return end
 	end
-	self.config.displayResource(settings, amount, powerToken)
+	self.config.displayResource(settings, amount, ResourceLabel(powerToken))
 end
 
 function Presentation:RememberIncomingHeal(record)

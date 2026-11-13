@@ -394,6 +394,13 @@ for _, forever in ipairs({ false, true }) do
 	assert(displayed[beforeResource + 2][2] == "1 - HOLY_POWER")
 	assert(displayed[#displayed][1] == resourceSettings)
 
+	-- Given a readable combo-point gain on either modern client.
+	resourceAmount, resourceToken = 1, "COMBO_POINTS"
+	-- When it reaches the real reader, presentation, and template formatter.
+	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
+	-- Then it immediately displays the requested resource label.
+	assert(displayed[#displayed][2] == "1 - Combo Point")
+
 	-- Given Blizzard supplies the amount as text, as its own renderer supports.
 	resourceAmount, resourceToken = "25", "MANA"
 	beforeResource = #displayed
