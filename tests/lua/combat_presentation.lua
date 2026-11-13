@@ -115,3 +115,28 @@ presentation:Out({ event = "damage", amount = 24,
 -- Then the identified source retains its own spell and icon.
 assert(queued[1] == 601 and queued[2] == 24)
 assert(queued[4] == "icon-601")
+
+-- Describe: the max combo alert doubles the resolved combo-point font size.
+-- Given an inherited resource font and a green normal event color.
+local Service = dofile("Display/DisplayService.lua")
+local rendered = {}
+profile.events.NOTIFICATION_RESOURCE_GAIN = { colorR = 0, colorG = 1, colorB = 0 }
+Service:Configure({
+	getProfile = function() return profile end,
+	isModDisabled = function() return false end,
+	scrollAreas = { Resolve = function() return { normalFontSize = 24 } end },
+	fonts = {}, display = function(...) rendered[#rendered + 1] = { ... } end,
+})
+presentation.config.display = function(...) Service:DisplayEvent(...) end
+presentation.config.displayResource = function(settings, amount, name)
+	Service:DisplayEvent(settings, tostring(amount) .. " " .. name)
+end
+-- When a normal total is followed by the maximum alert.
+presentation:ComboPoints(4, 5)
+presentation:ComboPoints(5, 5)
+-- Then only the alert becomes red and twice the effective normal font size.
+assert(rendered[1][7] == 24 and rendered[2][7] == 48,
+	"Finish Him did not double the resolved combo-point font")
+assert(rendered[1][4] == 0 and rendered[1][5] == 1)
+assert(rendered[2][4] == 1 and rendered[2][5] == 0 and rendered[2][6] == 0,
+	"Finish Him did not use red text")

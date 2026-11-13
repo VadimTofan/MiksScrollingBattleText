@@ -1,3 +1,35 @@
+# Resource display names and maximum combo alert styling
+
+Updated: 2026-11-13
+
+"Finish Him!" now renders in red at twice the effective combo-point font size.
+The scale is applied after the display service resolves event, scroll-area,
+and profile font inheritance. Both public-count and native-gated maximum
+alerts use the same styling and retain the existing sticky/Pow animation.
+Shared resource settings are not mutated.
+
+Known resource tokens now display readable names, including LUNAR_POWER as
+"Lunar Power", RUNIC_POWER as "Runic Power", and SOUL_SHARDS as "Soul Shards".
+The bounded resource-name table covers the same 30 token types as the resource
+configuration. Hidden tokens select labels through native string matching;
+they remain opaque to Lua. Unknown/custom labels and unavailable-helper
+fallbacks retain their original text.
+
+Regressions first failed for raw resource names and the unchanged alert font.
+All 146 tests ran: 145 passed and the actual release-archive check was skipped.
+Seventeen focused checks also passed after the final formatting changes.
+Coverage includes event/area/profile font resolution, red styling, hidden
+maximum alerts, multiword labels, custom labels, and the real combat runtime.
+
+Forever's presentation and display service match source by SHA-256. Ten
+related installed files parsed with Lua 5.1 and six installed regression
+scripts passed. Backups and the verifier are under
+D:/Codex-Temp/msbt-forever-resource-display-20261113.
+The source change has not been pushed; in-game visuals have not been checked.
+
+Next: /reload in Forever and reach maximum combo points; verify the red
+Finish Him alert is twice the ordinary combo-point text size.
+
 # Druid cat-form resource filtering
 
 Updated: 2026-11-13

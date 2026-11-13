@@ -390,8 +390,8 @@ for _, forever in ipairs({ false, true }) do
 
 	-- Then the amount, resource name, and configured area reach the display.
 	assert(#displayed == beforeResource + 2, "resource gains were delayed")
-	assert(displayed[beforeResource + 1][2] == "20 - MANA")
-	assert(displayed[beforeResource + 2][2] == "1 - HOLY_POWER")
+	assert(displayed[beforeResource + 1][2] == "20 - Mana")
+	assert(displayed[beforeResource + 2][2] == "1 - Holy Power")
 	assert(displayed[#displayed][1] == resourceSettings)
 
 	-- Given a readable combo-point gain on either modern client.
@@ -410,7 +410,7 @@ for _, forever in ipairs({ false, true }) do
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	-- Then only energy is displayed on both Retail and Forever.
 	assert(#displayed == beforeResource + 1)
-	assert(displayed[#displayed][2] == "20 - ENERGY")
+	assert(displayed[#displayed][2] == "20 - Energy")
 	MikSBT.Profiles.currentProfile.resourceExclusions = {}
 
 	-- Given Blizzard supplies the amount as text, as its own renderer supports.
@@ -419,7 +419,7 @@ for _, forever in ipairs({ false, true }) do
 	-- When the gain arrives, then its numeric text is displayed as an amount.
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	assert(#displayed == beforeResource + 1, "numeric text dropped a resource gain")
-	assert(displayed[#displayed][2] == "25 - MANA")
+	assert(displayed[#displayed][2] == "25 - Mana")
 
 	-- Given number shortening is enabled and Blizzard supplies a custom label.
 	local previousShortening = MikSBT.Profiles.currentProfile.shortenNumbers
@@ -445,12 +445,12 @@ for _, forever in ipairs({ false, true }) do
 	assert(#displayed == beforeResource)
 	resourceToken = "ENERGY"
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
-	assert(displayed[#displayed][2] == "9 - ENERGY")
+	assert(displayed[#displayed][2] == "9 - Energy")
 	-- When the player shifts to bear, rage becomes valid immediately.
 	UnitPowerType = function() return 1, "RAGE" end
 	resourceToken = "RAGE"
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
-	assert(displayed[#displayed][2] == "9 - RAGE")
+	assert(displayed[#displayed][2] == "9 - Rage")
 	UnitClass, UnitPowerType = resourceClass, resourcePower
 
 	-- Given a restricted amount and a restricted resource token in combat.
@@ -466,7 +466,7 @@ for _, forever in ipairs({ false, true }) do
 	Dispatch("COMBAT_TEXT_UPDATE", "ENERGIZE")
 	assert(displayed[#displayed][2] == "%s - %s")
 	assert(displayed[#displayed][4] == secretResource)
-	assert(displayed[#displayed][5] == "MANA")
+	assert(displayed[#displayed][5] == "Mana")
 
 	-- When the resource token is hidden too, then its label reaches rendering.
 	resourceToken = secretToken

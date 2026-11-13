@@ -89,10 +89,22 @@ presentation:Resource(Secret(20), Secret("ENERGY"))
 assert(displayed[2].amount == amount)
 assert(issecretvalue(displayed[2].name))
 assert(Read(displayed[2].name) == "Combo Point")
-assert(Read(displayed[3].name) == "ENERGY")
+assert(Read(displayed[3].name) == "Energy")
+
+-- Given the resource tokens reported by Blizzard, including multiword names.
+for token, label in pairs({ MANA = "Mana", ENERGY = "Energy",
+	LUNAR_POWER = "Lunar Power", RUNIC_POWER = "Runic Power",
+	SOUL_SHARDS = "Soul Shards", ARCANE_CHARGES = "Arcane Charges" }) do
+	-- When readable and hidden tokens reach the resource display.
+	presentation:Resource(2, token)
+	presentation:Resource(amount, Secret(token))
+	-- Then both paths show the same human-readable name.
+	assert(displayed[#displayed - 1].name == label)
+	assert(Read(displayed[#displayed].name) == label)
+end
 
 -- Given tokens that are not an exact combo-point match.
-for _, name in ipairs({ "MANA", "combo_points", "COMBO_POINTS_EXTRA",
+for _, name in ipairs({ "combo_points", "COMBO_POINTS_EXTRA",
 	"Combo Points", "Energy supplied by Blizzard" }) do
 	-- When readable and hidden forms arrive.
 	presentation:Resource(2, name)
@@ -307,6 +319,35 @@ assert(displayed[#displayed].message == "Finish Him!")
 assert(displayed[#displayed].settings.alwaysSticky)
 assert(not settings.alwaysSticky, "maximum alert mutated shared settings")
 
+-- Given combo text inherits its font from the scroll area or profile.
+local finishSettings = displayed[#displayed].settings
+local area = { normalFontSize = 24 }
+profile.normalFontSize = 18
+settings.colorR, settings.colorG, settings.colorB = 0.2, 0.8, 0.1
+Service.config.scrollAreas.Resolve = function() return area end
+Service.config.display = function(...)
+	rendered[#rendered + 1] = { args = { ... } }
+end
+-- When the normal notification and maximum alert reach real font resolution.
+Service:DisplayEvent(settings, "4 Combo Points")
+local normalFont = rendered[#rendered].args[7]
+Service:DisplayEvent(finishSettings, "Finish Him!")
+local finishArgs = rendered[#rendered].args
+-- Then Finish Him is exactly twice the inherited size and red.
+assert(normalFont == 24 and finishArgs[7] == 48,
+	"maximum combo alert is not twice the combo-point font size")
+assert(finishArgs[4] == 1 and finishArgs[5] == 0 and finishArgs[6] == 0,
+	"maximum combo alert is not red")
+assert(settings.colorR == 0.2 and settings.colorG == 0.8)
+-- Given an explicit event font, then doubling uses that override.
+settings.fontSize = 30
+Service:DisplayEvent(finishSettings, "Finish Him!")
+assert(rendered[#rendered].args[7] == 60)
+-- Given no event or area font, then doubling uses the profile default.
+settings.fontSize, area.normalFontSize = nil, nil
+Service:DisplayEvent(finishSettings, "Finish Him!")
+assert(rendered[#rendered].args[7] == 36)
+
 -- Given current and maximum counts that are both opaque.
 for _, count in ipairs({ 0, 1, 4, 5 }) do
 	local current = Secret(count)
@@ -322,6 +363,11 @@ for _, count in ipairs({ 0, 1, 4, 5 }) do
 	assert(Read(normal.name) == (count == 1 and "Combo Point" or "Combo Points"))
 	assert(full.message == "Finish Him!" and full.settings.alwaysSticky)
 	assert(normal.settings.soundFile == "" and full.settings.soundFile == "")
+	-- The same size and color must apply to the native-gated maximum animation.
+	Service:DisplayEvent(full.settings, full.message)
+	local fullArgs = rendered[#rendered].args
+	assert(fullArgs[7] == 36)
+	assert(fullArgs[4] == 1 and fullArgs[5] == 0 and fullArgs[6] == 0)
 end
 
 -- Given the combo-point checkbox is unchecked.

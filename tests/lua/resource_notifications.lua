@@ -27,8 +27,8 @@ assert(#displayed == 3, "resource gains were delayed")
 assert(#timers == 0, "resource gains still scheduled a collection window")
 assert(displayed[1].amount == 10)
 assert(displayed[2].amount == 5)
-assert(displayed[3].powerName == "ENERGY",
-	"Blizzard's resource label was modified")
+assert(displayed[3].powerName == "Energy",
+	"resource token was not formatted for display")
 
 -- Given an opaque amount and resource name.
 local hiddenAmount, hiddenName = {}, {}

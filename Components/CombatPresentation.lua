@@ -8,6 +8,38 @@ local MISS_TYPES = {
 	"MISS", "DODGE", "PARRY", "BLOCK", "RESIST", "EVADE",
 	"IMMUNE", "DEFLECT", "ABSORB", "REFLECT",
 }
+local RESOURCE_LABELS = {
+	MANA = "Mana",
+	RAGE = "Rage",
+	FOCUS = "Focus",
+	ENERGY = "Energy",
+	COMBO_POINTS = "Combo Point",
+	RUNES = "Runes",
+	RUNIC_POWER = "Runic Power",
+	SOUL_SHARDS = "Soul Shards",
+	LUNAR_POWER = "Lunar Power",
+	HOLY_POWER = "Holy Power",
+	ALTERNATE_POWER = "Alternate Power",
+	MAELSTROM = "Maelstrom",
+	CHI = "Chi",
+	INSANITY = "Insanity",
+	BURNING_EMBERS = "Burning Embers",
+	DEMONIC_FURY = "Demonic Fury",
+	ARCANE_CHARGES = "Arcane Charges",
+	FURY = "Fury",
+	PAIN = "Pain",
+	ESSENCE = "Essence",
+	RUNE_BLOOD = "Rune Blood",
+	RUNE_FROST = "Rune Frost",
+	RUNE_UNHOLY = "Rune Unholy",
+	ALTERNATE_QUEST_POWER = "Alternate Quest Power",
+	ALTERNATE_ENCOUNTER_POWER = "Alternate Encounter Power",
+	ALTERNATE_MOUNT_POWER = "Alternate Mount Power",
+	BALANCE = "Balance",
+	HAPPINESS = "Happiness",
+	SHADOW_ORBS = "Shadow Orbs",
+	RUNE_CHROMATIC = "Rune Chromatic",
+}
 
 -- A pet's swing: its family's icon when the client gives one. Auto Attack's
 -- icon (6603) is the player's own weapon.
@@ -116,8 +148,7 @@ end
 
 local function ResourceLabel(token)
 	if not RestrictedValue:IsRestricted(token) then
-		if token == "COMBO_POINTS" then return "Combo Point" end
-		return token
+		return RESOURCE_LABELS[token] or token
 	end
 	if not C_Intl or not C_StringUtil or not C_CurveUtil
 		or not Enum or not Enum.CollationStrength or not Enum.NormalizationForm
@@ -131,22 +162,26 @@ local function ResourceLabel(token)
 		return token
 	end
 	local ok, label = pcall(function()
-		local comparison = NativeResourceValue(C_Intl.CompareStrings(
-			token, "COMBO_POINTS", Enum.CollationStrength.Identical), "number")
-		local difference = NativeResourceValue(
-			C_StringUtil.TruncateWhenZero(comparison), "string")
-		-- Equality becomes empty NFC text; a mismatch keeps a decomposed marker.
-		local marker = NativeResourceValue(
-			C_StringUtil.WrapString(difference, "e\204\129", ""), "string")
-		local matches = NativeResourceValue(C_Intl.IsNormalized(
-			marker, Enum.NormalizationForm.Nfc), "boolean")
-		local matched = NativeResourceValue(
-			C_CurveUtil.EvaluateColorValueFromBoolean(matches, 1, 0), "number")
-		local unmatched = NativeResourceValue(
-			C_CurveUtil.EvaluateColorValueFromBoolean(matches, 0, 1), "number")
+		local output, unmatched = "", 1
+		for candidate, text in pairs(RESOURCE_LABELS) do
+			local comparison = NativeResourceValue(C_Intl.CompareStrings(
+				token, candidate, Enum.CollationStrength.Identical), "number")
+			local difference = NativeResourceValue(
+				C_StringUtil.TruncateWhenZero(comparison), "string")
+			-- Equality is empty NFC text; a mismatch retains a decomposed marker.
+			local marker = NativeResourceValue(
+				C_StringUtil.WrapString(difference, "e\204\129", ""), "string")
+			local matches = NativeResourceValue(C_Intl.IsNormalized(
+				marker, Enum.NormalizationForm.Nfc), "boolean")
+			local matched = NativeResourceValue(
+				C_CurveUtil.EvaluateColorValueFromBoolean(matches, 1, 0), "number")
+			unmatched = NativeResourceValue(
+				C_CurveUtil.EvaluateColorValueFromBoolean(matches, 0, unmatched), "number")
+			output = string.format("%s%s",
+				output, ResourceLabelFragment(matched, text))
+		end
 		return string.format("%s%s",
-			ResourceLabelFragment(matched, "Combo Point"),
-			ResourceLabelFragment(unmatched, token))
+			output, ResourceLabelFragment(unmatched, token))
 	end)
 	if ok then return label end
 	return token
@@ -244,6 +279,17 @@ function Presentation:CanTrackComboPoints()
 	return ok and type(selected) == "table"
 end
 
+local function FinishSettings(settings, visibility)
+	local alert = {
+		alwaysSticky = true, fontSizeScale = 2,
+		colorR = 1, colorG = 0, colorB = 0,
+	}
+	if visibility then
+		alert.auraVisibility, alert.soundFile = visibility, ""
+	end
+	return setmetatable(alert, { __index = settings })
+end
+
 function Presentation:ComboPoints(count, maximum)
 	local settings = self:Settings("NOTIFICATION_RESOURCE_GAIN")
 	local exclusions = self.config.getProfile().resourceExclusions
@@ -255,8 +301,7 @@ function Presentation:ComboPoints(count, maximum)
 	local finish = (MikSBT.translations or {}).CP_FULL or "Finish Him!"
 	if publicCount and publicMaximum then
 		if count == maximum then
-			local sticky = setmetatable({ alwaysSticky = true }, { __index = settings })
-			self.config.display(sticky, finish)
+			self.config.display(FinishSettings(settings), finish)
 		else
 			local name = count == 1 and "Combo Point" or "Combo Points"
 			self.config.displayResource(settings, count, name)
@@ -269,9 +314,7 @@ function Presentation:ComboPoints(count, maximum)
 	local normal = setmetatable({
 		auraVisibility = selected.normal, soundFile = "",
 	}, { __index = settings })
-	local sticky = setmetatable({
-		auraVisibility = selected.full, soundFile = "", alwaysSticky = true,
-	}, { __index = settings })
+	local sticky = FinishSettings(settings, selected.full)
 	self.config.displayResource(normal, count, selected.label)
 	self.config.display(sticky, finish)
 end
