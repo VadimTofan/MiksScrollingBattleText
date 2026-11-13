@@ -3,6 +3,7 @@
 dofile("tests/lua/notification_runtime.lua")
 MikSBT.Configuration = MikSBT.Configuration or {}
 dofile("Configuration/ResourcePolicy.lua")
+MikSBT.translations.SETUP_RELOAD_PROMPT = "重新加载界面以启用 MSBT。"
 
 local spellNames = {}
 local originalSpellInfo = MikSBT.GetSpellInfo
@@ -169,7 +170,7 @@ for _, forever in ipairs({ false, true }) do
 	assert(#chatMessages == chatCount,
 		"reload popup also printed a redundant chat reminder")
 	local dialog = popups[#popups]
-	assert(dialog.fontStrings[2].text:find("In order for MSBT to start", 1, true))
+	assert(dialog.fontStrings[2].text == MikSBT.translations.SETUP_RELOAD_PROMPT)
 	local reloadButton, cancelButton = dialog.children[1], dialog.children[2]
 	assert(reloadButton.text == RELOADUI and cancelButton.text == CANCEL)
 	assert(dialog:IsVisible())

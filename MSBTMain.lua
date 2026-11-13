@@ -57,7 +57,8 @@ local function NotifyCombatSetup()
 	local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	text:SetPoint("TOP", 0, -52)
 	text:SetWidth(332)
-	text:SetText("In order for MSBT to start, you need to reload your UI.")
+	text:SetText(L.SETUP_RELOAD_PROMPT
+		or "In order for MSBT to start, you need to reload your UI.")
 
 	local reloadButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate, SecureActionButtonTemplate")
 	reloadButton:SetSize(140, 26)

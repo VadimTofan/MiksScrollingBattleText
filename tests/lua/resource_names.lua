@@ -525,5 +525,24 @@ UnitPower = nil
 ns.StartReader()
 assert(not ns.reader.frame.events.UNIT_POWER_UPDATE)
 ns.StopReader()
+-- Given localized resource labels, combo names, and the finisher alert.
+MikSBT.translations = {
+	RESOURCE_NAMES = { MANA = "法力", LUNAR_POWER = "星界能量" },
+	COMBO_POINT = "连击点", COMBO_POINTS = "连击点", CP_FULL = "终结他！",
+}
+UnitClass = nil
+profile.resourceExclusions = {}
+-- When readable and hidden resource tokens and combo totals arrive.
+presentation:Resource(8, "MANA")
+assert(displayed[#displayed].name == "法力")
+presentation:Resource(amount, Secret("LUNAR_POWER"))
+assert(Read(displayed[#displayed].name) == "星界能量")
+presentation:ComboPoints(1, 5)
+assert(displayed[#displayed].name == "连击点")
+presentation:ComboPoints(Secret(4), Secret(5))
+assert(Read(displayed[#displayed - 1].name) == "连击点")
+presentation:ComboPoints(5, 5)
+-- Then both paths use translated text without reading the hidden values.
+assert(displayed[#displayed].message == "终结他！")
 string.format = format
 print("Resource token label tests passed")

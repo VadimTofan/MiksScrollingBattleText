@@ -1,3 +1,45 @@
+# Recent feature localization installed in Forever
+
+Updated: 2026-11-13
+
+The user requested translations for recent features that were English-only.
+Added explicit translations in all seven existing non-English locales:
+deDE, frFR, itIT, koKR, ruRU, zhCN, and zhTW. English defaults remain available.
+
+Covered recent General controls, Sounds and warning-sound help, profile
+import/export and errors, custom aura rules and all-ranks help, resource
+configuration and 30 resource labels, combo-point names and the full-points
+alert, new notification/self-heal/kill labels, language/reset help, Cosmic,
+and the initial reload prompt. The low-health/mana sound help now says
+10 seconds, matching the existing cooldown behavior.
+
+Resource labels now consult localized text for readable and hidden tokens;
+native string matching still compares the original resource token. Combo
+totals use translated singular/plural labels. The language and reset tabs
+use translation keys; language names are shown in their native spelling.
+Saved profile names, resource tokens, commands, and user templates are unchanged.
+
+Verification: new coverage first failed on missing combo defaults and then
+missing locale overrides. The hidden-resource translation assertion and the
+Cosmic coverage assertion also failed before their fixes. A sentinel-based
+test loads the real locale files, detects silent fallback for recent strings,
+and verifies format-token counts in every supported non-English locale.
+Runtime regressions verify Chinese setup text, tab headers/help, resource
+checkboxes, hidden resource labels, combo totals, and the full-points alert.
+
+Final suite: 152 tests ran, 151 passed, one archive check skipped. All 20
+changed installed Lua files match source and compile with Lua 5.1. Ten
+installed regression scripts passed, including seven-locale coverage.
+Backups: `D:/Codex-Temp/msbt-localization-20261113/backup`.
+Existing manifests and temporary diagnostics were preserved.
+
+Translations were authored in this change; native-speaker wording and live
+layout review have not been performed. Older unrelated untranslated strings
+were not included in this pass. No push or release was requested.
+
+Next: `/reload` and inspect the recent controls on the desired game locale.
+The separate Summon Hawk source-attribution limitation below remains unresolved.
+
 # Hunter report fixes installed in Forever
 
 Updated: 2026-11-13

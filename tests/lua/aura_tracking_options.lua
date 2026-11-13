@@ -384,3 +384,23 @@ MikSBT.Profiles.SetOption = setOption
 -- When another notification is configured, then the resource panel is omitted.
 combatRow.settingsButton:click()
 assert(not eventPopup.showResources)
+
+-- Given translated help text and the Chinese game locale.
+local language = tabs[MikSBT.translations.TABS.language.label]
+local reset = tabs[MikSBT.translations.TABS.resetBlizzardSCT.label]
+local L = MikSBT.translations
+L.TABS.language.label = "语言"
+L.TABS.resetBlizzardSCT.label = "重置暴雪战斗文字"
+L.LANGUAGE_CURRENT = "当前语言：%s（%s）"
+L.LANGUAGE_INFO = "MSBT 使用游戏语言。"
+L.RESET_BLIZZARD_INFO = "恢复暴雪战斗文字。"
+GetLocale = function() return "zhCN" end
+-- When both help tabs are opened for the first time.
+language.scripts.OnShow()
+reset.scripts.OnShow()
+-- Then actual controls render localized headers, language names, and help.
+assert(language.headerFontString.text == "语言")
+assert(language.currentLocaleFontString.text == "当前语言：简体中文（zhCN）")
+assert(language.languageInfoFontString.text == L.LANGUAGE_INFO)
+assert(reset.headerFontString.text == "重置暴雪战斗文字")
+assert(reset.bodyFontString.text == L.RESET_BLIZZARD_INFO)

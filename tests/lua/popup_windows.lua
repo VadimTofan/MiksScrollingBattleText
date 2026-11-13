@@ -433,6 +433,8 @@ MSBTOptions.Sounds = {
 	end,
 }
 -- Given a resource configuration with mana excluded.
+MikSBT.translations.RESOURCE_NAMES = { MANA = "法力" }
+MikSBT.translations.RESOURCE_COMBO_POINT = "连击点"
 config = Config()
 config.title, config.message = "Resource Gains", "%a - %p"
 config.scrollArea = "Incoming"
@@ -456,7 +458,8 @@ end
 assert(count == 30, "some resource types are missing")
 assert(not resourcePopup.resourceCheckboxes.MANA.checked)
 assert(resourcePopup.resourceCheckboxes.COMBO_POINTS.checked)
-assert(resourcePopup.resourceCheckboxes.COMBO_POINTS.label == "Combo Point")
+assert(resourcePopup.resourceCheckboxes.COMBO_POINTS.label == "连击点")
+assert(resourcePopup.resourceCheckboxes.MANA.label == "法力")
 assert(resourcePopup.resourceContent:GetHeight()
 	> resourcePopup:GetHeight(), "resource list cannot reach its last row")
 resourcePopup.resourceCheckboxes.ENERGY.clickHandler(

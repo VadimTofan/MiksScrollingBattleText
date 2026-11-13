@@ -146,9 +146,21 @@ local function ResourceLabelFragment(gate, label)
 	return NativeResourceValue(C_StringUtil.StripHyperlinks(link), "string")
 end
 
+local function TranslatedResource(token, fallback)
+	local translations = MikSBT.translations
+	local names = translations and translations.RESOURCE_NAMES
+	return names and names[token] or fallback
+end
+
+local function ComboLabel(one)
+	local translations = MikSBT.translations or {}
+	if one then return translations.COMBO_POINT or "Combo Point" end
+	return translations.COMBO_POINTS or "Combo Points"
+end
+
 local function ResourceLabel(token)
 	if not RestrictedValue:IsRestricted(token) then
-		return RESOURCE_LABELS[token] or token
+		return TranslatedResource(token, RESOURCE_LABELS[token] or token)
 	end
 	if not C_Intl or not C_StringUtil or not C_CurveUtil
 		or not Enum or not Enum.CollationStrength or not Enum.NormalizationForm
@@ -164,6 +176,7 @@ local function ResourceLabel(token)
 	local ok, label = pcall(function()
 		local output, unmatched = "", 1
 		for candidate, text in pairs(RESOURCE_LABELS) do
+			text = TranslatedResource(candidate, text)
 			local comparison = NativeResourceValue(C_Intl.CompareStrings(
 				token, candidate, Enum.CollationStrength.Identical), "number")
 			local difference = NativeResourceValue(
@@ -281,8 +294,8 @@ local function ComboPointDisplay(count, maximum)
 		normal = { visible = NativeCountMatches(normal, 1) },
 		full = { visible = NativeCountMatches(ready, 1) },
 		label = string.format("%s%s",
-			ResourceLabelFragment(SelectComboValue(one, 1, 0), "Combo Point"),
-			ResourceLabelFragment(SelectComboValue(one, 0, 1), "Combo Points")),
+			ResourceLabelFragment(SelectComboValue(one, 1, 0), ComboLabel(true)),
+			ResourceLabelFragment(SelectComboValue(one, 0, 1), ComboLabel(false))),
 	}
 end
 
@@ -317,7 +330,7 @@ function Presentation:ComboPoints(count, maximum)
 		if count == maximum then
 			self.config.display(FinishSettings(settings), finish)
 		else
-			local name = count == 1 and "Combo Point" or "Combo Points"
+			local name = ComboLabel(count == 1)
 			self.config.displayResource(settings, count, name)
 		end
 		return
