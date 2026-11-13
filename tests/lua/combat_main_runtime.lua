@@ -20,12 +20,17 @@ StaticPopup_Show = function()
 	error("reload prompt used Blizzard's shared popup frames")
 end
 ReloadUI = function() reloads = reloads + 1 end
+local clickOnKeyDown = false
+GetCVarBool = function() return clickOnKeyDown end
 CreateFrame = function(kind, name, parent, template)
 	local frame = createFrame(kind, name, parent, template)
 	frame.children, frame.fontStrings = {}, {}
+	frame.template, frame.attributes = template, {}
 	if parent and parent.children then
 		parent.children[#parent.children + 1] = frame
 	end
+	function frame:SetAttribute(name, value) self.attributes[name] = value end
+	function frame:RegisterForClicks(...) self.clicks = { ... } end
 	function frame:SetSize() end
 	function frame:SetPoint() end
 	function frame:EnableMouse() end
@@ -126,6 +131,7 @@ end
 
 for _, forever in ipairs({ false, true }) do
 	swingEventsSupported = forever
+	clickOnKeyDown = forever
 	MikSBT.Profiles.currentProfile.damageColoringDisabled = true
 	-- Isolate each client's fixture from palette edits in the previous run.
 	for _, key in pairs(MikSBT.Main.damageColorProfileEntries) do
@@ -158,7 +164,7 @@ for _, forever in ipairs({ false, true }) do
 	local reloadButton, cancelButton = dialog.children[1], dialog.children[2]
 	assert(reloadButton.text == RELOADUI and cancelButton.text == CANCEL)
 	assert(dialog:IsVisible())
-	assert(reloads == (forever and 1 or 0), "setup reloaded automatically")
+	assert(reloads == 0, "setup reloaded automatically")
 
 	-- Given Cancel on MSBT's own window.
 	-- When setup is checked again, then it stays dismissed without reloading.
@@ -168,12 +174,20 @@ for _, forever in ipairs({ false, true }) do
 	main.Disable()
 	main.Enable()
 	assert(#popups == popupCount + 1, "cancelled popup reopened")
-	assert(reloads == (forever and 1 or 0))
+	assert(reloads == 0)
 
-	-- When Reload UI is accepted, then it invokes the game's reload action.
-	reloadButton.scripts.OnClick(reloadButton)
-	assert(not dialog:IsVisible())
-	assert(reloads == (forever and 2 or 1))
+	-- Given ReloadUI is protected, so an addon's own click handler cannot call it.
+	-- Then Reload UI is a secure action button that runs the game's own /reload.
+	assert(reloadButton.scripts.OnClick == nil,
+		"reload button kept an insecure OnClick handler")
+	assert(reloadButton.template:find("SecureActionButtonTemplate", 1, true),
+		"reload button is not a secure action button")
+	assert(reloadButton.attributes.type == "macro"
+		and reloadButton.attributes.macrotext == "/reload",
+		"reload button does not run /reload as a secure macro")
+	assert(reloadButton.clicks[1] == (forever and "LeftButtonDown" or "LeftButtonUp"),
+		"reload button ignores the ActionButtonUseKeyDown setting")
+	assert(reloads == 0, "setup called ReloadUI from insecure code")
 	inCombat = true
 	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 123)
 	Dispatch("UNIT_COMBAT", "target", "WOUND", "", 999, 4)
@@ -188,12 +202,21 @@ for _, forever in ipairs({ false, true }) do
 	-- Then an activated filter needs no further setup popup.
 	assert(#popups == popupCount + 1)
 
-	-- Given an already visible setup prompt while saved filters finish loading.
+	-- Given an already visible setup prompt while saved filters finish loading
+	-- in combat, where its secure child makes the window a protected frame.
 	dialog:Show()
-	-- When maintenance sees the now-valid filter.
+	-- When Cancel is clicked and maintenance sees the now-valid filter.
+	cancelButton.scripts.OnClick(cancelButton)
+	assert(dialog:IsVisible(), "cancel hid a protected window in combat")
+	Dispatch("ADDON_LOADED", "Blizzard_CombatLog")
+	-- Then the window waits for combat to end instead of a blocked Hide().
+	assert(dialog:IsVisible(), "maintenance hid a protected window in combat")
+	-- When combat ends and maintenance runs again.
+	inCombat = false
 	Dispatch("ADDON_LOADED", "Blizzard_CombatLog")
 	-- Then the stale prompt closes instead of requesting another reload.
 	assert(not dialog:IsVisible(), "ready filter left a stale reload popup visible")
+	inCombat = true
 	Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 123)
 	Dispatch("PLAYER_REGEN_DISABLED")
 	Dispatch("UNIT_COMBAT", "target", "WOUND", "", 42, 4)
