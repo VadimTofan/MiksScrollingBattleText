@@ -4,6 +4,13 @@ dofile("tests/lua/notification_runtime.lua")
 MikSBT.Configuration = MikSBT.Configuration or {}
 dofile("Configuration/ResourcePolicy.lua")
 
+local spellNames = {}
+local originalSpellInfo = MikSBT.GetSpellInfo
+MikSBT.GetSpellInfo = function(id)
+	if spellNames[id] then return spellNames[id], nil, "localized-icon" end
+	return originalSpellInfo(id)
+end
+
 local createFrame = CreateFrame
 local frames, timers, displayed = {}, {}, {}
 local popups, reloads = {}, 0
@@ -391,7 +398,7 @@ for _, forever in ipairs({ false, true }) do
 		assert(#displayed == beforeStackedBurst + 2,
 			"stacking did not combine the restricted Windfury burst")
 		local stacked = displayed[#displayed]
-		assert(stacked[2] == "%s + %s [2 hits]",
+		assert(stacked[2] == "Hit %s + %s [2 hits]",
 			"restricted Windfury group lost its native format placeholders")
 		assert(stacked[3] == windfuryIcon)
 		assert(stacked[4] == firstProc and stacked[5] == delayedProc,
@@ -659,6 +666,7 @@ for _, forever in ipairs({ false, true }) do
 		local savedStacking = profile.stackSimilarHits
 		local keys = { "OUTGOING_SPELL_DAMAGE", "OUTGOING_SPELL_DAMAGE_CRIT",
 			"OUTGOING_SPELL_DOT", "PET_OUTGOING_SPELL_DAMAGE",
+			"PET_OUTGOING_SPELL_DOT",
 			"PET_OUTGOING_SPELL_DAMAGE_CRIT", "OUTGOING_DAMAGE",
 			"OUTGOING_DAMAGE_CRIT", "PET_OUTGOING_DAMAGE",
 			"PET_OUTGOING_DAMAGE_CRIT" }
@@ -769,8 +777,51 @@ for _, forever in ipairs({ false, true }) do
 		Out(opaque, 16)
 		local hidden = displayed[#displayed]
 		-- Then color surrounds its placeholder and the original amount survives.
-		assert(hidden[2] == "Hit |cFF0000ff%s|r" and hidden[4] == opaque,
+		assert(hidden[2] == "Hit |cFF0000ff%s|r (Spell 123)"
+			and hidden[4] == opaque,
 			"school coloring inspected or lost restricted damage")
+
+		-- Given a Chinese spell name and templates with each skill token.
+		spellNames[90002] = "毒蛇钉刺"
+		for _, token in ipairs({ "%s", "%sl", "%e" }) do
+			events.OUTGOING_SPELL_DAMAGE.message = "100% " .. token .. ": %a"
+			-- When a hidden amount is rendered beside readable spell metadata.
+			Out(opaque, 16, { who = "you", spell = 90002 })
+			-- Then its localized name and literal percent survive native formatting.
+			local hit = displayed[#displayed]
+			assert(hit[2] == "100%% 毒蛇钉刺: |cFF0000ff%s|r")
+			assert(hit[4] == opaque)
+		end
+		spellNames[90002] = nil
+		events.OUTGOING_SPELL_DAMAGE.message = "Hit %a (%s)"
+
+		-- Given names are disabled for hidden damage.
+		profile.hideSkills = true
+		-- When a known spell deals damage.
+		Out(opaque, 16)
+		-- Then the original checkbox still hides the name and empty parentheses.
+		assert(displayed[#displayed][2] == "Hit |cFF0000ff%s|r")
+		profile.hideSkills = false
+
+		-- Given identified pet abilities and periodic damage with hidden amounts.
+		for _, result in ipairs({
+			{ who = "pet", spell = 123 },
+			{ who = "pet", spell = 123, tick = true },
+			{ who = "you", spell = 123, tick = true },
+		}) do
+			-- When each reaches its configured outgoing event.
+			Out(opaque, 16, result)
+			-- Then the spell name survives beside the original opaque amount.
+			local hit = displayed[#displayed]
+			assert(hit[2] == "Hit |cFF0000ff%s|r (Spell 123)")
+			assert(hit[4] == opaque)
+		end
+
+		-- Given an unidentified spell whose template normally has a skill name.
+		-- When confirmed but ambiguous damage arrives.
+		Out(opaque, 16, { who = "you", ambiguous = true })
+		-- Then no name is invented and no skill token is left in the output.
+		assert(displayed[#displayed][2] == "Hit |cFF0000ff%s|r")
 		-- When only the school is hidden, then no school color is guessed.
 		Out(42, opaque)
 		Advance(0.31)
@@ -814,14 +865,15 @@ for _, forever in ipairs({ false, true }) do
 		local group = displayed[#displayed]
 		assert(#displayed == beforeHiddenGroup + 1)
 		assert(group[2]
-			== "|cFFff00ff%s|r + |cFFff00ff%s|r [2 hits]",
+			== "Hit |cFFff00ff%s|r + |cFFff00ff%s|r (Spell 8232) [2 hits]",
 			"restricted group lost per-number school coloring")
 		assert(group[4] == opaque and group[5] == opaque,
 			"restricted group changed its damage values")
 		profile.damageColoringDisabled = true
 		events.OUTGOING_SPELL_DAMAGE.message = "100% Hit %a (%s)"
 		Out(opaque, 16)
-		assert(displayed[#displayed][2] == "100%% Hit |cFF0000ff%s|r",
+		assert(displayed[#displayed][2]
+			== "100%% Hit |cFF0000ff%s|r (Spell 123)",
 			"baseline hidden coloring or literal percent escaping changed")
 		profile.damageColoringDisabled = false
 		issecretvalue, BreakUpLargeNumbers = secretCheck, largeNumbers

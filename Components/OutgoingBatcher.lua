@@ -126,10 +126,10 @@ function OutgoingBatcher:Flush(batchKey)
 	if batch.hasRestricted then
 		if batch.hitCount == 1 then
 			self.config.displayRestricted(displaySettings, batch.amounts[1],
-				batch.effectTexture, "%a", nil, school)
+				batch.effectTexture, nil, nil, school, batch.spellID)
 		else
 			self.config.displayRestrictedGroup(displaySettings, batch.amounts,
-				batch.effectTexture, school)
+				batch.effectTexture, school, batch.spellID)
 		end
 		return
 	end
@@ -167,9 +167,9 @@ function OutgoingBatcher:DisplayRestricted(
 	end
 	settings = self:DamageSettings(settings, isSpell, isDot, school)
 	if settings.attackColorOverride then school = nil end
-	local message = not eventKey and not isPet and "%a" or nil
+	local message = not eventKey and not isPet and not isSpell and "%a" or nil
 	self.config.displayRestricted(settings, amount, effectTexture,
-		message, nil, school)
+		message, nil, school, spellID)
 end
 
 function OutgoingBatcher:Queue(

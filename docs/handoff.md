@@ -1,3 +1,23 @@
+# Hunter report: restricted damage skill names fixed
+
+Updated: 2026-11-13
+
+Outgoing restricted damage now carries its readable spell ID to MSBT's native
+amount renderer. Public spell metadata is formatted before template cleanup,
+so enabled names survive beside the hidden amount. Grouped Windfury messages
+also retain their configured template and spell name. Skill-name visibility,
+school colors, and native amount arguments are preserved; unidentified damage
+does not receive an invented name.
+
+The new real-runtime assertion failed before implementation. Regressions cover
+Chinese names, %s/%sl/%e, literal percent signs, the names checkbox, pet skills,
+DoTs, unknown spells, and restricted grouped damage on Retail and Forever.
+Full suite: 150 tests ran, 149 passed, one archive check skipped.
+
+Next: address readable Chinese spell-school facts and helpfulness checks, then
+install the combined changes in Forever. Summon-versus-pet identity still needs
+live evidence; this checkpoint does not attempt to infer that source.
+
 # Chinese hunter report investigation
 
 Updated: 2026-11-13

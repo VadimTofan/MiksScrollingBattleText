@@ -546,14 +546,29 @@ local function CleanupActionMessage(message)
 	return message
 end
 
+local function RestrictedActionMessage(eventSettings, message, school, spellID)
+	message = message or eventSettings.message or "%a"
+	local publicSpellID = RestrictedValue:Number(spellID)
+	if publicSpellID then
+		local spellName = not IsAutoAttackSpellID(publicSpellID)
+			and RestrictedValue:String(GetSpellInfo(publicSpellID)) or nil
+		-- Format readable metadata without sending the hidden amount into Lua.
+		message = Formatter:FormatLegacyEvent(
+			message, nil, school, nil, nil, nil, nil, nil, spellName,
+			nil, nil, nil, MSBTProfiles.currentProfile.hideSkills
+		)
+	end
+	return CleanupActionMessage(message)
+end
+
 local function DisplayRestrictedAmount(
-	eventSettings, amount, texturePath, message, suffix, school
+	eventSettings, amount, texturePath, message, suffix, school, spellID
 )
 	if not eventSettings or eventSettings.disabled then
 		return
 	end
 	local template = Formatter:BuildRestrictedTemplate(
-		CleanupActionMessage(message or eventSettings.message or "%a"),
+		RestrictedActionMessage(eventSettings, message, school, spellID),
 		suffix,
 		school
 	)
@@ -566,7 +581,9 @@ local function DisplayRestrictedAmount(
 	)
 end
 
-local function DisplayRestrictedGroup(eventSettings, amounts, texturePath, school)
+local function DisplayRestrictedGroup(
+	eventSettings, amounts, texturePath, school, spellID
+)
 	if not eventSettings or eventSettings.disabled then return end
 	local formattedAmounts, placeholders = {}, {}
 	for index = 1, #amounts do
@@ -575,8 +592,12 @@ local function DisplayRestrictedGroup(eventSettings, amounts, texturePath, schoo
 		)
 		placeholders[index] = Formatter:ColorDamageAmount("%s", school)
 	end
-	local message = table.concat(placeholders, " + ")
-		.. string.format(" [%d %s]", #amounts, L.MSG_HITS or "Hits")
+	local message = (eventSettings.message or "%a"):gsub("%%a", "\001", 1)
+		:gsub("%%a", "")
+	message = RestrictedActionMessage(eventSettings, message, school, spellID)
+	message = message:gsub("%%", "%%%%"):gsub("\001", function()
+		return table.concat(placeholders, " + ")
+	end) .. string.format(" [%d %s]", #amounts, L.MSG_HITS or "Hits")
 	DisplayEvent(eventSettings, message, texturePath, nil,
 		unpack(formattedAmounts, 1, #amounts))
 end
