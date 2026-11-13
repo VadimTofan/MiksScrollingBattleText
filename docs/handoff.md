@@ -1,3 +1,47 @@
+# Chinese hunter report investigation
+
+Updated: 2026-11-13
+
+User requested investigation of missing skill names, Summon Hawk attacks
+shown as permanent-pet melee, and Serpent Sting ticks using another icon.
+Gallery: https://postimg.cc/gallery/3d7MmLn. All four screenshots were inspected;
+they show v12.051 and the Simplified Chinese (zhCN) client. The relevant code
+paths remain present on current main after PR #52.
+
+Findings and evidence:
+1. Confirmed: MSBTMain.lua DisplayRestrictedAmount calls CleanupActionMessage,
+   which removes skill placeholders before they can be replaced. A disposable
+   assertion in the real combat_main_runtime fixture fails because a known
+   spell's name disappears despite hideSkills=false. Misses take a separate
+   presentation path, explaining why their names can appear.
+2. Summon Hawk is a temporary summon, not the hunter's Auto Shot. The tracker
+   has no separate guardian identity; unmatched physical swings with a pet
+   present can return who=pet with melee=true. Presentation then uses the
+   permanent pet's family icon. A synthetic summon dive followed by a swing
+   reproduces that fallback. This confirms the model gap; the screenshots
+   alone cannot establish which live swing belonged to which creature.
+3. Confirmed localization gap: Combat/Spells.lua SpellFacts returns before
+   querying any facts on non-English clients, including the locale-independent
+   helpfulness API. English can reject a physical Hawk spell as the source of
+   Nature damage; zhCN lacks that constraint. A synthetic Nature tick following
+   a Hawk cast is rejected on enUS but receives the Hawk spell ID on zhCN.
+   This reproduces a cause consistent with the wrong-icon report; the exact
+   screenshot event sequence has not been captured in game.
+
+Disposable reproductions and downloaded screenshots:
+`D:/Codex-Temp/msbt-chinese-hunter-report-20261113`.
+The reproduction uses synthetic spell IDs and is not a live combat recording.
+No production code or installed client files were changed during investigation.
+
+Next: fix public spell-name substitution around restricted damage first, with
+hideSkills and localized-name regressions. Then address non-English spell
+facts and investigate reliable summon attribution without inventing a source
+when the available event evidence cannot distinguish it.
+
+Primary reference for Summon Hawk's initial hit, temporary summon duration,
+and support for two active hawks:
+https://news.blizzard.com/en-us/article/24301515/world-of-warcraft-forever-class-deep-dives-hunter-and-druid
+
 # Release v12.052 published
 
 Updated: 2026-11-13
