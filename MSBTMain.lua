@@ -26,7 +26,7 @@ local reloadPromptShown = false
 local reloadPromptFrame
 
 local function HideCombatSetup()
-	if reloadPromptFrame then reloadPromptFrame:Hide() end
+	if reloadPromptFrame and not InCombatLockdown() then reloadPromptFrame:Hide() end
 end
 
 local function NotifyCombatSetup()
@@ -59,19 +59,18 @@ local function NotifyCombatSetup()
 	text:SetWidth(332)
 	text:SetText("In order for MSBT to start, you need to reload your UI.")
 
-	local reloadButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	local reloadButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate, SecureActionButtonTemplate")
 	reloadButton:SetSize(140, 26)
 	reloadButton:SetPoint("BOTTOM", -76, 20)
 	reloadButton:SetText(RELOADUI)
-	reloadButton:SetScript("OnClick", function()
-		frame:Hide()
-		ReloadUI()
-	end)
+	reloadButton:SetAttribute("type", "macro")
+	reloadButton:SetAttribute("macrotext", "/reload")
+	reloadButton:RegisterForClicks(GetCVarBool("ActionButtonUseKeyDown") and "LeftButtonDown" or "LeftButtonUp")
 	local cancelButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
 	cancelButton:SetSize(140, 26)
 	cancelButton:SetPoint("BOTTOM", 76, 20)
 	cancelButton:SetText(CANCEL)
-	cancelButton:SetScript("OnClick", function() frame:Hide() end)
+	cancelButton:SetScript("OnClick", HideCombatSetup)
 	frame:Show()
 end
 
