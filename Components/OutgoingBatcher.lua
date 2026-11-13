@@ -23,14 +23,16 @@ end
 
 function OutgoingBatcher:BuildMessage(amount, hitCount, batch, settings)
 	local profile = self.config.getProfile()
+	local school = batch and batch.school
+	if settings.attackColorOverride then school = nil end
 	local formattedAmount
 	if batch and (batch.isPet or batch.eventKey) then
 		formattedAmount = self.config.formatEventMessage(
-			settings, amount, batch.spellID, batch.school
+			settings, amount, batch.spellID, school
 		)
 	else
 		formattedAmount = self.config.formatAmount(
-			amount, profile, batch and batch.school
+			amount, profile, school
 		)
 	end
 	if not profile.stackSimilarHits then
@@ -43,6 +45,15 @@ function OutgoingBatcher:BuildMessage(amount, hitCount, batch, settings)
 	local translations = MikSBT.translations
 	return string.format("%s [%d %s]", formattedAmount, hitCount,
 		translations and translations.MSG_HITS or "Hits")
+end
+
+function OutgoingBatcher:DamageSettings(settings, isSpell, isDot, school)
+	if isDot or (isSpell and school ~= 1) then return settings end
+	-- Use attack colors without changing the user's saved event settings.
+	return setmetatable({
+		colorR = 1, colorG = 1, colorB = isSpell and 0 or 1,
+		attackColorOverride = true,
+	}, { __index = settings })
 end
 
 -- Finds the event settings to use.
@@ -108,13 +119,17 @@ function OutgoingBatcher:Flush(batchKey)
 	if not displaySettings then
 		return
 	end
+	displaySettings = self:DamageSettings(displaySettings,
+		batch.isSpell, batch.isDot, batch.school)
+	local school = batch.school
+	if displaySettings.attackColorOverride then school = nil end
 	if batch.hasRestricted then
 		if batch.hitCount == 1 then
 			self.config.displayRestricted(displaySettings, batch.amounts[1],
-				batch.effectTexture, "%a", nil, batch.school)
+				batch.effectTexture, "%a", nil, school)
 		else
 			self.config.displayRestrictedGroup(displaySettings, batch.amounts,
-				batch.effectTexture, batch.school)
+				batch.effectTexture, school)
 		end
 		return
 	end
@@ -150,6 +165,8 @@ function OutgoingBatcher:DisplayRestricted(
 	if not settings then
 		return
 	end
+	settings = self:DamageSettings(settings, isSpell, isDot, school)
+	if settings.attackColorOverride then school = nil end
 	local message = not eventKey and not isPet and "%a" or nil
 	self.config.displayRestricted(settings, amount, effectTexture,
 		message, nil, school)

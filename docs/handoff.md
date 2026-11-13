@@ -1,3 +1,26 @@
+# Outgoing melee attack colors
+
+Updated: 2026-11-13
+
+Outgoing melee swings now display in white; direct physical abilities display
+in yellow. This applies to player/pet hits, crits, readable and restricted
+amounts, and grouped hits. Magic-school damage, periodic damage, and incoming
+damage retain their existing styling.
+
+`Components/OutgoingBatcher.lua` derives temporary event settings for these
+attacks and suppresses the physical-school amount markup that would otherwise
+override their color. Saved profile settings remain unchanged.
+
+Verification: the new runtime regression failed on the old attack colors
+before implementation. The full suite ran 150 tests: 149 passed, one archive
+check skipped. Seven installed Forever regression scripts passed, including
+the real Retail/Forever runtime with normal/critical, player/pet, grouped,
+and restricted attack-color assertions. The installed batcher matches source.
+Backup: `D:/Codex-Temp/msbt-melee-colors-20261113`.
+
+Next: `/reload` in Forever and compare an auto-attack with a physical ability.
+The separate resource-source investigation below still needs a live capture.
+
 # Resource source investigation (live capture pending)
 
 Updated: 2026-11-13

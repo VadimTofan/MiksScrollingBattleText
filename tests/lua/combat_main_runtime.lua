@@ -250,7 +250,9 @@ for _, forever in ipairs({ false, true }) do
 			assert(#displayed == beforeStrike + 1,
 				"queued strike produced missing or duplicate damage text")
 			local hit = displayed[#displayed]
-			assert(hit[1] == events.OUTGOING_SPELL_DAMAGE)
+			assert(hit[1].message == events.OUTGOING_SPELL_DAMAGE.message)
+			assert(hit[1].colorR == 1 and hit[1].colorG == 1
+				and hit[1].colorB == 0)
 			assert(hit[2] == "Hit %s" and hit[3] == "icon")
 			assert(hit[4] == opaqueDamage,
 				"queued strike's zero report reached the final renderer")
@@ -296,13 +298,16 @@ for _, forever in ipairs({ false, true }) do
 		assert(#displayed == beforeBurst + 3,
 			"the delayed Windfury hit did not reach the real display pipeline")
 		assert(displayed[beforeBurst + 1][4] == firstProc)
-		assert(displayed[beforeBurst + 1][1] == events.OUTGOING_SPELL_DAMAGE)
+		assert(getmetatable(displayed[beforeBurst + 1][1]).__index
+			== events.OUTGOING_SPELL_DAMAGE)
 		assert(displayed[beforeBurst + 1][3] == windfuryIcon,
 			"an early shaman proc did not receive Windfury's icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
-		assert(displayed[beforeBurst + 2][1] == events.OUTGOING_DAMAGE)
+		assert(getmetatable(displayed[beforeBurst + 2][1]).__index
+			== events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
-		assert(displayed[beforeBurst + 3][1] == events.OUTGOING_SPELL_DAMAGE)
+		assert(getmetatable(displayed[beforeBurst + 3][1]).__index
+			== events.OUTGOING_SPELL_DAMAGE)
 		assert(displayed[beforeBurst + 3][3] == windfuryIcon,
 			"a delayed shaman proc did not receive Windfury's icon")
 
@@ -630,7 +635,10 @@ for _, forever in ipairs({ false, true }) do
 		local savedFrost, savedShadow = profile.frost, profile.shadow
 		local savedStacking = profile.stackSimilarHits
 		local keys = { "OUTGOING_SPELL_DAMAGE", "OUTGOING_SPELL_DAMAGE_CRIT",
-			"OUTGOING_SPELL_DOT", "PET_OUTGOING_SPELL_DAMAGE" }
+			"OUTGOING_SPELL_DOT", "PET_OUTGOING_SPELL_DAMAGE",
+			"PET_OUTGOING_SPELL_DAMAGE_CRIT", "OUTGOING_DAMAGE",
+			"OUTGOING_DAMAGE_CRIT", "PET_OUTGOING_DAMAGE",
+			"PET_OUTGOING_DAMAGE_CRIT" }
 		local savedEvents = {}
 		for _, key in ipairs(keys) do
 			savedEvents[key] = events[key]
@@ -676,11 +684,64 @@ for _, forever in ipairs({ false, true }) do
 		end
 		profile.damageColoringDisabled, profile.frost.disabled = false, false
 
+		-- Given outgoing swings and physical abilities with custom event colors.
+		local savedMelee = events.OUTGOING_DAMAGE
+		events.OUTGOING_DAMAGE = { message = "Swing %a", scrollArea = "Outgoing",
+			colorR = 0.2, colorG = 0.3, colorB = 0.4 }
+		-- When normal and critical hits reach the real batcher.
+		for _, crit in ipairs({ false, true }) do
+			for _, case in ipairs({
+				{ result = { who = "you", melee = true }, blue = 1 },
+				{ result = { who = "you", spell = 123 }, blue = 0 },
+				{ result = { who = "pet", melee = true }, blue = 1 },
+				{ result = { who = "pet", spell = 123 }, blue = 0 },
+			}) do
+				local beforeAttack = #displayed
+				Out(42, 1, case.result, crit)
+				Advance(0.31)
+				-- Then the display color is white/yellow without a school override.
+				assert(#displayed == beforeAttack + 1)
+				local rendered = displayed[#displayed]
+				assert(rendered[1].colorR == 1 and rendered[1].colorG == 1
+					and rendered[1].colorB == case.blue,
+					"incorrect attack color: " .. case.result.who .. " melee="
+						.. tostring(case.result.melee) .. " crit=" .. tostring(crit))
+				assert(not rendered[2]:find("|c", 1, true),
+					"physical school markup overrode the melee attack color")
+			end
+		end
+		assert(events.OUTGOING_DAMAGE.colorR == 0.2,
+			"melee coloring mutated saved event settings")
+		-- Given grouping is enabled for repeated physical ability hits.
+		profile.stackSimilarHits = true
+		-- When two hits are combined in one batching window.
+		Out(42, 1)
+		Out(43, 1)
+		Advance(0.31)
+		-- Then their grouped total remains yellow with an unchanged count.
+		assert(displayed[#displayed][1].colorB == 0)
+		assert(displayed[#displayed][2] == "Hit 85 (Spell 123) [2 hits]")
+		profile.stackSimilarHits = false
+		events.OUTGOING_DAMAGE = savedMelee
+
 		-- Given a damage amount or school which Lua must not inspect.
 		local opaque = {}
 		local secretCheck, largeNumbers = issecretvalue, BreakUpLargeNumbers
 		issecretvalue = function(value) return value == opaque end
 		BreakUpLargeNumbers = nil
+		-- Given hidden swing and physical ability amounts.
+		for _, case in ipairs({
+			{ result = { who = "you", melee = true }, blue = 1 },
+			{ result = { who = "you", spell = 123 }, blue = 0 },
+		}) do
+			-- When each critical hit reaches native rendering.
+			Out(opaque, 1, case.result, true)
+			-- Then the original amount survives with the requested attack color.
+			local hit = displayed[#displayed]
+			assert(hit[4] == opaque and hit[1].colorR == 1
+				and hit[1].colorG == 1 and hit[1].colorB == case.blue)
+			assert(not hit[2]:find("|c", 1, true))
+		end
 		-- When the amount is hidden but Frost remains readable.
 		Out(opaque, 16)
 		local hidden = displayed[#displayed]
