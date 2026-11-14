@@ -4,6 +4,7 @@ Presentation.__index = Presentation
 local RestrictedValue = MikSBT.API.RestrictedValue
 local HEALER_PAIR_WINDOW = 0.2
 local GENERIC_SPELL_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local WINDFURY_ICON_SPELL_ID = 8232
 local MISS_TYPES = {
 	"MISS", "DODGE", "PARRY", "BLOCK", "RESIST", "EVADE",
 	"IMMUNE", "DEFLECT", "ABSORB", "REFLECT",
@@ -453,6 +454,12 @@ function Presentation:Out(record)
 	if result.ambiguous then
 		spell, icon = nil, GENERIC_SPELL_ICON
 	elseif not result.melee and not spell then
+		if not icon and record.event == "damage" and result.who == "you"
+			and not result.tick and result.procCandidate
+			and result.candidateSpell == WINDFURY_ICON_SPELL_ID then
+			-- Visual hint only: leave the damage spell ID and name unassigned.
+			icon = self.config.getSpellTexture(WINDFURY_ICON_SPELL_ID)
+		end
 		icon = icon or GENERIC_SPELL_ICON
 	end
 	if record.event == "damage" then

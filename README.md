@@ -66,8 +66,9 @@ so a spent cast cannot keep naming later damage. Confirmed damage remains
 visible when its spell identity is unknown.
 
 An active Windfury imbue can support matching delayed weapon-proc reports,
-but does not supply their spell name or icon. Unidentified procs use a generic
-icon. With Stack Similar Hits enabled, matching proc candidates within one
+but does not prove their spell identity. Windfury candidates use its icon as
+a visual hint without assigning a Windfury spell name. Other unidentified
+procs use a generic icon. With Stack Similar Hits enabled, candidates within one
 second can share a line without receiving a guessed Windfury label. Readable
 amounts show a total; restricted amounts keep separate values, such as
 `120 + 150 [2 Hits]`. Normal and critical hits stay separate.

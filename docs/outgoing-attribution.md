@@ -2,7 +2,8 @@
 
 MSBT separates whether a report belongs to the player or pet from which
 spell caused it. A confirmed hit can remain visible with no spell name and
-a generic icon. Reports with unresolved ownership stay hidden; they are
+a generic icon, or a Windfury candidate icon as a visual hint. Reports with
+unresolved ownership stay hidden; they are
 recorded as `unknown`, rather than being described as another player's hit.
 
 | Responsibility | Implementation |
@@ -55,8 +56,10 @@ including before the first log line. Unused direct confirmations following
 a melee swing or known physical ability can support delayed weapon-proc
 candidates. The existing bounded trigger and report windows still apply.
 An active imbue does not prove a proc's identity. Candidate metadata reaches
-grouping and diagnostics separately from the spell ID used for names/icons.
-Neither a candidate nor a guessed source supplies an authoritative proc name.
+grouping, diagnostics, and visual hints separately from the named spell ID.
+Windfury candidates can show its icon without acquiring its spell name.
+Known bleed icons, ambiguous results, and pet/periodic events keep their own
+icon rules. Neither a candidate nor a guessed source supplies a proc name.
 
 MSBT keeps its existing event settings, scrolling areas, sounds, critical
 styling, and pet routing. Candidate grouping preserves the one-second window

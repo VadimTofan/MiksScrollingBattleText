@@ -11,6 +11,7 @@
 - Kept confirmed damage visible when its spell is unknown. Active weapon
   effects no longer invent a Windfury or other proc name; unnamed candidates
   retain stacking, separate critical hits, and restricted damage values.
+  Windfury candidates keep its icon as a visual hint without a guessed name.
 - Updated Windfury diagnostics to distinguish candidate evidence, spell
   identity, unresolved ownership, and display dispatches. Magic-only and
   accounted ability sequences no longer cause false missing-hit pauses.
