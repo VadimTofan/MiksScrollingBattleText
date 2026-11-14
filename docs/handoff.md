@@ -1,3 +1,34 @@
+# PR #43 merged: restore names for hits in a single cast's frame
+
+Updated: 2026-11-14
+
+The user authorized approving validation and merging CornyMaster's PR #43.
+Reviewed head: `af8afca28645e3f96a7905a598e33d0f1dfb7543`.
+Approved Validate run `43177588176` after confirming its unchanged workflow
+uses contents:read, no secrets, and only runs tests. It passed before merge.
+A fresh local run of the reviewed head ran 143 tests: 142 passed and one
+release-archive check skipped.
+
+PR #43 merged remotely as `b0e863d5a2f9785961c63036546344835daf7809`.
+PR: https://github.com/VadimTofan/MiksScrollingBattleText/pull/43
+Author thank-you:
+https://github.com/VadimTofan/MiksScrollingBattleText/pull/43#issuecomment-6869624377
+
+A direct cast in the hit's frame receives a scoring lead over older casts.
+Two equally plausible spells in that frame remain ambiguous, and stronger
+readable damage evidence can still select an older spell. This implements
+the narrower alternative to #39; #39 remains open and should not be combined
+unchanged. The documented coincident-hit attribution limits remain; no live
+combat verification was performed here.
+
+Integrated origin/main into local main without rewriting or publishing the
+eight existing local commits. Combined suite: 154 tests ran, 153 passed,
+one release-archive check skipped. The local merge includes this handoff.
+No release or Forever installation sync was requested.
+
+Next: handle the remaining PR #39, #40, and #41 review findings when requested.
+The existing local hunter and localization changes remain unpublished.
+
 # PR #47 merged: profession skill gains use their own icons
 
 Updated: 2026-11-13
