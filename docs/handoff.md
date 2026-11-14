@@ -1,11 +1,16 @@
-# Remove the machine-specific PR #45 replay path
+# Portable artifact paths
 
 Updated: 2026-11-14
 
-Removed the absolute temporary replay path from the PR #45 review record.
-The verification result remains recorded without a local artifact dependency.
-Validation: confirmed the path is absent and checked diff whitespace.
-Next: no further changes are needed for this documentation correction.
+Artifact paths below use `${CODEX_OUTPUT_DIR}` for a user-supplied output
+root. This is a documentation convention, not an automatically supplied
+Codex variable or an addon setting. Use the output directory selected for
+the task; historical artifacts may no longer be available there.
+
+Replaced all 22 remaining machine-specific temporary paths while preserving
+artifact names and review results. The earlier PR #45 path was removed.
+Validation: repository path scan and diff whitespace checks passed.
+Next: use this convention for future artifact references.
 
 # PR #43 merged: restore names for hits in a single cast's frame
 
@@ -70,7 +75,7 @@ naming; #43 still needs CI approval. Extra replay checks found that #39
 clears ambiguity between two player spells when a pet cast shares the frame,
 #40 classifies a real offhand swing as pet damage, and #41 reuses aura timing
 across target switches. These findings have not been posted to GitHub.
-Review copies: `D:/Codex-Temp/msbt-remaining-prs-20261113`.
+Review copies: `${CODEX_OUTPUT_DIR}/msbt-remaining-prs-20261113`.
 
 Next: approve and run #43's reviewed validation before considering its merge.
 Local hunter and localization changes remain unpublished; no release or
@@ -131,7 +136,7 @@ Review verification: the PR head ran 144 tests, 143 passed and one archive
 check skipped. The patch applied cleanly to local main with all four
 unpublished commits. An additional disposable healing replay failed on main
 and passed on the PR: an earlier incoming heal cannot take the waiting frame's
-own heal confirmation. Replays: `D:/Codex-Temp/msbt-pr51-review`.
+own heal confirmation. Replays: `${CODEX_OUTPUT_DIR}/msbt-pr51-review`.
 
 Merged origin/main locally without rebasing or rewriting the four unpublished
 commits. Final combined suite: 152 tests ran, 151 passed, one archive check
@@ -173,7 +178,7 @@ checkboxes, hidden resource labels, combo totals, and the full-points alert.
 Final suite: 152 tests ran, 151 passed, one archive check skipped. All 20
 changed installed Lua files match source and compile with Lua 5.1. Ten
 installed regression scripts passed, including seven-locale coverage.
-Backups: `D:/Codex-Temp/msbt-localization-20261113/backup`.
+Backups: `${CODEX_OUTPUT_DIR}/msbt-localization-20261113/backup`.
 Existing manifests and temporary diagnostics were preserved.
 
 Translations were authored in this change; native-speaker wording and live
@@ -212,7 +217,7 @@ skipped. All three changed installed files match source and compile with
 Lua 5.1; eight installed Forever regression scripts passed.
 
 Installed files: MSBTMain.lua, Components/OutgoingBatcher.lua, Combat/Spells.lua.
-Backups: `D:/Codex-Temp/msbt-hunter-report-fixes-20261113/backup`.
+Backups: `${CODEX_OUTPUT_DIR}/msbt-hunter-report-fixes-20261113/backup`.
 Existing installed manifests and temporary diagnostic entries were preserved.
 No release or push was requested for these fixes.
 
@@ -271,7 +276,7 @@ Findings and evidence:
    screenshot event sequence has not been captured in game.
 
 Disposable reproductions and downloaded screenshots:
-`D:/Codex-Temp/msbt-chinese-hunter-report-20261113`.
+`${CODEX_OUTPUT_DIR}/msbt-chinese-hunter-report-20261113`.
 The reproduction uses synthetic spell IDs and is not a live combat recording.
 No production code or installed client files were changed during investigation.
 
@@ -310,7 +315,7 @@ libraries, locales, and licensing are retained; development files and temporary
 diagnostics are excluded.
 
 Published artifact:
-`D:/Codex-Temp/msbt-v12.052-release/MikScrollingBattleText-v12.052.zip`.
+`${CODEX_OUTPUT_DIR}/msbt-v12.052-release/MikScrollingBattleText-v12.052.zip`.
 
 The final full suite ran with this real archive: all 150 tests passed, with
 no skips. Whitespace checks passed. No generated workspace log files remain.
@@ -335,7 +340,7 @@ before implementation. The full suite ran 150 tests: 149 passed, one archive
 check skipped. Seven installed Forever regression scripts passed, including
 the real Retail/Forever runtime with normal/critical, player/pet, grouped,
 and restricted attack-color assertions. The installed batcher matches source.
-Backup: `D:/Codex-Temp/msbt-melee-colors-20261113`.
+Backup: `${CODEX_OUTPUT_DIR}/msbt-melee-colors-20261113`.
 
 Next: `/reload` in Forever and compare an auto-attack with a physical ability.
 The separate resource-source investigation below still needs a live capture.
@@ -361,7 +366,7 @@ Installed in Forever and appended to both installed manifests, preserving
 their existing content and temporary Windfury diagnostic entries. Repository
 release manifests do not load the diagnostic, and `.pkgmeta` already excludes
 the Diagnostics folder. Installation backups:
-`D:/Codex-Temp/msbt-resource-source-capture-20261113`.
+`${CODEX_OUTPUT_DIR}/msbt-resource-source-capture-20261113`.
 
 Live procedure:
 1. `/reload` in Forever, then `/msbtresources start`.
@@ -398,7 +403,7 @@ Verification: the regression failed on the old separator before the fix.
 The full suite ran 148 tests: 147 passed, one archive check skipped.
 Seven installed Forever regression scripts passed; both changed production
 files match their source hashes. Backups are in
-`D:/Codex-Temp/msbt-resource-spacing-20261113`.
+`${CODEX_OUTPUT_DIR}/msbt-resource-spacing-20261113`.
 
 Next: `/reload` in Forever and confirm resource gains display with one space.
 
@@ -465,7 +470,7 @@ Forever has the three Lua changes matched to source by SHA-256. Both installed
 manifests received only the policy entry; their diagnostic entries were
 preserved. Eleven related installed Lua files parsed and seven installed
 regression scripts passed. Backups and the verifier are under
-D:/Codex-Temp/msbt-forever-class-resource-policy-20261113.
+${CODEX_OUTPUT_DIR}/msbt-forever-class-resource-policy-20261113.
 The source change has not been pushed; live testing across classes is pending.
 
 Next: /reload in Forever and switch druid forms; verify each form only shows
@@ -497,7 +502,7 @@ maximum alerts, multiword labels, custom labels, and the real combat runtime.
 Forever's presentation and display service match source by SHA-256. Ten
 related installed files parsed with Lua 5.1 and six installed regression
 scripts passed. Backups and the verifier are under
-D:/Codex-Temp/msbt-forever-resource-display-20261113.
+${CODEX_OUTPUT_DIR}/msbt-forever-resource-display-20261113.
 The source change has not been pushed; in-game visuals have not been checked.
 
 Next: /reload in Forever and reach maximum combo points; verify the red
@@ -527,7 +532,7 @@ Forever's Components/CombatPresentation.lua matches the tested source by
 SHA-256. Nine related installed files parsed with Lua 5.1 and five installed
 regression scripts passed, including the full Retail/Forever runtime and new
 cat-form cases. The previous presentation file is backed up under
-D:/Codex-Temp/msbt-forever-cat-resources-20261113.
+${CODEX_OUTPUT_DIR}/msbt-forever-cat-resources-20261113.
 The source change has not been pushed; in-game behavior has not been checked.
 
 Next: /reload in Forever and check that cat form shows no Rage or Lunar Power
@@ -567,7 +572,7 @@ source by SHA-256 and parsing with Lua 5.1. Five installed regression scripts
 passed: resources/combo totals, full combat runtime, popup controls, profile
 transfer, and healer pairing. This also installs the prior individual resource
 checkbox feature there. Backups and the verifier are under
-D:/Codex-Temp/msbt-forever-combo-totals-20261113.
+${CODEX_OUTPUT_DIR}/msbt-forever-combo-totals-20261113.
 The source changes have not been pushed; in-game combat has not been checked.
 
 Next: /reload in Forever, build combo points to maximum, then use a finisher;
@@ -604,7 +609,7 @@ matches the source by SHA-256. Presentation retained its previous resource
 implementation at that checkpoint; the combo-point sync above updates it too.
 The installed healing patch passed a reverse applicability check.
 Backups and the verifier are under
-D:/Codex-Temp/msbt-forever-healer-names-20261113.
+${CODEX_OUTPUT_DIR}/msbt-forever-healer-names-20261113.
 
 Next: reload Forever and receive a heal in combat with %n in
 the Incoming Heals message; verify the healer name appears beside the amount.
@@ -684,7 +689,7 @@ installed _forever_ addon. Combat/WindfuryTrace.lua, WindfuryCapture.lua, and
 Trace.lua were copied and appended to both installed client manifests.
 The source manifests and release packaging remain unchanged. Previous
 installed files are backed up under
-D:/Codex-Temp/msbt-windfury-check-20261113-000346.
+${CODEX_OUTPUT_DIR}/msbt-windfury-check-20261113-000346.
 
 Nineteen focused tests passed. Five regression scripts also passed against
 the installed runtime; the three diagnostic files parsed with Lua 5.1.
@@ -719,7 +724,7 @@ on Retail and Forever. GitHub's PR and post-merge validation passed.
 The installed _forever_ runtime matches all 102 source files by SHA-256.
 Three installed healing/runtime regressions passed and all 70 runtime Lua
 files parsed with Lua 5.1. Its previous healing file is backed up under
-D:/Codex-Temp/msbt-targetless-healing-fix-20261112-234631.
+${CODEX_OUTPUT_DIR}/msbt-targetless-healing-fix-20261112-234631.
 
 The follow-up fix is saved locally on main; it has not been pushed or
 released. Next: /reload and test Mend Pet with an enemy selected while the
@@ -748,7 +753,7 @@ artifact was downloaded and passed all six archive tests locally again:
 and licensing retained; development files excluded by .pkgmeta.
 
 Published artifact:
-D:/Codex-Temp/msbt-v12.051-release/published/MikScrollingBattleText-v12.051.zip
+${CODEX_OUTPUT_DIR}/msbt-v12.051-release/published/MikScrollingBattleText-v12.051.zip
 
 All 102 Forever runtime files match source by SHA-256, including version
 metadata. The user confirmed school colors and healing skill names in game.
@@ -771,7 +776,7 @@ icons, and opaque amount identity on Retail and Forever; Hide Skills is
 also covered. Full suite: 144 tests, 143 passed and one release-archive
 check skipped. Installed Forever runtime tests passed, and the changed
 runtime file matches source by SHA-256. Its previous copy is saved under
-D:/Codex-Temp/msbt-heal-skill-names-20261112.
+${CODEX_OUTPUT_DIR}/msbt-heal-skill-names-20261112.
 
 Saved locally; no push or release. Next: run /reload and test an outgoing
 self-heal with skill names enabled.
@@ -800,7 +805,7 @@ and unconfirmed received healing. The full suite ran 144 tests: 143 passed,
 with the release-archive check skipped. Installed Forever engine and complete
 runtime regressions passed; all 102 runtime files match source by SHA-256.
 The two runtime files were backed up under
-D:/Codex-Temp/msbt-self-pet-heals-20261112 before installation.
+${CODEX_OUTPUT_DIR}/msbt-self-pet-heals-20261112 before installation.
 
 API payload reference:
 https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua
@@ -1041,7 +1046,7 @@ The upload response accepted CurseForge file `9566384`. Public processing or
 moderation status was not independently verified.
 
 The exact workflow artifact is retained at
-`D:/Codex-Temp/msbt-v12.050-release/MikScrollingBattleText-v12.050.zip`.
+`${CODEX_OUTPUT_DIR}/msbt-v12.050-release/MikScrollingBattleText-v12.050.zip`.
 It contains 102 files, 628,059 compressed bytes and 1,932,696 uncompressed bytes.
 All six actual-archive tests passed with no skips. All 70 packaged Lua files
 compile as Lua 5.1. Runtime files and binary media match the release source,
@@ -1231,7 +1236,7 @@ is 624,210 bytes. Tests, diagnostics, and development files are excluded;
 runtime dependencies, media, localizations, and notices remain included.
 Whitespace checks passed and task logs are clean.
 
-Artifact: `D:/Codex-Temp/msbt-v12.049-release/MikScrollingBattleText-v12.049.zip`.
+Artifact: `${CODEX_OUTPUT_DIR}/msbt-v12.049-release/MikScrollingBattleText-v12.049.zip`.
 
 Workflow: https://github.com/VadimTofan/MiksScrollingBattleText/actions/runs/43011216698
 
@@ -1345,7 +1350,7 @@ verified the archive before upload; CurseForge accepted file ID `9550672`.
 Public availability or moderation status was not independently checked.
 
 The exact workflow ZIP was downloaded to
-`D:/Codex-Temp/msbt-v12.048-release/MikScrollingBattleText-v12.048.zip`.
+`${CODEX_OUTPUT_DIR}/msbt-v12.048-release/MikScrollingBattleText-v12.048.zip`.
 Its six archive tests passed, all 69 packaged Lua files parsed as Lua 5.1,
 and both client manifests report 12.048. The ZIP contains 101 files and is
 622,870 bytes. Runtime dependencies, media, and licenses are retained;
