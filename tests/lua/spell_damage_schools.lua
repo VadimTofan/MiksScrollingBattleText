@@ -4,6 +4,21 @@ dofile("Combat/Spells.lua")
 dofile("Combat/Mine.lua")
 local ns = MikSBT.CombatEngine
 
+-- Describe: the axe bleed supplies periodic facts without a school word.
+-- Given the exact description returned by the user's Forever client.
+local bleedText =
+    "Wounds the target causing them to bleed for 210 damage over 7 sec."
+
+-- When the public description is parsed.
+local bleedFacts = ns.ParseSpellDescription(bleedText)
+
+-- Then it is a physical DoT, without inventing a tick interval.
+assert(bleedFacts.damages and bleedFacts.ticks and not bleedFacts.direct)
+assert(bleedFacts.school == 1, "axe bleed lost its physical school")
+assert(bleedFacts.total == 210 and bleedFacts.duration == 7,
+    "axe bleed lost its total or duration")
+assert(bleedFacts.period == nil, "tooltip total was mistaken for a tick interval")
+
 for _, example in ipairs({
     { name = "Physical", mask = 1 },
     { name = "Holy", mask = 2 },

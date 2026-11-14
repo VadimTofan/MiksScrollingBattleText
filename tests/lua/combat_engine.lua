@@ -659,6 +659,9 @@ assert(offsetBurst[3].amount == delayedProc and offsetBurst[3].result.proc)
 local originalDescription = C_Spell.GetSpellDescription
 C_Spell.GetSpellDescription = function(id)
 	if id == 17364 then return "Instantly deals weapon damage." end
+	if id == 21949 then
+		return "Wounds the target causing them to bleed for 210 damage over 7 sec."
+	end
 	return originalDescription(id)
 end
 local originalClass, originalEnchant = UnitClass, GetWeaponEnchantInfo
@@ -756,6 +759,43 @@ for _, example in ipairs({
 	assert(rejected and rejected.result.who == "other",
 		"weapon-proc matching accepted " .. example.name)
 end
+-- Describe: an axe bleed can coincide with an active Windfury enchant.
+-- Given the bleed application alongside a native swing and a direct line.
+Advance(4)
+Event("PLAYER_ENTERING_WORLD")
+local bleedStart, beforeBleed = now, #outgoing
+Event("PLAYER_SWING", 3.8, 0)
+Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 21949)
+Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+Event("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+Advance(0.02)
+Advance(0.5)
+Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+Advance(0.02)
+
+-- When its first opaque periodic hit arrives with a periodic confirmation.
+Advance(bleedStart + 1 - now)
+Event("COMBAT_LOG_MESSAGE", nil, "tick", 0, 0, 1)
+Event("UNIT_COMBAT", "target", "WOUND", "", delayedProc, 1)
+Advance(0.2)
+Advance(1)
+
+-- Then the ambiguous application stays visible without a false Windfury name,
+-- and the confirmed tick retains the bleed's identity.
+local application, bleedTick
+for index = beforeBleed + 1, #outgoing do
+	local report = outgoing[index]
+	if report.amount == firstProc then application = report end
+	if report.amount == delayedProc then bleedTick = report end
+end
+assert(application and application.result.who == "you")
+assert(application.result.procSpell ~= 8232,
+	"axe bleed application received the Windfury fallback name")
+assert(bleedTick and bleedTick.result.who == "you"
+	and bleedTick.result.spell == 21949 and bleedTick.result.tick,
+	"confirmed axe bleed tick lost its periodic spell identity")
+Event("PLAYER_ENTERING_WORLD")
 C_Spell.GetSpellDescription = originalDescription
 UnitClass, GetWeaponEnchantInfo = originalClass, originalEnchant
 

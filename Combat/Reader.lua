@@ -159,7 +159,8 @@ local function FlushHeld()
             -- 0.3.33: except a proc riding on a hit of yours (below).
             if entry.proc then
                 entry.record.result = { who = "you", proc = true,
-                    procSpell = ns.ProcSpell and ns.ProcSpell(entry.at, entry.record.school) }
+                    procSpell = ns.ProcSpell and ns.ProcSpell(entry.at,
+                        entry.record.school, entry.held.key) }
             end
             local router = Router()
             if router then router:Out(entry.record) end
@@ -356,11 +357,34 @@ end
 ns.ActiveWindfurySpell = ActiveWindfurySpell
 
 reader.procSources = {}
-local function ProcSpell(at, school)
+local PERIODIC_PROC_AMBIGUITY_WINDOW = 0.5
+
+local function PeriodicProcCast(at, school, key)
+    if not key then return false end
+    for spell, casts in pairs(ns.mine.casts) do
+        local facts = ns.SpellFacts(spell)
+        if facts and facts.ticks == true and facts.direct == false
+            and facts.school == school then
+            for _, cast in ipairs(casts) do
+                local age = at - cast.at
+                if cast.caster == "you" and cast.key == key
+                    and age >= 0 and age <= PERIODIC_PROC_AMBIGUITY_WINDOW then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function ProcSpell(at, school, key)
     -- Best guess for shamans: unresolved physical procs use active Windfury.
     -- This chooses an icon; the damage source is not proven by the enchant.
     local windfury = ActiveWindfurySpell(school)
     if windfury then
+        -- A bleed application can share the swing's direct confirmations.
+        -- Keep its unresolved damage visible without inventing a proc name.
+        if PeriodicProcCast(at, school, key) then return nil end
         local _, class = UnitClass("player")
         if ns.Text(class) and class == "SHAMAN" then return windfury end
         return nil
@@ -389,7 +413,9 @@ function ns.DecideHit(hit, line, restrict)
         result = ns.mine:Hit(hit.key, kind, record.school, hit.at, hit.petOn, line,
             ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech, record.avoid)
     end
-    if result.proc and not result.drain and not result.spell then result.procSpell = ProcSpell(hit.at, record.school) end
+    if result.proc and not result.drain and not result.spell then
+        result.procSpell = ProcSpell(hit.at, record.school, hit.key)
+    end
     record.result = result
     if ns.traceCombat then
         ns.traceCombat("decision", hit, { stage = "decision",

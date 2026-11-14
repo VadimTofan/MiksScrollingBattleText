@@ -132,6 +132,9 @@ function ns.ParseSpellDescription(text)
     if lower:find("every %d") then facts.ticks = true end
     -- "bleed for 15 damage over 9 sec" (Rend): ticks, school not said.
     if lower:find("%d+ damage over %d") then facts.ticks = true end
+    if not facts.school and facts.ticks and lower:find("bleed", 1, true) then
+        facts.school = SCHOOLS.physical
+    end
     -- A weapon or melee strike, or a shot, is physical and hits at once.
     if not facts.school and (lower:find("weapon damage", 1, true) or lower:find("melee damage", 1, true)
         or lower:find("ranged damage", 1, true) or lower:find("fires several missiles", 1, true)) then
@@ -140,6 +143,9 @@ function ns.ParseSpellDescription(text)
     if proc then facts.procSchool = procSchool or facts.school end
     -- "282 Shadow damage over 18 sec": what the ticks add up to (0.3.9).
     local total, secs = lower:match("(%d+) %a+ damage over (%d+) sec")
+    if not total then
+        total, secs = lower:match("(%d+) damage over (%d+) sec")
+    end
     if total then facts.total, facts.duration = tonumber(total), tonumber(secs) end
     -- Harm with no "<school> damage" (Drain Life's "health every"): say no
     -- more than that it harms.

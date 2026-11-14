@@ -26,6 +26,38 @@ local spell = engine.ProcSpell(10, 1)
 -- Then a shaman's uncertain physical proc uses the Windfury best guess.
 assert(spell == 8232, "shaman physical proc did not receive Windfury")
 
+-- Describe: a known bleed application makes its physical proc name uncertain.
+-- Given a periodic-only physical cast on one target.
+local savedMine, savedFacts = engine.mine, engine.SpellFacts
+local bleedFacts = { school = 1, direct = false, ticks = true }
+engine.mine = { casts = {
+    [21949] = { { at = 10, key = "target1", caster = "you" } },
+} }
+engine.SpellFacts = function() return bleedFacts end
+
+-- When an unidentified physical hit follows that application.
+local ambiguous = engine.ProcSpell(10.217, 1, "target1")
+
+-- Then the hit does not receive an invented Windfury identity.
+assert(ambiguous == nil, "bleed application was labelled Windfury")
+
+-- When the target differs or the application ambiguity window is over.
+local otherTarget = engine.ProcSpell(10.217, 1, "target2")
+local laterProc = engine.ProcSpell(10.6, 1, "target1")
+
+-- Then the normal Windfury fallback remains available.
+assert(otherTarget == 8232 and laterProc == 8232)
+
+-- Given a physical ability with a direct component instead of a pure bleed.
+bleedFacts.direct = true
+
+-- When its later proc is named.
+local directProc = engine.ProcSpell(10.217, 1, "target1")
+
+-- Then ordinary weapon abilities do not disable Windfury naming.
+assert(directProc == 8232)
+engine.mine, engine.SpellFacts = savedMine, savedFacts
+
 -- Given an extra-attack grant with a hidden spell and attack count.
 engine.reader.logLines = { { at = 10, source = "mine", kind = "extra" } }
 

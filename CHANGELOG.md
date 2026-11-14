@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Recognized school-less bleed descriptions as physical periodic damage,
+  preserving their total and duration. Unidentified hits near a known bleed
+  application no longer automatically receive the Windfury name.
 - Retained delayed physical Windfury candidates confirmed after a player
   weapon attack on Forever, including attacks between normal swings.
 - Windfury diagnostics now record player casts and distinguish estimated
