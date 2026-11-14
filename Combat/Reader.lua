@@ -9,6 +9,7 @@ local C_Timer = ns.Timer
 local reader = {
     epoch = 0, plateGeneration = 0, plates = {}, held = {},
     lastGlow = {}, lastCC = {}, swingTimes = {}, castTargets = {},
+    windfuryNotices = {},
     pendingHits = setmetatable({}, { __mode = "k" }),
 }
 ns.reader = reader
@@ -1236,9 +1237,41 @@ local function CastTarget(unit, spell, guid, now, consume)
 end
 
 local lastCast
+local WINDFURY_ATTACK_SPELL_ID = 439440
+local MAX_WINDFURY_NOTICES = 16
+
+local function WindfuryNotice(unit, spell, guid, now)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not (client and client.isForever) or unit ~= "player"
+        or spell ~= WINDFURY_ATTACK_SPELL_ID then return end
+
+    -- A public cast names Windfury activity, never a particular damage amount.
+    -- Keep duplicate casts bounded; coalesce multiple attacks in one frame.
+    local recent = reader.windfuryNotices
+    if ns.Text(guid) then
+        for _, seen in ipairs(recent) do
+            if seen == guid then return end
+        end
+        recent[#recent + 1] = guid
+        if #recent > MAX_WINDFURY_NOTICES then table.remove(recent, 1) end
+    end
+    if reader.windfuryNoticeAt == now then return end
+    reader.windfuryNoticeAt = now
+
+    local router = Router()
+    if router then
+        router:Alert({ kind = "proc",
+            text = ns.SpellName(spell)
+                or ns.SpellName(WINDFURY_WEAPON_SPELL_ID) or "Windfury",
+            icon = ns.SpellIcon(spell)
+                or ns.SpellIcon(WINDFURY_WEAPON_SPELL_ID) })
+    end
+end
+
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
+    WindfuryNotice(unit, spell, guid, now)
     local key, uncertain, observed = CastTarget(unit, spell, guid, now, true)
     if not observed and unit == "player" then
         key = ns.TargetKey()
@@ -2053,7 +2086,9 @@ local function OnEvent(_, event, ...)
         NoteCastTarget(unit, target, guid, spell, Now())
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, guid, spell = ...
-        if unit == "player" or unit == "pet" then OnCast(unit, spell, guid) end
+        if ns.Text(unit) and (unit == "player" or unit == "pet") then
+            OnCast(unit, spell, guid)
+        end
     elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
         local unit, guid, spell = ...
         if (unit == "player" or unit == "pet") and ns.Number(spell, 1) then

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Forever shows a separate Windfury proc notice when the client reports an
+  explicit player Windfury attack cast. Unidentified damage stays number-only;
+  weapon enchants and cooldown updates cannot trigger the notice.
 - Opt-in Windfury reports now include bounded public cooldown-update metadata.
   Updates remain unconfirmed context and never create damage or spell names.
 - Unknown and ambiguous outgoing spells now show numbers without an icon or
