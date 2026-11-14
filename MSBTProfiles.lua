@@ -72,6 +72,7 @@ local savedMedia
 
 local currentProfile
 local runtimeController
+local profileSnapshots
 
 local pathTable = {}
 
@@ -2921,6 +2922,23 @@ local function InitSavedVariables()
 	module.savedMedia = savedMedia
 end
 
+local function GetProfileSnapshots()
+	if not profileSnapshots then
+		profileSnapshots = MikSBT.Configuration.ProfileSnapshots:New({
+			savedVariables = savedVariables,
+			savedVariablesPerChar = savedVariablesPerChar,
+			masterProfile = masterProfile,
+			selectProfile = function(profileName)
+				if not savedVariables.profiles[profileName] then
+					profileName = DEFAULT_PROFILE_NAME
+				end
+				SelectProfile(profileName)
+			end,
+		})
+	end
+	return profileSnapshots
+end
+
 local function GetNextParameter(paramString)
 	local remainingParams
 	local currentParam = paramString
@@ -3028,6 +3046,10 @@ local function OnEvent(this, event, arg1)
 		end
 		collectgarbage("collect")
 	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
+		if event == "PLAYER_ENTERING_WORLD" then
+			-- Clients without the event arguments count as an initial login.
+			GetProfileSnapshots():UpdateLoginSnapshot(arg1 ~= false)
+		end
 		ApplyContextOptions()
 	end
 end
@@ -3058,4 +3080,5 @@ module.SetOptionUserDisabled		= SetOptionUserDisabled
 module.IsModDisabled				= IsModDisabled
 module.ApplyContextOptions			= ApplyContextOptions
 module.ResetOfficialBlizzardCombatText = ResetOfficialBlizzardCombatText
+module.GetProfileSnapshots			= GetProfileSnapshots
 

@@ -19,6 +19,7 @@ Configuration\ProfileStore.lua
 Configuration\MediaRegistry.lua
 Configuration\RuntimeController.lua
 Configuration\ProfileTransfer.lua
+Configuration\ProfileSnapshots.lua
 API\RestrictedValue.lua
 API\Sounds.lua
 API\Spells.lua
