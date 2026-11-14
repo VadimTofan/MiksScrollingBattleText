@@ -39,10 +39,12 @@ function Tracker:Log(line, key)
     }
 end
 
-function Tracker:Cast(at, key, spell)
+function Tracker:Cast(at, key, spell, weaponTrigger)
     local burst = self:Find(at, key)
     if not burst or #burst.casts >= 32 then return end
-    burst.casts[#burst.casts + 1] = { at = at, spell = spell }
+    burst.casts[#burst.casts + 1] = {
+        at = at, spell = spell, weaponTrigger = weaponTrigger == true,
+    }
 end
 
 function Tracker:Report(record, info)
@@ -120,7 +122,7 @@ function Tracker:Summary(burst)
     local summary = { expected = 0, estimated = 0,
         damage = 0, misses = 0, normal = 0,
         rawDamage = 0, rawMisses = 0, rejected = 0, forwarded = 0,
-        displays = 0, merged = false, confirmations = 0 }
+        displays = 0, merged = false, confirmations = 0, rejectedPhysical = 0 }
     for _, line in ipairs(burst.lines) do
         if burst.active and line.source == "mine" and line.kind == "extra" then
             summary.expected = 2
@@ -128,7 +130,9 @@ function Tracker:Summary(burst)
         local nearTrigger = line.at - burst.at <= 0.5
         for _, cast in ipairs(burst.casts) do
             local age = line.at - cast.at
-            if age >= 0 and age <= 0.15 then nearTrigger = true end
+            if cast.weaponTrigger and age >= 0 and age <= 0.15 then
+                nearTrigger = true
+            end
         end
         if line.source == "mine" and (line.kind == "spell"
             or line.kind == "spellMiss") and nearTrigger then
@@ -142,6 +146,10 @@ function Tracker:Summary(burst)
         if entry.event == "damage" then summary.rawDamage = summary.rawDamage + 1 end
         if entry.event == "miss" then summary.rawMisses = summary.rawMisses + 1 end
         if entry.who == "other" then summary.rejected = summary.rejected + 1 end
+        if entry.who == "other" and entry.event == "damage"
+            and entry.school == 1 then
+            summary.rejectedPhysical = summary.rejectedPhysical + 1
+        end
         if entry.who == "you" and entry.melee then summary.normal = summary.normal + 1 end
         if entry.who == "you" and entry.procSpell == 8232 then
             summary.estimated = 2
@@ -165,9 +173,11 @@ function Tracker:NeedsAttention(burst)
     end
     if not retained then return false end
     local summary = self:Summary(burst)
-    local candidate = summary.expected == 2
-        or (burst.active and summary.confirmations >= 2)
-    return (candidate and summary.damage + summary.misses < 2)
+    local missingGranted = summary.expected == 2
+        and summary.damage + summary.misses < 2
+    local rejectedCandidate = burst.active and summary.confirmations >= 2
+        and summary.rejectedPhysical > 0
+    return missingGranted or rejectedCandidate
         or summary.displays < summary.damage or summary.merged
 end
 
@@ -199,8 +209,9 @@ function Tracker:ReportText()
                 line.at - burst.at, Value(line.kind), Value(line.source))
         end
         for _, cast in ipairs(burst.casts) do
-            rows[#rows + 1] = string.format("  cast +%.3f spell=%d",
-                cast.at - burst.at, cast.spell)
+            rows[#rows + 1] = string.format(
+                "  cast +%.3f spell=%d weaponTrigger=%s",
+                cast.at - burst.at, cast.spell, Value(cast.weaponTrigger))
         end
         for _, id in ipairs(burst.reports) do
             local e = self.records[id]

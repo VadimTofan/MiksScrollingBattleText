@@ -64,7 +64,11 @@ function Capture:Event(event, duration, hand, spell)
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local spellID = RV:Number(spell)
         if RV:String(duration) == "player" and spellID then
-            self.model:Cast(GetTime(), key, spellID)
+            local facts = ns.SpellFacts and ns.SpellFacts(spellID)
+            local weaponTrigger = facts and facts.direct == true
+                and facts.school == 1 and facts.helpful ~= true
+                and not facts.weaponProc
+            self.model:Cast(GetTime(), key, spellID, weaponTrigger)
         end
     elseif event == "COMBAT_LOG_MESSAGE" then
         local lines = ns.reader and ns.reader.logLines

@@ -9,6 +9,9 @@ end }
 local ns = MikSBT.CombatEngine
 ns.TargetKey = function() return "target1" end
 ns.ActiveWindfurySpell = function() return 8232 end
+ns.SpellFacts = function(spell)
+    return { direct = true, school = spell == 17364 and 1 or 8 }
+end
 ns.ProcSpell = function() error("capture confused enchant with damage identity") end
 ns.reader = { logLines = {} }
 MikSBT.Print = function() end
@@ -100,7 +103,15 @@ Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", opaque, 17364)
 
 -- Then capture retains only the public spell ID and timing.
 assert(#burst.casts == 1 and burst.casts[1].spell == 17364)
+assert(burst.casts[1].weaponTrigger)
 assert(capture.model:ReportText():find("cast +0.000 spell=17364", 1, true))
+
+-- When a Nature cast is recorded in the same capture.
+Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", opaque, 8042)
+
+-- Then its public ID remains visible but it cannot anchor a weapon proc.
+assert(#burst.casts == 2 and burst.casts[2].spell == 8042)
+assert(not burst.casts[2].weaponTrigger)
 now = now + 0.5
 
 -- When two opaque proc hits pass through presentation and the real service.

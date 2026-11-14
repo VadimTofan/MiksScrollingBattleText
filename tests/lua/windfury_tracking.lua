@@ -5,6 +5,46 @@ local opaque = setmetatable({}, {
     __tostring = function() error("tracking inspected a damage amount") end,
 })
 
+-- Describe: Nature and Fire reports cannot freeze a physical-proc capture.
+-- Given the latest capture's two lines near a Nature cast between swings.
+local magicTracker = Tracker:New()
+local magicBurst = magicTracker:Swing(0, "target1", 0, true)
+magicTracker:Cast(1.980, "target1", 8042, false)
+magicTracker:Log({ at = 1.980, kind = "spell", source = "mine" }, "target1")
+magicTracker:Log({ at = 2.121, kind = "spell", source = "mine" }, "target1")
+local fire = {}
+magicTracker:Report(fire, {
+    at = 2.176, key = "target1", event = "damage", school = 4,
+})
+magicTracker:Decision(fire, { who = "other" })
+
+-- When the candidate evidence is evaluated.
+local magicSummary = magicTracker:Summary(magicBurst)
+
+-- Then the nonphysical cast and rejected Fire hit are not Windfury evidence.
+assert(magicSummary.estimated == 0, "Nature cast estimated a Windfury proc")
+assert(not magicTracker:NeedsAttention(magicBurst),
+    "a rejected Fire report froze the Windfury capture")
+
+-- Given two fully accounted physical ability hits near a native swing.
+local covered = magicTracker:Swing(4, "target1", 0, true)
+for index = 1, 2 do
+    magicTracker:Log({ at = 4.225, kind = "spell", source = "mine" }, "target1")
+    local hit = {}
+    magicTracker:Report(hit, {
+        at = 4.225, key = "target1", event = "damage", school = 1,
+    })
+    magicTracker:Decision(hit, { who = "you" })
+end
+
+-- When those confirmations lack an explicit extra-attack grant.
+local coveredSummary = magicTracker:Summary(covered)
+
+-- Then the heuristic remains inspectable without claiming a missing hit.
+assert(coveredSummary.estimated == 2)
+assert(not magicTracker:NeedsAttention(covered),
+    "accounted physical ability hits froze the capture")
+
 -- Given an ordinary swing with an active enchant but no proc evidence.
 local ordinary = tracker:Swing(10, "target1", 0, true)
 
@@ -43,7 +83,7 @@ assert(castReport:find("cast +0.100 spell=17364", 1, true))
 
 -- Given two spell confirmations following an ability between native swings.
 local abilityBurst = tracker:Swing(13, "target1", 0, true)
-tracker:Cast(13.9, "target1", 17364)
+tracker:Cast(13.9, "target1", 17364, true)
 tracker:Log({ at = 13.9, kind = "spell", source = "mine" }, "target1")
 tracker:Log({ at = 13.9, kind = "spell", source = "mine" }, "target1")
 
@@ -52,7 +92,22 @@ local abilitySummary = tracker:Summary(abilityBurst)
 
 -- Then late confirmations remain visible as candidate evidence.
 assert(abilitySummary.expected == 0 and abilitySummary.estimated == 2)
-assert(abilitySummary.confirmations == 2 and tracker:NeedsAttention(abilityBurst))
+assert(abilitySummary.confirmations == 2)
+assert(not tracker:NeedsAttention(abilityBurst))
+
+-- Given a physical report rejected despite those candidate confirmations.
+local rejectedAbilityHit = {}
+tracker:Report(rejectedAbilityHit, {
+    at = 14.2, key = "target1", event = "damage", school = 1,
+})
+tracker:Decision(rejectedAbilityHit, { who = "other" })
+
+-- When the capture checks the actual unresolved physical outcome.
+local rejectedSummary = tracker:Summary(abilityBurst)
+
+-- Then it still pauses for the original late-report failure pattern.
+assert(rejectedSummary.rejectedPhysical == 1)
+assert(tracker:NeedsAttention(abilityBurst))
 
 -- Given an extra-attack notification without any surviving damage reports.
 local granted = tracker:Swing(15, "target1", 0, true)

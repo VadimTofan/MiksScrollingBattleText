@@ -7,6 +7,8 @@
 - Windfury diagnostics now record player casts and distinguish estimated
   proc counts from extra-attack grants. A fallback spell label alone no
   longer pauses capture as evidence of a missing hit.
+- Windfury capture ignores magic-only and fully accounted ability sequences
+  when deciding whether to pause for a suspected missing physical hit.
 - Unchecking Outgoing Pet or Incoming Pet redirects its messages to Outgoing
   or Incoming. Individually disabled events remain hidden.
 
