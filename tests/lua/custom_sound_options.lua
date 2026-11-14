@@ -37,6 +37,7 @@ dofile("MSBTOptions/Localization/localization.lua")
 local widgets = {}
 local Widget = {}
 Widget.__index = Widget
+function Widget:GetWidth() return 0 end
 local function NewWidget(parent)
 	local widget = setmetatable({ parent = parent, scripts = {}, items = {} }, Widget)
 	widgets[#widgets + 1] = widget
