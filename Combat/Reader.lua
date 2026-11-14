@@ -1372,6 +1372,10 @@ local function OnTargetAura(info)
     if watch and now - watch.at <= LAND_FRAME then watch.aura = true end
 end
 local function WatchLanding(spell, cast, now)
+    -- A cast whose recipient is another unit (the target changed while it
+    -- was cast, or it went to the focus) puts its aura there, not on the
+    -- target selected now. One whose recipient is unknown is still watched.
+    if cast.key and cast.key ~= ns.TargetKey() then return end
     local auraAt = reader.targetAuraAt
     local watch = { at = now, aura = auraAt ~= nil and now - auraAt <= LAND_FRAME }
     reader.landing = watch
@@ -2370,6 +2374,9 @@ local function OnEvent(_, event, ...)
             reader.departedTargetKey, reader.departedTargetAt = nil, nil
         end
         reader.epoch = reader.epoch + 1
+        -- An aura's moment and a cast watched for its landing belong to the
+        -- target they came on, not to the one selected now.
+        reader.targetAuraAt, reader.landing = nil, nil
         FindTargetPlate()
         ns.TargetKey()
     elseif event == "NAME_PLATE_UNIT_ADDED" then

@@ -244,6 +244,70 @@ do
     -- Then its miss, though unnamed, speaks for it.
     assert(#landed == 3, "a spell with an unnamed miss of its own was shown as landed")
 
+    -- Given an aura event on the target, then another target and a cast on it
+    -- in the same frame.
+    Advance(4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Settle()
+    -- Then the earlier target's aura does not count for the cast.
+    assert(#landed == 3, "an aura of the earlier target counted as landed")
+    -- Given a cast, then another target and an aura event on that one.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the new target's aura does not count for the earlier cast.
+    assert(#landed == 3, "an aura of the new target counted for a cast on the earlier one")
+    -- Given another target, then a cast on it and its aura in the same frame.
+    Advance(4)
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the spell is shown as landed on the new target.
+    assert(#landed == 4, "a debuff landing on a new target was not shown")
+    -- Given a cast and its aura, then another target before the wait is over.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Event("PLAYER_TARGET_CHANGED")
+    Settle()
+    -- Then the landing already seen is still shown.
+    assert(#landed == 5, "a landing seen before the switch was not shown")
+    -- Given a cast sent to the target, then another target before it
+    -- succeeds and an aura event on that one in its frame.
+    local unitName, selected = UnitName, "Creature A"
+    UnitName = function(unit) if unit == "target" then return selected end end
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", "Creature A", "sent-before-switch", 503)
+    selected = "Creature B"
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-before-switch", 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the new target's aura does not count for a cast sent to the earlier one.
+    assert(#landed == 5, "an aura of the new target counted for a cast sent to the earlier one")
+    -- Given a cast sent to the target selected now and its aura in its frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", "Creature B", "sent-to-target", 503)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-to-target", 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    UnitName = unitName
+    -- Then the spell is shown as landed.
+    assert(#landed == 6, "a debuff sent to the selected target was not shown")
+    -- Given a cast whose recipient the client hides and an aura in its frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", hiddenRecipient, "sent-hidden", 503)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-hidden", 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the spell is shown as landed, as the target may be its recipient.
+    assert(#landed == 7, "a debuff sent to a hidden recipient was not shown")
+
     -- Given a spell of yours resisted a moment before a debuff, then a swing
     -- of yours parried and an aura event in the debuff's frame.
     local before = #landed
