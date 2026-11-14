@@ -2,11 +2,12 @@
 
 ## Unreleased
 
-- Forever shows a separate Windfury proc notice when the client reports an
-  explicit player Windfury attack cast. Unidentified damage stays number-only;
-  weapon enchants and cooldown updates cannot trigger the notice.
+- Forever shows a separate Windfury activity notice from an explicit attack
+  cast or a Windfury cooldown update corroborated by a player melee trigger
+  and direct combat-log line in the same frame. Damage identities and counts
+  remain independent; isolated updates and weapon enchants stay silent.
 - Opt-in Windfury reports now include bounded public cooldown-update metadata.
-  Updates remain unconfirmed context and never create damage or spell names.
+  Reports preserve this context without using it to create or name damage.
 - Unknown and ambiguous outgoing spells now show numbers without an icon or
   question mark. Reused scrolling lines release their previous icon.
 - Kept delayed damage, casts, and swings tied to their creature's lifetime.

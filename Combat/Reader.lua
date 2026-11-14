@@ -1245,7 +1245,7 @@ local function WindfuryNotice(unit, spell, guid, now)
     if not (client and client.isForever) or unit ~= "player"
         or spell ~= WINDFURY_ATTACK_SPELL_ID then return end
 
-    -- A public cast names Windfury activity, never a particular damage amount.
+    -- Windfury activity is separate from any particular damage amount.
     -- Keep duplicate casts bounded; coalesce multiple attacks in one frame.
     local recent = reader.windfuryNotices
     if ns.Text(guid) then
@@ -1255,7 +1255,8 @@ local function WindfuryNotice(unit, spell, guid, now)
         recent[#recent + 1] = guid
         if #recent > MAX_WINDFURY_NOTICES then table.remove(recent, 1) end
     end
-    if reader.windfuryNoticeAt == now then return end
+    if reader.windfuryNoticeAt
+        and now <= reader.windfuryNoticeAt + SWING_FRAME then return end
     reader.windfuryNoticeAt = now
 
     local router = Router()
@@ -1266,6 +1267,53 @@ local function WindfuryNotice(unit, spell, guid, now)
             icon = ns.SpellIcon(spell)
                 or ns.SpellIcon(WINDFURY_WEAPON_SPELL_ID) })
     end
+end
+
+local function WindfuryTriggerAt(at)
+    for _, swing in ipairs(reader.swingTimes) do
+        if not swing.ranged and math.abs(swing.at - at) <= SWING_FRAME then
+            return true
+        end
+    end
+    for spell, casts in pairs(ns.mine.casts) do
+        local facts = ns.SpellFacts(spell)
+        if facts and facts.direct == true and facts.school == ns.SCHOOL_PHYSICAL
+            and facts.helpful ~= true and not facts.weaponProc
+            and ns.SpellReach(spell) == "melee" then
+            for _, cast in ipairs(casts) do
+                if cast.caster == "you"
+                    and math.abs(cast.at - at) <= SWING_FRAME then return true end
+            end
+        end
+    end
+    return false
+end
+
+local function WindfuryCooldown(spell)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not (client and client.isForever) or not ns.Number(spell, 1)
+        or spell ~= WINDFURY_ATTACK_SPELL_ID then return end
+    local at = Now()
+    local pending = reader.windfuryCooldownFrame
+    if pending and math.abs(pending.at - at) <= SWING_FRAME then return end
+    pending = { at = at }
+    reader.windfuryCooldownFrame = pending
+
+    -- Recorded Forever frames expose this update beside the melee trigger
+    -- and direct lines, without a cast event. Evaluate after all arrive.
+    -- This correlation is an activity cue, not a hit identity or proc count.
+    C_Timer.After(0, function()
+        if reader.windfuryCooldownFrame ~= pending
+            or not (ns.LineKindsReady and ns.LineKindsReady())
+            or not WindfuryTriggerAt(at) then return end
+        for _, line in ipairs(reader.logLines) do
+            if line.source == "mine" and math.abs(line.at - at) <= SWING_FRAME
+                and (line.kind == "spell" or line.kind == "spellMiss") then
+                WindfuryNotice("player", spell, nil, at)
+                return
+            end
+        end
+    end)
 end
 
 local function OnCast(unit, spell, guid)
@@ -2080,6 +2128,8 @@ ns.READER_EVENTS = EVENTS
 local function OnEvent(_, event, ...)
     if event == "UNIT_COMBAT" then
         OnUnitCombat(...)
+    elseif event == "SPELL_UPDATE_COOLDOWN" then
+        WindfuryCooldown(...)
     elseif event == "UNIT_SPELLCAST_SENT" then
         local unit, target, guid, spell = ...
         ns.NoteHealTarget(unit, target, guid, spell, Now())
@@ -2178,6 +2228,8 @@ local function OnEvent(_, event, ...)
         OnCombat(false)
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
+        reader.windfuryCooldownFrame, reader.windfuryNoticeAt = nil, nil
+        reader.windfuryNotices = {}
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil
         reader.pendingHits = setmetatable({}, { __mode = "k" })
@@ -2218,6 +2270,14 @@ function ns.StartReader()
     for _, event in ipairs(EVENTS) do
         if ns.EventAvailable(event) then
             frame:RegisterEvent(event)
+        end
+    end
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if client and client.isForever and C_EventUtils
+        and type(C_EventUtils.IsEventValid) == "function" then
+        local ok, supported = pcall(ns.EventAvailable, "SPELL_UPDATE_COOLDOWN")
+        if ok and ns.Bool(supported) and supported then
+            frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
         end
     end
     if ns.EventAvailable("UNIT_AURA") then
