@@ -126,3 +126,12 @@ especially for group combat, changed server behavior, and spells missing
 from the catalog. `/msbttrace wf` remains opt-in development instrumentation;
 its candidate counts are not proof of actual Windfury proc counts or visible
 pixels. The diagnostic files remain excluded from release manifests.
+
+During `/msbttrace wf`, a separate frame records `SPELL_UPDATE_COOLDOWN`
+only when event support is positively confirmed. Each burst keeps at most
+32 updates with the public spell ID, base spell ID, category, start-recovery
+category, item ID, and arrival time. Unreadable fields are omitted; zero and
+repeated updates are retained. `targetContext` records the selected target
+at arrival, not the spell's victim. These updates never change ownership,
+names, damage, or expected proc counts. The event unregisters when capture
+stops. Live recordings are needed before using this signal for attribution.

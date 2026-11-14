@@ -2,6 +2,7 @@
 local Capture = { generation = 0 }
 MikSBT.WindfuryCapture = Capture
 local RV = MikSBT.API.RestrictedValue
+local COOLDOWN_EVENT = "SPELL_UPDATE_COOLDOWN"
 
 local function Pack(...) return { n = select("#", ...), ... } end
 local function Metadata(value)
@@ -75,6 +76,32 @@ function Capture:Event(event, duration, hand, spell)
         local line = lines and lines[#lines]
         if line and line.at == GetTime() then self.model:Log(line, key) end
     end
+end
+
+function Capture:Cooldown(spellID, baseSpellID, category,
+    startRecoveryCategory, itemID)
+    if not self.active then return end
+    self.model:Cooldown(GetTime(), RV:String(MikSBT.CombatEngine.TargetKey()), {
+        spellID = RV:Number(spellID), baseSpellID = RV:Number(baseSpellID),
+        category = RV:Number(category),
+        startRecoveryCategory = RV:Number(startRecoveryCategory),
+        itemID = RV:Number(itemID),
+    })
+end
+
+function Capture:StartCooldownEvents()
+    local available = MikSBT.CombatEngine.EventAvailable
+    if not C_EventUtils or type(C_EventUtils.IsEventValid) ~= "function"
+        or type(available) ~= "function" then return end
+    local ok, supported = pcall(available, COOLDOWN_EVENT)
+    if not ok or RV:Boolean(supported) ~= true then return end
+    if not self.eventFrame then
+        self.eventFrame = CreateFrame("Frame")
+        self.eventFrame:SetScript("OnEvent", function(_, event, ...)
+            if event == COOLDOWN_EVENT then self:Cooldown(...) end
+        end)
+    end
+    self.eventFrame:RegisterEvent(COOLDOWN_EVENT)
 end
 
 function Capture:Gate(service, settings)
@@ -166,6 +193,7 @@ function Capture:Start()
     self.observer = function(...) self:Observe(...) end
     MikSBT.CombatEngine.traceCombat = self.observer
     self.active = true
+    self:StartCooldownEvents()
     if self.frame then self.frame:Hide() end
     MikSBT.Print("Windfury capture armed: fight normally. It pauses on a " ..
         "candidate needing review. /msbttrace report opens it.")
@@ -173,6 +201,7 @@ end
 
 function Capture:Stop()
     self.active = false
+    if self.eventFrame then self.eventFrame:UnregisterEvent(COOLDOWN_EVENT) end
     self.generation = self.generation + 1
     local ns = MikSBT.CombatEngine
     if self.observer and ns.traceCombat == self.observer then ns.traceCombat = nil end

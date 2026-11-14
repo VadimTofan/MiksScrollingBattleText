@@ -5,6 +5,43 @@ local opaque = setmetatable({}, {
     __tostring = function() error("tracking inspected a damage amount") end,
 })
 
+-- Describe: cooldown notifications are unconfirmed diagnostic context.
+-- Given a native swing with no damage, cast, or extra-attack confirmation.
+local cooldownTracker = Tracker:New()
+local cooldownBurst = cooldownTracker:Swing(1, "target1", 0, true)
+
+-- When repeated updates arrive while the player's current target changes.
+for index = 1, 40 do
+    cooldownTracker:Cooldown(1.25, "target2", {
+        spellID = 8232, baseSpellID = 8232,
+        category = 0, startRecoveryCategory = 0, itemID = 123,
+    })
+end
+
+-- Then retention is bounded, repeats survive, and no damage is fabricated.
+assert(#cooldownBurst.cooldowns == 32)
+assert(cooldownBurst.cooldownsTruncated)
+assert(cooldownBurst.cooldowns[1].at == 1.25)
+assert(cooldownBurst.cooldowns[1].targetContext == "target2")
+assert(cooldownBurst.cooldowns[32].spellID == 8232)
+local cooldownSummary = cooldownTracker:Summary(cooldownBurst)
+assert(cooldownSummary.expected == 0 and cooldownSummary.estimated == 0)
+assert(cooldownSummary.rawDamage == 0 and cooldownSummary.damage == 0)
+assert(cooldownSummary.confirmations == 0 and #cooldownBurst.reports == 0)
+assert(not cooldownTracker:NeedsAttention(cooldownBurst))
+local cooldownText = cooldownTracker:ReportText()
+assert(cooldownText:find("Cooldown updates are unconfirmed", 1, true))
+assert(cooldownText:find("cooldowns=32 cooldownsTruncated=true", 1, true))
+assert(cooldownText:find("cooldown +0.250 spellID=8232 baseSpellID=8232 " ..
+    "category=0 startRecoveryCategory=0 itemID=123 targetContext=target2", 1, true))
+
+-- Given an update outside the retained swing's three-second context window.
+-- When it arrives without a new swing.
+cooldownTracker:Cooldown(5, nil, { spellID = 8232 })
+
+-- Then that unrelated update cannot create another burst or report.
+assert(#cooldownTracker.bursts == 1 and #cooldownBurst.cooldowns == 32)
+
 -- Describe: Nature and Fire reports cannot freeze a physical-proc capture.
 -- Given the latest capture's two lines near a Nature cast between swings.
 local magicTracker = Tracker:New()
@@ -253,6 +290,7 @@ assert(tracker.records[rekeyedID].burstID == blocked.id)
 for index = 1, 30 do
     local retained = tracker:Swing(60 + index * 4, "target1", 0, true)
     for reportIndex = 1, 40 do
+        tracker:Cooldown(retained.at + 0.1, "target2", { spellID = 8232 })
         tracker:Report({}, {
             at = retained.at + 0.2, key = "target1", unit = "target",
             event = "damage", school = 1,
@@ -265,6 +303,12 @@ assert(#tracker.bursts == 8)
 local recordCount = 0
 for _ in pairs(tracker.records) do recordCount = recordCount + 1 end
 assert(recordCount <= 8 * 32)
+local cooldownCount = 0
+for _, retained in ipairs(tracker.bursts) do
+    assert(#retained.cooldowns == 32 and retained.cooldownsTruncated)
+    cooldownCount = cooldownCount + #retained.cooldowns
+end
+assert(cooldownCount == 8 * 32)
 assert(tracker.bursts[#tracker.bursts].truncated)
 assert(not tracker:NeedsAttention(burst), "expired burst remained eligible to freeze capture")
 print("Deep Windfury timeline tests passed")

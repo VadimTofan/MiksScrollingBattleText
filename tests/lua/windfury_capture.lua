@@ -7,7 +7,27 @@ C_Timer = { After = function(delay, callback)
     timers[#timers + 1] = { at = now + delay, callback = callback }
 end }
 local ns = MikSBT.CombatEngine
-ns.TargetKey = function() return "target1" end
+local targetKey, cooldownAvailable, eventFrames = "target1", true, {}
+local COOLDOWN_EVENT = "SPELL_UPDATE_COOLDOWN"
+ns.TargetKey = function() return targetKey end
+ns.EventAvailable = function(event)
+    return C_EventUtils and C_EventUtils.IsEventValid(event)
+end
+C_EventUtils = { IsEventValid = function(event)
+    assert(event == COOLDOWN_EVENT)
+    return cooldownAvailable
+end }
+CreateFrame = function()
+    local frame = { events = {}, scripts = {} }
+    function frame:RegisterEvent(event) self.events[event] = true end
+    function frame:UnregisterEvent(event) self.events[event] = nil end
+    function frame:SetScript(script, callback) self.scripts[script] = callback end
+    function frame:Fire(event, ...)
+        if self.events[event] then self.scripts.OnEvent(self, event, ...) end
+    end
+    eventFrames[#eventFrames + 1] = frame
+    return frame
+end
 ns.ActiveWindfurySpell = function() return 8232 end
 ns.SpellFacts = function(spell)
     return { direct = true, school = spell == 17364 and 1 or 8 }
@@ -93,6 +113,97 @@ local function Advance(seconds)
         end
     end
 end
+
+-- Describe: public cooldown metadata remains opt-in, bounded context only.
+-- Given capture has never been enabled and cooldown support is unavailable.
+assert(#eventFrames == 0, "loading diagnostics created an event frame")
+cooldownAvailable = false
+
+-- When capture starts on an unsupported client.
+capture:Start()
+
+-- Then it does not create or register a cooldown observer.
+assert(#eventFrames == 0, "unsupported cooldown event was registered")
+capture:Stop()
+
+-- Given no API can positively establish the event's availability.
+local eventUtils = C_EventUtils
+C_EventUtils = nil
+cooldownAvailable = true
+
+-- When capture starts without that capability API.
+capture:Start()
+
+-- Then legacy availability defaults cannot register the observer.
+assert(#eventFrames == 0, "missing capability API registered cooldown capture")
+capture:Stop()
+C_EventUtils = eventUtils
+
+-- Given supported cooldown metadata and a swing with no proc evidence.
+capture:Start()
+local cooldownFrame = eventFrames[1]
+assert(cooldownFrame and cooldownFrame.events[COOLDOWN_EVENT],
+    "active supported capture did not register cooldown metadata")
+cooldownFrame:Fire(COOLDOWN_EVENT, 8232)
+assert(#capture.model.bursts == 0,
+    "cooldown update created a burst without a swing")
+local cooldownBurst = capture.model:Swing(now, "target1", 0, true)
+
+-- When repeated, nullable, and secret payloads arrive through the native frame.
+cooldownFrame:Fire(COOLDOWN_EVENT, 8232, nil, 0, 0, nil)
+cooldownFrame:Fire(COOLDOWN_EVENT, 8232, nil, 0, 0, nil)
+cooldownFrame:Fire(COOLDOWN_EVENT, nil, opaque, opaque, opaque, opaque)
+cooldownFrame:Fire(COOLDOWN_EVENT, opaque, 123, opaque, 0, 456)
+now = now + 0.25
+targetKey = "target2"
+cooldownFrame:Fire(COOLDOWN_EVENT, 321, 322, 0, 7, 456)
+
+-- Then only public numbers survive, including zero, without deduplicating them.
+assert(#cooldownBurst.cooldowns == 5, "repeated cooldown updates were lost")
+assert(cooldownBurst.cooldowns[1].spellID == 8232)
+assert(cooldownBurst.cooldowns[2].spellID == 8232)
+assert(cooldownBurst.cooldowns[1].category == 0)
+for _, field in ipairs({ "spellID", "baseSpellID", "category",
+    "startRecoveryCategory", "itemID" }) do
+    assert(cooldownBurst.cooldowns[3][field] == nil,
+        "nullable or secret cooldown field reached the model: " .. field)
+end
+assert(cooldownBurst.cooldowns[4].spellID == nil)
+assert(cooldownBurst.cooldowns[4].baseSpellID == 123)
+assert(cooldownBurst.cooldowns[4].category == nil)
+assert(cooldownBurst.cooldowns[4].startRecoveryCategory == 0)
+assert(cooldownBurst.cooldowns[4].itemID == 456)
+assert(cooldownBurst.cooldowns[5].at == now)
+assert(cooldownBurst.cooldowns[5].targetContext == "target2")
+assert(cooldownBurst.key == "target1", "cooldown context changed burst ownership")
+targetKey = opaque
+cooldownFrame:Fire(COOLDOWN_EVENT)
+assert(cooldownBurst.cooldowns[6].targetContext == nil,
+    "secret target context reached the report")
+local cooldownSummary = capture.model:Summary(cooldownBurst)
+assert(cooldownSummary.expected == 0 and cooldownSummary.estimated == 0)
+assert(cooldownSummary.damage == 0 and cooldownSummary.rawDamage == 0)
+assert(cooldownSummary.confirmations == 0 and #cooldownBurst.reports == 0)
+assert(not capture.model:NeedsAttention(cooldownBurst))
+local cooldownReport = capture.model:ReportText()
+assert(cooldownReport:find("Cooldown updates are unconfirmed", 1, true))
+assert(cooldownReport:find("cooldown +0.250 spellID=321 baseSpellID=322 " ..
+    "category=0 startRecoveryCategory=7 itemID=456 targetContext=target2", 1, true))
+
+-- When capture stops and a stale callback is attempted.
+capture:Stop()
+assert(not cooldownFrame.events[COOLDOWN_EVENT],
+    "stopping capture left its cooldown event registered")
+cooldownFrame:Fire(COOLDOWN_EVENT, 999)
+local callback = cooldownFrame.scripts.OnEvent
+if callback then callback(cooldownFrame, COOLDOWN_EVENT, 999) end
+
+-- Then the stopped model remains unchanged and the frame can be reused.
+assert(#cooldownBurst.cooldowns == 6, "stopped capture observed a cooldown")
+targetKey = "target1"
+capture:Start()
+assert(#eventFrames == 1 and cooldownFrame.events[COOLDOWN_EVENT])
+capture:Stop()
 
 -- Given capture is explicitly enabled with a normal outgoing configuration.
 capture:Start()

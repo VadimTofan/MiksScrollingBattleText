@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Opt-in Windfury reports now include bounded public cooldown-update metadata.
+  Updates remain unconfirmed context and never create damage or spell names.
 - Unknown and ambiguous outgoing spells now show numbers without an icon or
   question mark. Reused scrolling lines release their previous icon.
 - Kept delayed damage, casts, and swings tied to their creature's lifetime.

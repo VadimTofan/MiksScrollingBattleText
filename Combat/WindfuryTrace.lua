@@ -12,7 +12,7 @@ end
 function Tracker:Swing(at, key, hand, active)
     self.nextID = self.nextID + 1
     local burst = { id = self.nextID, at = at, key = key, hand = hand,
-        active = active, reports = {}, lines = {}, casts = {} }
+        active = active, reports = {}, lines = {}, casts = {}, cooldowns = {} }
     self.bursts[#self.bursts + 1] = burst
     if #self.bursts > 8 then
         local expired = table.remove(self.bursts, 1)
@@ -44,6 +44,24 @@ function Tracker:Cast(at, key, spell, weaponTrigger)
     if not burst or #burst.casts >= 32 then return end
     burst.casts[#burst.casts + 1] = {
         at = at, spell = spell, weaponTrigger = weaponTrigger == true,
+    }
+end
+
+function Tracker:Cooldown(at, targetContext, info)
+    -- Cooldown payloads have no target or ownership field. Keep the latest
+    -- swing's timing context without using the current target to match them.
+    local burst = self.bursts[#self.bursts]
+    if not burst or at < burst.at - 0.01 or at - burst.at > 3 then return end
+    if #burst.cooldowns >= 32 then
+        burst.cooldownsTruncated = true
+        return
+    end
+    burst.cooldowns[#burst.cooldowns + 1] = {
+        at = at, targetContext = targetContext,
+        spellID = info.spellID, baseSpellID = info.baseSpellID,
+        category = info.category,
+        startRecoveryCategory = info.startRecoveryCategory,
+        itemID = info.itemID,
     }
 end
 
@@ -203,6 +221,8 @@ function Tracker:ReportText()
         "Expected counts require an extra-attack grant; estimated counts are heuristic.",
         "Candidate grouping is separate from spell identity; identity=- means unnamed.",
         "Candidate evidence is timing/enchant based, not proof of spell identity.",
+        "Cooldown updates are unconfirmed; targetContext is the current " ..
+            "target, not a spell target or ownership evidence.",
         "Dispatch means animation requested, not proof of visible pixels.",
     }
     for _, burst in ipairs(self.bursts) do
@@ -210,12 +230,14 @@ function Tracker:ReportText()
         rows[#rows + 1] = string.format(
             "Swing #%d %.3f key=%s hand=%s enchant=%s expected=%d estimated=%d " ..
             "WF damage=%d miss=%d normal=%d raw=%d/%d other=%d unknown=%d " ..
-            "forwarded=%d dispatches=%d merged=%s truncated=%s",
+            "forwarded=%d dispatches=%d merged=%s truncated=%s " ..
+            "cooldowns=%d cooldownsTruncated=%s",
             burst.id, burst.at, Value(burst.key), Value(burst.hand),
             Value(burst.active), s.expected, s.estimated, s.damage, s.misses, s.normal,
             s.rawDamage, s.rawMisses, s.rejected, s.unknown,
             s.forwarded, s.displays,
-            Value(s.merged), Value(burst.truncated))
+            Value(s.merged), Value(burst.truncated),
+            #burst.cooldowns, Value(burst.cooldownsTruncated))
         for _, line in ipairs(burst.lines) do
             rows[#rows + 1] = string.format("  log +%.3f %s %s",
                 line.at - burst.at, Value(line.kind), Value(line.source))
@@ -224,6 +246,15 @@ function Tracker:ReportText()
             rows[#rows + 1] = string.format(
                 "  cast +%.3f spell=%d weaponTrigger=%s",
                 cast.at - burst.at, cast.spell, Value(cast.weaponTrigger))
+        end
+        for _, cooldown in ipairs(burst.cooldowns) do
+            rows[#rows + 1] = string.format(
+                "  cooldown +%.3f spellID=%s baseSpellID=%s category=%s " ..
+                "startRecoveryCategory=%s itemID=%s targetContext=%s",
+                cooldown.at - burst.at, Value(cooldown.spellID),
+                Value(cooldown.baseSpellID), Value(cooldown.category),
+                Value(cooldown.startRecoveryCategory), Value(cooldown.itemID),
+                Value(cooldown.targetContext))
         end
         for _, id in ipairs(burst.reports) do
             local e = self.records[id]
