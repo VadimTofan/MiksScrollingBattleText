@@ -533,11 +533,6 @@ local function ProfileTab_Create()
 	)
 	controls.profileDropdown = dropdown
 
-	for profileName in pairs(MSBTProfiles.savedVariables.profiles) do
-		dropdown:AddItem(profileName, profileName)
-	end
-	dropdown:Sort()
-
 	local button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["copyProfile"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
@@ -610,12 +605,19 @@ local function ProfileTab_Create()
 	button:SetClickHandler(function() ProfileTab_ShowTransfer(false) end)
 	controls.importProfileButton = button
 
-	ProfileTab_Populate()
 	tabFrame.created = true
 end
 
+-- Profiles can change outside this tab, for instance in another design, so the list is rebuilt
+-- on every show.
 local function ProfileTab_OnShow()
 	if (not tabFrames.profile.created) then ProfileTab_Create() end
+	local dropdown = tabFrames.profile.controls.profileDropdown
+	dropdown:Clear()
+	for profileName in pairs(MSBTProfiles.savedVariables.profiles) do
+		dropdown:AddItem(profileName, profileName)
+	end
+	dropdown:Sort()
 	ProfileTab_Populate()
 end
 

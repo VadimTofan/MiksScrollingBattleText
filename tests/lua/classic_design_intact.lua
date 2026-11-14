@@ -968,3 +968,33 @@ end)
 for _, message in ipairs(docked.errors) do print("docked: " .. message) end
 assert(#docked.errors == 0, "the docked walk failed")
 assert(next(docked.skinned) and docked.shownClassic > 0, "the docked walk skinned or opened no popup, so it proves nothing")
+
+-- Given the classic Profile tab was shown, and the profiles then change outside it, as another
+-- design can change them.
+local profileDropdown
+local relisted = Run(function(world)
+	local G = world.G
+	Command(world)
+	local tabs = G.MSBTOptions.Main.GetTabs()
+	local profileTab
+	for _, tab in ipairs(tabs) do
+		SelectTab(world, tab)
+		local dropdown = Collect(world, function(obj)
+			return obj.buttonFrame and obj.itemIDs and obj.itemIDs[1] == "Alt" and Visible(obj)
+		end)[1]
+		if dropdown then profileTab, profileDropdown = tab, dropdown end
+	end
+	assert(profileTab and #profileDropdown.itemIDs == 2, "the classic Profile tab does not list both profiles")
+	local profiles = G.MikSBT.Profiles.savedVariables.profiles
+	profiles.Restored, profiles.Alt = profiles.Alt, nil
+
+	-- When another tab and then the Profile tab is shown again.
+	SelectTab(world, tabs[1])
+	SelectTab(world, profileTab)
+end)
+
+-- Then its list holds exactly the current profiles, with the current one selected.
+assert(#relisted.errors == 0, "a step of the profile walk failed")
+assert(#profileDropdown.itemIDs == 2 and profileDropdown.itemIDs[1] == "Default"
+	and profileDropdown.itemIDs[2] == "Restored", "the classic Profile tab lists stale profiles")
+assert(profileDropdown:GetSelectedID() == "Default", "the current profile is not selected")
