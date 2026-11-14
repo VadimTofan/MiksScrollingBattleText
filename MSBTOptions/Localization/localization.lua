@@ -56,6 +56,48 @@ L.MSG_ITEMS							= "Items"
 L.MSG_ITEM_ALREADY_EXISTS			= "Item name already exists."
 L.MSG_INVALID_ITEM_NAME				= "Invalid item name."
 L.MSG_CLASSIC_DESIGN				= "Classic"
+L.MSG_FOREVER_DESIGN				= "Forever"
+
+L.WINDOW = {
+	subtitle = "Options \194\183 %s",
+	groupDisplay = "Display", groupEvents = "Events", groupMore = "More",
+	incoming = "Incoming", incomingHint = "What others do to you: damage, healing, misses.",
+	outgoing = "Outgoing", outgoingHint = "What you do to others: damage, healing, misses.",
+	pet = "Pet", petHint = "What your pet does and what is done to it.",
+	notifications = "Notifications", notificationsHint = "Buffs, debuffs, power, procs and other notices.",
+	changes = "Changes", changesHint = "Every setting changed since login. Undo one or all of them.",
+	changesCount = "Changes since login: %d",
+	noChanges = "No changes since login.",
+	unset = "-",
+	cancel = "Cancel", cancelTooltip = "Restore the settings from when the window was opened or last applied, then close.",
+	apply = "Apply", applyTooltip = "Keep the changes. Cancel returns to this point from now on.",
+	undo = "Undo", undoTooltip = "Restore this setting to its value at login.",
+	undoAll = "Undo all", undoAllTooltip = "Restore every setting to its value at login.",
+	allOn = "All on", allOnTooltip = "Turn on every event on this page.",
+	allOff = "All off", allOffTooltip = "Turn off every event on this page.",
+	columnOn = "On", columnEvent = "Event", columnPreview = "Preview", columnArea = "Area", columnSound = "Sound",
+	color = "Color", sampleName = "Someone", sampleSkill = "Ability",
+	sampleItem = "Potion", sampleMoney = "1 Gold 23 Silver",
+	headerMelee = "Melee", headerSpells = "Spells", headerHealing = "Healing", headerOther = "Other",
+	resources = "Resources", resourcesTooltip = "Choose which resources Resource Gains shows.",
+	font = "Font", fontTooltip = "Back to the font of this event.",
+	scrollAreasHint = "Where the text appears and how it moves. Drag an area on the sketch to move it.",
+	onScreen = "Configure on screen", onScreenTooltip = "Hide this window and move the scroll areas on the game screen.",
+	resizeTooltip = "Drag to resize the window. Right-click resets the size.",
+}
+
+obj = L.WINDOW
+obj.fontsColors = "Fonts & Colors"
+obj.fontsColorsHint = "Fonts, partial effects and colors that events and scroll areas inherit."
+obj.search = "Event search"
+obj.searchTooltip = "Type part of an event name to list matching events of every category."
+obj.searchHint = "Events of every category whose name contains the search text."
+obj.edit = "Edit"
+obj.currentProfile = "Current profile: %s"
+obj.noSounds = "No custom sounds yet."
+obj.remove = "Remove"
+obj.removeTooltip = "Remove this sound from your saved sounds. Until the next reload it can still be chosen and played, here and in other addons, and adding it again replaces it in MSBT."
+obj.resetProfile = "Reset Profile"
 
 L.CUSTOM_FONTS = {
 	add = "Add custom font",

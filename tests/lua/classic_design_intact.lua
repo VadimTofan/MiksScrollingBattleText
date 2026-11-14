@@ -246,6 +246,10 @@ local function NewWorld()
 	G.GameTooltip = setmetatable({}, { __index = function() return Noop end })
 	G.NORMAL_FONT_COLOR = { r = 1, g = 0.82, b = 0 }
 	G.HIGHLIGHT_FONT_COLOR = { r = 1, g = 1, b = 1 }
+	-- Like the client: Blizzard's options art is there, so the new design wears it.
+	G.C_Texture = { GetAtlasInfo = function() return { width = 1, height = 1 } end }
+	-- The preview reopens the new window after a delay; here at once.
+	G.C_Timer = { After = function(_, callback) callback() end }
 	setmetatable(G, { __index = function(_, key)
 		if type(key) == "string" and key:match("Font") and key:match("^%u") then
 			G[key] = { fontName = key }
@@ -323,54 +327,11 @@ local function NewProfiles(world)
 		Main = { damageColorProfileEntries = {}, damageTypeMap = {} },
 		DisplayMessage = Noop, CopyTable = Copy,
 	}
-end
-
--- A second design with no more than the shared code asks of one: a window with the button that
--- positions the scroll areas, popups of its own with a skin, and a Cancel that returns the profile
--- to how it was when the window opened, kept while the window is only put away.
-local STUB = "stub"
-local function RegisterStubDesign(world)
-	local G = world.G
-	local Options = G.MSBTOptions
-	local design, frame, ownPopups, base = { label = "Stub" }
-	function design.Show()
-		-- Another design took the popups since this window was put away, so its base is stale.
-		if Options.Popups.GetPopupFrames() ~= ownPopups then base = nil end
-		Options.Popups.UseDesignPopups(STUB)
-		ownPopups = Options.Popups.GetPopupFrames()
-		if not frame then
-			frame = G.CreateFrame("Frame", "MSBTOptionsStubFrame", G.UIParent)
-			Options.Controls.CreateOptionButton(frame):SetClickHandler(Options.Tabs.scrollAreas.ConfigureOnScreen)
-		end
-		frame:Show()
-		if not base then
-			base = {}
-			for key, value in pairs(G.MikSBT.Profiles.currentProfile) do base[key] = value end
-		end
-	end
-	function design.Hide(comesBack)
-		if frame then frame:Hide() end
-		Options.Main.HidePopups()
-		if not comesBack then
-			base = nil
-			Options.Popups.UseDesignPopups("classic")
-		end
-	end
-	function design.IsShown() return frame ~= nil and frame:IsShown() end
-	-- Only a popup made for the new design may receive its skin.
-	function design.SkinPopup(popup)
-		world.skinned[popup] = true
-		if not popup.id:find("^design:") then
-			world.errors[#world.errors + 1] = "the new design skinned the classic popup " .. popup.id
-		end
-	end
-	function design.Cancel()
-		local profile = G.MikSBT.Profiles.currentProfile
-		for key in pairs(profile) do profile[key] = nil end
-		for key, value in pairs(base) do profile[key] = value end
-	end
-	world.stub = design
-	Options.Designs.Register(STUB, design)
+	setfenv(assert(loadfile("Configuration/ProfileSnapshots.lua")), G)()
+	local snapshots = G.MikSBT.Configuration.ProfileSnapshots:New({
+		savedVariables = saved, savedVariablesPerChar = perChar, selectProfile = Select })
+	function Profiles.GetProfileSnapshots() return snapshots end
+	snapshots:UpdateLoginSnapshot(true)
 end
 
 -- Loads the options files in the order of the TOC.
@@ -392,13 +353,24 @@ local function LoadOptions(world)
 		elseif path:find("OptionsPopups.lua", 1, true) then
 			local use = Options.Popups.UseDesignPopups
 			Options.Popups.UseDesignPopups = function(key) world.designPopups = key ~= "classic" use(key) end
+		-- Only a popup made for the new design may receive its skin.
+		elseif path:find("/Window.lua", 1, true) then
+			local design = Options.Designs.designs.forever
+			local skin = design.SkinPopup
+			design.SkinPopup = function(frame)
+				-- Recorded apart from the flag that names the popups, which the code under test also sets.
+				world.skinned[frame] = true
+				if not frame.id:find("^design:") then
+					world.errors[#world.errors + 1] = "the new design skinned the classic popup " .. frame.id
+				end
+				skin(frame)
+			end
 		end
 	end
-	RegisterStubDesign(world)
 end
 
 local function InNewWindow(world, obj)
-	local window = world.G.MSBTOptionsStubFrame
+	local window = world.G.MSBTOptionsWindowFrame
 	local node = obj
 	while node do
 		if node.singleton then return false end
@@ -474,6 +446,10 @@ end
 local function OpenDropdowns(world, label)
 	for _, dropdown in ipairs(Collect(world, function(obj) return obj.buttonFrame and Visible(obj) end)) do
 		if Try(world, label .. "/" .. dropdown.id, Click, dropdown.buttonFrame) then
+			-- The new design opens a list of its own and leaves the shared one alone.
+			if label:find("^new") and world.sharedList.shown then
+				world.errors[#world.errors + 1] = label .. ": the shared list opened for " .. dropdown.id
+			end
 			Snap(world, label .. " list of " .. dropdown.id)
 			if world.sharedList.shown then Click(dropdown.buttonFrame) end
 			Snap(world, label .. " list closed")
@@ -546,7 +522,7 @@ local function Under(obj, root)
 end
 
 -- Chooses an option of the visible options design dropdown, as a click on its list does; the
--- classic window's list is the shared one.
+-- classic window's list is the shared one, the new window's a list under the dropdown.
 -- Like /msbt followed by a design, or alone without one: the choice is saved and the options open.
 local function Command(world, design)
 	local Designs = world.G.MSBTOptions.Designs
@@ -623,13 +599,13 @@ end
 -- options command then has nothing to open. The new design is chosen, which must change nothing.
 local function DockedWalk(world, round)
 	local G = world.G
-	local Main = G.MSBTOptions.Main
-	assert(G.MSBTOptions.Designs.Select(STUB))
+	local Main, Window = G.MSBTOptions.Main, G.MSBTOptions.Window
+	assert(G.MSBTOptions.Designs.Select("forever"))
 	for _, tab in ipairs(Main.GetTabs()) do
 		local panel = G.CreateFrame("Frame", nil, G.UIParent)
 		Main.DockMainFrame(panel, Noop, tab.index)
 		Command(world)
-		assert(Main.IsDocked() and not world.stub.IsShown(), round .. ": the new window opened beside the docked view")
+		assert(Main.IsDocked() and not Window.IsShown(), round .. ": the new window opened beside the docked view")
 		Snap(world, round .. " tab " .. tab.text)
 		OpenDropdowns(world, round .. " " .. tab.text)
 		OpenPopups(world, round .. " " .. tab.text)
@@ -638,13 +614,30 @@ local function DockedWalk(world, round)
 	end
 end
 
--- The new window: every popup of its own set with the dropdowns in it, and the configuration on screen.
+local function ClickEntry(world, key)
+	Click(assert(Collect(world, function(obj) return obj.key == key end)[1], "no entry " .. key))
+end
+
+-- The new window: every sidebar page, its dropdowns and popups, the search field.
 local function NewWindowWalk(world, round)
 	local G = world.G
-	Command(world, STUB)
-	assert(world.stub.IsShown(), "the new window did not open")
-	OpenEveryPopup(world, round, G.MSBTOptionsStubFrame)
+	Command(world, "forever")
+	assert(G.MSBTOptions.Window.IsShown(), "the new window did not open")
+	for _, entry in ipairs(Collect(world, function(obj) return obj.key and obj.scripts.OnClick end)) do
+		Try(world, round .. " page " .. entry.key, Click, entry)
+		Snap(world, round .. " page " .. entry.key)
+		OpenDropdowns(world, round .. " " .. entry.key)
+		OpenPopups(world, round .. " " .. entry.key)
+	end
+	OpenEveryPopup(world, round, G.MSBTOptionsWindowFrame)
+	local search = Collect(world, function(obj) return obj.kind:lower() == "editbox" and Visible(obj) end)[1]
+	search:SetText("font")
+	Snap(world, round .. " search")
+	search:SetText("")
+	Snap(world, round .. " search cleared")
+	ClickEntry(world, "scrollAreas")
 	Try(world, round .. " on screen", ConfigureOnScreen, world, round)
+	ClickEntry(world, "general")
 end
 
 local function Run(scenario)
@@ -732,9 +725,10 @@ local function OnScreenFromNewWindow(world, classicBuilt)
 	local G = world.G
 	world.classicPopups = G.MSBTOptions.Popups.GetPopupFrames()
 	if classicBuilt then Command(world, "classic") end
-	Command(world, STUB)
+	Command(world, "forever")
 	world.newShown = 0
-	G.MSBTOptionsStubFrame:HookScript("OnShow", function() world.newShown = world.newShown + 1 end)
+	G.MSBTOptionsWindowFrame:HookScript("OnShow", function() world.newShown = world.newShown + 1 end)
+	ClickEntry(world, "scrollAreas")
 	local handler = G.MSBTOptions.Tabs.scrollAreas.ConfigureOnScreen
 	Click(assert(Collect(world, function(obj) return obj.clickHandler == handler and Visible(obj) end)[1],
 		"no visible Configure on screen button"))
@@ -751,8 +745,8 @@ local function FreshCancelBase(world)
 	local G = world.G
 	G.MikSBT.Profiles.SetOption(nil, "stackSimilarHits", true)
 	Command(world)
-	if not G.MSBTOptionsStubFrame.shown then return false end
-	world.stub.Cancel()
+	if not G.MSBTOptionsWindowFrame.shown then return false end
+	Press(world, G.MSBTOptionsWindowFrame, G.MikSBT.translations.WINDOW.cancelTooltip)
 	return rawget(G.MikSBT.Profiles.currentProfile, "stackSimilarHits") == true
 end
 
@@ -797,14 +791,14 @@ for _, classicBuilt in ipairs({ false, true }) do
 		Command(world, "classic")
 		during.configShown = config.shown
 		during.classicShown = G.MSBTMainOptionsFrame ~= nil and Visible(G.MSBTMainOptionsFrame)
-		during.newShown = G.MSBTOptionsStubFrame.shown
+		during.newShown = G.MSBTOptionsWindowFrame.shown
 		Press(world, config, G.MikSBT.translations.BUTTONS.genericSave.tooltip)
 	end)
 	local G = world.G
 	-- Then nothing opens while the configuration is open, and the classic window opens when it ends.
 	assert(during.configShown and not during.classicShown and not during.newShown,
 		label .. ": a window opened over the configuration")
-	assert(G.MSBTMainOptionsFrame and Visible(G.MSBTMainOptionsFrame) and not G.MSBTOptionsStubFrame.shown
+	assert(G.MSBTMainOptionsFrame and Visible(G.MSBTMainOptionsFrame) and not G.MSBTOptionsWindowFrame.shown
 		and not config.shown, label .. ": not exactly the classic window is open at the end")
 	assert(G.MikSBT.Animations.scrollAreas.Incoming.offsetX == 77, label .. ": the saved configuration was lost")
 	assert(#world.errors == 0, label .. ": a step failed")
@@ -819,9 +813,10 @@ do
 		local config = OnScreenFromNewWindow(world, false)
 		Command(world)
 		during.configShown = config.shown
-		during.newShown = G.MSBTOptionsStubFrame.shown
-		Press(world, config, G.MikSBT.translations.BUTTONS.genericSave.tooltip)
-		back = G.MSBTOptionsStubFrame.shown and not config.shown
+		during.newShown = G.MSBTOptionsWindowFrame.shown
+		-- A window that opens closes the configuration, and then there is nothing left to save.
+		if config.shown then Press(world, config, G.MikSBT.translations.BUTTONS.genericSave.tooltip) end
+		back = G.MSBTOptionsWindowFrame.shown and not config.shown
 	end)
 	-- Then the new window, which has no check of its own, stays away while the configuration is
 	-- open and comes back when it ends.
@@ -836,15 +831,15 @@ for _, button in ipairs({ "genericSave", "genericCancel" }) do
 	local world = Run(function(world)
 		local G = world.G
 		local Profiles = G.MikSBT.Profiles
-		Command(world, STUB)
+		Command(world, "forever")
 		Profiles.SetOption(nil, "shortenNumbers", true)
 		-- The classic window is never built here, so nothing but the new window can come back.
 		local config = OnScreenFromNewWindow(world, false)
 		Press(world, config, G.MikSBT.translations.BUTTONS[button].tooltip)
-		back = G.MSBTOptionsStubFrame.shown and not G.MSBTMainOptionsFrame
+		back = G.MSBTOptionsWindowFrame.shown and not G.MSBTMainOptionsFrame
 			and G.MSBTOptions.Popups.GetPopupFrames().scrollAreaConfigFrame == config
 		if back then
-			world.stub.Cancel()
+			Press(world, G.MSBTOptionsWindowFrame, G.MikSBT.translations.WINDOW.cancelTooltip)
 			keptBase = rawget(Profiles.currentProfile, "shortenNumbers") == nil
 		end
 	end)
@@ -859,12 +854,12 @@ do
 	local open = {}
 	local world = Run(function(world)
 		local G = world.G
-		Command(world, STUB)
-		local window = G.MSBTOptionsStubFrame
+		Command(world, "forever")
+		local window = G.MSBTOptionsWindowFrame
 		G.MSBTOptions.Popups.ShowAcknowledge({ parentFrame = window, anchorFrame = window })
 		local popup = G.MSBTOptions.Popups.GetPopupFrames().acknowledgeFrame
 		open.before = popup.shown
-		world.stub.Hide()
+		G.MSBTOptions.Designs.designs.forever.Hide()
 		open.after = popup.shown
 	end)
 	-- Then the shared HidePopups closed the popup with the window.
@@ -882,7 +877,7 @@ do
 		G.MSBTOptions.Designs.Register("third", { label = "Third", Show = Noop, Hide = Noop,
 			IsShown = function() return false end, SkinPopup = function(frame) world.thirdSkinned[frame] = true end })
 		local parent = G.CreateFrame("Frame", nil, G.UIParent)
-		for _, key in ipairs({ STUB, "third", "classic" }) do
+		for _, key in ipairs({ "forever", "third", "classic" }) do
 			Popups.UseDesignPopups(key)
 			OpenEveryPopup(world, key, parent)
 			sets[key] = Popups.GetPopupFrames()
@@ -890,13 +885,13 @@ do
 	end)
 	-- Then the third design's popups are its own and wore its skin alone, the new design's never
 	-- wore it, and no classic popup went through a skin.
-	for name, frame in pairs(sets[STUB]) do
+	for name, frame in pairs(sets.forever) do
 		assert(world.skinned[frame] and not world.thirdSkinned[frame], "the new design's " .. name .. " wore the wrong skin")
 	end
 	local third = 0
 	for name, frame in pairs(sets.third) do
 		third = third + 1
-		assert(frame ~= sets[STUB][name] and frame ~= sets.classic[name], "the third design shares the popup " .. name)
+		assert(frame ~= sets.forever[name] and frame ~= sets.classic[name], "the third design shares the popup " .. name)
 		assert(world.thirdSkinned[frame] and not world.skinned[frame], "the third design's " .. name .. " wore the wrong skin")
 	end
 	assert(third > 0, "the third design opened no popup, so it proves nothing")
@@ -913,19 +908,20 @@ local classic = Run(function(world)
 	ClassicWalk(world, "classic2")
 end)
 
--- Given the new window used first, then switched to classic by its choice of design and back by
--- the design dropdown.
+-- Given the new window used first, then switched to classic and back by the design dropdown.
 local mixed = Run(function(world)
 	NewWindowWalk(world, "new1")
-	assert(world.G.MSBTOptions.Designs.Select("classic"))
+	ClickEntry(world, "general")
+	ChooseDesign(world, "classic")
 	assert(world.G.MSBTMainOptionsFrame.shown, "choosing classic did not open the classic window")
 	ClassicWalk(world, "classic1")
 	-- When the classic General tab chooses the new design, and the new window chooses classic again.
 	local Main = world.G.MSBTOptions.Main
 	SelectTab(world, Main.GetTabs()[1])
-	ChooseDesign(world, STUB)
+	ChooseDesign(world, "forever")
 	NewWindowWalk(world, "new2")
-	assert(world.G.MSBTOptions.Designs.Select("classic"))
+	ClickEntry(world, "general")
+	ChooseDesign(world, "classic")
 	ClassicWalk(world, "classic2")
 end)
 
@@ -942,17 +938,17 @@ for _, message in ipairs(mixed.errors) do print("mixed: " .. message) end
 for index = 1, math.min(#failures, 40) do print(failures[index]) end
 assert(#classic.errors == 0 and #mixed.errors == 0, "a walk step failed")
 assert(#failures == 0, #failures .. " classic properties differ after the new window was used")
--- And the walks reached the movers: the classic ones were compared, the new design made its own.
-local classicMovers, designMovers = 0, 0
+-- And the walks reached the movers: the classic ones were compared, the new design's wear its skin.
+local classicMovers, skinnedMovers = 0, 0
 for id in pairs(objects) do
 	if id:find("CreateScrollAreaMoverFrame", 1, true) and not id:find("^design:") then classicMovers = classicMovers + 1 end
 end
 for _, obj in ipairs(mixed.all) do
-	if obj.site == "CreateScrollAreaMoverFrame" and obj.id:find("^design:") then
-		designMovers = designMovers + 1
+	if obj.site == "CreateScrollAreaMoverFrame" and obj.id:find("^design:") and obj.scripts.OnEnter then
+		skinnedMovers = skinnedMovers + 1
 	end
 end
-assert(classicMovers > 0 and designMovers > 0, "the walks compared no classic mover or made none for the new design")
+assert(classicMovers > 0 and skinnedMovers > 0, "the walks compared no classic mover or skinned none of the new design")
 local objectCount = 0
 for _ in pairs(objects) do objectCount = objectCount + 1 end
 print(string.format("classic design intact: 2 rounds, %d steps, %d objects, %d properties compared",
@@ -969,8 +965,8 @@ for _, message in ipairs(docked.errors) do print("docked: " .. message) end
 assert(#docked.errors == 0, "the docked walk failed")
 assert(next(docked.skinned) and docked.shownClassic > 0, "the docked walk skinned or opened no popup, so it proves nothing")
 
--- Given the classic Profile tab was shown, and the profiles then change outside it, as another
--- design can change them.
+-- Given the classic Profile tab was shown, and the profiles then change outside it, as an undo
+-- in the new window does.
 local profileDropdown
 local relisted = Run(function(world)
 	local G = world.G
