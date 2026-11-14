@@ -189,6 +189,13 @@ local function LocalizedSchoolFacts(text, locale)
     if school then return { school = school } end
 end
 
+local function CatalogFacts(spell)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if client and client.isForever and ns.CatalogSpellFacts then
+        return ns.CatalogSpellFacts(spell)
+    end
+end
+
 -- The facts for a spell ID, cached; nil until its text has loaded.
 function ns.SpellFacts(spell)
     if type(spell) ~= "number" then return nil end
@@ -205,16 +212,28 @@ function ns.SpellFacts(spell)
             C_Spell.RequestLoadSpellData(spell)
         end
     end
+    local verified = CatalogFacts(spell)
+    if verified then
+        -- Retain optional tooltip amounts/proc hints. Verified identity fields
+        -- win even when a localized description is incomplete or unavailable.
+        facts = facts or {}
+        for field, value in pairs(verified) do facts[field] = value end
+        -- Missing identity fields are authoritative too: a direct-only spell
+        -- has no periodic duration, and Shoot's school is set by its wand.
+        facts.school = verified.school
+        facts.period = verified.period
+        facts.duration = verified.duration
+    end
     -- Whether it is cast on yourself or friends (0.3.38: a resist of yours
     -- had gone to the Life Tap cast just before it). This API is locale-neutral.
     if C_Spell and type(C_Spell.IsSpellHelpful) == "function" then
         local ok, helpful = pcall(C_Spell.IsSpellHelpful, spell)
         if ok and ns.Bool(helpful) then
-            if helpful then
+            if helpful and not verified then
                 facts = facts or {}
                 facts.damages = false
             end
-            if facts then facts.helpful = helpful end
+            if facts and not verified then facts.helpful = helpful end
         end
     end
     if facts then cache[spell] = facts end

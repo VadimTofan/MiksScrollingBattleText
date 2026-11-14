@@ -140,8 +140,9 @@ mine:Cast("player", 1130, "other-target", 100)
 local fallback = mine:Hit("target", "miss", 1, 100.4,
     true, true, nil, false, "direct", nil, "MISS")
 
--- Then that fallback also respects the direct-spell confirmation.
-assert(Is(fallback, "you", 1130), "confirmed fallback spell miss lost its icon")
+-- Then ownership survives without borrowing another target's spell.
+assert(fallback.who == "you" and fallback.spell == nil,
+    "confirmed miss borrowed a spell from another target")
 
 -- Given a recent ranged shot with no pet or spell to explain a parry.
 for _, restrict in ipairs({ "shot", "unknown" }) do
@@ -167,7 +168,7 @@ for _, restrict in ipairs({ "shot", "unknown" }) do
         false, true, nil, false, source, nil, "PARRY")
 
     -- Then it agrees with ranking and leaves the shot available.
-    assert(parry.who == "other" and not mine.swings[1].used)
+    assert(parry.who == "unknown" and not mine.swings[1].used)
 end
 
 -- Given a spell cast from afar, then a dodge that came with a spell's miss
@@ -198,5 +199,6 @@ mine = New()
 local castless = mine:Hit("target", "miss", 1, 220.3,
     false, true, nil, false, "direct", nil, "DODGE")
 
--- Then it is left to someone else as before.
-assert(unsureFit == nil and unsure.who == "other" and castless.who == "other")
+-- Then untyped ownership stays unknown, while the typed miss remains unnamed.
+assert(unsureFit == nil and unsure.who == "unknown")
+assert(castless.who == "you" and castless.spell == nil and castless.missed)

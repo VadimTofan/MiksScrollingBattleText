@@ -450,20 +450,23 @@ function Presentation:Out(record)
 		and not record.icon then
 		icon = PetIcon()
 	end
-	if result.ambiguous or (result.proc and not spell) then
+	if result.ambiguous then
 		spell, icon = nil, GENERIC_SPELL_ICON
+	elseif not result.melee and not spell then
+		icon = icon or GENERIC_SPELL_ICON
 	end
 	if record.event == "damage" then
 		local isSpell = not result.melee or result.hand == "ranged"
 		local school = RestrictedValue:Number(record.school)
+		local candidateSpell = result.procCandidate and result.candidateSpell
 		if RestrictedValue:IsRestricted(record.amount) then
 			self.config.batcher:DisplayRestricted(
 				spell, record.amount, record.crit, icon, isSpell,
-				result.who == "pet", result.tick, key, school)
+				result.who == "pet", result.tick, key, school, candidateSpell)
 		else
 			self.config.batcher:Queue(
 				spell, record.amount, record.crit, icon, isSpell,
-				result.who == "pet", result.tick, key, nil, school)
+				result.who == "pet", result.tick, key, nil, school, candidateSpell)
 		end
 		return
 	end

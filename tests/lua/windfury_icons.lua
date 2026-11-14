@@ -20,10 +20,10 @@ C_PaperDollInfo = {
 }
 GetWeaponEnchantInfo = function() error("modern API must take precedence") end
 
--- When a confirmed physical proc needs its spell identity.
-local spell = engine.ProcSpell(10, 1)
+-- When a confirmed physical proc needs candidate evidence.
+local spell = engine.ProcCandidate(10, 1)
 
--- Then a shaman's uncertain physical proc uses the Windfury best guess.
+-- Then a shaman's uncertain physical proc retains Windfury candidate evidence.
 assert(spell == 8232, "shaman physical proc did not receive Windfury")
 
 -- Describe: a known bleed application makes its physical proc name uncertain.
@@ -36,14 +36,14 @@ engine.mine = { casts = {
 engine.SpellFacts = function() return bleedFacts end
 
 -- When an unidentified physical hit follows that application.
-local ambiguous = engine.ProcSpell(10.217, 1, "target1")
+local ambiguous = engine.ProcCandidate(10.217, 1, "target1")
 
 -- Then the hit does not receive an invented Windfury identity.
 assert(ambiguous == nil, "bleed application was labelled Windfury")
 
 -- When the target differs or the application ambiguity window is over.
-local otherTarget = engine.ProcSpell(10.217, 1, "target2")
-local laterProc = engine.ProcSpell(10.6, 1, "target1")
+local otherTarget = engine.ProcCandidate(10.217, 1, "target2")
+local laterProc = engine.ProcCandidate(10.6, 1, "target1")
 
 -- Then the normal Windfury fallback remains available.
 assert(otherTarget == 8232 and laterProc == 8232)
@@ -52,7 +52,7 @@ assert(otherTarget == 8232 and laterProc == 8232)
 bleedFacts.direct = true
 
 -- When its later proc is named.
-local directProc = engine.ProcSpell(10.217, 1, "target1")
+local directProc = engine.ProcCandidate(10.217, 1, "target1")
 
 -- Then ordinary weapon abilities do not disable Windfury naming.
 assert(directProc == 8232)
@@ -62,7 +62,7 @@ engine.mine, engine.SpellFacts = savedMine, savedFacts
 engine.reader.logLines = { { at = 10, source = "mine", kind = "extra" } }
 
 -- When a physical proc resolves beside that grant.
-spell = engine.ProcSpell(10, 1)
+spell = engine.ProcCandidate(10, 1)
 
 -- Then an extra-attack grant keeps the same shaman fallback.
 assert(spell == 8232, "extra-attack proc lost the Windfury fallback")
@@ -71,7 +71,7 @@ assert(spell == 8232, "extra-attack proc lost the Windfury fallback")
 engine.reader.procSources.enchant = { at = 0, spell = 602, school = 1 }
 
 -- When physical damage is unresolved, then the requested best guess applies.
-assert(engine.ProcSpell(10, 1) == 8232,
+assert(engine.ProcCandidate(10, 1) == 8232,
     "cached source bypassed the shaman Windfury fallback")
 engine.reader.procSources.enchant = nil
 
@@ -79,7 +79,7 @@ engine.reader.procSources.enchant = nil
 playerClass = "WARRIOR"
 
 -- When its uncertain physical proc is resolved.
-spell = engine.ProcSpell(10, 1)
+spell = engine.ProcCandidate(10, 1)
 
 -- Then the shaman-only fallback does not name its proc.
 assert(spell == nil, "another class received the shaman fallback")
@@ -99,21 +99,21 @@ end
 -- Given an expired enchant, replacement enchant, or off-hand Windfury.
 mainEnchant = nil
 assert(engine.ActiveWindfurySpell(1) == nil, "expired enchant was cached")
-assert(engine.ProcSpell(10, 1) == nil, "expired Windfury supplied an icon")
+assert(engine.ProcCandidate(10, 1) == nil, "expired Windfury supplied an icon")
 mainEnchant = { enchantID = 9999 }
 assert(engine.ActiveWindfurySpell(1) == nil, "unrelated enchant was named Windfury")
-assert(engine.ProcSpell(10, 1) == nil, "replacement imbue supplied Windfury")
+assert(engine.ProcCandidate(10, 1) == nil, "replacement imbue supplied Windfury")
 offEnchant = { enchantID = 283 }
 assert(engine.ActiveWindfurySpell(1) == 8232)
 
 -- Given a Fire proc, unknown school, or another game client.
 -- When the icon is requested, then Windfury is not assigned.
-assert(engine.ProcSpell(10, 4) == nil)
-assert(engine.ProcSpell(10, nil) == nil)
+assert(engine.ProcCandidate(10, 4) == nil)
+assert(engine.ProcCandidate(10, nil) == nil)
 assert(engine.ActiveWindfurySpell(4) == nil)
 assert(engine.ActiveWindfurySpell(nil) == nil)
 MikSBT.Compatibility.Client.isForever = false
-assert(engine.ProcSpell(10, 1) == nil)
+assert(engine.ProcCandidate(10, 1) == nil)
 assert(engine.ActiveWindfurySpell(1) == nil)
 MikSBT.Compatibility.Client.isForever = true
 
@@ -125,15 +125,15 @@ issecretvalue = function(value) return value == opaque end
 mainEnchant, offEnchant = { enchantID = opaque }, nil
 
 -- When a proc asks for its icon, then hidden values are not used as keys.
-assert(engine.ProcSpell(10, 1) == nil)
+assert(engine.ProcCandidate(10, 1) == nil)
 assert(engine.ActiveWindfurySpell(1) == nil)
 mainEnchant = opaque
-assert(engine.ProcSpell(10, 1) == nil)
+assert(engine.ProcCandidate(10, 1) == nil)
 assert(engine.ActiveWindfurySpell(1) == nil)
 
 -- Given the API fails, then no stale icon or alternative secret read is used.
 C_PaperDollInfo.GetTemporaryEnchantmentInfo = function() error("unavailable") end
-assert(engine.ProcSpell(10, 1) == nil)
+assert(engine.ProcCandidate(10, 1) == nil)
 assert(engine.ActiveWindfurySpell(1) == nil)
 
 -- Given an older client API shape supported by Forever.
@@ -163,6 +163,6 @@ GetWeaponEnchantInfo = nil
 engine.reader.procSources.oil = { at = 0, spell = 601, school = 4 }
 
 -- When ordinary proc sources resolve, then their existing behavior remains.
-assert(engine.ProcSpell(10, 4) == 601)
-assert(engine.ProcSpell(10, 1) == nil)
+assert(engine.ProcCandidate(10, 4) == 601)
+assert(engine.ProcCandidate(10, 1) == nil)
 print("Shaman Windfury fallback tests passed")

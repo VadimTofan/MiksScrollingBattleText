@@ -308,7 +308,7 @@ for _, forever in ipairs({ false, true }) do
 			return value == firstProc or value == normalHit or value == delayedProc
 		end
 		local melee = filter.colors.eventColoring.SWING_DAMAGE
-		local windfuryIcon = "icon"
+		local genericProcIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 		-- When their confirmations share a swing but their reports cross frames.
 		Dispatch("PLAYER_SWING", 3.8, 0)
@@ -331,16 +331,16 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeBurst + 1][4] == firstProc)
 		assert(getmetatable(displayed[beforeBurst + 1][1]).__index
 			== events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 1][3] == windfuryIcon,
-			"an early shaman proc did not receive Windfury's icon")
+		assert(displayed[beforeBurst + 1][3] == genericProcIcon,
+			"an early shaman proc did not retain an unnamed proc icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
 		assert(getmetatable(displayed[beforeBurst + 2][1]).__index
 			== events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(getmetatable(displayed[beforeBurst + 3][1]).__index
 			== events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 3][3] == windfuryIcon,
-			"a delayed shaman proc did not receive Windfury's icon")
+		assert(displayed[beforeBurst + 3][3] == genericProcIcon,
+			"a delayed shaman proc did not retain an unnamed proc icon")
 
 		-- Given another burst with an unidentified extra-attack grant.
 		Advance(4)
@@ -370,9 +370,9 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
 		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
 		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
-		assert(displayed[beforeOffsetBurst + 2][3] == windfuryIcon,
-			"a shaman extra-attack proc lost the Windfury fallback")
-		assert(displayed[beforeOffsetBurst + 3][3] == windfuryIcon)
+		assert(displayed[beforeOffsetBurst + 2][3] == genericProcIcon,
+			"a shaman extra-attack proc lost its unnamed candidate display")
+		assert(displayed[beforeOffsetBurst + 3][3] == genericProcIcon)
 
 		-- Given stacking is enabled for a shaman's next Windfury burst.
 		local previousStacking = MikSBT.Profiles.currentProfile.stackSimilarHits
@@ -401,7 +401,7 @@ for _, forever in ipairs({ false, true }) do
 		local stacked = displayed[#displayed]
 		assert(stacked[2] == "Hit %s + %s [2 hits]",
 			"restricted Windfury group lost its native format placeholders")
-		assert(stacked[3] == windfuryIcon)
+		assert(stacked[3] == genericProcIcon)
 		assert(stacked[4] == firstProc and stacked[5] == delayedProc,
 			"stacked Windfury changed or dropped restricted damage")
 		MikSBT.Profiles.currentProfile.stackSimilarHits = previousStacking

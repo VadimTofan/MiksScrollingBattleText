@@ -59,13 +59,21 @@ Confirmed outgoing damage with several equally plausible direct spells keeps
 its amount and uses a generic question-mark icon without a guessed spell name.
 Ambiguous direct matches do not teach the engine a spell's school or hit type.
 
-On Forever, shamans with an active Windfury imbue use Windfury's icon for
-unidentified physical procs as a best guess. The imbue does not prove the
-damage source. Other unidentified procs keep the question-mark icon.
+On Forever, spell tables from NameplateSCT Reforged supply known damage
+schools and direct/periodic behavior before tooltip inference. Unknown spells
+retain the description fallback. Each cast accounts for its hits and misses
+so a spent cast cannot keep naming later damage. Confirmed damage remains
+visible when its spell identity is unknown.
 
-With Stack Similar Hits enabled, Windfury hits within one second share a line.
-Readable amounts show a total; restricted amounts show each value on that
-line, such as `120 + 150 [2 Hits]`. Normal and critical hits stay separate.
+An active Windfury imbue can support matching delayed weapon-proc reports,
+but does not supply their spell name or icon. Unidentified procs use a generic
+icon. With Stack Similar Hits enabled, matching proc candidates within one
+second can share a line without receiving a guessed Windfury label. Readable
+amounts show a total; restricted amounts keep separate values, such as
+`120 + 150 [2 Hits]`. Normal and critical hits stay separate.
+
+See [outgoing attribution](docs/outgoing-attribution.md) for data provenance,
+cast accounting, replay coverage, and attribution limits.
 
 Where combat-log messages are supported, MSBT initially asks for `/reload`.
 During logout it saves a dedicated **MSBT combat** filter; Blizzard activates

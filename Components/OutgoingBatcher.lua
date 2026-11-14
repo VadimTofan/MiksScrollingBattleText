@@ -16,8 +16,10 @@ function OutgoingBatcher:Reset()
 	end
 end
 
-function OutgoingBatcher:ShouldStackWindfury(spellID, isPet, isDot)
-	return spellID == WINDFURY_WEAPON_SPELL_ID and not isPet and not isDot
+function OutgoingBatcher:ShouldStackWindfury(spellID, isPet, isDot, candidateSpell)
+	local candidate = candidateSpell == WINDFURY_WEAPON_SPELL_ID
+	return (spellID == WINDFURY_WEAPON_SPELL_ID or candidate)
+		and not isPet and not isDot
 		and self.config.getProfile().stackSimilarHits
 end
 
@@ -149,11 +151,12 @@ function OutgoingBatcher:DisplayRestricted(
 	isPet,
 	isDot,
 	eventKey,
-	school
+	school,
+	candidateSpell
 )
-	if self:ShouldStackWindfury(spellID, isPet, isDot) then
+	if self:ShouldStackWindfury(spellID, isPet, isDot, candidateSpell) then
 		self:Queue(spellID, amount, isCrit, effectTexture, forceIsSpell,
-			isPet, isDot, eventKey, true, school)
+			isPet, isDot, eventKey, true, school, candidateSpell)
 		return
 	end
 	if not effectTexture and not isDot and not eventKey then
@@ -182,7 +185,8 @@ function OutgoingBatcher:Queue(
 	isDot,
 	eventKey,
 	isRestricted,
-	school
+	school,
+	candidateSpell
 )
 	if not isRestricted and (not amount or amount <= 0) then
 		return
@@ -198,10 +202,14 @@ function OutgoingBatcher:Queue(
 		effectTexture = self.config.getSpellTexture(spellID)
 	end
 
-	local stackWindfury = self:ShouldStackWindfury(spellID, isPet, isDot)
+	local stackWindfury = self:ShouldStackWindfury(
+		spellID, isPet, isDot, candidateSpell)
 	local batchKey = (isPet and "pet:" or "") .. (isDot and "dot:" or "")
 		.. tostring(spellID or 0) .. (isCrit and ":crit" or "")
 	if stackWindfury then batchKey = batchKey .. ":stacked" end
+	if candidateSpell then
+		batchKey = batchKey .. ":candidate:" .. candidateSpell
+	end
 	if eventKey then batchKey = eventKey .. ":" .. batchKey end
 	if school then batchKey = batchKey .. ":school:" .. school end
 	local batch = self.batches[batchKey]

@@ -191,7 +191,7 @@ Advance(0.13)
 
 -- Then the active channel must not claim it.
 assert(#outgoing == previous + 1)
-assert(outgoing[#outgoing].result.who == "other",
+assert(outgoing[#outgoing].result.who == "unknown",
     "channel claimed an unconfirmed hit")
 
 -- Given a final hit whose confirming line follows the channel stop.
@@ -509,7 +509,7 @@ local burst = {}
 for index = beforeBurst + 1, #outgoing do
 	local hit = outgoing[index]
 	if hit.amount == 321 then
-		assert(hit.result.who == "other",
+		assert(hit.result.who == "unknown",
 			"a delayed proc line was stolen by another target")
 	elseif hit.result.who == "you" then
 		burst[#burst + 1] = hit
@@ -543,7 +543,7 @@ Advance(0.01)
 
 -- Then that hit cannot reuse either proc confirmation.
 assert(outgoing[#outgoing].amount == 322)
-assert(outgoing[#outgoing].result.who == "other",
+assert(outgoing[#outgoing].result.who == "unknown",
 	"a proc confirmation was reused for unrelated damage")
 
 for _, example in ipairs({
@@ -569,7 +569,7 @@ for _, example in ipairs({
 
 	-- Then the widened path does not claim that unrelated damage.
 	assert(outgoing[#outgoing].amount == 323)
-	assert(outgoing[#outgoing].result.who == "other",
+	assert(outgoing[#outgoing].result.who == "unknown",
 		"delayed-proc matching claimed an unsupported report")
 end
 
@@ -594,7 +594,7 @@ for index = beforeMagicHit + 1, #outgoing do
 	if hit.amount == 324 then magicHit = hit end
 	if hit.amount == normalHit then swingHit = hit end
 end
-assert(magicHit and magicHit.result.who == "other",
+assert(magicHit and magicHit.result.who == "unknown",
 	"a magic hit took a melee swing's line")
 assert(swingHit and swingHit.result.who == "you" and swingHit.result.melee,
 	"a melee swing lost its line to a magic hit")
@@ -711,7 +711,7 @@ Advance(0.01)
 
 -- Then a proc cannot consume the same confirmation twice.
 assert(outgoing[#outgoing].amount == 327
-	and outgoing[#outgoing].result.who == "other")
+	and outgoing[#outgoing].result.who == "unknown")
 
 for _, example in ipairs({
 	{ name = "Retail", forever = false },
@@ -756,7 +756,7 @@ for _, example in ipairs({
 			break
 		end
 	end
-	assert(rejected and rejected.result.who == "other",
+	assert(rejected and rejected.result.who == "unknown",
 		"weapon-proc matching accepted " .. example.name)
 end
 -- Describe: an axe bleed can coincide with an active Windfury enchant.
@@ -999,7 +999,7 @@ Advance(0.7)
 
 -- Then the teammate's hit cannot take the player's swing confirmation.
 assert(#outgoing == 2)
-assert(outgoing[1].amount == 999 and outgoing[1].result.who == "other",
+assert(outgoing[1].amount == 999 and outgoing[1].result.who == "unknown",
 	"an early teammate hit stole a stable swing's confirmation")
 assert(outgoing[2].amount == 40 and outgoing[2].result.who == "you"
 	and outgoing[2].result.melee,

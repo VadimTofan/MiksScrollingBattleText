@@ -143,6 +143,14 @@ end
 -- after it; then it goes out as someone else's, unless a combat log line of
 -- yours came with it.
 local LinesRunning, DecideGroup
+local WeaponProcTrigger
+local function TagProcCandidate(result, at, school, key)
+    if not result.proc or result.spell or result.drain then return end
+    local candidate = ns.ProcCandidate and ns.ProcCandidate(at, school, key)
+    result.procCandidate = candidate ~= nil
+    result.candidateSpell = candidate
+end
+
 local function FlushHeld()
     local now = Now()
     local keep = {}
@@ -158,9 +166,9 @@ local function FlushHeld()
             -- lines (a 541 Physical crit shown as a warlock's, 1.60.1.70374).
             -- 0.3.33: except a proc riding on a hit of yours (below).
             if entry.proc then
-                entry.record.result = { who = "you", proc = true,
-                    procSpell = ns.ProcSpell and ns.ProcSpell(entry.at,
-                        entry.record.school, entry.held.key) }
+                entry.record.result = { who = "you", proc = true }
+                TagProcCandidate(entry.record.result, entry.at,
+                    entry.record.school, entry.held.key)
             end
             local router = Router()
             if router then router:Out(entry.record) end
@@ -377,13 +385,12 @@ local function PeriodicProcCast(at, school, key)
     return false
 end
 
-local function ProcSpell(at, school, key)
-    -- Best guess for shamans: unresolved physical procs use active Windfury.
-    -- This chooses an icon; the damage source is not proven by the enchant.
+local function ProcCandidate(at, school, key)
+    -- Active effects support candidate diagnostics and grouping, not identity.
     local windfury = ActiveWindfurySpell(school)
     if windfury then
         -- A bleed application can share the swing's direct confirmations.
-        -- Keep its unresolved damage visible without inventing a proc name.
+        -- Keep this candidate separate from the known periodic effect.
         if PeriodicProcCast(at, school, key) then return nil end
         local _, class = UnitClass("player")
         if ns.Text(class) and class == "SHAMAN" then return windfury end
@@ -397,7 +404,9 @@ local function ProcSpell(at, school, key)
     end
     return best and best.spell or nil
 end
-ns.ProcSpell = ProcSpell
+ns.ProcCandidate = ProcCandidate
+-- Compatibility boundary: active effects cannot prove a damage spell's ID.
+ns.ProcSpell = function() return nil end
 
 function ns.DecideHit(hit, line, restrict)
     local router = Router()
@@ -413,9 +422,14 @@ function ns.DecideHit(hit, line, restrict)
         result = ns.mine:Hit(hit.key, kind, record.school, hit.at, hit.petOn, line,
             ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech, record.avoid)
     end
-    if result.proc and not result.drain and not result.spell then
-        result.procSpell = ProcSpell(hit.at, record.school, hit.key)
+    if line == true and restrict == "direct" and result.who == "you"
+        and not result.spell and not result.melee and not result.tick
+        and WeaponProcTrigger(hit.at, hit.key)
+        and ProcCandidate(hit.at, record.school, hit.key)
+            == WINDFURY_WEAPON_SPELL_ID then
+        result.proc = true
     end
+    TagProcCandidate(result, hit.at, record.school, hit.key)
     record.result = result
     if ns.traceCombat then
         ns.traceCombat("decision", hit, { stage = "decision",
@@ -687,7 +701,7 @@ local LATE_PHYSICAL_PROC = 1.0
 local WEAPON_PROC_TRIGGER_WINDOW = 0.15
 local WEAPON_PROC_REPORT_WINDOW = 1.45
 
-local function WeaponProcTrigger(at, key)
+WeaponProcTrigger = function(at, key)
     for _, swing in ipairs(reader.swingTimes) do
         local age = at - swing.at
         if not swing.ranged and swing.key == key
@@ -714,7 +728,7 @@ end
 local function WeaponProcLine(hit)
     local record = hit.record
     if record.event ~= "damage" or record.school ~= ns.SCHOOL_PHYSICAL
-        or ProcSpell(hit.at, record.school) ~= WINDFURY_WEAPON_SPELL_ID then
+        or ActiveWindfurySpell(record.school) ~= WINDFURY_WEAPON_SPELL_ID then
         return nil
     end
     -- Keep the delay relative to the confirmation, including procs triggered
@@ -832,8 +846,11 @@ local function PreferQueuedStrikeHit(group, lines, restrict)
         or first.record.school ~= ns.SCHOOL_PHYSICAL
         or last.record.school ~= ns.SCHOOL_PHYSICAL then return false end
     for _, cast in ipairs(ns.mine.pending) do
+        local facts = ns.SpellFacts(cast.spell)
+        local nextSwing = QUEUED_STRIKES[cast.spell]
+            or (facts and facts.nextSwing == true)
         if not cast.used and cast.caster == "you" and cast.key == first.key
-            and cast.at == first.at and QUEUED_STRIKES[cast.spell] then
+            and cast.at == first.at and nextSwing then
             return true
         end
     end
@@ -1630,10 +1647,13 @@ end
 ns.PairWindow = PairWindow
 local function Close(hit) return hit.line ~= nil and (hit.gap or 0) <= PairWindow() end
 
--- Whether lines of yours are coming: confirming is on, the filter is My
--- actions and grey lines have shown.
+-- A ready Forever filter requires confirmation even before its first line.
+-- A recent cast alone cannot establish that an enemy's damage report is ours.
 function LinesRunning()
-    return MyActionsFilter() and reader.sawGrey == true
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    local ready = client and client.isForever
+        and ns.LineKindsReady and ns.LineKindsReady()
+    return MyActionsFilter() and (reader.sawGrey == true or ready)
 end
 
 -- A hit known to be yours (or your pet's) takes the line that came with it.

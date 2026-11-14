@@ -73,6 +73,9 @@ function Tracker:Decision(record, info)
     if not entry then return end
     entry.who, entry.melee = info.who, info.melee
     entry.procSpell, entry.held = info.procSpell, info.hold or info.held
+    entry.spell, entry.proc = info.spell, info.proc
+    entry.procCandidate, entry.candidateSpell =
+        info.procCandidate, info.candidateSpell
     entry.confirmed = info.confirmed
 end
 
@@ -122,7 +125,8 @@ function Tracker:Summary(burst)
     local summary = { expected = 0, estimated = 0,
         damage = 0, misses = 0, normal = 0,
         rawDamage = 0, rawMisses = 0, rejected = 0, forwarded = 0,
-        displays = 0, merged = false, confirmations = 0, rejectedPhysical = 0 }
+        displays = 0, merged = false, confirmations = 0, rejectedPhysical = 0,
+        unknown = 0, unknownPhysical = 0 }
     for _, line in ipairs(burst.lines) do
         if burst.active and line.source == "mine" and line.kind == "extra" then
             summary.expected = 2
@@ -146,12 +150,19 @@ function Tracker:Summary(burst)
         if entry.event == "damage" then summary.rawDamage = summary.rawDamage + 1 end
         if entry.event == "miss" then summary.rawMisses = summary.rawMisses + 1 end
         if entry.who == "other" then summary.rejected = summary.rejected + 1 end
+        if entry.who == "unknown" then summary.unknown = summary.unknown + 1 end
+        if entry.who == "unknown" and entry.event == "damage"
+            and entry.school == 1 then
+            summary.unknownPhysical = summary.unknownPhysical + 1
+        end
         if entry.who == "other" and entry.event == "damage"
             and entry.school == 1 then
             summary.rejectedPhysical = summary.rejectedPhysical + 1
         end
         if entry.who == "you" and entry.melee then summary.normal = summary.normal + 1 end
-        if entry.who == "you" and entry.procSpell == 8232 then
+        local candidate = entry.procCandidate and entry.candidateSpell == 8232
+        local identity = entry.spell == 8232 or entry.procSpell == 8232
+        if entry.who == "you" and (candidate or identity) then
             summary.estimated = 2
             if entry.event == "damage" then summary.damage = summary.damage + 1 end
             if entry.event == "miss" then summary.misses = summary.misses + 1 end
@@ -176,7 +187,7 @@ function Tracker:NeedsAttention(burst)
     local missingGranted = summary.expected == 2
         and summary.damage + summary.misses < 2
     local rejectedCandidate = burst.active and summary.confirmations >= 2
-        and summary.rejectedPhysical > 0
+        and summary.rejectedPhysical + summary.unknownPhysical > 0
     return missingGranted or rejectedCandidate
         or summary.displays < summary.damage or summary.merged
 end
@@ -190,7 +201,7 @@ function Tracker:ReportText()
     local rows = {
         "MSBT Windfury timeline (metadata only; no damage amounts)",
         "Expected counts require an extra-attack grant; estimated counts are heuristic.",
-        "WF labels are fallback identities, not confirmed spell identities.",
+        "Candidate grouping is separate from spell identity; identity=- means unnamed.",
         "Candidate evidence is timing/enchant based, not proof of spell identity.",
         "Dispatch means animation requested, not proof of visible pixels.",
     }
@@ -198,11 +209,12 @@ function Tracker:ReportText()
         local s = self:Summary(burst)
         rows[#rows + 1] = string.format(
             "Swing #%d %.3f key=%s hand=%s enchant=%s expected=%d estimated=%d " ..
-            "WF damage=%d miss=%d normal=%d raw=%d/%d other=%d " ..
+            "WF damage=%d miss=%d normal=%d raw=%d/%d other=%d unknown=%d " ..
             "forwarded=%d dispatches=%d merged=%s truncated=%s",
             burst.id, burst.at, Value(burst.key), Value(burst.hand),
             Value(burst.active), s.expected, s.estimated, s.damage, s.misses, s.normal,
-            s.rawDamage, s.rawMisses, s.rejected, s.forwarded, s.displays,
+            s.rawDamage, s.rawMisses, s.rejected, s.unknown,
+            s.forwarded, s.displays,
             Value(s.merged), Value(burst.truncated))
         for _, line in ipairs(burst.lines) do
             rows[#rows + 1] = string.format("  log +%.3f %s %s",
@@ -222,10 +234,13 @@ function Tracker:ReportText()
             table.sort(dispatches)
             rows[#rows + 1] = string.format(
                 "  R%d +%.3f %s school=%s outcome=%s who=%s " ..
-                "melee=%s WF=%s held=%s path=%s attempted=%s " ..
+                "melee=%s WF=%s candidateSpell=%s identity=%s " ..
+                "held=%s path=%s attempted=%s " ..
                 "blocked=%s area=%s alpha=%s dispatchIDs=%s", id, e.at - burst.at,
                 Value(e.event), Value(e.school), Value(e.outcome),
                 Value(e.who), Value(e.melee), Value(e.procSpell == 8232),
+                Value(e.procCandidate and e.candidateSpell or nil),
+                Value(e.spell or e.procSpell),
                 Value(e.held), Value(e.path), Value(e.attempted),
                 Value(e.blocked), Value(e.area), Value(e.alpha),
                 table.concat(dispatches, ","))

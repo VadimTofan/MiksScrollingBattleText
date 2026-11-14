@@ -2,16 +2,18 @@
 
 ## Unreleased
 
-- Recognized school-less bleed descriptions as physical periodic damage,
-  preserving their total and duration. Unidentified hits near a known bleed
-  application no longer automatically receive the Windfury name.
-- Retained delayed physical Windfury candidates confirmed after a player
-  weapon attack on Forever, including attacks between normal swings.
-- Windfury diagnostics now record player casts and distinguish estimated
-  proc counts from extra-attack grants. A fallback spell label alone no
-  longer pauses capture as evidence of a missing hit.
-- Windfury capture ignores magic-only and fully accounted ability sequences
-  when deciding whether to pause for a suspected missing physical hit.
+- Added Forever spell tables for damage schools, direct hits, periodic
+  effects, and matching windows, with descriptions as the fallback for
+  unknown spells. Bleeds retain their physical school and duration.
+- Accounted for each cast's direct hits and misses across matching paths.
+  Spent casts no longer name later hits; separate area targets and periodic
+  effects retain their own outcomes.
+- Kept confirmed damage visible when its spell is unknown. Active weapon
+  effects no longer invent a Windfury or other proc name; unnamed candidates
+  retain stacking, separate critical hits, and restricted damage values.
+- Updated Windfury diagnostics to distinguish candidate evidence, spell
+  identity, unresolved ownership, and display dispatches. Magic-only and
+  accounted ability sequences no longer cause false missing-hit pauses.
 - Unchecking Outgoing Pet or Incoming Pet redirects its messages to Outgoing
   or Incoming. Individually disabled events remain hidden.
 

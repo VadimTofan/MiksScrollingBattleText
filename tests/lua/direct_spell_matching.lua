@@ -218,7 +218,7 @@ Check("ambiguity without ownership confirmation does not claim damage", function
     local hit = tracker:Hit("t", "damage", 4, 10.2, false, nil,
         100, false, "direct")
     -- Then no player spell or ownership is invented.
-    assert(hit.who == "other" and hit.spell == nil)
+    assert(hit.who == "unknown" and hit.spell == nil)
     assert(next(learned.school) == nil)
 end)
 
@@ -234,7 +234,7 @@ Check("mixed player and pet candidates do not invent a caster", function()
     local hit = tracker:Hit("t", "damage", 4, 10.2, true, true,
         nil, false, "direct")
     -- Then the generic result does not falsely pick the player or pet.
-    assert(hit.who == "other" and hit.spell == nil and hit.ambiguous)
+    assert(hit.who == "unknown" and hit.spell == nil and hit.ambiguous)
 end)
 
 Check("untargeted area casts obey the same ambiguity rule", function()
