@@ -127,6 +127,10 @@ local RHYTHM_SLACK = 0.15
 local VOTES = 3               -- casts that must agree on an untrusted school
 local MAX = 32                -- of each list
 local CAST_HISTORY_WINDOW = 30
+-- Instant abilities (Raptor Strike, a pet's Claw, Screech) are reported in
+-- their cast's own frame on Forever, so a cast in the hit's frame comes
+-- before older ones (1.60.1.70862).
+local SAME_FRAME = 0.001
 local RHYTHM_WINDOW = 3.3
 ns.LATE_SWING = LATE_SWING
 
@@ -625,10 +629,11 @@ local function DirectFit(self, spell, amount, crit)
     return Score(amount)
 end
 
-local function DirectCandidateScore(self, entry, key, school, now, amount, crit)
+local function DirectCandidateScore(self, entry, key, school, now, amount, crit, sameFrame)
     local age = now - entry.at
     if entry.used or entry.missOnly or entry.key ~= key
         or age < -0.05 or age > DIRECT_WINDOW
+        or (sameFrame and math.abs(age) > SAME_FRAME)
         or not SchoolFits(entry.school, school) then return nil end
 
     local facts = self.facts(entry.spell)
@@ -649,10 +654,24 @@ local function SameIdentity(first, second)
 end
 
 local function SelectDirectCandidate(self, key, school, now)
+    -- A cast in the hit's own frame made it. Ranked by age and amount with
+    -- the casts still waiting, two abilities used close together were
+    -- ambiguous or took each other's hits, and one wrong match shifted every
+    -- label after it (a Raptor Strike dodge shown as Claw, the next Screech
+    -- as Raptor Strike).
+    -- Only the casts of that frame are then compared.
+    local sameFrame = false
+    for _, entry in ipairs(self.pending) do
+        if math.abs(now - entry.at) <= SAME_FRAME and DirectCandidateScore(self,
+            entry, key, school, now, self.amountNow, self.critNow) then
+            sameFrame = true
+            break
+        end
+    end
     local best, bestScore
     for _, entry in ipairs(self.pending) do
         local score = DirectCandidateScore(self, entry, key, school, now,
-            self.amountNow, self.critNow)
+            self.amountNow, self.critNow, sameFrame)
         if score then
             if best and SameIdentity(entry, best) then
                 -- Repeated casts share an identity; consume the oldest first.
@@ -666,23 +685,28 @@ local function SelectDirectCandidate(self, key, school, now)
     if not best then return nil end
 
     -- Compare the winner with every other identity, not just the first cast.
-    local ambiguous = false
+    local ambiguous, mixed = false, false
     for _, entry in ipairs(self.pending) do
         local score = DirectCandidateScore(self, entry, key, school, now,
-            self.amountNow, self.critNow)
+            self.amountNow, self.critNow, sameFrame)
         if score and score <= bestScore + DIRECT_MATCH_MARGIN
             and (entry.ambiguous or not SameIdentity(entry, best)) then
             ambiguous = true
+            if entry.caster ~= best.caster then mixed = true end
         end
     end
-    return best, bestScore, ambiguous
+    -- A cast of yours and one of your pet's in one frame each made a hit of
+    -- that frame (a Raptor Strike and a Claw): they are taken in the order
+    -- cast, where hiding both as nobody's lost two real hits.
+    if sameFrame and mixed then ambiguous = false end
+    return best, bestScore, ambiguous, sameFrame
 end
 
-local function AmbiguousDirectResult(self, key, school, now, bestScore)
+local function AmbiguousDirectResult(self, key, school, now, bestScore, sameFrame)
     local owner, mixedOwners
     for _, entry in ipairs(self.pending) do
         local score = DirectCandidateScore(self, entry, key, school, now,
-            self.amountNow, self.critNow)
+            self.amountNow, self.critNow, sameFrame)
         if score and score <= bestScore + DIRECT_MATCH_MARGIN then
             if owner and owner ~= entry.caster then mixedOwners = true end
             owner = owner or entry.caster
@@ -1003,13 +1027,13 @@ local function Yours(self, key, kind, school, now)
         if tick then return tick end
     end
     -- 2. Compare direct casts together; misses retain their existing order.
-    local exact, unknown
-    local directScore, directAmbiguous
+    local exact, unknown, sameFrame
+    local directScore, directAmbiguous, directSameFrame
     if kind == "damage" and allowed.casts then
         local candidate
-        candidate, directScore, directAmbiguous =
+        candidate, directScore, directAmbiguous, directSameFrame =
             SelectDirectCandidate(self, key, school, now)
-        if candidate and candidate.school then exact = candidate
+        if candidate and (candidate.school or directSameFrame) then exact = candidate
         else unknown = candidate end
     end
     for _, entry in ipairs(kind == "miss" and allowed.casts
@@ -1018,12 +1042,19 @@ local function Yours(self, key, kind, school, now)
             if CastTakesMiss(self, entry.spell, key, now,
                 self.avoidNow, self.petNow, self.restrictNow) then
                 exact = exact or entry
+                if math.abs(now - entry.at) <= SAME_FRAME then
+                    sameFrame = sameFrame or entry
+                end
             end
         end
     end
+    -- A Growl still waiting for a resist had taken Claw's miss in Claw's own
+    -- frame: of the casts a miss can answer, the one in its frame comes first.
+    if sameFrame then exact = sameFrame end
     local function Direct(entry)
         if directAmbiguous then
-            return AmbiguousDirectResult(self, key, school, now, directScore)
+            return AmbiguousDirectResult(self, key, school, now, directScore,
+                directSameFrame)
         end
         entry.used = true
         entry.cast.directUsed = true
