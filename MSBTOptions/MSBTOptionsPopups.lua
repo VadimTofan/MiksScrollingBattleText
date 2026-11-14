@@ -30,6 +30,23 @@ local DEFAULT_SCROLL_WIDTH = 40
 local DEFAULT_ANIMATION_STYLE = "Straight"
 local DEFAULT_STICKY_ANIMATION_STYLE = "Pow"
 local DEFAULT_ICON_ALIGN = "Left"
+-- Fields of a scroll area the configuration saves, and the default each is saved with.
+local SCROLL_AREA_FIELDS = {
+	"animationStyle", "direction", "behavior", "textAlignIndex",
+	"stickyAnimationStyle", "stickyDirection", "stickyBehavior", "stickyTextAlignIndex",
+	"scrollHeight", "scrollWidth", "offsetX", "offsetY", "animationSpeed", "iconAlign", "skillIconsDisabled",
+}
+local SCROLL_AREA_DEFAULTS = {
+	animationStyle = DEFAULT_ANIMATION_STYLE, direction = "MSBT_NORMAL", behavior = "MSBT_NORMAL",
+	textAlignIndex = DEFAULT_TEXT_ALIGN_INDEX,
+	stickyAnimationStyle = DEFAULT_STICKY_ANIMATION_STYLE, stickyDirection = "MSBT_NORMAL",
+	stickyBehavior = "MSBT_NORMAL", stickyTextAlignIndex = DEFAULT_TEXT_ALIGN_INDEX,
+	scrollHeight = DEFAULT_SCROLL_HEIGHT, scrollWidth = DEFAULT_SCROLL_WIDTH, iconAlign = DEFAULT_ICON_ALIGN,
+}
+-- Minimum, maximum and step of the scroll area sliders.
+local SCROLL_AREA_RANGES = {
+	scrollHeight = { 50, 600, 5 }, scrollWidth = { 10, 800, 10 }, animationSpeed = { 20, 250, 10 },
+}
 local PREVIEW_ICON_PATH = "Interface\\Icons\\INV_Misc_AhnQirajTrinket_03"
 local RESOURCE_TOKENS = {
 	"MANA", "RAGE", "FOCUS", "ENERGY", "COMBO_POINTS", "RUNES",
@@ -1078,75 +1095,53 @@ local function CopyTempScrollAreaSettings(settingsTable)
 end
 
 
+local function StyleEntryName(styleSettings, entry)
+	local objLocale = styleSettings.localizationTable
+	return objLocale and objLocale[entry] or L.ANIMATION_STYLE_DATA[entry] or entry
+end
+
+
+local function FillStyleList(dropdown, styles)
+	dropdown:Clear()
+	for styleKey, settings in pairs(styles) do
+		dropdown:AddItem(StyleEntryName(settings, styleKey), styleKey)
+	end
+end
+
+
+-- Lists the entries a style offers ("a;b") and selects the first; a style without any offers Normal.
+local function FillStyleEntries(dropdown, styleSettings, entries)
+	local firstEntry
+	dropdown:Clear()
+	if (entries) then
+		for entry in string.gmatch(entries, "[^;]+") do
+			if (not firstEntry) then firstEntry = entry end
+			dropdown:AddItem(StyleEntryName(styleSettings, entry), entry)
+		end
+	else
+		firstEntry = "MSBT_NORMAL"
+		dropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], firstEntry)
+	end
+	dropdown:SetSelectedID(firstEntry)
+end
+
+
+local function FillStyleDropdowns(styleSettings, directionDropdown, behaviorDropdown)
+	FillStyleEntries(directionDropdown, styleSettings, styleSettings.availableDirections)
+	FillStyleEntries(behaviorDropdown, styleSettings, styleSettings.availableBehaviors)
+end
+
+
 local function ChangeAnimationStyle(styleKey)
 	local frame = popupFrames.scrollAreaConfigFrame
-	local styleSettings = MSBTAnimations.animationStyles[styleKey]
-	local firstEntry, name, objLocale
-
-	frame.directionDropdown:Clear()
-	if (styleSettings.availableDirections) then
-		for direction in string.gmatch(styleSettings.availableDirections, "[^;]+") do
-			if (not firstEntry) then firstEntry = direction end
-			objLocale = styleSettings.localizationTable
-			name = objLocale and objLocale[direction] or L.ANIMATION_STYLE_DATA[direction] or direction
-			frame.directionDropdown:AddItem(name, direction)
-		end
-		frame.directionDropdown:SetSelectedID(firstEntry)
-	else
-		frame.directionDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
-		frame.directionDropdown:SetSelectedID("MSBT_NORMAL")
-	end
-
-	firstEntry = nil
-	frame.behaviorDropdown:Clear()
-	if (styleSettings.availableBehaviors) then
-		for behavior in string.gmatch(styleSettings.availableBehaviors, "[^;]+") do
-			if (not firstEntry) then firstEntry = behavior end
-			objLocale = styleSettings.localizationTable
-			name = objLocale and objLocale[behavior] or L.ANIMATION_STYLE_DATA[behavior] or behavior
-			frame.behaviorDropdown:AddItem(name, behavior)
-		end
-		frame.behaviorDropdown:SetSelectedID(firstEntry)
-	else
-		frame.behaviorDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
-		frame.behaviorDropdown:SetSelectedID("MSBT_NORMAL")
-	end
+	FillStyleDropdowns(MSBTAnimations.animationStyles[styleKey], frame.directionDropdown, frame.behaviorDropdown)
 end
 
 
 local function ChangeStickyAnimationStyle(styleKey)
 	local frame = popupFrames.scrollAreaConfigFrame
-	local styleSettings = MSBTAnimations.stickyAnimationStyles[styleKey]
-	local firstEntry, name, objLocale
-
-	frame.stickyDirectionDropdown:Clear()
-	if (styleSettings.availableDirections) then
-		for direction in string.gmatch(styleSettings.availableDirections, "[^;]+") do
-			if (not firstEntry) then firstEntry = direction end
-			objLocale = styleSettings.localizationTable
-			name = objLocale and objLocale[direction] or L.ANIMATION_STYLE_DATA[direction] or direction
-			frame.stickyDirectionDropdown:AddItem(name, direction)
-		end
-		frame.stickyDirectionDropdown:SetSelectedID(firstEntry)
-	else
-		frame.stickyDirectionDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
-		frame.stickyDirectionDropdown:SetSelectedID("MSBT_NORMAL")
-	end
-
-	firstEntry = nil
-	frame.stickyBehaviorDropdown:Clear()
-	if (styleSettings.availableBehaviors) then
-		for behavior in string.gmatch(styleSettings.availableBehaviors, "[^;]+") do
-			if (not firstEntry) then firstEntry = behavior end
-			objLocale = styleSettings.localizationTable
-			name = objLocale and objLocale[behavior] or L.ANIMATION_STYLE_DATA[behavior] or behavior
-			frame.stickyBehaviorDropdown:AddItem(name, behavior)
-		end
-		frame.stickyBehaviorDropdown:SetSelectedID(firstEntry)
-	else
-		frame.stickyBehaviorDropdown:AddItem(L.ANIMATION_STYLE_DATA["Normal"], "MSBT_NORMAL")
-		frame.stickyBehaviorDropdown:SetSelectedID("MSBT_NORMAL")
-	end
+	FillStyleDropdowns(MSBTAnimations.stickyAnimationStyles[styleKey],
+		frame.stickyDirectionDropdown, frame.stickyBehaviorDropdown)
 end
 
 
@@ -1154,14 +1149,8 @@ local function ChangeConfigScrollArea(scrollArea)
 	local frame = popupFrames.scrollAreaConfigFrame
 	frame.currentScrollArea = scrollArea
 	local saSettings = frame.previewSettings[scrollArea]
-	local name, objLocale
 
-	frame.animationStyleDropdown:Clear()
-	for styleKey, settings in pairs(MSBTAnimations.animationStyles) do
-		objLocale = settings.localizationTable
-		name = objLocale and objLocale[styleKey] or L.ANIMATION_STYLE_DATA[styleKey] or styleKey
-		frame.animationStyleDropdown:AddItem(name, styleKey)
-	end
+	FillStyleList(frame.animationStyleDropdown, MSBTAnimations.animationStyles)
 	frame.animationStyleDropdown:SetSelectedID(saSettings.animationStyle)
 	ChangeAnimationStyle(saSettings.animationStyle)
 
@@ -1170,12 +1159,7 @@ local function ChangeConfigScrollArea(scrollArea)
 	frame.textAlignDropdown:SetSelectedID(saSettings.textAlignIndex)
 
 
-	frame.stickyAnimationStyleDropdown:Clear()
-	for styleKey, settings in pairs(MSBTAnimations.stickyAnimationStyles) do
-		objLocale = settings.localizationTable
-		name = objLocale and objLocale[styleKey] or L.ANIMATION_STYLE_DATA[styleKey] or styleKey
-		frame.stickyAnimationStyleDropdown:AddItem(name, styleKey)
-	end
+	FillStyleList(frame.stickyAnimationStyleDropdown, MSBTAnimations.stickyAnimationStyles)
 	frame.stickyAnimationStyleDropdown:SetSelectedID(saSettings.stickyAnimationStyle)
 	ChangeStickyAnimationStyle(saSettings.stickyAnimationStyle)
 
@@ -1282,32 +1266,38 @@ local function CreateScrollAreaMoverFrame(scrollArea)
 end
 
 
+-- The speed is saved against the profile's speed, so an area at that speed inherits it.
+local function SaveScrollAreaOption(saKey, field, value)
+	local default = SCROLL_AREA_DEFAULTS[field]
+	if (field == "animationSpeed") then default = MSBTProfiles.currentProfile.animationSpeed end
+	MSBTProfiles.SetOption("scrollAreas." .. saKey, field, value, default)
+end
+
+
 local function SaveScrollAreaSettings(settingsTable)
-	local frame = popupFrames.scrollAreaConfigFrame
-
 	for saKey, saSettings in pairs(settingsTable) do
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "animationStyle", saSettings.animationStyle, DEFAULT_ANIMATION_STYLE)
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "direction", saSettings.direction, "MSBT_NORMAL")
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "behavior", saSettings.behavior, "MSBT_NORMAL")
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "textAlignIndex", saSettings.textAlignIndex, DEFAULT_TEXT_ALIGN_INDEX)
-
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyAnimationStyle", saSettings.stickyAnimationStyle, DEFAULT_STICKY_ANIMATION_STYLE)
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyDirection", saSettings.stickyDirection, "MSBT_NORMAL")
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyBehavior", saSettings.stickyBehavior, "MSBT_NORMAL")
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "stickyTextAlignIndex", saSettings.stickyTextAlignIndex, DEFAULT_TEXT_ALIGN_INDEX)
-
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "scrollHeight", saSettings.scrollHeight, DEFAULT_SCROLL_HEIGHT)
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "scrollWidth", saSettings.scrollWidth, DEFAULT_SCROLL_WIDTH)
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "offsetX", saSettings.offsetX)
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "offsetY", saSettings.offsetY)
-
-		local animationSpeed = saSettings.animationSpeed
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "animationSpeed", animationSpeed, saSettings.inheritedAnimationSpeed)
-
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "iconAlign", saSettings.iconAlign, DEFAULT_ICON_ALIGN)
-		MSBTProfiles.SetOption("scrollAreas." .. saKey, "skillIconsDisabled", saSettings.skillIconsDisabled)
+		for _, field in ipairs(SCROLL_AREA_FIELDS) do
+			SaveScrollAreaOption(saKey, field, saSettings[field])
+		end
 	end
 	MSBTAnimations.UpdateScrollAreas()
+end
+
+
+local function ConfigureScrollAreaSlider(slider, field)
+	local range = SCROLL_AREA_RANGES[field]
+	slider:SetMinMaxValues(range[1], range[2])
+	slider:SetValueStep(range[3])
+end
+
+
+-- Shows a red, a white and a sticky blue test line in every scroll area.
+local function PreviewScrollAreas()
+	for saKey, saSettings in pairs(MSBTAnimations.scrollAreas) do
+		MikSBT.DisplayMessage(saSettings.name, saKey, nil, 255, 0, 0, nil, nil, nil, PREVIEW_ICON_PATH)
+		MikSBT.DisplayMessage(saSettings.name, saKey, nil, 255, 255, 255, nil, nil, nil, PREVIEW_ICON_PATH)
+		MikSBT.DisplayMessage(saSettings.name, saKey, true, 0, 0, 255, 28, nil, nil, PREVIEW_ICON_PATH)
+	end
 end
 
 
@@ -1443,8 +1433,7 @@ local function CreateScrollAreaConfig()
 	objLocale = L.SLIDERS["scrollHeight"]
 	slider:Configure(135, objLocale.label, objLocale.tooltip)
 	slider:SetPoint("TOPLEFT", texture, "BOTTOMLEFT", 5, -15)
-	slider:SetMinMaxValues(50, 600)
-	slider:SetValueStep(5)
+	ConfigureScrollAreaSlider(slider, "scrollHeight")
 	slider:SetValueChangedHandler(function(this, value)
 		frame.previewSettings[frame.currentScrollArea].scrollHeight = value
 		RepositionScrollAreaMoverFrame(frame.currentScrollArea)
@@ -1455,8 +1444,7 @@ local function CreateScrollAreaConfig()
 	objLocale = L.SLIDERS["scrollWidth"]
 	slider:Configure(135, objLocale.label, objLocale.tooltip)
 	slider:SetPoint("LEFT", frame.scrollHeightSlider, "RIGHT", 15, 0)
-	slider:SetMinMaxValues(10, 800)
-	slider:SetValueStep(10)
+	ConfigureScrollAreaSlider(slider, "scrollWidth")
 	slider:SetValueChangedHandler(function(this, value)
 		frame.previewSettings[frame.currentScrollArea].scrollWidth = value
 		RepositionScrollAreaMoverFrame(frame.currentScrollArea)
@@ -1467,8 +1455,7 @@ local function CreateScrollAreaConfig()
 	objLocale = L.SLIDERS["scrollAnimationSpeed"]
 	slider:Configure(135, objLocale.label, objLocale.tooltip)
 	slider:SetPoint("TOPLEFT", frame.scrollHeightSlider, "BOTTOMLEFT", 0, -10)
-	slider:SetMinMaxValues(20, 250)
-	slider:SetValueStep(10)
+	ConfigureScrollAreaSlider(slider, "animationSpeed")
 	slider:SetValueChangedHandler(function(this, value)
 		frame.previewSettings[frame.currentScrollArea].animationSpeed = value
 	end)
@@ -1546,13 +1533,7 @@ local function CreateScrollAreaConfig()
 	button:SetPoint("BOTTOM", frame, "BOTTOM", 0, 50)
 	button:SetClickHandler(function(this)
 		SaveScrollAreaSettings(frame.previewSettings)
-		local name
-		for saKey in pairs(frame.previewSettings) do
-			name = MSBTAnimations.scrollAreas[saKey].name
-			MikSBT.DisplayMessage(name, saKey, nil, 255, 0, 0, nil, nil, nil, PREVIEW_ICON_PATH)
-			MikSBT.DisplayMessage(name, saKey, nil, 255, 255, 255, nil, nil, nil, PREVIEW_ICON_PATH)
-			MikSBT.DisplayMessage(name, saKey, true, 0, 0, 255, 28, nil, nil, PREVIEW_ICON_PATH)
-		end
+		PreviewScrollAreas()
 	end)
 
 	local button = MSBTControls.CreateOptionButton(frame)
