@@ -448,7 +448,7 @@ end
 local function FrameRoles(at)
     local swings = 0
     for _, swing in ipairs(reader.swingTimes) do
-        if not swing.ranged and math.abs(swing.at - at) <= SWING_FRAME then
+        if not swing.ranged and not swing.strike and math.abs(swing.at - at) <= SWING_FRAME then
             swings = swings + 1
         end
     end
@@ -748,6 +748,25 @@ local QUEUED_STRIKES = {
     [14263] = true, [14264] = true, [14265] = true, [14266] = true,
 }
 
+-- With your pet's Claw in the same frame (three
+-- reports, two lines), the zero report had gone to your pet's swing. It is
+-- the first report on the strike's unit, before the strike's swing.
+local function QueuedStrikePhantom(group, lines)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not client or not client.isForever or #group < 3 or lines ~= #group - 1 then return nil end
+    local first = group[1]
+    if first.record.event ~= "damage" or first.record.school ~= ns.SCHOOL_PHYSICAL then return nil end
+    for _, hit in ipairs(group) do
+        if hit.at ~= first.at then return nil end
+    end
+    for _, cast in ipairs(ns.mine.pending) do
+        if not cast.used and cast.caster == "you" and cast.key == first.key
+            and cast.at == first.at and QUEUED_STRIKES[cast.spell] then
+            return first
+        end
+    end
+end
+
 local function PreferQueuedStrikeHit(group, lines, restrict)
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     if not client or not client.isForever or #group ~= 2
@@ -884,6 +903,17 @@ function DecideGroup(group, frameLines, decided, settled)
             end
         end
     else
+        local phantom = QueuedStrikePhantom(group, lines)
+        if phantom then
+            phantom.record.result = { who = "other", phantom = true }
+            if ns.traceCombat then ns.traceCombat("decision", phantom, { stage = "phantom" }) end
+            decided[#decided + 1] = { result = phantom.record.result }
+            local rest = {}
+            for _, hit in ipairs(group) do
+                if hit ~= phantom then rest[#rest + 1] = hit end
+            end
+            return DecideGroup(rest, frameLines, decided)
+        end
         local restrict = SharedRestrict(frameLines, lines)
         Claim(lines)
         -- Fewer lines than hits (0.3.32, for raid bosses struck by many
@@ -910,8 +940,23 @@ function DecideGroup(group, frameLines, decided, settled)
             return a.index < b.index
         end)
         local flags = {}
-        for rank, entry in ipairs(ranked) do flags[entry.hit] = rank <= lines and entry.fit ~= nil end
-        for _, hit in ipairs(group) do Decide(hit, flags[hit], restrict) end
+        local anyFlagged = false
+        for rank, entry in ipairs(ranked) do
+            flags[entry.hit] = rank <= lines and entry.fit ~= nil
+            anyFlagged = anyFlagged or flags[entry.hit]
+        end
+        for _, hit in ipairs(group) do
+            if preferQueuedHit and anyFlagged and not flags[hit] then
+                -- The strike's zero report is not a
+                -- hit; it had been shown as your pet's swing, with your
+                -- weapon's icon, after every Raptor Strike that landed.
+                hit.record.result = { who = "other", phantom = true }
+                if ns.traceCombat then ns.traceCombat("decision", hit, { stage = "phantom" }) end
+                decided[#decided + 1] = { result = hit.record.result }
+            else
+                Decide(hit, flags[hit], restrict)
+            end
+        end
     end
 end
 
@@ -1017,9 +1062,15 @@ local function OnSwing(swingType, swingDuration)
     if not hand then return end
     local times = reader.swingTimes
     local key = ns.TargetKey()
-    times[#times + 1] = { at = Now(), ranged = hand == "ranged",
+    -- Raptor Strike (a queued strike) sends this
+    -- swing in its cast's frame, and its hit is the strike's; left as a swing,
+    -- it took your pet's next blow as your Auto Attack.
+    local strike = hand ~= "ranged" and lastCast and lastCast.unit == "player"
+        and math.abs(lastCast.at - Now()) <= SWING_FRAME and QUEUED_STRIKES[lastCast.spell] or nil
+    times[#times + 1] = { at = Now(), ranged = hand == "ranged", strike = strike,
         key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
+    if strike then return end
     local claimed = ns.mine:Swing(hand, key, Now(), ns.Number(swingDuration) and swingDuration or nil)
     if not claimed then return end
     for _, entry in ipairs(reader.held) do
