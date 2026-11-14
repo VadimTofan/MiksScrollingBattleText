@@ -63,7 +63,14 @@ local CLASS_NAMES = {}
 
 local _
 
-local popupFrames = {}
+-- Every design keeps popups of its own, a set per design key. A design with a SkinPopup function
+-- gets each popup of its set handed to it once, when the popup is stored.
+local popupSets = { classic = {} }
+
+local popupFrames = popupSets.classic
+
+-- Set while another design takes over, so the scroll area configuration brings no design back.
+local isTakingOver
 
 local moverBackdrop = {
 	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -1315,7 +1322,7 @@ local function CreateScrollAreaConfig()
 		for _, moverFrame in pairs(this.moverFrames) do
 			moverFrame:Hide()
 		end
-		MSBTOptions.Designs.Show()
+		if not isTakingOver then MSBTOptions.Designs.Show() end
 	end)
 
 	local dropdown = MSBTControls.CreateDropdown(frame)
@@ -1558,7 +1565,6 @@ local function CreateScrollAreaConfig()
 	frame.originalSettings = {}
 	frame.previewSettings = {}
 
-	_G["MSBTScrollAreasConfigFrame"] = frame
 	return frame
 end
 
@@ -1567,6 +1573,7 @@ local function ShowScrollAreaConfig()
 	if (not popupFrames.scrollAreaConfigFrame) then popupFrames.scrollAreaConfigFrame = CreateScrollAreaConfig() end
 
 	local frame = popupFrames.scrollAreaConfigFrame
+	_G["MSBTScrollAreasConfigFrame"] = frame
 
 	CopyTempScrollAreaSettings(frame.originalSettings)
 	CopyTempScrollAreaSettings(frame.previewSettings)
@@ -2007,6 +2014,36 @@ end
 
 
 
+-- A popup open across the switch would run its handlers against the other set. A scroll area
+-- configuration open there ends as cancelled: the design it put away gives way to this one.
+local function UseDesignPopups(key)
+	if not popupSets[key] then
+		local skin = MSBTOptions.Designs.designs[key].SkinPopup
+		popupSets[key] = skin and setmetatable({}, { __newindex = function(cache, name, frame)
+			rawset(cache, name, frame)
+			skin(frame)
+		end }) or {}
+	end
+	local frames = popupSets[key]
+	if frames == popupFrames then return end
+	local configFrame = popupFrames.scrollAreaConfigFrame
+	if configFrame and configFrame:IsShown() then
+		SaveScrollAreaSettings(configFrame.originalSettings)
+		isTakingOver = true
+		configFrame:Hide()
+		isTakingOver = nil
+	end
+	MSBTOptions.Main.HidePopups()
+	popupFrames = frames
+end
+
+
+local function GetPopupFrames()
+	return popupFrames
+end
+
+
+
 if type(FillLocalizedClassList) == "function" then
 	FillLocalizedClassList(CLASS_NAMES)
 else
@@ -2039,3 +2076,5 @@ module.PreviewScrollAreas			= PreviewScrollAreas
 module.ShowScrollAreaSelection		= ShowScrollAreaSelection
 module.ShowEvent					= ShowEvent
 module.ShowItemList					= ShowItemList
+module.UseDesignPopups				= UseDesignPopups
+module.GetPopupFrames				= GetPopupFrames

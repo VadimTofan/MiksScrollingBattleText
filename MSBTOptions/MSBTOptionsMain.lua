@@ -138,14 +138,19 @@ local function DisplayTabLine(this, line, key, isSelected)
 end
 
 
+local function HidePopups()
+	for frame in pairs(popupFrames) do
+		frame:Hide()
+	end
+end
+
+
 local function OnClickTabLine(this, line, value)
 	for _, info in ipairs(tabData) do
 		info.frame:Hide()
 	end
 
-	for frame in pairs(popupFrames) do
-		frame:Hide()
-	end
+	HidePopups()
 
 	local frame = tabData[value].frame
 	if (frame) then frame:Show() end
@@ -161,9 +166,7 @@ local function OnHideMainFrame(this)
 	if not dockedParent then
 		PlaySound(799)
 	end
-	for frame in pairs(popupFrames) do
-		frame:Hide()
-	end
+	HidePopups()
 end
 
 
@@ -198,6 +201,8 @@ local function CreateMainFrame()
 
 	mainFrame:SetScript("OnShow", function(self)
 			self:SetFrameLevel((self:GetParent() and self:GetParent():GetFrameLevel() or 0) + 50)
+			-- Another design may have left its popups in use.
+			MSBTOptions.Popups.UseDesignPopups("classic")
 			if not dockedParent then
 				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
 			end
@@ -353,6 +358,8 @@ local function CreateMainFrame()
 	tabData[defaultTabIndex].frame:Show()
 
 	SetSpecialFrame(true)
+	-- A new frame is already shown, so its first Show() does not run OnShow.
+	MSBTOptions.Popups.UseDesignPopups("classic")
 end
 
 
@@ -480,10 +487,11 @@ local function ShowMainFrame()
 		reopen()
 		return
 	end
+	-- Nothing opens while the scroll areas are positioned, and the frame is not built then either:
+	-- a new frame is shown the moment it is made.
+	if MSBTScrollAreasConfigFrame and MSBTScrollAreasConfigFrame:IsShown() then return end
 	if (not mainFrame) then CreateMainFrame() end
-	if (not MSBTScrollAreasConfigFrame or not MSBTScrollAreasConfigFrame:IsShown()) then
-		mainFrame:Show()
-	end
+	mainFrame:Show()
 end
 
 
@@ -512,6 +520,7 @@ end
 
 module.ShowMainFrame		= ShowMainFrame
 module.HideMainFrame		= HideMainFrame
+module.HidePopups			= HidePopups
 module.DockMainFrame		= DockMainFrame
 module.UndockMainFrame		= UndockMainFrame
 module.IsDocked				= IsDocked

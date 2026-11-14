@@ -284,3 +284,33 @@ do
 	end
 	Events()
 end
+
+-- Rule: while the scroll areas are positioned, a further design does not open; the classic one is
+-- asked as ever, for it checks that itself.
+do
+	-- Given two designs and the positioning on screen.
+	Designs, windows = LoadDesigns("classic", "other")
+	local positioned = true
+	MSBTScrollAreasConfigFrame = { IsShown = function() return positioned end }
+
+	-- When the options are opened in the further design.
+	saved.optionsDesign = "other"
+	Designs.Show()
+	-- Then its window is not asked to open.
+	assert(Events() == "", "a further design opened while the scroll areas are positioned")
+
+	-- When the options are opened in the classic design.
+	saved.optionsDesign = nil
+	Designs.Show()
+	-- Then its window is asked, as before there were designs.
+	assert(Events() == "show classic", "the classic design was not asked while the scroll areas are positioned")
+	windows.classic.shown = false
+
+	-- When the positioning has closed.
+	positioned = false
+	saved.optionsDesign = "other"
+	Designs.Show()
+	-- Then the further design opens.
+	assert(Events() == "show other", "a further design did not open after the positioning")
+	MSBTScrollAreasConfigFrame = nil
+end

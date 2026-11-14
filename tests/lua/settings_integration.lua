@@ -58,7 +58,7 @@ MikSBT = {
 }
 MSBTOptions = {Controls = {CreateListbox = function(parent)
 	return NewFrame(nil, parent)
-end}}
+end}, Popups = {UseDesignPopups = function() end}}
 CreateFrame = function(_, name, parent) return NewFrame(name, parent) end
 MikSBT.Profiles = {savedVariables = {}}
 dofile("MSBTOptions/MSBTOptionsDesigns.lua")

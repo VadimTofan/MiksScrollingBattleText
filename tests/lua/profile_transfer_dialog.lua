@@ -100,6 +100,7 @@ dofile("MSBTOptions/Localization/localization.lua")
 local tabs = {}
 MSBTOptions.Main = {
 	RegisterPopupFrame = function(frame) popup = frame end,
+	HidePopups = function() end,
 	AddTab = function(frame, label) tabs[label] = frame end,
 }
 MSBTOptions.Controls = {
@@ -278,5 +279,53 @@ assert(popup.dataEditbox.highlighted and popup.dataEditbox.focused)
 assert(popup.scrollFrame:GetVerticalScroll() == 0,
 	"reopening export must return to its first line")
 popup:Hide()
+
+-- Rule: the new design has a dialog of its own, skinned once, and the classic one stays as it was.
+do
+	-- Given the new design's popups are in use.
+	local classicDialog, skinned = popup, {}
+	MSBTOptions.Designs = { designs = { other = { SkinPopup = function(frame) skinned[#skinned + 1] = frame end } } }
+	MSBTOptions.Popups.UseDesignPopups("other")
+
+	-- When Export opens twice, and then once more with the classic popups.
+	controls.exportProfileButton.clickHandler(controls.exportProfileButton)
+	local designDialog = popup
+	popup:Hide()
+	controls.exportProfileButton.clickHandler(controls.exportProfileButton)
+	local reused = designDialog.shown
+	designDialog:Hide()
+	MSBTOptions.Popups.UseDesignPopups("classic")
+	controls.exportProfileButton.clickHandler(controls.exportProfileButton)
+	local classicShown = classicDialog.shown and not designDialog.shown
+	classicDialog:Hide()
+
+	-- Then the design's dialog is another one, kept and skinned once, and the classic one returns.
+	assert(designDialog ~= classicDialog and reused, "both designs share the dialog")
+	assert(#skinned == 1 and skinned[1] == designDialog, "the skin reached the wrong dialog")
+	assert(classicShown, "the classic popups did not get their dialog back")
+end
+
+-- Rule: switching the popup set hides every open popup first, and staying on a set hides none.
+do
+	-- Given the classic set in use and a Main that counts the popups it hides and sees which set was current.
+	local Popups, hides, current = MSBTOptions.Popups, 0, nil
+	local classicSet = Popups.GetPopupFrames()
+	MSBTOptions.Main.HidePopups = function() hides = hides + 1 current = Popups.GetPopupFrames() end
+
+	-- When the set stays the same, changes to the design's, stays, and changes back.
+	Popups.UseDesignPopups("classic")
+	local stayed = hides
+	Popups.UseDesignPopups("other")
+	local designSet = Popups.GetPopupFrames()
+	local switched, hiddenIn = hides, current
+	Popups.UseDesignPopups("other")
+	local stayedDesign = hides
+	Popups.UseDesignPopups("classic")
+
+	-- Then only the two changes hid popups, each while the old set was still the current one.
+	assert(stayed == 0 and stayedDesign == 1 and hides == 2, "the popups were hidden " .. hides .. " times")
+	assert(hiddenIn == classicSet and designSet ~= classicSet, "the popups were hidden after the switch")
+	assert(current == designSet and Popups.GetPopupFrames() == classicSet, "the classic set did not come back")
+end
 
 print("Profile transfer dialog tests passed")
