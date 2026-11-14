@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Unchecking Outgoing Pet or Incoming Pet redirects its messages to Outgoing
+  or Incoming. Individually disabled events remain hidden.
+
 ## v12.052
 
 - Added individual resource checkboxes under Configure Resources. Notifications
