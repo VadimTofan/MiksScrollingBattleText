@@ -330,6 +330,39 @@ assert(list.items[1] == nameKey)
 assert(list.lines[1].auraLine.label.text == "Aura 17 (all ranks)")
 assert(list.lines[2].auraLine.label.text == "Aura 17 (17)")
 
+-- Describe: the Events tab treats an aura tracked by name as an aura.
+-- Given the all-ranks row and a spy on the events written through the profile.
+local profileWrites = {}
+MikSBT.Profiles.currentProfile.events.NOTIFICATION_BUFF.fontSize = 24
+MikSBT.Profiles.currentProfile.scrollAreas = { Notification = {} }
+local plainSetOption = MikSBT.Profiles.SetOption
+MikSBT.Profiles.SetOption = function(path, ...)
+	if path then profileWrites[#profileWrites + 1] = path return end
+	return plainSetOption(path, ...)
+end
+MSBTOptions.Auras.SaveSetting(nameKey, "message", "Named %sl")
+MSBTOptions.Auras.SaveSetting(nameKey, "fontSize", 32)
+local named = list.lines[1].auraLine
+-- When its settings and font dialogs open, and then save.
+named.settingsButton:click()
+assert(eventPopup.message == "Named %sl", "settings did not read the aura's settings")
+eventPopup.saveHandler({ message = "Saved %sl", scrollArea = "Notification" },
+	eventPopup.saveArg1)
+named.fontButton:click()
+assert(fontPopup.normalFontSize == 32, "font dialog did not read the aura's settings")
+assert(fontPopup.inheritedNormalFontSize == 24, "font dialog did not inherit from the aura base")
+fontPopup.saveHandler({ normalFontSize = 40 }, fontPopup.saveArg1)
+-- And the color is changed.
+named.colorSwatch:SetColor(0.3, 0.6, 0.9)
+named.colorSwatch.colorChangedHandler(named.colorSwatch)
+-- Then everything is saved with the aura and nothing under the events table.
+local nameSettings = MikSBT.Profiles.currentProfile.auraSettings[nameKey]
+assert(nameSettings.message == "Saved %sl" and nameSettings.fontSize == 40)
+assert(nameSettings.colorR == 0.3 and nameSettings.colorB == 0.9)
+assert(#profileWrites == 0, "a name rule was written to events: " .. tostring(profileWrites[1]))
+MikSBT.Profiles.currentProfile.events.NOTIFICATION_BUFF.fontSize = nil
+MikSBT.Profiles.SetOption = plainSetOption
+
 -- Given the all-ranks row with a custom font.
 MSBTOptions.Auras.SaveSetting(nameKey, "fontSize", 32)
 -- When it is enabled and removed.

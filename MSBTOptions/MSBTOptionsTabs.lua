@@ -1108,8 +1108,13 @@ local function EventsTab_MoveAll(scrollArea)
 end
 
 
+-- Tracked auras are keyed by spell ID or by "name:" and the spell name.
+local function EventsTab_IsAura(eventType)
+	return eventType:match("^%d+$") or eventType:match("^name:")
+end
+
 local function EventsTab_GetSettings(eventType)
-	if eventType:match("^%d+$") then
+	if EventsTab_IsAura(eventType) then
 		return MikSBT.Configuration.AuraTracking:GetSettings(
 			MSBTProfiles.currentProfile, eventType)
 	end
@@ -1117,7 +1122,7 @@ local function EventsTab_GetSettings(eventType)
 end
 
 local function EventsTab_SaveOption(eventType, field, value, default)
-	if eventType:match("^%d+$") then
+	if EventsTab_IsAura(eventType) then
 		MSBTOptions.Auras.SaveSetting(eventType, field, value)
 	else
 		MSBTProfiles.SetOption("events." .. eventType, field, value, default)
@@ -1241,7 +1246,7 @@ local function EventsTab_FontButtonOnClick(this)
 		configTable.hideNormal = true
 	end
 
-	if eventType:match("^%d+$") then
+	if EventsTab_IsAura(eventType) then
 		local profile = MSBTProfiles.currentProfile
 		local base = profile.events.NOTIFICATION_BUFF
 		local custom = profile.auraSettings and profile.auraSettings[eventType] or {}
