@@ -1661,12 +1661,30 @@ local function EnableEventControls()
 end
 
 
+-- One checkbox per resource token stacked in parent, keyed by token; the handler reads checkbox.token.
+local function CreateResourceList(parent, clickHandler)
+	local checkboxes = {}
+	parent:SetHeight(#RESOURCE_TOKENS * 26 + 10)
+	for index, token in ipairs(RESOURCE_TOKENS) do
+		local label = (L.RESOURCE_NAMES and L.RESOURCE_NAMES[token])
+			or _G[token] or token:lower():gsub("_", " ")
+		if token == "COMBO_POINTS" then label = L.RESOURCE_COMBO_POINT end
+		local checkbox = MSBTControls.CreateCheckbox(parent)
+		checkbox:Configure(24, label, L.RESOURCE_CHECKBOX_HELP)
+		checkbox:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -(index - 1) * 26)
+		checkbox:SetClickHandler(clickHandler)
+		checkbox.token = token
+		checkboxes[token] = checkbox
+	end
+	return checkboxes
+end
+
+
 local function CreateResourceCheckboxes(frame)
 	local panel = CreateFrame("Frame", nil, frame)
 	panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 380, -65)
 	panel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -44, 78)
 	frame.resourcePanel = panel
-	frame.resourceCheckboxes = {}
 
 	local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
@@ -1677,21 +1695,14 @@ local function CreateResourceCheckboxes(frame)
 	scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -24)
 	scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -24, 0)
 	local content = CreateFrame("Frame", nil, scroll)
-	content:SetSize(260, #RESOURCE_TOKENS * 26 + 10)
+	content:SetWidth(260)
 	scroll:SetScrollChild(content)
 	frame.resourceContent = content
 
-	for index, token in ipairs(RESOURCE_TOKENS) do
-		local label = (L.RESOURCE_NAMES and L.RESOURCE_NAMES[token])
-			or _G[token] or token:lower():gsub("_", " ")
-		if token == "COMBO_POINTS" then label = L.RESOURCE_COMBO_POINT end
-		local checkbox = MSBTControls.CreateCheckbox(content)
-		checkbox:Configure(24, label, L.RESOURCE_CHECKBOX_HELP)
-		checkbox:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(index - 1) * 26)
-		checkbox:SetClickHandler(function(_, checked)
-			frame.resourceExclusions[token] = not checked or nil
-		end)
-		frame.resourceCheckboxes[token] = checkbox
+	frame.resourceCheckboxes = CreateResourceList(content, function(this, checked)
+		frame.resourceExclusions[this.token] = not checked or nil
+	end)
+	for _, checkbox in pairs(frame.resourceCheckboxes) do
 		frame.controls[#frame.controls + 1] = checkbox
 	end
 
@@ -2006,7 +2017,11 @@ end
 
 
 
+module.OUTLINE_MAP					= OUTLINE_MAP
 module.DisableControls				= DisableControls
+module.ToggleDropdownInheritState	= ToggleDropdownInheritState
+module.ToggleSliderInheritState		= ToggleSliderInheritState
+module.CreateResourceList			= CreateResourceList
 module.CreateMenuArtwork			= CreateMenuArtwork
 module.ShowInput					= ShowInput
 module.ShowAcknowledge				= ShowAcknowledge
@@ -2015,6 +2030,12 @@ module.ShowPartialEffects			= ShowPartialEffects
 module.ShowDamageColors				= ShowDamageColors
 module.ShowClassColors				= ShowClassColors
 module.ShowScrollAreaConfig			= ShowScrollAreaConfig
+module.SCROLL_AREA_DEFAULTS			= SCROLL_AREA_DEFAULTS
+module.SaveScrollAreaOption			= SaveScrollAreaOption
+module.ConfigureScrollAreaSlider	= ConfigureScrollAreaSlider
+module.FillStyleList				= FillStyleList
+module.FillStyleDropdowns			= FillStyleDropdowns
+module.PreviewScrollAreas			= PreviewScrollAreas
 module.ShowScrollAreaSelection		= ShowScrollAreaSelection
 module.ShowEvent					= ShowEvent
 module.ShowItemList					= ShowItemList

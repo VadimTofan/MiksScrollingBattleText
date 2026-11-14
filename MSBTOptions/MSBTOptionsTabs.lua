@@ -202,6 +202,34 @@ local function GeneralTab_SaveFontSettings(fontSettings)
 end
 
 
+local function GeneralTab_ShowMasterFont(parentFrame, anchorFrame, anchorPoint, relativePoint, hideHandler)
+	EraseTable(configTable)
+	configTable.title = L.BUTTONS["masterFont"].label
+
+	local fontName = MSBTProfiles.currentProfile.normalFontName
+	if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
+	configTable.normalFontName = fontName
+	configTable.normalOutlineIndex = MSBTProfiles.currentProfile.normalOutlineIndex
+	configTable.normalFontSize = MSBTProfiles.currentProfile.normalFontSize
+	configTable.normalFontAlpha = MSBTProfiles.currentProfile.normalFontAlpha
+
+	fontName = MSBTProfiles.currentProfile.critFontName
+	if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
+	configTable.critFontName = fontName
+	configTable.critOutlineIndex = MSBTProfiles.currentProfile.critOutlineIndex
+	configTable.critFontSize = MSBTProfiles.currentProfile.critFontSize
+	configTable.critFontAlpha = MSBTProfiles.currentProfile.critFontAlpha
+	configTable.hideInherit = true
+	configTable.parentFrame = parentFrame
+	configTable.anchorFrame = anchorFrame
+	configTable.anchorPoint = anchorPoint
+	configTable.relativePoint = relativePoint
+	configTable.saveHandler = GeneralTab_SaveFontSettings
+	configTable.hideHandler = hideHandler
+	MSBTPopups.ShowFont(configTable)
+end
+
+
 local function GeneralTab_Create()
 	local tabFrame = tabFrames.general
 	tabFrame.controls = {}
@@ -399,31 +427,8 @@ local function GeneralTab_Create()
 	button:SetPoint("BOTTOMLEFT", controls.partialEffectsButton, "TOPLEFT", 0, 10)
 	button:SetClickHandler(
 		function (this)
-			EraseTable(configTable)
-			configTable.title = objLocale.label
-
-			local fontName = MSBTProfiles.currentProfile.normalFontName
-			if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
-			configTable.normalFontName = fontName
-			configTable.normalOutlineIndex = MSBTProfiles.currentProfile.normalOutlineIndex
-			configTable.normalFontSize = MSBTProfiles.currentProfile.normalFontSize
-			configTable.normalFontAlpha = MSBTProfiles.currentProfile.normalFontAlpha
-
-			fontName = MSBTProfiles.currentProfile.critFontName
-			if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
-			configTable.critFontName = fontName
-			configTable.critOutlineIndex = MSBTProfiles.currentProfile.critOutlineIndex
-			configTable.critFontSize = MSBTProfiles.currentProfile.critFontSize
-			configTable.critFontAlpha = MSBTProfiles.currentProfile.critFontAlpha
-			configTable.hideInherit = true
-			configTable.parentFrame = tabFrame
-			configTable.anchorFrame = tabFrame
-			configTable.anchorPoint = "BOTTOM"
-			configTable.relativePoint = "BOTTOM"
-			configTable.saveHandler = GeneralTab_SaveFontSettings
-			configTable.hideHandler = GeneralTab_EnableControls
 			DisableControls(controls)
-			MSBTPopups.ShowFont(configTable)
+			GeneralTab_ShowMasterFont(tabFrame, tabFrame, "BOTTOM", "BOTTOM", GeneralTab_EnableControls)
 		end
 	)
 	controls.masterFontButton = button
@@ -467,17 +472,21 @@ local function ProfileTab_Populate()
 	ProfileTab_ToggleDeleteButton()
 end
 
+local function ProfileTab_ReportImport(name, details)
+	local locale = L.PROFILE_TRANSFER
+	Print(string.format(locale.imported, name), 0, 1, 0)
+	if details.clientMismatch or details.localeMismatch then
+		Print(locale.compatibility, 1, 0.8, 0)
+	end
+end
+
 local function ProfileTab_ImportSucceeded(name, details)
 	local dropdown = tabFrames.profile.controls.profileDropdown
 	dropdown:AddItem(name, name)
 	dropdown:Sort()
 	ProfileTab_Populate()
 	RefreshGeneralTabIfCreated()
-	local locale = L.PROFILE_TRANSFER
-	Print(string.format(locale.imported, name), 0, 1, 0)
-	if details.clientMismatch or details.localeMismatch then
-		Print(locale.compatibility, 1, 0.8, 0)
-	end
+	ProfileTab_ReportImport(name, details)
 end
 
 local function ProfileTab_ShowTransfer(isExport)
@@ -632,7 +641,7 @@ local function ScrollAreasTab_ValidateScrollAreaName(scrollAreaName)
 end
 
 
-local function ScrollAreasTab_AddScrollArea(settings)
+local function ScrollAreasTab_CreateScrollArea(name)
 	local nextAvailable = 1
 	while (MSBTProfiles.currentProfile.scrollAreas["Custom" .. nextAvailable]) do
 		nextAvailable = nextAvailable + 1
@@ -640,10 +649,15 @@ local function ScrollAreasTab_AddScrollArea(settings)
 
 	local newKey = "Custom" .. nextAvailable
 	local saSettings = {}
-	saSettings.name = settings.inputText
+	saSettings.name = name
 	MSBTProfiles.SetOption("scrollAreas", newKey, saSettings)
 	MSBTAnimations.UpdateScrollAreas()
-	tabFrames.scrollAreas.controls.scrollAreasListbox:AddItem(newKey, true)
+	return newKey
+end
+
+
+local function ScrollAreasTab_AddScrollArea(settings)
+	tabFrames.scrollAreas.controls.scrollAreasListbox:AddItem(ScrollAreasTab_CreateScrollArea(settings.inputText), true)
 end
 
 
@@ -654,9 +668,14 @@ local function ScrollAreasTab_EnableOnClick(this, isChecked)
 end
 
 
-local function ScrollAreasTab_ChangeScrollAreaName(settings)
-	MSBTProfiles.SetOption("scrollAreas." .. settings.saveArg1, "name", settings.inputText)
+local function ScrollAreasTab_RenameScrollArea(saKey, name)
+	MSBTProfiles.SetOption("scrollAreas." .. saKey, "name", name)
 	MSBTAnimations.UpdateScrollAreas()
+end
+
+
+local function ScrollAreasTab_ChangeScrollAreaName(settings)
+	ScrollAreasTab_RenameScrollArea(settings.saveArg1, settings.inputText)
 	tabFrames.scrollAreas.controls.scrollAreasListbox:Refresh()
 end
 
@@ -681,10 +700,21 @@ local function ScrollAreasTab_EditNameButtonOnClick(this)
 end
 
 
-local function ScrollAreasTab_DeleteScrollArea(line)
-	MSBTProfiles.SetOption("scrollAreas", line.scrollAreaKey, nil)
-	tabFrames.scrollAreas.controls.scrollAreasListbox:RemoveItem(line.itemNumber)
+-- Areas of the master profile are built in and cannot be deleted.
+local function ScrollAreasTab_IsBuiltIn(saKey)
+	return MSBTProfiles.masterProfile.scrollAreas[saKey] ~= nil
+end
+
+
+local function ScrollAreasTab_RemoveScrollArea(saKey)
+	MSBTProfiles.SetOption("scrollAreas", saKey, nil)
 	MSBTAnimations.UpdateScrollAreas()
+end
+
+
+local function ScrollAreasTab_DeleteScrollArea(line)
+	ScrollAreasTab_RemoveScrollArea(line.scrollAreaKey)
+	tabFrames.scrollAreas.controls.scrollAreasListbox:RemoveItem(line.itemNumber)
 end
 
 
@@ -717,8 +747,7 @@ local function ScrollAreasTab_SaveFontSettings(fontSettings, scrollAreaKey)
 end
 
 
-local function ScrollAreasTab_FontButtonOnClick(this)
-	local saKey = this:GetParent().scrollAreaKey
+local function ScrollAreasTab_ShowFont(saKey, parentFrame, hideHandler)
 	local saSettings = MSBTProfiles.currentProfile.scrollAreas[saKey]
 
 	EraseTable(configTable)
@@ -752,15 +781,20 @@ local function ScrollAreasTab_FontButtonOnClick(this)
 	configTable.critFontSize = saSettings.critFontSize
 	configTable.critFontAlpha = saSettings.critFontAlpha
 
-	configTable.parentFrame = tabFrames.scrollAreas
-	configTable.anchorFrame = tabFrames.scrollAreas
+	configTable.parentFrame = parentFrame
+	configTable.anchorFrame = parentFrame
 	configTable.anchorPoint = "BOTTOM"
 	configTable.relativePoint = "BOTTOM"
 	configTable.saveHandler = ScrollAreasTab_SaveFontSettings
 	configTable.saveArg1 = saKey
-	configTable.hideHandler = ScrollAreasTab_EnableControls
-	DisableControls(tabFrames.scrollAreas.controls)
+	configTable.hideHandler = hideHandler
 	MSBTPopups.ShowFont(configTable)
+end
+
+
+local function ScrollAreasTab_FontButtonOnClick(this)
+	DisableControls(tabFrames.scrollAreas.controls)
+	ScrollAreasTab_ShowFont(this:GetParent().scrollAreaKey, tabFrames.scrollAreas, ScrollAreasTab_EnableControls)
 end
 
 
@@ -811,11 +845,18 @@ local function ScrollAreasTab_DisplayLine(this, line, key, isSelected)
 	line.enableCheckbox:SetLabel(saSettings.name)
 	line.enableCheckbox:SetChecked(not saSettings.disabled)
 
-	if (MSBTProfiles.masterProfile.scrollAreas[key]) then
+	if (ScrollAreasTab_IsBuiltIn(key)) then
 		line.deleteButton:Disable()
 	else
 		line.deleteButton:Enable()
 	end
+end
+
+
+-- The configuration moves the areas on the game screen, so the options window steps aside.
+local function ScrollAreasTab_ConfigureOnScreen()
+	MSBTDesigns.Hide()
+	MSBTPopups.ShowScrollAreaConfig()
 end
 
 
@@ -857,12 +898,7 @@ local function ScrollAreasTab_Create()
 	objLocale = L.BUTTONS["configScrollAreas"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("BOTTOMRIGHT", texture, "TOPRIGHT", -5, 15)
-	button:SetClickHandler(
-		function (this)
-			MSBTDesigns.Hide()
-			MSBTPopups.ShowScrollAreaConfig()
-		end
-	)
+	button:SetClickHandler(ScrollAreasTab_ConfigureOnScreen)
 	controls.configScrollAreasButton = button
 
 	local listbox = MSBTControls.CreateListbox(tabFrame)
@@ -1197,73 +1233,76 @@ local function EventsTab_SaveFontSettings(settings, eventType)
 end
 
 
+-- Font, outline, size and opacity an event inherits: its scroll area's, else the profile's.
+local function EventsTab_InheritedFont(eventSettings)
+	local profile = MSBTProfiles.currentProfile
+	local saSettings = profile.scrollAreas[eventSettings.scrollArea] or profile.scrollAreas[DEFAULT_SCROLL_AREA]
+	local kind = eventSettings.isCrit and "crit" or "normal"
+
+	local fontName = saSettings[kind .. "FontName"]
+	if (not fonts[fontName]) then fontName = profile[kind .. "FontName"] end
+	if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
+	return fontName, saSettings[kind .. "OutlineIndex"] or profile[kind .. "OutlineIndex"],
+		saSettings[kind .. "FontSize"] or profile[kind .. "FontSize"],
+		saSettings[kind .. "FontAlpha"] or profile[kind .. "FontAlpha"]
+end
+
+
+-- The table holding an event's own font fields and the four values it inherits.
+-- An aura keeps its own fields apart and inherits from the buff notification first.
+local function EventsTab_FontSource(eventType)
+	local eventSettings = EventsTab_GetSettings(eventType)
+	local fontName, outlineIndex, fontSize, fontAlpha = EventsTab_InheritedFont(eventSettings)
+	if (not EventsTab_IsAura(eventType)) then
+		return eventSettings, fontName, outlineIndex, fontSize, fontAlpha
+	end
+	local profile = MSBTProfiles.currentProfile
+	local base = profile.events.NOTIFICATION_BUFF
+	if fonts[base.fontName] then fontName = base.fontName end
+	return profile.auraSettings and profile.auraSettings[eventType] or {}, fontName,
+		base.outlineIndex or outlineIndex, base.fontSize or fontSize, base.fontAlpha or fontAlpha
+end
+
+
 local function EventsTab_FontButtonOnClick(this)
 	local categoryText = tabFrames.events.controls.eventCategoryDropdown:GetSelectedText()
 	local eventType = this:GetParent().eventType
 	local eventSettings = EventsTab_GetSettings(eventType)
 
-	local saKey = eventSettings.scrollArea
-	local saSettings = MSBTProfiles.currentProfile.scrollAreas[saKey]
-	if (not saSettings) then saSettings = MSBTProfiles.currentProfile.scrollAreas[DEFAULT_SCROLL_AREA] end
-
 	EraseTable(configTable)
 	configTable.title = categoryText .. " - " .. EventsTab_LineLabel(this:GetParent())
 
-	local fontName
+	local own, fontName, outlineIndex, fontSize, fontAlpha = EventsTab_FontSource(eventType)
 	if (not eventSettings.isCrit) then
-		fontName = saSettings.normalFontName
-		if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.normalFontName end
-		if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
 		configTable.inheritedNormalFontName = fontName
-		configTable.inheritedNormalOutlineIndex = saSettings.normalOutlineIndex or MSBTProfiles.currentProfile.normalOutlineIndex
-		configTable.inheritedNormalFontSize = saSettings.normalFontSize or MSBTProfiles.currentProfile.normalFontSize
-		configTable.inheritedNormalFontAlpha = saSettings.normalFontAlpha or MSBTProfiles.currentProfile.normalFontAlpha
+		configTable.inheritedNormalOutlineIndex = outlineIndex
+		configTable.inheritedNormalFontSize = fontSize
+		configTable.inheritedNormalFontAlpha = fontAlpha
 
-		fontName = eventSettings.fontName
+		fontName = own.fontName
 		if (not fonts[fontName]) then fontName = nil end
 		configTable.normalFontName = fontName
-		configTable.normalOutlineIndex = eventSettings.outlineIndex
-		configTable.normalFontSize = eventSettings.fontSize
-		configTable.normalFontAlpha = eventSettings.fontAlpha
+		configTable.normalOutlineIndex = own.outlineIndex
+		configTable.normalFontSize = own.fontSize
+		configTable.normalFontAlpha = own.fontAlpha
 
 		configTable.hideCrit = true
 	else
-		fontName = saSettings.critFontName
-		if (not fonts[fontName]) then fontName = MSBTProfiles.currentProfile.critFontName end
-		if (not fonts[fontName]) then fontName = DEFAULT_FONT_NAME end
 		configTable.inheritedCritFontName = fontName
-		configTable.inheritedCritOutlineIndex = saSettings.critOutlineIndex or MSBTProfiles.currentProfile.critOutlineIndex
-		configTable.inheritedCritFontSize = saSettings.critFontSize or MSBTProfiles.currentProfile.critFontSize
-		configTable.inheritedCritFontAlpha = saSettings.critFontAlpha or MSBTProfiles.currentProfile.critFontAlpha
+		configTable.inheritedCritOutlineIndex = outlineIndex
+		configTable.inheritedCritFontSize = fontSize
+		configTable.inheritedCritFontAlpha = fontAlpha
 
-		fontName = eventSettings.fontName
+		fontName = own.fontName
 		if (not fonts[fontName]) then fontName = nil end
 		configTable.critFontName = fontName
-		configTable.critOutlineIndex = eventSettings.outlineIndex
-		configTable.critFontSize = eventSettings.fontSize
-		configTable.critFontAlpha = eventSettings.fontAlpha
+		configTable.critOutlineIndex = own.outlineIndex
+		configTable.critFontSize = own.fontSize
+		configTable.critFontAlpha = own.fontAlpha
 
 		configTable.hideNormal = true
 	end
 
-	if EventsTab_IsAura(eventType) then
-		local profile = MSBTProfiles.currentProfile
-		local base = profile.events.NOTIFICATION_BUFF
-		local custom = profile.auraSettings and profile.auraSettings[eventType] or {}
-		if fonts[base.fontName] then
-			configTable.inheritedNormalFontName = base.fontName
-		end
-		configTable.inheritedNormalOutlineIndex = base.outlineIndex
-			or configTable.inheritedNormalOutlineIndex
-		configTable.inheritedNormalFontSize = base.fontSize
-			or configTable.inheritedNormalFontSize
-		configTable.inheritedNormalFontAlpha = base.fontAlpha
-			or configTable.inheritedNormalFontAlpha
-		configTable.normalFontName = custom.fontName
-		configTable.normalOutlineIndex = custom.outlineIndex
-		configTable.normalFontSize = custom.fontSize
-		configTable.normalFontAlpha = custom.fontAlpha
-	end
 	configTable.parentFrame = tabFrames.events
 	configTable.anchorFrame = tabFrames.events
 	configTable.anchorPoint = "BOTTOM"
@@ -1451,6 +1490,24 @@ local function EventsTab_OnShow()
 end
 
 
+local function EventsTab_GetEvents(category)
+	if (not orderedEvents[category]) then EventsTab_SetupEvents() end
+	return orderedEvents[category]
+end
+
+
+
+-- The loot events with the labels and codes of the Loot Alerts tab, also a category of the designs' Events pages.
+local LOOT_ITEM_CODES = L.EVENT_CODES.ITEM_AMOUNT .. L.EVENT_CODES.ITEM_NAME .. L.EVENT_CODES.TOTAL_ITEMS
+orderedEvents.LOOT_EVENTS = {
+	{ eventType = "NOTIFICATION_LOOT", label = L.CHECKBOXES.lootedItems.label,
+		tooltip = L.CHECKBOXES.lootedItems.tooltip, codes = LOOT_ITEM_CODES },
+	{ eventType = "NOTIFICATION_MONEY", label = L.CHECKBOXES.moneyGains.label,
+		tooltip = L.CHECKBOXES.moneyGains.tooltip, codes = L.EVENT_CODES.MONEY_TEXT },
+	{ eventType = "NOTIFICATION_CURRENCY", label = L.CHECKBOXES.currencyGains.label,
+		tooltip = L.CHECKBOXES.currencyGains.tooltip, codes = LOOT_ITEM_CODES },
+}
+
 
 local function LootAlertsTab_EnableControls()
 	for name, frame in pairs(tabFrames.lootAlerts.controls) do
@@ -1477,6 +1534,50 @@ local function LootAlertsTab_SaveFontSettings(settings, eventType)
 	MSBTProfiles.SetOption("events." .. eventType, "outlineIndex", settings.normalOutlineIndex)
 	MSBTProfiles.SetOption("events." .. eventType, "fontSize", settings.normalFontSize)
 	MSBTProfiles.SetOption("events." .. eventType, "fontAlpha", settings.normalFontAlpha)
+end
+
+
+local function LootAlertsTab_Qualities()
+	return LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor, LE_ITEM_QUALITY_EPIC or Enum.ItemQuality.Epic
+end
+
+
+local function LootAlertsTab_QualityLabel(quality)
+	local label = _G["ITEM_QUALITY" .. quality .. "_DESC"]
+	local color = ITEM_QUALITY_COLORS[quality]
+	if color then label = string.format("|cFF%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, label) end
+	return label
+end
+
+
+local function LootAlertsTab_QualityOnClick(this, isChecked)
+	MSBTProfiles.SetOption("qualityExclusions", this.quality, not isChecked)
+end
+
+
+local function LootAlertsTab_QuestItemsOnClick(this, isChecked)
+	MSBTProfiles.SetOption(nil, "alwaysShowQuestItems", isChecked)
+end
+
+
+-- Opens the list the button names over the button's parent; the classic tab is locked meanwhile.
+local function LootAlertsTab_ItemListOnClick(this)
+	local listName = this.listName
+	PopulateList(listName)
+	EraseTable(configTable)
+	configTable.title = this:GetText()
+	configTable.items = listTable
+	configTable.parentFrame = this:GetParent()
+	configTable.anchorFrame = this:GetParent()
+	configTable.anchorPoint = "TOPRIGHT"
+	configTable.relativePoint = "TOPRIGHT"
+	configTable.saveHandler = SaveList
+	configTable.saveArg1 = listName
+	if this:GetParent() == tabFrames.lootAlerts then
+		configTable.hideHandler = LootAlertsTab_EnableControls
+		DisableControls(tabFrames.lootAlerts.controls)
+	end
+	MSBTPopups.ShowItemList(configTable)
 end
 
 
@@ -1522,7 +1623,7 @@ local function LootAlertsTab_Create()
 			configTable.title = L.CHECKBOXES.lootedItems.label
 			configTable.message = eventSettings.message
 			configTable.soundFile = eventSettings.soundFile
-			configTable.codes = L.EVENT_CODES["ITEM_AMOUNT"] .. L.EVENT_CODES["ITEM_NAME"] .. L.EVENT_CODES["TOTAL_ITEMS"]
+			configTable.codes = LOOT_ITEM_CODES
 			configTable.scrollArea = eventSettings.scrollArea or DEFAULT_SCROLL_AREA
 			configTable.alwaysSticky = eventSettings.alwaysSticky
 			configTable.parentFrame = tabFrame
@@ -1728,7 +1829,7 @@ local function LootAlertsTab_Create()
 			configTable.title = L.CHECKBOXES.currencyGains.label
 			configTable.message = eventSettings.message
 			configTable.soundFile = eventSettings.soundFile
-			configTable.codes = L.EVENT_CODES["ITEM_AMOUNT"] .. L.EVENT_CODES["ITEM_NAME"] .. L.EVENT_CODES["TOTAL_ITEMS"]
+			configTable.codes = LOOT_ITEM_CODES
 			configTable.scrollArea = eventSettings.scrollArea or DEFAULT_SCROLL_AREA
 			configTable.alwaysSticky = eventSettings.alwaysSticky
 			configTable.parentFrame = tabFrame
@@ -1799,18 +1900,13 @@ local function LootAlertsTab_Create()
 	fontString:SetText(L.MSG_ITEM_QUALITIES .. ":")
 
 	local anchor = fontString
-	for quality = LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor, LE_ITEM_QUALITY_EPIC or Enum.ItemQuality.Epic do
+	local firstQuality, lastQuality = LootAlertsTab_Qualities()
+	for quality = firstQuality, lastQuality do
 		local checkbox = MSBTControls.CreateCheckbox(tabFrame)
-		local label = _G["ITEM_QUALITY" .. quality .. "_DESC"]
-		local color = ITEM_QUALITY_COLORS[quality]
-		if color then label = string.format("|cFF%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, label) end
-		checkbox:Configure(24, label, L.MSG_DISPLAY_QUALITY)
+		checkbox:Configure(24, LootAlertsTab_QualityLabel(quality), L.MSG_DISPLAY_QUALITY)
 		checkbox:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", anchor == fontString and 5 or 0, anchor == fontString and -10 or 0)
-		checkbox:SetClickHandler(
-			function (this, isChecked)
-				MSBTProfiles.SetOption("qualityExclusions", quality, not isChecked)
-			end
-		)
+		checkbox.quality = quality
+		checkbox:SetClickHandler(LootAlertsTab_QualityOnClick)
 		controls["quality" .. quality .. "Checkbox"] = checkbox
 		anchor = checkbox
 	end
@@ -1819,59 +1915,23 @@ local function LootAlertsTab_Create()
 	local objLocale = L.CHECKBOXES["alwaysShowQuestItems"]
 	checkbox:Configure(24, objLocale.label, objLocale.tooltip)
 	checkbox:SetPoint("TOPLEFT", controls.quality0Checkbox, "TOPRIGHT", 100, 0)
-		checkbox:SetClickHandler(
-			function (this, isChecked)
-				MSBTProfiles.SetOption(nil, "alwaysShowQuestItems", isChecked)
-			end
-		)
+	checkbox:SetClickHandler(LootAlertsTab_QuestItemsOnClick)
 	controls.alwaysShowQuestItemsCheckbox = checkbox
 
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["itemsAllowed"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("BOTTOMLEFT", tabFrame, "BOTTOMLEFT", 5, 40)
-	button:SetClickHandler(
-		function (this)
-			local listName = "itemsAllowed"
-			PopulateList(listName)
-			EraseTable(configTable)
-			configTable.title = this:GetText()
-			configTable.items = listTable
-			configTable.parentFrame = tabFrame
-			configTable.anchorFrame = tabFrame
-			configTable.anchorPoint = "TOPRIGHT"
-			configTable.relativePoint = "TOPRIGHT"
-			configTable.saveHandler = SaveList
-			configTable.saveArg1 = listName
-			configTable.hideHandler = LootAlertsTab_EnableControls
-			DisableControls(controls)
-			MSBTPopups.ShowItemList(configTable)
-		end
-	)
+	button.listName = "itemsAllowed"
+	button:SetClickHandler(LootAlertsTab_ItemListOnClick)
 	controls.itemsAllowedButton = button
 
 	button = MSBTControls.CreateOptionButton(tabFrame)
 	objLocale = L.BUTTONS["itemExclusions"]
 	button:Configure(20, objLocale.label, objLocale.tooltip)
 	button:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", -10, 40)
-	button:SetClickHandler(
-		function (this)
-			local listName = "itemExclusions"
-			PopulateList(listName)
-			EraseTable(configTable)
-			configTable.title = this:GetText()
-			configTable.items = listTable
-			configTable.parentFrame = tabFrame
-			configTable.anchorFrame = tabFrame
-			configTable.anchorPoint = "TOPRIGHT"
-			configTable.relativePoint = "TOPRIGHT"
-			configTable.saveHandler = SaveList
-			configTable.saveArg1 = listName
-			configTable.hideHandler = LootAlertsTab_EnableControls
-			DisableControls(controls)
-			MSBTPopups.ShowItemList(configTable)
-		end
-	)
+	button.listName = "itemExclusions"
+	button:SetClickHandler(LootAlertsTab_ItemListOnClick)
 	controls.itemExclusionsButton = button
 
 	tabFrame.created = true
@@ -1901,7 +1961,8 @@ local function LootAlertsTab_OnShow()
 	tabFrame.currencyGainsFontString:SetText(eventSettings.message)
 
 
-	for quality = LE_ITEM_QUALITY_POOR or Enum.ItemQuality.Poor, LE_ITEM_QUALITY_EPIC or Enum.ItemQuality.Epic do
+	local firstQuality, lastQuality = LootAlertsTab_Qualities()
+	for quality = firstQuality, lastQuality do
 		controls["quality" .. quality .. "Checkbox"]:SetChecked(not currentProfile.qualityExclusions[quality])
 	end
 
@@ -2076,3 +2137,40 @@ tabFrame:SetScript("OnShow", ResetBlizzardSCTTab_OnShow)
 tabFrames.resetBlizzardSCT = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9000)
 
+
+
+-- The designs' Events pages list and save events through these.
+module.events = {
+	DEFAULT_SCROLL_AREA = DEFAULT_SCROLL_AREA,
+	GetEvents = EventsTab_GetEvents,
+	SaveOption = EventsTab_SaveOption,
+	EnableOnClick = EventsTab_EnableOnClick,
+	ColorswatchOnChanged = EventsTab_ColorswatchOnChanged,
+	GetSettings = EventsTab_GetSettings,
+	FontSource = EventsTab_FontSource,
+	Qualities = LootAlertsTab_Qualities,
+	QualityLabel = LootAlertsTab_QualityLabel,
+	QualityOnClick = LootAlertsTab_QualityOnClick,
+	QuestItemsOnClick = LootAlertsTab_QuestItemsOnClick,
+	ItemListOnClick = LootAlertsTab_ItemListOnClick,
+}
+
+-- The designs' Scroll Areas pages manage areas through these.
+module.scrollAreas = {
+	ValidateName = ScrollAreasTab_ValidateScrollAreaName,
+	Create = ScrollAreasTab_CreateScrollArea,
+	Rename = ScrollAreasTab_RenameScrollArea,
+	Remove = ScrollAreasTab_RemoveScrollArea,
+	IsBuiltIn = ScrollAreasTab_IsBuiltIn,
+	EnableOnClick = ScrollAreasTab_EnableOnClick,
+	ShowFont = ScrollAreasTab_ShowFont,
+	ConfigureOnScreen = ScrollAreasTab_ConfigureOnScreen,
+}
+
+
+-- The designs' General, Fonts & Colors and Profile pages share these.
+module.general = {
+	ShowMasterFont = GeneralTab_ShowMasterFont,
+	ResetBlizzardSCT = ResetBlizzardSCTTab_ConfirmReset,
+	ReportImport = ProfileTab_ReportImport,
+}
