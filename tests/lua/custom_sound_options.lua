@@ -89,7 +89,7 @@ Widget.CreateTexture = NewWidget
 CreateFrame = function(_, _, parent) return NewWidget(parent) end
 UIParent = NewWidget()
 local tabs, tabOrder = {}, {}
-MSBTOptions = { Controls = {}, Main = {
+MSBTOptions = { Controls = {}, Designs = { keys = {} }, Main = {
 	RegisterPopupFrame = function() end,
 	AddTab = function(frame, label)
 		tabs[label] = frame

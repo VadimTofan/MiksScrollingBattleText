@@ -6,6 +6,7 @@ MSBTOptions[moduleName] = module
 
 
 local MSBTOptMain = MSBTOptions.Main
+local MSBTDesigns = MSBTOptions.Designs
 local MSBTControls = MSBTOptions.Controls
 local MSBTPopups = MSBTOptions.Popups
 local MSBTProfiles = MikSBT.Profiles
@@ -144,6 +145,9 @@ GeneralTab_Populate = function()
 		end
 	end
 	controls.animationSpeedSlider:SetValue(currentProfile.animationSpeed)
+	if controls.optionsDesignDropdown then
+		controls.optionsDesignDropdown:SetSelectedID(MSBTDesigns.GetSelected())
+	end
 end
 
 
@@ -319,6 +323,19 @@ local function GeneralTab_Create()
 		end
 	)
 	controls.animationSpeedSlider = slider
+
+	-- The choice between the designs of the options window, once there is more than one.
+	if #MSBTDesigns.keys > 1 then
+		local dropdown = MSBTControls.CreateDropdown(tabFrame)
+		objLocale = L.DROPDOWNS["optionsDesign"]
+		dropdown:Configure(180, objLocale.label, objLocale.tooltip)
+		dropdown:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 5, -140)
+		for _, key in ipairs(MSBTDesigns.keys) do
+			dropdown:AddItem(MSBTDesigns.designs[key].label, key)
+		end
+		dropdown:SetChangeHandler(function(this, id) MSBTDesigns.Select(id) end)
+		controls.optionsDesignDropdown = dropdown
+	end
 
 
 
@@ -842,7 +859,7 @@ local function ScrollAreasTab_Create()
 	button:SetPoint("BOTTOMRIGHT", texture, "TOPRIGHT", -5, 15)
 	button:SetClickHandler(
 		function (this)
-			MSBTOptMain.HideMainFrame()
+			MSBTDesigns.Hide()
 			MSBTPopups.ShowScrollAreaConfig()
 		end
 	)

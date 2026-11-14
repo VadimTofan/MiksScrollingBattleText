@@ -55,6 +55,7 @@ L.MSG_ITEM_QUALITIES				= "Item qualities"
 L.MSG_ITEMS							= "Items"
 L.MSG_ITEM_ALREADY_EXISTS			= "Item name already exists."
 L.MSG_INVALID_ITEM_NAME				= "Invalid item name."
+L.MSG_CLASSIC_DESIGN				= "Classic"
 
 L.PROFILE_TRANSFER = {
 	exportTitle = "Export Profile", importTitle = "Import Profile",
@@ -171,6 +172,7 @@ obj["textAlign"]			= { label="Text Align:", tooltip="The alignment of the text f
 obj["iconAlign"]			= { label="Icon Align:", tooltip="The alignment of skill icons relative to the text."}
 obj["eventCategory"]		= { label="Event Category:", tooltip="The category of events to configure."}
 obj["outputScrollArea"]		= { label="Output Scroll Area:", tooltip="Selects the scroll area to use for output."}
+obj["optionsDesign"]		= { label="Options Design:", tooltip="Selects the options window that /msbt opens."}
 
 
 

@@ -424,6 +424,8 @@ local function DockMainFrame(parent, reopen, tabIndex)
 			end
 		end)
 	end
+	-- Another design's window closes while the game's settings window shows the options.
+	MSBTOptions.Designs.HideOthers("classic")
 	mainFrame:Show()
 	if tabIndex then
 		SelectTab(tabIndex)
@@ -450,6 +452,11 @@ local function UndockMainFrame(parent)
 	SetChromeShown(true)
 	SetTabListsShown(true)
 	SetSpecialFrame(true)
+end
+
+
+local function IsDocked()
+	return dockedParent ~= nil
 end
 
 
@@ -492,6 +499,11 @@ local function HideMainFrame()
 end
 
 
+local function IsMainFrameShown()
+	return mainFrame ~= nil and mainFrame:IsShown()
+end
+
+
 local function RegisterPopupFrame(frame)
 	if (not popupFrames[frame]) then popupFrames[frame] = true end
 end
@@ -502,6 +514,12 @@ module.ShowMainFrame		= ShowMainFrame
 module.HideMainFrame		= HideMainFrame
 module.DockMainFrame		= DockMainFrame
 module.UndockMainFrame		= UndockMainFrame
+module.IsDocked				= IsDocked
 module.GetTabs				= GetTabs
 module.RegisterPopupFrame	= RegisterPopupFrame
 module.AddTab				= AddTab
+
+-- The window in this file is the classic design of the options.
+MSBTOptions.Designs.Register("classic", {
+	label = L.MSG_CLASSIC_DESIGN, Show = ShowMainFrame, Hide = HideMainFrame, IsShown = IsMainFrameShown,
+})

@@ -1325,7 +1325,7 @@ local function CreateScrollAreaConfig()
 		for _, moverFrame in pairs(this.moverFrames) do
 			moverFrame:Hide()
 		end
-		MSBTOptions.Main.ShowMainFrame()
+		MSBTOptions.Designs.Show()
 	end)
 
 	local dropdown = MSBTControls.CreateDropdown(frame)

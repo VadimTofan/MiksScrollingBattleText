@@ -2333,7 +2333,7 @@ end
 
 local function ShowOptions()
 	if (MSBTOptions and MSBTOptions.Main and MSBTOptions.Main.ShowMainFrame) then
-		MSBTOptions.Main.ShowMainFrame()
+		MSBTOptions.Designs.Show()
 		return
 	end
 
