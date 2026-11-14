@@ -204,3 +204,83 @@ assert(Events() == "show other", "/msbt did not open the chosen design")
 assert(tabs:find("MSBTDesigns%.Hide%(%)%s+MSBTPopups%.ShowScrollAreaConfig%(%)")
 	and not tabs:find("MSBTOptMain.HideMainFrame()", 1, true),
 	"the positioning button does not put the options away through the registry")
+
+-- The slash command's handler and the texts it prints, with Print recorded.
+local translations = {}
+local localization = Read("Localization/localization.lua"):gsub("^\239\187\191", "")
+setfenv(assert(loadstring(localization)), setmetatable({
+	MikSBT = { translations = translations, COMMAND = "/msbt" },
+}, { __index = _G }))()
+local profiles = Read("MSBTProfiles.lua")
+local printed = {}
+local handler = assert(loadstring(table.concat({
+	assert(profiles:match("local function ShowOptions%b()%s*.-\nend")),
+	assert(profiles:match("local function GetNextParameter%b()%s*.-\nend")),
+	assert(profiles:match("local function CommandHandler%b()%s*.-\nend")),
+	"return CommandHandler",
+}, "\n")))
+setfenv(handler, setmetatable({
+	L = translations, MSBTOptions = MSBTOptions, string_find = string.find,
+	Print = function(message) printed[#printed + 1] = message end,
+}, { __index = _G }))
+local Slash = handler()
+local usage = translations.COMMAND_USAGE
+
+-- Rule: /msbt followed by a registered design saves it and opens it; another word shows the usage.
+do
+	-- Given two designs, no choice saved and no window open.
+	Designs, windows = LoadDesigns("classic", "other")
+	saved.optionsDesign = nil
+
+	-- When /msbt runs alone.
+	Slash("")
+	-- Then the classic design opens.
+	assert(Events() == "show classic" and saved.optionsDesign == nil, "/msbt did not open the classic design")
+	windows.classic.shown = false
+
+	-- When /msbt other runs with the options closed.
+	Slash("other")
+	-- Then it saves the design and opens it.
+	assert(saved.optionsDesign == "other", "/msbt other did not save the design")
+	assert(Events() == "show other", "/msbt other did not open the other design")
+	windows.other.shown = false
+	Slash("")
+	assert(Events() == "show other", "/msbt did not open the chosen design")
+
+	-- When /msbt classic runs while the other window is open.
+	Slash("classic")
+	-- Then it saves the classic design and switches to the classic window.
+	assert(saved.optionsDesign == nil, "/msbt classic did not save the design")
+	assert(windows.classic.IsShown() and not windows.other.IsShown() and Events():find("^hide other, show classic"),
+		"/msbt classic did not switch to the classic design")
+	windows.classic.shown = false
+
+	-- When an unknown word follows /msbt.
+	printed = {}
+	Slash("neww")
+	-- Then nothing opens, the choice stays, and the usage is printed.
+	assert(Events() == "" and saved.optionsDesign == nil, "an unknown word changed the design")
+	assert(#printed > 0 and printed[1] == usage[1], "an unknown word did not show the usage")
+end
+
+-- Rule: the usage names the design keys, joined by " | ", only when more than one design is registered.
+do
+	-- Given each number of designs.
+	for _, keys in ipairs({ { "classic" }, { "classic", "other" }, { "classic", "other", "third" } }) do
+		LoadDesigns(unpack(keys))
+
+		-- When the usage is printed.
+		printed = {}
+		Slash("help")
+
+		-- Then the usage is followed by the line of design keys from two designs on.
+		local count = #usage + (#keys > 1 and 1 or 0)
+		assert(#printed == count and printed[#usage] == usage[#usage],
+			#keys .. " designs printed " .. #printed .. " usage lines")
+		if #keys > 1 then
+			assert(printed[count] == translations.COMMAND_USAGE_DESIGN:format(table.concat(keys, " | ")),
+				"the usage names the designs as " .. tostring(printed[count]))
+		end
+	end
+	Events()
+end
