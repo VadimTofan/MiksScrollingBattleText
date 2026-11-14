@@ -14,6 +14,46 @@ local summary = tracker:Summary(ordinary)
 -- Then it does not demand two extra hits from every normal attack.
 assert(summary.expected == 0 and not tracker:NeedsAttention(ordinary))
 
+-- Given one confirmed hit with only a fallback Windfury identity.
+local single = tracker:Swing(12, "target1", 0, true)
+tracker:Log({ at = 12, kind = "spell", source = "mine" }, "target1")
+local singleRecord = {}
+local singleID = tracker:Report(singleRecord, {
+    at = 12.216, key = "target1", event = "damage", school = 1,
+})
+tracker:Decision(singleRecord, { who = "you", procSpell = 8232 })
+tracker:Forward({ singleID }, "restricted")
+tracker:Dispatch({ singleID }, { area = "Outgoing", alpha = 100 })
+
+-- When the capture evaluates the candidate.
+local singleSummary = tracker:Summary(single)
+
+-- Then an estimated second hit is not presented as confirmed missing damage.
+assert(singleSummary.expected == 0 and singleSummary.estimated == 2)
+assert(not tracker:NeedsAttention(single), "fallback identity froze capture")
+
+-- Given a physical ability cast between the swing and its late reports.
+tracker:Cast(12.1, "target1", 17364)
+
+-- When the diagnostic report is exported.
+local castReport = tracker:ReportText()
+
+-- Then the trigger is visible without recording hidden amounts or cast text.
+assert(castReport:find("cast +0.100 spell=17364", 1, true))
+
+-- Given two spell confirmations following an ability between native swings.
+local abilityBurst = tracker:Swing(13, "target1", 0, true)
+tracker:Cast(13.9, "target1", 17364)
+tracker:Log({ at = 13.9, kind = "spell", source = "mine" }, "target1")
+tracker:Log({ at = 13.9, kind = "spell", source = "mine" }, "target1")
+
+-- When the ability's reports are absent from the capture.
+local abilitySummary = tracker:Summary(abilityBurst)
+
+-- Then late confirmations remain visible as candidate evidence.
+assert(abilitySummary.expected == 0 and abilitySummary.estimated == 2)
+assert(abilitySummary.confirmations == 2 and tracker:NeedsAttention(abilityBurst))
+
 -- Given an extra-attack notification without any surviving damage reports.
 local granted = tracker:Swing(15, "target1", 0, true)
 tracker:Log({ at = 15.1, kind = "extra", source = "mine" }, "target1")
@@ -56,7 +96,8 @@ tracker:Dispatch({ firstID }, { area = "Outgoing", alpha = 100 })
 
 -- Then the missing second outcome is explicit, with a stable report ID.
 summary = tracker:Summary(burst)
-assert(summary.expected == 2 and summary.damage == 1 and summary.misses == 0)
+assert(summary.expected == 0 and summary.estimated == 2)
+assert(summary.damage == 1 and summary.misses == 0)
 assert(summary.normal == 1 and summary.rawDamage == 3 and summary.rejected == 1)
 assert(summary.forwarded == 1 and summary.displays == 1)
 assert(tracker:NeedsAttention(burst))
@@ -98,7 +139,7 @@ tracker:Dispatch({ hitID }, { area = "Outgoing", alpha = 100 })
 -- Then two outcomes are present, with one damage hit and one failed attack.
 summary = tracker:Summary(missedBurst)
 assert(summary.damage == 1 and summary.misses == 1)
-assert(summary.rawMisses == 1 and tracker:NeedsAttention(missedBurst))
+assert(summary.rawMisses == 1 and not tracker:NeedsAttention(missedBurst))
 
 -- Given public amounts are combined into one batch display.
 local mergedBurst = tracker:Swing(40, "target1", 0, true)

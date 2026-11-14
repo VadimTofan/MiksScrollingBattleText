@@ -45,7 +45,7 @@ function Capture:Observe(stage, hit, info)
     end
 end
 
-function Capture:Event(event, duration, hand)
+function Capture:Event(event, duration, hand, spell)
     local ns = MikSBT.CombatEngine
     local key = ns.TargetKey()
     if event == "PLAYER_SWING" then
@@ -57,10 +57,15 @@ function Capture:Event(event, duration, hand)
             if model:NeedsAttention(burst) then
                 self:Stop()
                 self:ShowReport()
-                MikSBT.Print("Windfury capture paused: fewer than two damage " ..
-                    "numbers. Copy the report; misses and batching are listed.")
+                MikSBT.Print("Windfury capture paused: candidate outcomes or " ..
+                    "display dispatches need review. Copy the report.")
             end
         end)
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+        local spellID = RV:Number(spell)
+        if RV:String(duration) == "player" and spellID then
+            self.model:Cast(GetTime(), key, spellID)
+        end
     elseif event == "COMBAT_LOG_MESSAGE" then
         local lines = ns.reader and ns.reader.logLines
         local line = lines and lines[#lines]
@@ -159,7 +164,7 @@ function Capture:Start()
     self.active = true
     if self.frame then self.frame:Hide() end
     MikSBT.Print("Windfury capture armed: fight normally. It pauses on a " ..
-        "candidate with fewer than two numbers. /msbttrace report opens it.")
+        "candidate needing review. /msbttrace report opens it.")
 end
 
 function Capture:Stop()

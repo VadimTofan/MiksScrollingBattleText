@@ -655,6 +655,110 @@ assert(offsetBurst[1].amount == normalHit and offsetBurst[1].result.melee)
 assert(offsetBurst[2].amount == firstProc and offsetBurst[2].result.proc)
 assert(offsetBurst[3].amount == delayedProc and offsetBurst[3].result.proc)
 
+-- Describe: a physical ability can trigger delayed Windfury between swings.
+local originalDescription = C_Spell.GetSpellDescription
+C_Spell.GetSpellDescription = function(id)
+	if id == 17364 then return "Instantly deals weapon damage." end
+	return originalDescription(id)
+end
+local originalClass, originalEnchant = UnitClass, GetWeaponEnchantInfo
+UnitClass = function() return "Shaman", "SHAMAN" end
+GetWeaponEnchantInfo = function() return true, 10000, 0, 283 end
+
+-- Given the captured swing, normal hit, and later physical cast confirmations.
+Advance(4)
+Event("PLAYER_ENTERING_WORLD")
+local abilityStart, beforeAbility = now, #outgoing
+Event("PLAYER_SWING", 3.8, 0)
+Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+Advance(0.429)
+Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+Advance(0.01)
+Advance(abilityStart + 1.047 - now)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 17364)
+for index = 1, 3 do
+	Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+end
+Event("UNIT_COMBAT", "target", "WOUND", "", 326, 1)
+Advance(0.01)
+
+-- When the two opaque physical reports arrive at the captured delays.
+Advance(abilityStart + 1.293 - now)
+Event("UNIT_COMBAT", "target", "WOUND", "", firstProc, 1)
+Advance(0.01)
+Advance(abilityStart + 1.632 - now)
+Event("UNIT_COMBAT", "target", "WOUND", "", delayedProc, 1)
+Advance(0.01)
+
+-- Then both proc reports retain ownership and their original amounts.
+local abilityProcs = 0
+for index = beforeAbility + 1, #outgoing do
+	local report = outgoing[index]
+	if report.amount == firstProc or report.amount == delayedProc then
+		assert(report.result.who == "you" and report.result.proc,
+			"ability-triggered Windfury was rejected by native-swing timing")
+		abilityProcs = abilityProcs + 1
+	end
+end
+assert(abilityProcs == 2, "ability-triggered proc report disappeared")
+
+-- When an additional hit arrives after both spare confirmations were used.
+Event("UNIT_COMBAT", "target", "WOUND", "", 327, 1)
+Advance(0.01)
+
+-- Then a proc cannot consume the same confirmation twice.
+assert(outgoing[#outgoing].amount == 327
+	and outgoing[#outgoing].result.who == "other")
+
+for _, example in ipairs({
+	{ name = "Retail", forever = false },
+	{ name = "missing Windfury enchant", enchanted = false },
+	{ name = "magic damage", school = 4 },
+	{ name = "periodic confirmation", kind = "tick" },
+	{ name = "nonphysical ability", spell = 101 },
+	{ name = "another target", unit = "nameplate1" },
+	{ name = "expired confirmation", delay = 1.46 },
+}) do
+	-- Given a spare line with one required proc condition absent.
+	Advance(4)
+	Event("PLAYER_ENTERING_WORLD")
+	MikSBT.Compatibility.Client.isForever = example.forever ~= false
+	GetWeaponEnchantInfo = function()
+		return example.enchanted ~= false, 10000, 0, 283
+	end
+	Event("PLAYER_SWING", 3.8, 0)
+	Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+	Advance(0.429)
+	Event("UNIT_COMBAT", "target", "WOUND", "", normalHit, 1)
+	Advance(0.01)
+	Advance(0.608)
+	Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example.spell or 17364)
+	Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+	Event("COMBAT_LOG_MESSAGE", nil, example.kind or "spell", 0, 0, 1)
+	Event("UNIT_COMBAT", "target", "WOUND", "", 328, 1)
+	Advance(0.01)
+	MikSBT.CombatEngine.reader.plates.nameplate1 = true
+
+	-- When the unrelated or unsupported delayed report arrives.
+	Advance((example.delay or 0.585) - 0.01)
+	Event("UNIT_COMBAT", example.unit or "target", "WOUND", "",
+		329, example.school or 1)
+	Advance(0.2)
+
+	-- Then the new path cannot assign ownership to that report.
+	local rejected
+	for index = #outgoing, 1, -1 do
+		if outgoing[index].amount == 329 then
+			rejected = outgoing[index]
+			break
+		end
+	end
+	assert(rejected and rejected.result.who == "other",
+		"weapon-proc matching accepted " .. example.name)
+end
+C_Spell.GetSpellDescription = originalDescription
+UnitClass, GetWeaponEnchantInfo = originalClass, originalEnchant
+
 MikSBT.CombatEngine.reader.plates.nameplate1 = nil
 MikSBT.Compatibility = windfuryCompatibility
 issecretvalue = windfurySecretCheck

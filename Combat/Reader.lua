@@ -658,9 +658,57 @@ end
 -- line from that swing, with a longer delay for physical procs on Forever.
 reader.swingHits = {}
 local LATE_PHYSICAL_PROC = 1.0
+local WEAPON_PROC_TRIGGER_WINDOW = 0.15
+local WEAPON_PROC_REPORT_WINDOW = 1.45
+
+local function WeaponProcTrigger(at, key)
+    for _, swing in ipairs(reader.swingTimes) do
+        local age = at - swing.at
+        if not swing.ranged and swing.key == key
+            and age >= 0 and age <= WEAPON_PROC_TRIGGER_WINDOW then
+            return true
+        end
+    end
+    for spell, casts in pairs(ns.mine.casts) do
+        local facts = ns.SpellFacts(spell)
+        if facts and facts.direct == true and facts.school == ns.SCHOOL_PHYSICAL
+            and facts.helpful ~= true and not facts.weaponProc then
+            for _, cast in ipairs(casts) do
+                local age = at - cast.at
+                if cast.caster == "you" and cast.key == key
+                    and age >= 0 and age <= WEAPON_PROC_TRIGGER_WINDOW then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function WeaponProcLine(hit)
+    local record = hit.record
+    if record.event ~= "damage" or record.school ~= ns.SCHOOL_PHYSICAL
+        or ProcSpell(hit.at, record.school) ~= WINDFURY_WEAPON_SPELL_ID then
+        return nil
+    end
+    -- Keep the delay relative to the confirmation, including procs triggered
+    -- by a physical ability between native swings. Each line is consumed once.
+    for _, line in ipairs(reader.logLines or {}) do
+        local age = hit.at - line.at
+        if not line.claimed and not line.hit and Pairs(line, record)
+            and LineRestrict(line) == "direct" and not MeleeLine(line)
+            and age >= 0 and age <= WEAPON_PROC_REPORT_WINDOW
+            and WeaponProcTrigger(line.at, hit.key) then
+            return line
+        end
+    end
+end
+
 local function ProcLine(hit)
     local record = hit.record
     if record.event ~= "damage" and record.event ~= "miss" then return nil end
+    local weaponLine = WeaponProcLine(hit)
+    if weaponLine then return weaponLine end
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     for _, paired in ipairs(reader.swingHits) do
         local since = hit.at - paired.at

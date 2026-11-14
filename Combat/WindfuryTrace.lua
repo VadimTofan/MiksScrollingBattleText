@@ -12,7 +12,7 @@ end
 function Tracker:Swing(at, key, hand, active)
     self.nextID = self.nextID + 1
     local burst = { id = self.nextID, at = at, key = key, hand = hand,
-        active = active, reports = {}, lines = {} }
+        active = active, reports = {}, lines = {}, casts = {} }
     self.bursts[#self.bursts + 1] = burst
     if #self.bursts > 8 then
         local expired = table.remove(self.bursts, 1)
@@ -37,6 +37,12 @@ function Tracker:Log(line, key)
     burst.lines[#burst.lines + 1] = {
         at = line.at, kind = line.kind, source = line.source,
     }
+end
+
+function Tracker:Cast(at, key, spell)
+    local burst = self:Find(at, key)
+    if not burst or #burst.casts >= 32 then return end
+    burst.casts[#burst.casts + 1] = { at = at, spell = spell }
 end
 
 function Tracker:Report(record, info)
@@ -111,19 +117,25 @@ function Tracker:Rekey(old, new)
 end
 
 function Tracker:Summary(burst)
-    local summary = { expected = 0, damage = 0, misses = 0, normal = 0,
+    local summary = { expected = 0, estimated = 0,
+        damage = 0, misses = 0, normal = 0,
         rawDamage = 0, rawMisses = 0, rejected = 0, forwarded = 0,
         displays = 0, merged = false, confirmations = 0 }
     for _, line in ipairs(burst.lines) do
         if burst.active and line.source == "mine" and line.kind == "extra" then
             summary.expected = 2
         end
+        local nearTrigger = line.at - burst.at <= 0.5
+        for _, cast in ipairs(burst.casts) do
+            local age = line.at - cast.at
+            if age >= 0 and age <= 0.15 then nearTrigger = true end
+        end
         if line.source == "mine" and (line.kind == "spell"
-            or line.kind == "spellMiss") and line.at - burst.at <= 0.5 then
+            or line.kind == "spellMiss") and nearTrigger then
             summary.confirmations = summary.confirmations + 1
         end
     end
-    if burst.active and summary.confirmations >= 2 then summary.expected = 2 end
+    if burst.active and summary.confirmations >= 2 then summary.estimated = 2 end
     local dispatches = {}
     for _, id in ipairs(burst.reports) do
         local entry = self.records[id]
@@ -132,7 +144,7 @@ function Tracker:Summary(burst)
         if entry.who == "other" then summary.rejected = summary.rejected + 1 end
         if entry.who == "you" and entry.melee then summary.normal = summary.normal + 1 end
         if entry.who == "you" and entry.procSpell == 8232 then
-            summary.expected = 2
+            summary.estimated = 2
             if entry.event == "damage" then summary.damage = summary.damage + 1 end
             if entry.event == "miss" then summary.misses = summary.misses + 1 end
             if entry.path then summary.forwarded = summary.forwarded + 1 end
@@ -153,8 +165,10 @@ function Tracker:NeedsAttention(burst)
     end
     if not retained then return false end
     local summary = self:Summary(burst)
-    return summary.expected == 2 and (summary.damage < 2
-        or summary.displays < summary.damage or summary.merged)
+    local candidate = summary.expected == 2
+        or (burst.active and summary.confirmations >= 2)
+    return (candidate and summary.damage + summary.misses < 2)
+        or summary.displays < summary.damage or summary.merged
 end
 
 local function Value(value)
@@ -165,23 +179,28 @@ end
 function Tracker:ReportText()
     local rows = {
         "MSBT Windfury timeline (metadata only; no damage amounts)",
-        "Expected: 2 extra outcomes per candidate proc, plus the normal swing.",
+        "Expected counts require an extra-attack grant; estimated counts are heuristic.",
+        "WF labels are fallback identities, not confirmed spell identities.",
         "Candidate evidence is timing/enchant based, not proof of spell identity.",
         "Dispatch means animation requested, not proof of visible pixels.",
     }
     for _, burst in ipairs(self.bursts) do
         local s = self:Summary(burst)
         rows[#rows + 1] = string.format(
-            "Swing #%d %.3f key=%s hand=%s enchant=%s expected=%d " ..
+            "Swing #%d %.3f key=%s hand=%s enchant=%s expected=%d estimated=%d " ..
             "WF damage=%d miss=%d normal=%d raw=%d/%d other=%d " ..
             "forwarded=%d dispatches=%d merged=%s truncated=%s",
             burst.id, burst.at, Value(burst.key), Value(burst.hand),
-            Value(burst.active), s.expected, s.damage, s.misses, s.normal,
+            Value(burst.active), s.expected, s.estimated, s.damage, s.misses, s.normal,
             s.rawDamage, s.rawMisses, s.rejected, s.forwarded, s.displays,
             Value(s.merged), Value(burst.truncated))
         for _, line in ipairs(burst.lines) do
             rows[#rows + 1] = string.format("  log +%.3f %s %s",
                 line.at - burst.at, Value(line.kind), Value(line.source))
+        end
+        for _, cast in ipairs(burst.casts) do
+            rows[#rows + 1] = string.format("  cast +%.3f spell=%d",
+                cast.at - burst.at, cast.spell)
         end
         for _, id in ipairs(burst.reports) do
             local e = self.records[id]

@@ -94,6 +94,13 @@ end
 -- Given capture is explicitly enabled with a normal outgoing configuration.
 capture:Start()
 local burst = Swing()
+
+-- When the player casts between swings, with a hidden cast GUID.
+Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", opaque, 17364)
+
+-- Then capture retains only the public spell ID and timing.
+assert(#burst.casts == 1 and burst.casts[1].spell == 17364)
+assert(capture.model:ReportText():find("cast +0.000 spell=17364", 1, true))
 now = now + 0.5
 
 -- When two opaque proc hits pass through presentation and the real service.
