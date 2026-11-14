@@ -15,6 +15,19 @@ local function TargetlessHealRecipient(unit, spell)
 	if name and mendPet and name == mendPet then return "pet" end
 end
 
+-- Checks if a spell actually heals. This filters out non-healing buffs like Thorns or Mark of the Wild.
+local function Heals(spell)
+	if TargetlessHealRecipient("player", spell) then return true end
+	if not (C_Spell and C_Spell.GetSpellDescription) then return true end
+	local ok, text = pcall(C_Spell.GetSpellDescription, spell)
+	if not ok or not ns.Text(text) then return true end
+	local lower = text:lower()
+	-- Ignore buffs that only modify healing received or done.
+	local clean = lower:gsub("healing received", ""):gsub("healing taken", "")
+		:gsub("healing done", ""):gsub("damage and healing", "")
+	return clean:find("heal", 1, true) ~= nil or clean:find("restores %d+.*health") ~= nil
+end
+
 function ns.NoteHealTarget(unit, target, guid, spell, now)
 	if (unit ~= "player" and unit ~= "pet")
 		or not ns.Text(guid) or not ns.Number(spell, 1) then return end
@@ -50,6 +63,8 @@ function ns.NoteHealCast(unit, spell, key, now, guid)
 	local helpful = C_Spell and C_Spell.IsSpellHelpful
 		and C_Spell.IsSpellHelpful(spell)
 	if not ns.Bool(helpful) or not helpful then return end
+	-- Do not record non-healing buffs as heals.
+	if not Heals(spell) then return end
 	local recipient
 	if ns.Text(guid) then
 		for index = #targets, 1, -1 do
@@ -91,15 +106,19 @@ function ns.MatchHealing(key, now, tick, confirmed)
 		if cast.key == key and since >= 0
 			and since <= (tick and HOT_WINDOW or DIRECT_WINDOW)
 			and (tick or not cast.used) then
-			if not age or since < age then
+			-- An active HoT already ticking on this recipient takes priority over newer unproven casts.
+			local priority = (tick and cast.ticked) and 1 or 0
+			local bestPriority = (best and tick and best.ticked) and 1 or 0
+			if not best or priority > bestPriority or (priority == bestPriority and since < age) then
 				best, age, ambiguous = cast, since, false
-			elseif since == age and cast.spell ~= best.spell then
+			elseif priority == bestPriority and since == age and cast.spell ~= best.spell then
 				ambiguous = true
 			end
 		end
 	end
 	if not best or ambiguous then return nil end
 	best.used = true
+	if tick then best.ticked = true end
 	return { who = best.who, spell = best.spell, tick = tick }
 end
 

@@ -144,3 +144,13 @@ class CombatEngineTests(unittest.TestCase):
 
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_hot_ticks_retain_spell_identity_when_buffs_or_direct_heals_are_cast(self):
+        # Given an active HoT followed by a helpful buff or direct heal
+        script = "hot_attribution.lua"
+
+        # When subsequent ticks arrive
+        result = run_lua_test(script)
+
+        # Then the HoT ticks must retain the original HoT spell identity
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
