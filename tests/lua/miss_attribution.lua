@@ -42,8 +42,19 @@ mine:Cast("player", 1130, "target", 10)
 -- When the parry is reported while the pet attacks that unit.
 local parried = mine:Hit("target", "miss", 1, 10.6, true, nil, nil, false, nil, nil, "PARRY")
 
--- Then it is the pet's swing, not the Mark.
-assert(Is(parried, "pet", nil, true), tostring(parried.who) .. " " .. tostring(parried.spell))
+-- Then pet activity alone cannot establish ownership or name the Mark.
+assert(Is(parried, "unknown", nil),
+    tostring(parried.who) .. " " .. tostring(parried.spell))
+
+-- Given the same attacking pet with its outgoing lines enabled.
+mine = New()
+mine.petLines, mine.petOut = true, true
+mine:Cast("player", 1130, "target", 12)
+-- When an own melee miss line confirms the parry.
+local confirmedPet = mine:Hit("target", "miss", 1, 12.6, true, true,
+    nil, false, "swing", nil, "PARRY")
+-- Then the incompatible Mark cannot take the confirmed pet swing.
+assert(Is(confirmedPet, "pet", nil, true))
 
 -- Given Hunter's Mark, then an Auto Shot that is dodged.
 mine = New()
@@ -75,8 +86,8 @@ mine = New()
 mine:Cast("player", 1130, "target", 40)
 local missed = mine:Hit("target", "miss", 1, 40.5, true, nil, nil, false, nil, nil, "MISS")
 
--- Then the pet missed, not the Mark.
-assert(Is(missed, "pet", nil, true))
+-- Then neither pet activity nor the incompatible Mark establishes ownership.
+assert(Is(missed, "unknown", nil))
 
 -- Given a shot and a melee strike.
 mine = New()
@@ -89,7 +100,7 @@ local strikeParried = mine:Hit("target", "miss", 1, 58.3, false, nil, nil, false
 
 -- Then a shot can be dodged but never parried, and a strike can be parried.
 assert(Is(shotDodged, "you", 5116))
-assert(Is(shotParried, "pet", nil, true))
+assert(Is(shotParried, "unknown", nil))
 assert(Is(strikeParried, "you", 2973))
 
 -- Given a miss reported with no avoid word, as before this was known.

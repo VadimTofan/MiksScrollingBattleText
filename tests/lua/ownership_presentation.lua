@@ -1,7 +1,11 @@
 MikSBT = { Components = {}, Services = {} }
 dofile("API/RestrictedValue.lua")
 local Presentation = dofile("Components/CombatPresentation.lua")
-local secret = {}
+local secret = setmetatable({}, {
+    __add = function() error("summed hidden damage") end,
+    __le = function() error("compared hidden damage") end,
+    __tostring = function() error("read hidden damage") end,
+})
 issecretvalue = function(value) return value == secret end
 local queued, calls = nil, 0
 local function Capture(_, ...)
@@ -22,10 +26,10 @@ for _, owner in ipairs({ "you", "pet" }) do
         presentation:Out({ event = "damage", amount = amount,
             crit = true, school = 1, result = result })
 
-        -- Then rendering keeps the exact amount and uses an unnamed icon.
+        -- Then rendering keeps the exact amount without an invented icon.
         assert(queued[1] == nil and queued[2] == amount and queued[3])
-        assert(queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark",
-            "owned unnamed damage needs a generic icon")
+        assert(queued[4] == nil,
+            "owned unnamed damage must display without an icon")
         assert(queued[5] == true and queued[6] == (owner == "pet"))
     end
 end
@@ -42,8 +46,8 @@ for _, amount in ipairs({ 37, secret }) do
 
     -- Then grouping metadata is separate from the absent spell ID.
     assert(queued[1] == nil and queued[2] == amount)
-    assert(queued[4] == "icon-8232",
-        "Windfury candidate lost its visual icon hint")
+    assert(queued[4] == nil,
+        "candidate grouping must not invent a spell icon")
     local candidateIndex = amount == secret and 10 or 11
     assert(queued[candidateIndex] == 8232,
         "candidate grouping metadata did not reach the batcher")
@@ -58,15 +62,20 @@ presentation:Out({ event = "damage", amount = 28, school = 1,
 -- Then its identified bleed icon and spell remain intact.
 assert(queued[1] == 21949 and queued[4] == "icon-21949")
 
--- Given an ambiguous result with a possible Windfury candidate.
--- When it reaches presentation.
-presentation:Out({ event = "damage", amount = 30, school = 1,
-    result = { who = "you", ambiguous = true,
-        procCandidate = true, candidateSpell = 8232 } })
+-- Describe: ambiguity suppresses even supplied spell IDs and source icons.
+for _, amount in ipairs({ 30, secret }) do
+    -- Given a possible spell whose identity remains ambiguous.
+    local result = { who = "you", ambiguous = true, spell = 101,
+        procSpell = 8232, procCandidate = true, candidateSpell = 8232 }
 
--- Then ambiguity retains its generic icon and absent spell identity.
-assert(queued[1] == nil
-    and queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark")
+    -- When a source also supplies an icon for that uncertain identity.
+    presentation:Out({ event = "damage", amount = amount, school = 1,
+        icon = "uncertain-source-icon", result = result })
+
+    -- Then only the original amount reaches presentation.
+    assert(queued[1] == nil and queued[2] == amount and queued[4] == nil,
+        "ambiguous damage retained a spell identity or icon")
+end
 
 -- Given unresolved ownership or an explicitly foreign report.
 local before = calls
@@ -84,9 +93,9 @@ assert(calls == before)
 presentation:Out({ event = "damage", amount = 21, icon = "source-icon",
     result = { who = "you", procCandidate = true, candidateSpell = 8232 } })
 
--- Then an explicit source icon survives the unnamed fallback.
-assert(queued[1] == nil and queued[4] == "source-icon",
-    "unnamed fallback replaced an explicit source icon")
+-- Then a source icon cannot identify an otherwise unknown spell.
+assert(queued[1] == nil and queued[4] == nil,
+    "unknown spell retained a source icon")
 
 -- Given an unnamed periodic hit or pet hit with a candidate hint.
 for _, result in ipairs({
@@ -97,9 +106,8 @@ for _, result in ipairs({
     presentation:Out({ event = "damage", amount = 28, school = 1,
         result = result })
 
-    -- Then the hint does not overwrite periodic or pet attribution visually.
-    assert(queued[1] == nil
-        and queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark")
+    -- Then unknown periodic and pet spell damage also has no icon.
+    assert(queued[1] == nil and queued[4] == nil)
 end
 
 -- Given the client has not supplied the Windfury icon.
@@ -109,7 +117,14 @@ presentation.config.getSpellTexture = function() return nil end
 presentation:Out({ event = "damage", amount = 40, school = 1,
     result = { who = "you", procCandidate = true, candidateSpell = 8232 } })
 
--- Then generic rendering remains available without inventing a name.
-assert(queued[1] == nil
-    and queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark")
+-- Then rendering remains available without inventing an icon or name.
+assert(queued[1] == nil and queued[4] == nil)
+
+-- Given an identified spell with an explicit source icon.
+-- When that spell reaches presentation.
+presentation:Out({ event = "damage", amount = 51, icon = "known-source-icon",
+    result = { who = "you", spell = 101 } })
+
+-- Then its authoritative identity and explicit icon stay intact.
+assert(queued[1] == 101 and queued[4] == "known-source-icon")
 print("Ownership presentation tests passed")

@@ -2,6 +2,18 @@ local frames = {}
 local object = {}
 local formattedText
 object.__index = function(_, key)
+	if key == "SetTexture" then
+		return function(self, value) self.texturePath = value end
+	end
+	if key == "SetPoint" then
+		return function(self, ...) self.lastPoint = { ... } end
+	end
+	if key == "SetWidth" then
+		return function(self, value) self.width = value end
+	end
+	if key == "SetHeight" then
+		return function(self, value) self.height = value end
+	end
 	if key == "SetAlpha" then
 		return function(self, value) self.lastAlpha = value end
 	end
@@ -94,6 +106,57 @@ assert(next(weakAreas) ~= nil, "active animation lost its scroll area")
 animationFrame:OnUpdate(4)
 collectgarbage("collect")
 assert(next(weakAreas) == nil, "last completed animation retained its area")
+
+-- Describe: iconless damage stays iconless when the active-area limit is full.
+local initializedEvents = {}
+local function CaptureIconEvent(event)
+	initializedEvents[#initializedEvents + 1] = event
+	event.animationHandler = function() end
+end
+MikSBT.Animations.RegisterAnimationStyle("Iconless", CaptureIconEvent)
+MikSBT.Animations.RegisterStickyAnimationStyle("Iconless", CaptureIconEvent)
+for _, sticky in ipairs({ false, true }) do
+	-- Given fifteen active lines with identified spell icons in one area.
+	local area = {
+		animationStyle = "Iconless", stickyAnimationStyle = "Iconless",
+		iconAlign = sticky and "Right" or "Left",
+	}
+	initializedEvents = {}
+	for index = 1, 15 do
+		displayConfig.display("Known spell", area, sticky,
+			1, 1, 1, 18, "font", 1, 100, "known-spell-icon")
+	end
+	local oldestEvent = initializedEvents[1]
+	local oldestTexture = oldestEvent.texture
+	assert(oldestTexture ~= nil)
+
+	-- When unknown spell damage replaces the oldest line with no supplied icon.
+	displayConfig.display("42", area, sticky,
+		1, 1, 1, 18, "font", 1, 100, nil)
+
+	-- Then the reused line has no texture for animation or icon spacing.
+	assert(initializedEvents[16] == oldestEvent)
+	assert(oldestEvent.texture == nil,
+		"iconless damage inherited an icon at the active-area limit")
+	assert(oldestTexture.lastAlpha == 0 and rawget(oldestTexture, "texturePath") == nil)
+
+	-- When more known spells make that same line display an icon again.
+	for index = 1, 15 do
+		displayConfig.display("Known again", area, sticky,
+			1, 1, 1, 18, "font", 1, 100, "restored-spell-icon")
+	end
+
+	-- Then its restored icon uses the configured side and normal dimensions.
+	assert(initializedEvents[31] == oldestEvent)
+	local restoredTexture = oldestEvent.texture
+	assert(restoredTexture and restoredTexture.texturePath == "restored-spell-icon")
+	assert(restoredTexture.width == 18 and restoredTexture.height == 18)
+	assert(restoredTexture.lastPoint[1] == (sticky and "LEFT" or "RIGHT"))
+	assert(restoredTexture.lastPoint[2] == oldestEvent.fontString)
+	assert(restoredTexture.lastPoint[3] == (sticky and "RIGHT" or "LEFT"))
+	assert(restoredTexture.lastPoint[4] == (sticky and 4 or -4))
+	animationFrame:OnUpdate(4)
+end
 
 -- Describe: native visibility controls text and icons without Lua arithmetic.
 -- Given a secret visibility boolean and native-only alpha selector.

@@ -89,10 +89,10 @@ for _, amount in ipairs({ 75, secret }) do
     end
     presentation:Out({ event = "damage", amount = amount,
         result = { who = "you", ambiguous = true } })
-    -- Then the exact damage survives with a generic icon and no spell identity.
+    -- Then the exact damage survives without an icon or spell identity.
     assert(queued[1] == nil and queued[2] == amount)
-    assert(queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark",
-        "ambiguous spell damage did not receive a generic icon")
+    assert(queued[4] == nil,
+        "ambiguous spell damage retained an icon")
 end
 
 -- Given confirmed proc damage with no identified spell.
@@ -103,8 +103,8 @@ for _, amount in ipairs({ 36, secret }) do
 
     -- Then both keep their amount and critical flag without a guessed name.
     assert(queued[1] == nil and queued[2] == amount and queued[3])
-    assert(queued[4] == "Interface\\Icons\\INV_Misc_QuestionMark",
-        "unidentified proc damage did not receive a generic icon")
+    assert(queued[4] == nil,
+        "unidentified proc damage retained an icon")
 end
 
 -- Given a proc whose spell identity is available to presentation.

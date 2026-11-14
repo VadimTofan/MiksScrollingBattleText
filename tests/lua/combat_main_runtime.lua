@@ -308,7 +308,6 @@ for _, forever in ipairs({ false, true }) do
 			return value == firstProc or value == normalHit or value == delayedProc
 		end
 		local melee = filter.colors.eventColoring.SWING_DAMAGE
-		local windfuryCandidateIcon = "icon"
 
 		-- When their confirmations share a swing but their reports cross frames.
 		Dispatch("PLAYER_SWING", 3.8, 0)
@@ -331,16 +330,16 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeBurst + 1][4] == firstProc)
 		assert(getmetatable(displayed[beforeBurst + 1][1]).__index
 			== events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 1][3] == windfuryCandidateIcon,
-			"an early shaman proc lost the Windfury candidate icon")
+		assert(displayed[beforeBurst + 1][3] == nil,
+			"an early unnamed shaman proc retained an icon")
 		assert(displayed[beforeBurst + 2][4] == normalHit)
 		assert(getmetatable(displayed[beforeBurst + 2][1]).__index
 			== events.OUTGOING_DAMAGE)
 		assert(displayed[beforeBurst + 3][4] == delayedProc)
 		assert(getmetatable(displayed[beforeBurst + 3][1]).__index
 			== events.OUTGOING_SPELL_DAMAGE)
-		assert(displayed[beforeBurst + 3][3] == windfuryCandidateIcon,
-			"a delayed shaman proc lost the Windfury candidate icon")
+		assert(displayed[beforeBurst + 3][3] == nil,
+			"a delayed unnamed shaman proc retained an icon")
 
 		-- Given another burst with an unidentified extra-attack grant.
 		Advance(4)
@@ -370,9 +369,9 @@ for _, forever in ipairs({ false, true }) do
 		assert(displayed[beforeOffsetBurst + 1][4] == normalHit)
 		assert(displayed[beforeOffsetBurst + 2][4] == firstProc)
 		assert(displayed[beforeOffsetBurst + 3][4] == delayedProc)
-		assert(displayed[beforeOffsetBurst + 2][3] == windfuryCandidateIcon,
-			"a shaman extra-attack proc lost its unnamed candidate display")
-		assert(displayed[beforeOffsetBurst + 3][3] == windfuryCandidateIcon)
+		assert(displayed[beforeOffsetBurst + 2][3] == nil,
+			"an unnamed shaman extra-attack proc retained an icon")
+		assert(displayed[beforeOffsetBurst + 3][3] == nil)
 
 		-- Given stacking is enabled for a shaman's next Windfury burst.
 		local previousStacking = MikSBT.Profiles.currentProfile.stackSimilarHits
@@ -401,7 +400,7 @@ for _, forever in ipairs({ false, true }) do
 		local stacked = displayed[#displayed]
 		assert(stacked[2] == "Hit %s + %s [2 hits]",
 			"restricted Windfury group lost its native format placeholders")
-		assert(stacked[3] == windfuryCandidateIcon)
+		assert(stacked[3] == nil)
 		assert(stacked[4] == firstProc and stacked[5] == delayedProc,
 			"stacked Windfury changed or dropped restricted damage")
 		MikSBT.Profiles.currentProfile.stackSimilarHits = previousStacking
@@ -823,6 +822,31 @@ for _, forever in ipairs({ false, true }) do
 		Out(opaque, 16, { who = "you", ambiguous = true })
 		-- Then no name is invented and no skill token is left in the output.
 		assert(displayed[#displayed][2] == "Hit |cFF0000ff%s|r")
+		assert(displayed[#displayed][3] == nil)
+
+		-- Describe: an owned spell needs no identity to display its amount.
+		for _, amount in ipairs({ 42, opaque }) do
+			for _, owner in ipairs({ "you", "pet" }) do
+				for _, tick in ipairs({ false, true }) do
+					-- Given configured spell-name templates and an unknown spell.
+					local beforeUnnamed = #displayed
+
+					-- When public or opaque critical damage reaches the full runtime.
+					Out(amount, 16, { who = owner, tick = tick }, true)
+					Advance(0.31)
+
+					-- Then one amount appears without an icon or missing-name label.
+					assert(#displayed == beforeUnnamed + 1)
+					local hit = displayed[#displayed]
+					local number = amount == opaque and "%s" or "42"
+					assert(hit[2] == "Hit |cFF0000ff" .. number .. "|r",
+						"unknown spell retained a missing-name label")
+					assert(hit[3] == nil, "unknown spell retained an icon")
+					if amount == opaque then assert(hit[4] == opaque) end
+				end
+			end
+		end
+
 		-- When only the school is hidden, then no school color is guessed.
 		Out(42, opaque)
 		Advance(0.31)
@@ -1177,11 +1201,11 @@ for _, forever in ipairs({ false, true }) do
 		Dispatch("UNIT_COMBAT", "target", "WOUND", "", amount, 4)
 		Advance(0.02)
 		Advance(0.31)
-		-- Then the hit appears once with a generic icon and no guessed name.
+		-- Then the hit appears once without an icon or guessed name.
 		assert(#displayed == beforeAmbiguous + 1,
 			"ambiguous confirmed damage was dropped or displayed twice")
 		local output = displayed[#displayed]
-		assert(output[3] == "Interface\\Icons\\INV_Misc_QuestionMark")
+		assert(output[3] == nil)
 		if amount == opaqueHit then
 			assert(output[4] == amount, "opaque damage was changed")
 			assert(not output[2]:find("Test spell", 1, true))

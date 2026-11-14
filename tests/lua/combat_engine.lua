@@ -158,7 +158,8 @@ Advance(4)
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 403)
 Event("UNIT_SPELLCAST_CHANNEL_START", "player", "channel-1", 403)
 for index = 1, 5 do
-    Advance(0.2)
+    -- Keep all five hits and the final buffered hit inside its two seconds.
+    Advance(0.15)
     local previous = #outgoing
 
     -- When channel lines and hits arrive in different frames, either first.
@@ -853,13 +854,13 @@ for _, spell in ipairs(queuedSpells) do
 end
 
 for _, example in ipairs({
-	{ spell = 105, forever = true, hits = 2, lines = 1, expected = opaqueZero },
-	{ spell = 2973, forever = false, hits = 2, lines = 1, expected = opaqueZero },
+	{ spell = 105, forever = true, hits = 2, lines = 1 },
+	{ spell = 2973, forever = false, hits = 2, lines = 1 },
 	{ spell = 2973, forever = true, hits = 1, lines = 1, expected = opaqueDamage },
 	{ spell = 2973, forever = true, hits = 2, lines = 0 },
-	{ spell = 2973, forever = true, hits = 3, lines = 1, expected = opaqueZero },
+	{ spell = 2973, forever = true, hits = 3, lines = 1 },
 	{ spell = 2973, forever = true, hits = 2, lines = 1,
-		delay = 0.01, expected = opaqueZero },
+		delay = 0.01 },
 }) do
 	-- Given a normal spell, another client, a lone hit, or no confirmation.
 	Advance(4)
@@ -879,7 +880,7 @@ for _, example in ipairs({
 	Advance(0.02)
 	Advance(0.5)
 
-	-- Then the special pair rule does not alter their normal matching.
+	-- Then a lone confirmed report survives; equal contested fits stay unknown.
 	local own = {}
 	for index = before + 1, #outgoing do
 		if outgoing[index].result.who == "you" then

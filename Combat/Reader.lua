@@ -8,7 +8,8 @@ local C_Timer = ns.Timer
 
 local reader = {
     epoch = 0, plateGeneration = 0, plates = {}, held = {},
-    lastGlow = {}, lastCC = {}, swingTimes = {},
+    lastGlow = {}, lastCC = {}, swingTimes = {}, castTargets = {},
+    pendingHits = setmetatable({}, { __mode = "k" }),
 }
 ns.reader = reader
 
@@ -32,9 +33,42 @@ local function DepartedTargetKey()
 end
 
 -- Unit keys -----------------------------------------------------------------------
--- A unit is known by its nameplate token while it has one, so a DoT followed
--- on your target is still followed once you target something else; without a
--- plate, by "target" and how many times the target has changed.
+-- Tokens are reusable. Evidence belongs to one visible lifetime of a token.
+local function PlateKey(token)
+    local generation = token and reader.plates[token]
+    if generation == nil then return nil end
+    return token .. ":" .. tostring(generation)
+end
+
+local function RekeyTarget(old, new)
+    if not old or not new or old == new then return end
+    ns.mine:Rekey(old, new)
+    ns.RekeyHealing(old, new)
+    local function Move(entry)
+        if entry.key == old then entry.key = new end
+        if entry.victimKey == old then entry.victimKey = new end
+        if entry.record and entry.record.victimKey == old then
+            entry.record.victimKey = new
+        end
+        if entry.held and entry.held.key == old then entry.held.key = new end
+    end
+    for _, field in ipairs({ "swingTimes", "swingHits", "frameHits",
+        "held", "yourHits", "castTargets" }) do
+        for _, entry in ipairs(reader[field] or {}) do Move(entry) end
+    end
+    for hit in pairs(reader.pendingHits or {}) do Move(hit) end
+    for _, line in ipairs(reader.logLines or {}) do
+        if line.targetContext == old then line.targetContext = new end
+        if line.hit then Move(line.hit) end
+    end
+    if reader.lastCastTarget then Move(reader.lastCastTarget) end
+    if reader.targetKey == old then reader.targetKey = new end
+    if reader.departedTargetKey == old then reader.departedTargetKey = new end
+    if ns.traceCombat then
+        ns.traceCombat("rekey", nil, { old = old, new = new })
+    end
+end
+
 local function FindTargetPlate()
     reader.targetPlate = nil
     if not UnitExists("target") then return end
@@ -55,7 +89,8 @@ function ns.TargetKey()
         reader.targetKey = nil
         return nil
     end
-    reader.targetKey = reader.targetPlate or ("target" .. reader.epoch)
+    reader.targetKey = PlateKey(reader.targetPlate) or reader.targetKey
+        or ("target" .. reader.epoch)
     return reader.targetKey
 end
 
@@ -281,7 +316,7 @@ local function OnUnitCombat(unit, event, flag, amount, school)
         -- "pet" too, and a miss on it had taken your swing's line.
         local pet = UnitIsUnit(unit, "pet")
         if ns.Bool(pet) and pet then return end
-        key, token = unit, unit
+        key, token = PlateKey(unit), unit
         record.plate = unit
     else
         return
@@ -291,6 +326,7 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     end
     local hit = { record = record, key = key, at = now, unit = unit,
         petOn = PetAttacking(token) }
+    reader.pendingHits[hit] = true
     if ns.traceCombat then ns.traceCombat("report", hit) end
     -- 0.3.8: while lines of yours come, a hit is decided at the end of its
     -- frame, once every line of that frame has come (the game sends a hit
@@ -415,7 +451,9 @@ function ns.DecideHit(hit, line, restrict)
     local kind = record.event == "miss" and "miss" or record.event
     local leech = Leech(hit)
     local result
-    if kind == "heal" then
+    if hit.unidentified then
+        result = ns.mine:ConfirmUnidentified(hit.key, record.school, hit.at)
+    elseif kind == "heal" then
         result = ns.MatchHealing(hit.key, hit.at, restrict == "tick", line)
             or { who = "other" }
     else
@@ -431,6 +469,7 @@ function ns.DecideHit(hit, line, restrict)
     end
     TagProcCandidate(result, hit.at, record.school, hit.key)
     record.result = result
+    reader.pendingHits[hit] = nil
     if ns.traceCombat then
         ns.traceCombat("decision", hit, { stage = "decision",
             confirmed = line, restrict = restrict })
@@ -687,6 +726,7 @@ local function OrphanSwingLine(hit)
     for _, line in ipairs(reader.logLines or {}) do
         local gap = hit.at - line.at
         if not line.claimed and not line.hit and MeleeLine(line) and Pairs(line, record)
+            and line.targetContext == hit.key
             and gap >= math.max(early, ORPHAN_MIN) and gap <= late and Role(line) == "orphan" then
             return line
         end
@@ -862,6 +902,21 @@ end
 -- on an enemy without a plate also sends one) and every hit is yours; none
 -- and none is; fewer, and the engine decides as it would without lines.
 function DecideGroup(group, frameLines, decided, settled)
+    local reportsBySchool, periodicConfirmations = {}, 0
+    for _, line in ipairs(frameLines) do
+        if PeriodicLine(line) then periodicConfirmations = periodicConfirmations + 1 end
+    end
+    for _, hit in ipairs(group) do
+        local school = hit.record.school or false
+        reportsBySchool[school] = reportsBySchool[school] or {}
+        reportsBySchool[school][hit.key] = true
+    end
+    local function CompetingPeriodic(hit)
+        return ns.mine.OffscreenTickFit and ns.mine:OffscreenTickFit(
+            hit.key, hit.record.school, hit.at,
+            periodicConfirmations >= #group
+                and reportsBySchool[hit.record.school or false] or nil)
+    end
     local function Claim(count)
         for index = 1, math.min(count, #frameLines) do frameLines[index].claimed = true end
     end
@@ -876,9 +931,10 @@ function DecideGroup(group, frameLines, decided, settled)
     end
     for _, line in ipairs(frameLines) do
         if PeriodicLine(line) then
-            local best, score
+            local best, score, tied
             for index, hit in ipairs(remaining) do
-                local fit = TickFit(hit)
+                local fit
+                if not CompetingPeriodic(hit) then fit = TickFit(hit) end
                 if fit ~= nil and #frameLines > #group then
                     for _, other in ipairs(ordinary) do
                         local restrict = LineRestrict(other)
@@ -889,7 +945,31 @@ function DecideGroup(group, frameLines, decided, settled)
                         end
                     end
                 end
-                if fit ~= nil and (not score or fit < score) then best, score = index, fit end
+                if fit ~= nil and (not score or fit < score) then
+                    best, score, tied = index, fit, false
+                elseif fit ~= nil and fit == score then
+                    tied = true
+                end
+            end
+            if tied and #frameLines >= #group and #ordinary > 0 then
+                -- All amounts are confirmed, but the periodic/direct roles
+                -- cannot be assigned. Preserve numbers without spending a
+                -- guessed spell or teaching a false rhythm.
+                for _, ownLine in ipairs(frameLines) do ownLine.claimed = true end
+                for _, hit in ipairs(remaining) do
+                    hit.unidentified = true
+                    Decide(hit, true)
+                end
+                return
+            elseif tied and periodicConfirmations < #group then
+                line.claimed, best = true, nil
+            end
+            -- Spell identity is optional when the typed confirmations cover
+            -- every report. A known offscreen tick remains a competing source.
+            if not best and #ordinary == 0 and #frameLines >= #group then
+                for index, hit in ipairs(remaining) do
+                    if not CompetingPeriodic(hit) then best = index break end
+                end
             end
             if best then
                 line.claimed = true
@@ -1001,7 +1081,13 @@ function DecideGroup(group, frameLines, decided, settled)
             return a.index < b.index
         end)
         local flags = {}
-        for rank, entry in ipairs(ranked) do flags[entry.hit] = rank <= lines and entry.fit ~= nil end
+        local cutoff = ranked[lines] and ranked[lines].fit
+        local contested = not preferQueuedHit and cutoff ~= nil
+            and ranked[lines + 1] and ranked[lines + 1].fit == cutoff
+        for rank, entry in ipairs(ranked) do
+            flags[entry.hit] = rank <= lines and entry.fit ~= nil
+                and not (contested and entry.fit == cutoff)
+        end
         for _, hit in ipairs(group) do Decide(hit, flags[hit], restrict) end
     end
 end
@@ -1060,20 +1146,112 @@ function ns.DecideLateMiss(hit)
 end
 
 -- Your casts and swings -----------------------------------------------------------
+local CAST_TARGET_KEEP, MAX_CAST_TARGETS = 30, 64
+
+local function RecipientKey(unit)
+    local same = UnitIsUnit(unit, "target")
+    if ns.Bool(same) and same then return ns.TargetKey() end
+    for token in pairs(reader.plates) do
+        same = UnitIsUnit(unit, token)
+        if ns.Bool(same) and same then return PlateKey(token) end
+    end
+end
+
+local function NamedRecipient(target)
+    if type(UnitName) ~= "function" then return nil, true end
+    local key, uncertain
+    local tokens = { "target", "focus", "mouseover" }
+    for token in pairs(reader.plates) do tokens[#tokens + 1] = token end
+    for _, token in ipairs(tokens) do
+        local ok, name, realm = pcall(UnitName, token)
+        if ok and ns.Text(name) and (target == name
+            or (ns.Text(realm) and target == name .. "-" .. realm)) then
+            local candidate = RecipientKey(token)
+            if candidate then
+                if key and key ~= candidate then uncertain = true end
+                key = candidate
+            else
+                uncertain = true
+            end
+        end
+    end
+    if uncertain then return nil, true end
+    return key, key == nil
+end
+
+local function NoteCastTarget(unit, target, guid, spell, now)
+    if (unit ~= "player" and unit ~= "pet")
+        or not ns.Number(spell, 1) then return end
+    local key, uncertain
+    if not ns.Public(target) then
+        uncertain = true
+    elseif ns.Text(target) then
+        key, uncertain = NamedRecipient(target)
+    elseif target == nil or target == "" then
+        -- Older clients omit the recipient name. Keep the start snapshot;
+        -- selecting another target before success must not move the cast.
+        key = unit == "player" and ns.TargetKey()
+            or (PetAttacking("target") and ns.TargetKey() or nil)
+    else
+        uncertain = true
+    end
+    local targets = reader.castTargets
+    for index = #targets, 1, -1 do
+        if now - targets[index].at > CAST_TARGET_KEEP then
+            table.remove(targets, index)
+        end
+    end
+    targets[#targets + 1] = { unit = unit, spell = spell, at = now,
+        guid = ns.Text(guid) and guid or nil, key = key,
+        uncertain = uncertain == true or not ns.Text(guid) }
+    while #targets > MAX_CAST_TARGETS do table.remove(targets, 1) end
+end
+
+local function CastTarget(unit, spell, guid, now, consume)
+    local found, count
+    count = 0
+    for index, entry in ipairs(reader.castTargets) do
+        if entry.unit == unit and entry.spell == spell
+            and now >= entry.at and now - entry.at <= CAST_TARGET_KEEP then
+            if ns.Text(guid) and entry.guid == guid then
+                found, count = index, 1
+                break
+            elseif not ns.Text(guid) or not entry.guid then
+                found, count = index, count + 1
+            end
+        end
+    end
+    if found then
+        local entry = reader.castTargets[found]
+        if consume then table.remove(reader.castTargets, found) end
+        if entry.uncertain or count > 1 then return nil, true, true end
+        return entry.key, false, true
+    end
+    local recent = reader.lastCastTarget
+    if not consume and recent and recent.unit == unit and recent.spell == spell
+        and (not ns.Text(guid) or recent.guid == guid)
+        and now - recent.at <= 0.05 then
+        return recent.key, recent.uncertain, true
+    end
+end
+
 local lastCast
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
-    local key
-    if unit == "player" then
+    local key, uncertain, observed = CastTarget(unit, spell, guid, now, true)
+    if not observed and unit == "player" then
         key = ns.TargetKey()
-    elseif unit == "pet" then
+    elseif not observed and unit == "pet" then
         -- Its target is hidden in battlegrounds; with its lines coming, a
         -- cast is taken to be at your target and its line decides (0.3.18).
         if PetAttacking("target") or (ns.mine.petLines and LinesRunning and LinesRunning()) then key = ns.TargetKey() end
     end
     if ns.NoteHealCast then ns.NoteHealCast(unit, spell, key, now, guid) end
-    ns.mine:Cast(unit, spell, key, now)
+    reader.lastCastTarget = { unit = unit, spell = spell, key = key,
+        guid = ns.Text(guid) and guid or nil,
+        uncertain = uncertain, at = now }
+    ns.mine:Cast(unit, spell, key, now, uncertain)
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     -- Your pet's casts and your own with no target to hit (Life Tap) are
     -- written too (0.3.16).
@@ -1835,7 +2013,8 @@ local function OnLogMessage(text, r, g, b, order)
     if ns.Public(text) and text == nil then return end
     local now = Now()
     local source, kind = LineSource(r, g, b)
-    local line = { at = now, source = source, kind = kind }
+    local line = { at = now, source = source, kind = kind,
+        targetContext = ns.TargetKey() }
     if line.source == "mine" then reader.sawGrey = true end
     reader.logLines = Prune(reader.logLines, now)
     reader.logLines[#reader.logLines + 1] = line
@@ -1871,13 +2050,17 @@ local function OnEvent(_, event, ...)
     elseif event == "UNIT_SPELLCAST_SENT" then
         local unit, target, guid, spell = ...
         ns.NoteHealTarget(unit, target, guid, spell, Now())
+        NoteCastTarget(unit, target, guid, spell, Now())
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, guid, spell = ...
         if unit == "player" or unit == "pet" then OnCast(unit, spell, guid) end
     elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
-        local unit, _, spell = ...
+        local unit, guid, spell = ...
         if (unit == "player" or unit == "pet") and ns.Number(spell, 1) then
-            ns.mine:StartChannel(unit, spell, ns.TargetKey(), Now())
+            local key, uncertain, observed =
+                CastTarget(unit, spell, guid, Now(), false)
+            if not observed then key = ns.TargetKey() end
+            ns.mine:StartChannel(unit, spell, key, Now(), uncertain)
         end
     elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
         local unit, _, spell = ...
@@ -1909,41 +2092,25 @@ local function OnEvent(_, event, ...)
             local same = UnitIsUnit(token, "target")
             if ns.Bool(same) and same and reader.targetPlate ~= token then
                 -- Casts made while your target had no plate follow it.
-                ns.mine:Rekey("target" .. reader.epoch, token)
-                ns.RekeyHealing("target" .. reader.epoch, token)
-                if reader.targetKey == "target" .. reader.epoch then
-                    reader.targetKey = token
-                end
-                if ns.traceCombat then
-                    ns.traceCombat("rekey", nil,
-                        { old = "target" .. reader.epoch, new = token })
-                end
+                RekeyTarget(reader.targetKey or ("target" .. reader.epoch),
+                    PlateKey(token))
                 reader.targetPlate = token
             end
         end
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
         local token = ...
         if ns.Text(token) then
+            local old = PlateKey(token)
             reader.plates[token] = nil
-            -- Your target's plate goes before the blow that killed it is
-            -- reported (an Ice Lance that ended the fight showed nothing in
-            -- 0.1.1, 13 October 2026): its casts carry on under "target".
+            -- A dying target can lose its plate before its final hit arrives.
+            -- Preserve its lifetime through the selected/departed target.
             if token == reader.targetPlate then
-                ns.mine:Rekey(token, "target" .. reader.epoch)
-                ns.RekeyHealing(token, "target" .. reader.epoch)
-                if reader.targetKey == token then
-                    reader.targetKey = "target" .. reader.epoch
-                end
-                if reader.departedTargetKey == token then
-                    reader.departedTargetKey = "target" .. reader.epoch
-                end
-                if ns.traceCombat then
-                    ns.traceCombat("rekey", nil,
-                        { old = token, new = "target" .. reader.epoch })
-                end
-            elseif token ~= DepartedTargetKey() then
-                ns.mine:Forget(token)
-                ns.ForgetHealing(token)
+                -- Keep the same lifetime for the still-selected or departed
+                -- target. A later creature reusing this token gets a new key.
+                reader.targetKey = reader.targetKey or old
+            elseif old and old ~= DepartedTargetKey() then
+                ns.mine:Forget(old)
+                ns.ForgetHealing(old)
             end
             if reader.targetPlate == token then
                 reader.targetPlate = nil
@@ -1977,6 +2144,8 @@ local function OnEvent(_, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
+        reader.castTargets, reader.lastCastTarget = {}, nil
+        reader.pendingHits = setmetatable({}, { __mode = "k" })
         reader.targetKey = nil
         reader.departedTargetKey, reader.departedTargetAt = nil, nil
         reader.epoch = reader.epoch + 1
@@ -1999,6 +2168,9 @@ local function ResetReader()
         reader[key] = type(value) == "table" and {} or value
     end
     reader.frame = frame
+    -- Delayed groups retain their hits after frameHits has been drained.
+    -- Weak keys let those live callbacks participate in target rekeying.
+    reader.pendingHits = setmetatable({}, { __mode = "k" })
     lastCast, lastInterrupt = nil, 0
     beats = {}
 end

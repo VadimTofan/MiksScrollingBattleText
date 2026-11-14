@@ -40,7 +40,8 @@ UnitName = function() return "Replay" end
 UnitClass = function() return "Shaman", "SHAMAN" end
 GetWeaponEnchantInfo = function() return true, 10000, 0, 283 end
 UnitHealthMax = function() return 1000 end
-Enum = { CombatLogMessageOrder = { Oldest = 0, Newest = 1 } }
+Enum = { CombatLogMessageOrder = { Newest = 0, Oldest = 1 },
+    PlayerSwingType = { MainHand = 0, OffHand = 1, Ranged = 2 } }
 C_EventUtils = { IsEventValid = function() return true end }
 C_Timer = {
     After = function(delay, callback)
@@ -126,7 +127,7 @@ local function Line(kind)
         tick = "SPELL_PERIODIC_DAMAGE" })[kind]
     local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[event]
     Event("COMBAT_LOG_MESSAGE", "opaque combat-log text",
-        rgb.r, rgb.g, rgb.b, 1)
+        rgb.r, rgb.g, rgb.b, Enum.CombatLogMessageOrder.Newest)
 end
 local function At(time)
     assert(time >= now, "capture events must be chronological")

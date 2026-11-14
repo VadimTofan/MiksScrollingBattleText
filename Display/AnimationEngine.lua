@@ -215,6 +215,10 @@ local function Display(visibility, message, saSettings, isSticky, colorR, colorG
 		texture:SetDrawLayer(isSticky and "OVERLAY" or "ARTWORK")
 		texture:SetAlpha(0)
 		displayEvent.texture = texture
+	elseif displayEvent.texture then
+		textureCache[#textureCache + 1] = displayEvent.texture
+		displayEvent.texture:SetTexture(nil)
+		displayEvent.texture = nil
 	end
 
 	displayEvent.elapsedTime = 0

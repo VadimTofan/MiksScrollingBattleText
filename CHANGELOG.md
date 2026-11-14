@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Unknown and ambiguous outgoing spells now show numbers without an icon or
+  question mark. Reused scrolling lines release their previous icon.
+- Kept delayed damage, casts, and swings tied to their creature's lifetime.
+  Reused nameplates, off-screen effects, and pet activity cannot supply an
+  unrelated report's ownership. Cast recipients survive target switches.
+- Applied conservative naming to periodic ticks, channels, and misses.
+  Ambiguous reports do not teach spell facts or shift known tick intervals.
 - Added Forever spell tables for damage schools, direct hits, periodic
   effects, and matching windows, with descriptions as the fallback for
   unknown spells. Bleeds retain their physical school and duration.
@@ -11,7 +18,6 @@
 - Kept confirmed damage visible when its spell is unknown. Active weapon
   effects no longer invent a Windfury or other proc name; unnamed candidates
   retain stacking, separate critical hits, and restricted damage values.
-  Windfury candidates keep its icon as a visual hint without a guessed name.
 - Updated Windfury diagnostics to distinguish candidate evidence, spell
   identity, unresolved ownership, and display dispatches. Magic-only and
   accounted ability sequences no longer cause false missing-hit pauses.

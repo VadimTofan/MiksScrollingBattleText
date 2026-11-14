@@ -106,6 +106,15 @@ end
 local function hit(amount, school, unit)
     ns.ReaderEvent(nil, "UNIT_COMBAT", unit or "target", "WOUND", "", amount or 20, school)
 end
+local function plateKey(token)
+    return token .. ":" .. tostring(ns.reader.plates[token])
+end
+local function assertUnnamedDot(message)
+    equal(#shown, 1, "confirmed tick displayed once")
+    equal(shown[1].key, "OUTGOING_SPELL_DOT", "periodic event")
+    equal(shown[1].message, message or "20", "reported amount")
+    equal(shown[1].icon, nil, "unresolved identity has no icon")
+end
 local function assertDot(message, spell)
     for _, item in ipairs(shown) do
         if item.key == "OUTGOING_SPELL_DOT" then
@@ -194,8 +203,8 @@ end)
 test("periodic fitting is read-only even with stale cached guesses", function()
     beginDot({ school = { [1] = 1 }, direct = { [1] = 1 }, period = {} })
     local pending = #ns.mine.pending
-    assert(ns.mine:TickFit("nameplate1", 8, 3.8, 20))
-    assert(ns.mine:TickFit("nameplate1", nil, 3.8, nil))
+    assert(ns.mine:TickFit(plateKey("nameplate1"), 8, 3.8, 20))
+    assert(ns.mine:TickFit(plateKey("nameplate1"), nil, 3.8, nil))
     equal(#ns.mine:Dots(), 0, "fit cannot create DoTs")
     equal(#ns.mine.pending, pending, "fit cannot consume casts")
     equal(ns.mine.pending[1].used, nil, "cast remains unused")
@@ -208,7 +217,7 @@ test("wrong schools from actual spell facts are not overridden", function()
     hit(20, 4)
     combatLine("tick")
     flush()
-    equal(#shown, 0, "authoritative school mismatch rejected")
+    assertUnnamedDot()
 end)
 test("a direct-only spell description is not a periodic candidate", function()
     reset()
@@ -218,7 +227,7 @@ test("a direct-only spell description is not a periodic candidate", function()
     hit(20, 4)
     combatLine("tick")
     flush()
-    equal(#shown, 0, "direct-only spell cannot claim an unrelated tick")
+    assertUnnamedDot()
 end)
 test("mixed spell retains its direct hit after delayed DoT recovery", function()
     local learned = beginDot()
@@ -281,7 +290,7 @@ test("expired casts cannot recover unrelated ticks", function()
     hit(20, 8)
     combatLine("tick")
     flush()
-    equal(#shown, 0, "expired history rejected")
+    assertUnnamedDot()
 end)
 test("ambiguous periodic matches do not overwrite learned guesses", function()
     local learned = beginDot()
@@ -297,23 +306,23 @@ test("ambiguous periodic matches do not overwrite learned guesses", function()
     equal(learned.school[2], nil, "other ambiguous school not saved")
     equal(learned.period[2], nil, "other ambiguous interval not saved")
 end)
-test("confirmed tick on another target retains the history fallback", function()
+test("another target's periodic line cannot establish report ownership", function()
     reset()
     ns.mine:Cast("you", 1, "nameplate2", 0)
     clock = 3
     hit(20, 32)
     after(0.05, function() combatLine("tick") end)
     flush()
-    assertDot()
+    equal(#shown, 0, "another target may have supplied the periodic line")
 end)
-test("plate lost before first tick can recover", function()
+test("plate lost before first tick cannot supply another target identity", function()
     beginDot()
-    ns.mine:Forget("nameplate1")
+    ns.mine:Forget(plateKey("nameplate1"))
     clock = 3.8
     hit(20, 32)
     after(0.05, function() combatLine("tick") end)
     flush()
-    assertDot()
+    equal(#shown, 0, "offscreen effect may have supplied the periodic line")
 end)
 test("cross-frame DoT survives target switch", function()
     beginDot()
@@ -331,7 +340,7 @@ test("contested first tick prefers its own target", function()
     clock = 3
     ns.reader.frameHits = {
         { at = 3, key = "other", record = { event = "damage", amount = 99, school = 32 } },
-        { at = 3, key = "nameplate1", record = { event = "damage", amount = 20, school = 32 } },
+        { at = 3, key = plateKey("nameplate1"), record = { event = "damage", amount = 20, school = 32 } },
     }
     combatLine("tick")
     ns.DecideFrame()
@@ -377,7 +386,8 @@ test("near-duplicate reports do not teach a cast interval", function()
     hit(20, 32)
     combatLine("tick")
     flush()
-    equal(#shown, 1, "near-duplicate hidden")
+    equal(#shown, 2, "both separately confirmed reports remain visible")
+    equal(shown[2].icon, nil, "second report has no supported identity")
     equal(learned.period[1], nil, "no invented interval")
 end)
 test("confirmation outside the late window is not borrowed", function()
@@ -390,7 +400,12 @@ test("confirmation outside the late window is not borrowed", function()
 end)
 for _, delayed in ipairs({ false, true }) do
     test("simultaneous direct damage keeps its own amount " .. tostring(delayed), function()
-        beginDot()
+        -- Given explicit facts that distinguish the periodic and direct roles.
+        reset({ school = { [1] = 32, [2] = 4 },
+            direct = { [1] = 2, [2] = 1 }, period = { [1] = 3 } })
+        descriptions[1] = "Causes 60 Shadow damage over 9 sec."
+        descriptions[2] = "Deals 60 Fire damage."
+        cast(1)
         clock = 2.9
         cast(2)
         clock = 3
@@ -410,7 +425,7 @@ for _, opaqueSchool in ipairs({ false, true }) do
     test("missing tick never borrows an auto-shot amount " .. tostring(opaqueSchool), function()
         beginDot()
         ns.mine.wandSchool = 1
-        ns.mine:Swing("ranged", "nameplate1", 2.6)
+        ns.mine:Swing("ranged", plateKey("nameplate1"), 2.6)
         clock = 3
         combatLine("tick")
         combatLine("shot")
@@ -424,9 +439,13 @@ for _, opaqueSchool in ipairs({ false, true }) do
     end)
 end
 test("auto shot and delayed DoT retain separate icons", function()
-    beginDot()
+    -- Given a known Shadow DoT that cannot explain the Physical shot report.
+    reset({ school = { [1] = 32 }, direct = { [1] = 2 },
+        period = { [1] = 3 } })
+    descriptions[1] = "Causes 60 Shadow damage over 9 sec."
+    cast(1)
     ns.mine.wandSchool = 1
-    ns.mine:Swing("ranged", "nameplate1", 2.6)
+    ns.mine:Swing("ranged", plateKey("nameplate1"), 2.6)
     clock = 3
     combatLine("shot")
     hit(20, nil)
@@ -448,17 +467,17 @@ test("maintenance cannot skip a buffered tick", function()
     assertDot()
     equal(dot.ticks, 1, "buffered tick counted")
 end)
-test("unkeyed known DoT recovers only after confirmation", function()
+test("forgotten known DoT cannot be adopted by timing and confirmation", function()
     beginDot()
     local dot = ns.mine:Dots()[1]
     dot.period, dot.next, dot.known = 3, 3, true
-    ns.mine:Forget("nameplate1")
+    ns.mine:Forget(plateKey("nameplate1"))
     clock = 3
     hit(20, 32)
     after(0.05, function() combatLine("tick") end)
     flush()
-    assertDot()
-    equal(dot.key, "nameplate1", "re-adopted")
+    equal(#shown, 0, "forgotten DoT cannot claim an unrelated amount")
+    equal(#ns.mine:Dots(), 0, "forgotten lifetime stays forgotten")
 end)
 test("opaque amounts and school are not inspected", function()
     local learned = beginDot()
@@ -534,12 +553,12 @@ test("periodic fits use only the current hit's healing evidence", function()
     local dot = ns.mine:Dots()[1]
 
     -- When the same hit is fitted with and without a matching heal.
-    local ordinary = ns.mine:TickFit("nameplate1", 32, 3, 20)
-    local draining = ns.mine:TickFit("nameplate1", 32, 3, 20, true)
-    ns.mine:Hit("nameplate1", "damage", 32, 3, false, true,
+    local ordinary = ns.mine:TickFit(plateKey("nameplate1"), 32, 3, 20)
+    local draining = ns.mine:TickFit(plateKey("nameplate1"), 32, 3, 20, true)
+    ns.mine:Hit(plateKey("nameplate1"), "damage", 32, 3, false, true,
         20, false, "tick", true)
-    local nextOrdinary = ns.mine:TickFit("nameplate1", 32, 6, 20)
-    local nextDraining = ns.mine:TickFit("nameplate1", 32, 6, 20, true)
+    local nextOrdinary = ns.mine:TickFit(plateKey("nameplate1"), 32, 6, 20)
+    local nextDraining = ns.mine:TickFit(plateKey("nameplate1"), 32, 6, 20, true)
 
     -- Then mismatches score worse and old healing evidence cannot leak.
     assert(draining > ordinary, "matching heal ignored during fitting")
@@ -560,7 +579,7 @@ test("Drain Life cannot take a due Siphon Life tick", function()
     cast(1)
     ns.mine.amounts[1] = { n = 1, [20] = true }
     clock = 1
-    ns.mine:StartChannel("you", 2, "nameplate1", clock)
+    ns.mine:StartChannel("you", 2, plateKey("nameplate1"), clock)
     clock = 3
     ns.reader.playerHeals = { { at = clock, amount = 20 } }
 
@@ -585,13 +604,13 @@ test("a channel cannot flatten competing DoT amount evidence", function()
     cast(1)
     ns.mine.amounts[1] = { n = 1, [20] = true }
     clock = 1
-    ns.mine:StartChannel("you", 2, "nameplate1", clock)
+    ns.mine:StartChannel("you", 2, plateKey("nameplate1"), clock)
     clock = 3
 
     -- When a foreign hit precedes a partial-resist tick, with one own line.
-    local foreignFit = ns.mine:Fit("nameplate1", "damage", 32, 3,
+    local foreignFit = ns.mine:Fit(plateKey("nameplate1"), "damage", 32, 3,
         99, "tick")
-    local ownFit = ns.mine:Fit("nameplate1", "damage", 32, 3,
+    local ownFit = ns.mine:Fit(plateKey("nameplate1"), "damage", 32, 3,
         10, "tick")
     hit(99, 32)
     hit(10, 32)
@@ -612,7 +631,7 @@ for _, healed in ipairs({ false, true }) do
         reset()
         descriptions[2] = "Transfers 10 health every 1 sec "
             .. "from the target to the caster. Lasts 5 sec."
-        ns.mine:StartChannel("you", 2, "nameplate1", 0)
+        ns.mine:StartChannel("you", 2, plateKey("nameplate1"), 0)
         clock = 1
         if healed then
             ns.reader.playerHeals = { { at = clock, amount = 10 } }
@@ -650,7 +669,7 @@ for _, scenario in ipairs({
         cast(1)
         ns.mine.amounts[1] = { n = 1, [20] = true }
         ns.mine.amounts[2] = { n = 1, [10] = true }
-        ns.mine:StartChannel("you", 2, "nameplate1", 1)
+        ns.mine:StartChannel("you", 2, plateKey("nameplate1"), 1)
         clock = 3
         ns.reader.playerHeals = {
             { at = clock, amount = channelFirst and 10 or 20 },

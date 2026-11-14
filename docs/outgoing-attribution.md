@@ -1,10 +1,10 @@
 # Outgoing damage attribution
 
 MSBT separates whether a report belongs to the player or pet from which
-spell caused it. A confirmed hit can remain visible with no spell name and
-a generic icon, or a Windfury candidate icon as a visual hint. Reports with
-unresolved ownership stay hidden; they are
-recorded as `unknown`, rather than being described as another player's hit.
+spell caused it. A confirmed hit with an unknown or ambiguous spell shows its
+number without a spell name, icon, or question mark. Identified spells and
+melee attacks retain their icons. Reports with unresolved ownership stay
+hidden and are recorded as `unknown`.
 
 | Responsibility | Implementation |
 | --- | --- |
@@ -44,6 +44,10 @@ metadata uses its matching window; legacy secondary-target inference remains
 limited to the existing simultaneous-impact window. A target token change
 does not reopen spent outcomes. A failed application cannot provide later
 periodic identity, while another target or a remaining component stays valid.
+Periodic outcomes also share a per-cast, per-target occurrence budget across
+normal, historical, and miss matching. A duplicate confirmed report retains
+its amount without reusing a tick's name. These budgets follow live DoT cast
+links even after ordinary cast history expires.
 
 Consuming a direct impact does not consume the periodic component of a mixed
 spell. Unknown spell behavior cannot become periodic evidence merely because
@@ -56,10 +60,38 @@ including before the first log line. Unused direct confirmations following
 a melee swing or known physical ability can support delayed weapon-proc
 candidates. The existing bounded trigger and report windows still apply.
 An active imbue does not prove a proc's identity. Candidate metadata reaches
-grouping, diagnostics, and visual hints separately from the named spell ID.
-Windfury candidates can show its icon without acquiring its spell name.
-Known bleed icons, ambiguous results, and pet/periodic events keep their own
-icon rules. Neither a candidate nor a guessed source supplies a proc name.
+grouping and diagnostics separately from the named spell ID. It does not
+supply a spell icon or name. Confirmed periodic damage can remain visible
+without a spell candidate, provided no competing target's periodic evidence
+could have supplied its confirmation.
+
+Nameplate keys include their visible generation. Casts, outcomes, swings,
+held reports, and callbacks waiting for confirmations follow that lifetime.
+Public aliases of the same selected creature can move those references
+together when a plate appears. A new creature reusing a token receives a
+different key. Forgotten periodic effects retain bounded timing only as
+competing evidence; they cannot adopt another target or supply its name.
+Pet activity without confirmation cannot establish ownership.
+Active and retired channels also remain competing evidence on other targets
+until their stop or duration expires. Simultaneous represented targets only
+waive that competition when confirmations cover the complete report group.
+When confirmations are fewer than reports, equal ownership fits remain
+unresolved. Their confirmations cannot be lent to later reports. If all
+amounts are confirmed but their direct/periodic roles cannot be assigned,
+they remain numeric and unnamed without teaching a rhythm or reopening
+possible spell outcomes.
+
+Readable cast GUIDs join SENT recipient evidence to successful casts and
+channel starts. Public target, focus, mouseover, and nameplate aliases are
+checked together. Duplicate or unreadable recipients stay uncertain. Older
+events with an empty recipient retain the start snapshot; casts without
+SENT evidence retain the legacy current-context fallback. Those fallbacks
+remain inference rather than proof of the spell's actual victim.
+
+Periodic, channel, historical, and miss matching share conservative identity
+rules. Equally plausible identities remain unnamed and do not teach amounts,
+schools, or tick timing. Known catalog periods and durations constrain later
+reports instead of being replaced by the gap between competing ticks.
 
 MSBT keeps its existing event settings, scrolling areas, sounds, critical
 styling, and pet routing. Candidate grouping preserves the one-second window
@@ -76,6 +108,17 @@ reports are also covered. The catalogued next-swing test is a conservative
 ordering fixture; it does not establish unobserved live Cleave behavior.
 Separate tests cover cast budgets, misses, ambiguity, metadata/client
 boundaries, public/restricted amounts, and candidate grouping exclusions.
+
+`tests/lua/reader_attribution_lifecycle.lua` covers recipient ambiguity,
+target switches, reused plates, late confirmations, same-creature rekeying,
+and missing spell identity. `tests/lua/matcher_conservatism.lua` covers
+shared ambiguity rules, unconfirmed pets, retired periodic evidence, and
+authoritative timing. `tests/lua/recorded_spell_identity.lua` replays a
+sanitized subset of the reference project's build 70938 Warlock recording.
+Its four pet-target/tooltip variants preserve all 12 confirmed periodic
+reports once, retain isolated known identities, and reject names contradicted
+by independently checked combat-log labels. This is a fixed-target
+regression, not a general accuracy percentage.
 
 Timing and filtered log colors cannot always identify an individual attacker
 or distinguish simultaneous spells. Live validation remains necessary,

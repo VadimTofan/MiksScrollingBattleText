@@ -4,11 +4,11 @@ local mine = MikSBT.CombatEngine.NewMine()
 
 -- Given abandoned targets and recently active target and pet timings.
 for index = 1, 1000 do
-    mine:Hit("target" .. index, "damage", 4, 0, false, false)
-    mine:Hit("pet" .. index, "damage", 1, 0, true, false)
+    mine.rhythm["target" .. index] = { [4] = { last = 0, interval = 1 } }
+    mine.petLast["pet" .. index] = 0
 end
-mine:Hit("active", "damage", 4, 99, false, false)
-mine:Hit("activePet", "damage", 1, 99.5, true, false)
+mine.rhythm.active = { [4] = { last = 99, interval = 1 } }
+mine.petLast.activePet = 99.5
 mine:Rekey("active", "nameplate1")
 
 -- When normal maintenance runs after the abandoned timings expire.
@@ -27,5 +27,5 @@ assert(petCount == 1 and mine.petLast.activePet == 99.5)
 mine:Hit("nameplate1", "damage", 4, 100, false, false)
 local result = mine:Hit("nameplate1", "damage", 4, 101, false, false)
 
--- Then cleanup has preserved the timing needed to identify periodic hits.
-assert(result.tick, "cleanup discarded an active target's rhythm")
+-- Then a cached rhythm still cannot establish ownership without confirmation.
+assert(result.who == "unknown", "cached rhythm established false ownership")

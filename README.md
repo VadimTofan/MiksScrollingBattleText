@@ -55,9 +55,10 @@ hit reports, spell descriptions, damage-over-time timing, and available
 combat-log message colours. MSBT still owns the scrolling windows, animations,
 fonts, sounds, crit styling, event settings, and profiles.
 
-Confirmed outgoing damage with several equally plausible direct spells keeps
-its amount and uses a generic question-mark icon without a guessed spell name.
-Ambiguous direct matches do not teach the engine a spell's school or hit type.
+Confirmed outgoing damage with an unknown or ambiguous spell shows its number
+without a spell name, icon, or question mark. Known spells and identified melee
+attacks retain their icons. Ambiguous damage, periodic ticks, and misses do not
+teach the engine a spell's school or change its periodic rhythm.
 
 On Forever, spell tables from NameplateSCT Reforged supply known damage
 schools and direct/periodic behavior before tooltip inference. Unknown spells
@@ -66,12 +67,17 @@ so a spent cast cannot keep naming later damage. Confirmed damage remains
 visible when its spell identity is unknown.
 
 An active Windfury imbue can support matching delayed weapon-proc reports,
-but does not prove their spell identity. Windfury candidates use its icon as
-a visual hint without assigning a Windfury spell name. Other unidentified
-procs use a generic icon. With Stack Similar Hits enabled, candidates within one
+but does not prove their spell identity. Unidentified proc candidates show
+numbers without icons. With Stack Similar Hits enabled, candidates within one
 second can share a line without receiving a guessed Windfury label. Readable
 amounts show a total; restricted amounts keep separate values, such as
 `120 + 150 [2 Hits]`. Normal and critical hits stay separate.
+
+Target evidence follows a creature's nameplate lifetime, including delayed
+reports and returning plates. A reused token cannot inherit the previous
+creature's casts or swings. Readable cast identities and recipients preserve
+the target observed when a spell was sent. Pet activity alone does not prove
+ownership; unresolved ownership remains hidden.
 
 See [outgoing attribution](docs/outgoing-attribution.md) for data provenance,
 cast accounting, replay coverage, and attribution limits.
