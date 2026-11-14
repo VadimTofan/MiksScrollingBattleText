@@ -1,3 +1,12 @@
+# Remove the machine-specific PR #45 replay path
+
+Updated: 2026-11-14
+
+Removed the absolute temporary replay path from the PR #45 review record.
+The verification result remains recorded without a local artifact dependency.
+Validation: confirmed the path is absent and checked diff whitespace.
+Next: no further changes are needed for this documentation correction.
+
 # PR #43 merged: restore names for hits in a single cast's frame
 
 Updated: 2026-11-14
@@ -91,7 +100,7 @@ Review: PR head ran 142 tests, 141 passed and one archive check skipped.
 Applied cleanly to local main including PR #51 and the unpublished hunter and
 localization fixes. Extra replays verified the confirmation gate, valid-cast
 priority, and unnamed rendering. Current main reproduced the original dropped
-miss; the PR passed. Replays: `D:/Codex-Temp/msbt-pr45-review`.
+miss; the PR passed.
 
 Merged origin/main into local main without rebasing or publishing existing
 local commits. Final combined suite: 152 tests ran, 151 passed, one archive
