@@ -616,7 +616,7 @@ end
 local function FrameRoles(at)
     local swings = 0
     for _, swing in ipairs(reader.swingTimes) do
-        if not swing.ranged and math.abs(swing.at - at) <= SWING_FRAME then
+        if not swing.ranged and not swing.strike and math.abs(swing.at - at) <= SWING_FRAME then
             swings = swings + 1
         end
     end
@@ -1474,9 +1474,16 @@ local function OnSwing(swingType, swingDuration)
     local times = reader.swingTimes
     local key = ns.TargetKey()
     if ns.windfuryInference then ns.windfuryInference:Swing(Now(), key, hand) end
-    times[#times + 1] = { at = Now(), ranged = hand == "ranged",
+    -- A queued strike (Raptor Strike) sends this swing in its cast's frame on
+    -- Forever, and its hit is the strike's. Kept as a swing of yours, it took
+    -- the pet's next blow in its window as your Auto Attack.
+    local strike = hand ~= "ranged" and lastCast and lastCast.unit == "player"
+        and math.abs(lastCast.at - Now()) <= SWING_FRAME
+        and QUEUED_STRIKES[lastCast.spell] or nil
+    times[#times + 1] = { at = Now(), ranged = hand == "ranged", strike = strike,
         key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
+    if strike then return end
     local claimed = ns.mine:Swing(hand, key, Now(), ns.Number(swingDuration) and swingDuration or nil)
     if not claimed then return end
     for _, entry in ipairs(reader.held) do
