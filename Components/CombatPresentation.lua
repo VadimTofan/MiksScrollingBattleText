@@ -113,7 +113,11 @@ function Presentation:Emit(key, record, eventSettings)
 			metadata.amount = nil
 			message = self.config.formatMessage(settings, metadata, message)
 		end
-		self.config.displayRestricted(settings, record.amount, icon, message)
+		-- A partly blocked hit's trailer follows the hidden amount.
+		local suffix = self.config.formatBlockedTrailer
+			and self.config.formatBlockedTrailer(record)
+		self.config.displayRestricted(settings, record.amount, icon, message,
+			suffix)
 		return
 	end
 	local message
@@ -367,6 +371,18 @@ function Presentation:EmitIncomingHeal(key, record)
 	end)
 end
 
+-- Merged hits keep the total blocked; it is unknown if any part's amount is.
+local function MergeBlocked(batch, record)
+	if not record.blocked then return end
+	if not batch.blocked then
+		batch.blocked, batch.blockedAmount = true, record.blockedAmount
+	elseif batch.blockedAmount and record.blockedAmount then
+		batch.blockedAmount = batch.blockedAmount + record.blockedAmount
+	else
+		batch.blockedAmount = nil
+	end
+end
+
 function Presentation:Queue(key, record, incomingHeal)
 	if not self.config.after then
 		self:Emit(key, record)
@@ -389,6 +405,7 @@ function Presentation:Queue(key, record, incomingHeal)
 	if batch then
 		batch.amount = batch.amount + record.amount
 		batch.hitCount = batch.hitCount + 1
+		MergeBlocked(batch, record)
 		if incomingHeal then self:RememberIncomingHeal(batch) end
 		return
 	end
