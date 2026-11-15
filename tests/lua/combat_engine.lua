@@ -223,8 +223,14 @@ assert(incoming[3].pet)
 -- Describe: a partly blocked hit on you carries the amount blocked.
 do
     local blockSecretCheck, hiddenBlock = issecretvalue, {}
+    local originalCompatibility = MikSBT.Compatibility
+    MikSBT.Compatibility = { Client = { isForever = true } }
     local shieldBlock = 25
-    GetShieldBlock = function() return shieldBlock end
+    local shieldBlockReads = 0
+    GetShieldBlock = function()
+        shieldBlockReads = shieldBlockReads + 1
+        return shieldBlock
+    end
     local function Hit(unit, flag)
         Event("UNIT_COMBAT", unit, "WOUND", flag, 30, 1)
         return incoming[#incoming]
@@ -260,7 +266,33 @@ do
     assert(blocked.blocked and blocked.blockedAmount == nil,
         "a partial block with an unknown amount was not marked")
 
+    -- Given Retail exposes block armor rather than flat damage blocked.
+    MikSBT.Compatibility.Client = { isMainline = true, isForever = false }
+    shieldBlock = 26702
+    MikSBT.CombatEngine.reader.shieldBlock = 25
+    local readsBeforeRetail = shieldBlockReads
+
+    -- When a Retail hit is partly blocked.
+    blocked = Hit("player", "BLOCK_REDUCED")
+
+    -- Then it keeps the block marker without using the armor as an amount.
+    assert(blocked.blocked and blocked.blockedAmount == nil,
+        "Retail block armor was presented as damage blocked")
+    assert(shieldBlockReads == readsBeforeRetail,
+        "a non-Forever client queried the flat block amount")
+
+    -- Given client compatibility information is unavailable.
+    MikSBT.Compatibility = nil
+
+    -- When another partly blocked hit arrives.
+    blocked = Hit("player", "BLOCK_REDUCED")
+
+    -- Then the amount remains unknown rather than assuming Forever rules.
+    assert(blocked.blocked and blocked.blockedAmount == nil,
+        "an unknown client assumed a flat block amount")
+
     issecretvalue = blockSecretCheck
+    MikSBT.Compatibility = originalCompatibility
     GetShieldBlock = nil
 end
 

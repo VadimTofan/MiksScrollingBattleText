@@ -267,6 +267,12 @@ ns.DescribeCombat = Describe
 -- out of combat is kept (at login, gear changes and the end of a fight).
 local SHIELD_BLOCK_SETTLE = 1 -- stats settle a moment after a gear change
 local function ReadShieldBlock()
+    -- Retail exposes block armor, not a flat amount of damage blocked.
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not client or not client.isForever then
+        reader.shieldBlock = nil
+        return
+    end
     if type(GetShieldBlock) ~= "function" then return end
     local ok, value = pcall(GetShieldBlock)
     if ok and ns.Number(value) then

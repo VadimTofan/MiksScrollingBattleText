@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restricted flat partial-block amounts to Forever so Retail block armor
+  is never displayed as damage blocked.
 - Made inferred Windfury icons baseline on Forever and removed the General
   checkbox. Complete Weapon-only or Totem-only accounting can add an
   estimated icon without naming the damage. Checks may hold proc numbers
