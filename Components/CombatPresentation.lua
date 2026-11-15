@@ -452,6 +452,23 @@ function Presentation:Out(record)
 	if result.ambiguous or (not result.melee and not spell) then
 		spell, icon = nil, nil
 	end
+	local inferenceGroup
+	if record.event == "damage" and result.who == "you" and not spell
+		and not result.melee and not result.tick and not result.ambiguous
+		and RestrictedValue:Number(record.school) == 1 then
+		inferenceGroup = RestrictedValue:String(record.windfuryInferenceGroup)
+		if inferenceGroup and (#inferenceGroup == 0 or #inferenceGroup > 80) then
+			inferenceGroup = nil
+		end
+		local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+		local profile = self.config.getProfile and self.config.getProfile()
+		if inferenceGroup and client and client.isForever
+			and RestrictedValue:Table(profile)
+			and RestrictedValue:Boolean(profile.inferredWindfuryIcons) == true
+			and RestrictedValue:Number(record.inferredWindfuryIcon) == 8232 then
+			icon = self.config.getSpellTexture(8232)
+		end
+	end
 	if record.event == "damage" then
 		local isSpell = not result.melee or result.hand == "ranged"
 		local school = RestrictedValue:Number(record.school)
@@ -459,11 +476,13 @@ function Presentation:Out(record)
 		if RestrictedValue:IsRestricted(record.amount) then
 			self.config.batcher:DisplayRestricted(
 				spell, record.amount, record.crit, icon, isSpell,
-				result.who == "pet", result.tick, key, school, candidateSpell)
+				result.who == "pet", result.tick, key, school, candidateSpell,
+				inferenceGroup)
 		else
 			self.config.batcher:Queue(
 				spell, record.amount, record.crit, icon, isSpell,
-				result.who == "pet", result.tick, key, nil, school, candidateSpell)
+				result.who == "pet", result.tick, key, nil, school, candidateSpell,
+				inferenceGroup)
 		end
 		return
 	end

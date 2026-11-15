@@ -386,7 +386,8 @@ local function SpendDirect(self, spell, cast, key, missed)
     cast.outcomes = cast.outcomes or {}
     local target = key or false
     cast.outcomes[target] = (cast.outcomes[target] or 0) + 1
-    if self.accountingEnabled == true and not cast.ambiguous then
+    if (self.accountingEnabled == true or self.inferredWindfuryEnabled == true)
+        and not cast.ambiguous then
         self.lastOutcomeReceipt = {
             kind = "cast", at = cast.at, key = key, sourceKey = cast.key,
             spell = spell, who = cast.caster, ordinal = cast.outcomes[target],
@@ -631,7 +632,7 @@ function Mine:Swing(hand, key, now, duration)
         -- A ranged shot flies, so it never claims a hit from before it (0.3.13).
         if hand ~= "ranged" and not hit.claimed and hit.key == key and (hit.kind == "miss" or SchoolFits(PHYSICAL, hit.school)) then
             hit.claimed = true
-            if self.accountingEnabled == true then
+            if self.accountingEnabled == true or self.inferredWindfuryEnabled == true then
                 hit.accountingReceipt = {
                     kind = "swing", at = now, key = key, hand = hand,
                     who = "you", ordinal = 1,
@@ -1468,7 +1469,7 @@ local function Yours(self, key, kind, school, now)
                         and SchoolFits(self.wandSchool, school))
                     or (not ranged and SchoolFits(PHYSICAL, school))) then
                 swing.used = true
-                if self.accountingEnabled == true then
+                if self.accountingEnabled == true or self.inferredWindfuryEnabled == true then
                     self.lastOutcomeReceipt = {
                         kind = "swing", at = swing.at, key = swing.key,
                         hand = swing.hand, who = "you", ordinal = 1,

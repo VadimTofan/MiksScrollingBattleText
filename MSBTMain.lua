@@ -802,6 +802,7 @@ if Client.isMainline or Client.isForever then
 	})
 	combatEngine = CombatEngine:New({
 		presentation = presentation,
+		getProfile = function() return MSBTProfiles.currentProfile end,
 		log = CombatLogFilter:New({
 			getSaved = function() return Blizzard_CombatLog_Filters end,
 			getTemplate = function() return DEFAULT_COMBATLOG_FILTER_TEMPLATE end,

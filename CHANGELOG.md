@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added Forever's optional "Show inferred Windfury icons" setting, disabled
+  by default. Complete Weapon-only or Totem-only accounting can add an
+  estimated icon without naming the damage. Checks may hold proc numbers
+  for up to 1.6 seconds; incomplete or conflicting bursts stay number-only.
 - Confirmed outgoing reports reuse their original combat-log evidence.
   Timing bookkeeping no longer occupies a second spare confirmation that
   a later report could use; shared confirmations remain shared.

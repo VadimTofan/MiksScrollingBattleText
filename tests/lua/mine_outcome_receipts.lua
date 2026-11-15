@@ -112,6 +112,24 @@ Check("Stormstrike damage and avoidance spend the same ordinal", function()
     end
 end)
 
+Check("inferred icons keep receipts independently of diagnostic capture", function()
+    -- Given icon inference enabled while diagnostic accounting is disabled.
+    local mine = New({ [17364] = Direct() }, false)
+    mine.inferredWindfuryEnabled = true
+    mine:Swing("main", "target1", 10)
+
+    -- When its normal swing spends the existing reservation.
+    local result = mine:Hit("target1", "damage", 1, 10.5,
+        false, true, nil, false, "swing")
+
+    -- Then inference receives its receipt without enabling window diagnostics.
+    assert(result.melee and Receipt(mine).kind == "swing")
+    assert(mine:AccountingSwingChecks("target1", 10.5) == nil)
+    mine:Cast("player", 17364, "target1", 11)
+    assert(Hit(mine, 11.1).spell == 17364)
+    assert(Receipt(mine).spell == 17364)
+end)
+
 Check("supported direct components receive increasing ordinals", function()
     -- Given a cast explicitly supporting two direct components.
     local mine = New({ [17364] = Direct(2) }, true)

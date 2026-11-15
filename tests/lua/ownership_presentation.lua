@@ -127,4 +127,34 @@ presentation:Out({ event = "damage", amount = 51, icon = "known-source-icon",
 
 -- Then its authoritative identity and explicit icon stay intact.
 assert(queued[1] == 101 and queued[4] == "known-source-icon")
+-- Describe: inferred icons decorate output without inventing spell identity.
+local trialProfile = { inferredWindfuryIcons = true }
+MikSBT.Compatibility = { Client = { isForever = true } }
+presentation.config.getProfile = function() return trialProfile end
+presentation.config.getSpellTexture = function(id) return "icon-" .. id end
+for _, amount in ipairs({ 42, secret }) do
+    -- Given an owned physical extra accepted by the opt-in inference stage.
+    local result = { who = "you", procCandidate = true, candidateSpell = 8232 }
+    local record = { event = "damage", amount = amount, school = 1,
+        result = result, inferredWindfuryIcon = 8232,
+        windfuryInferenceGroup = "wf:clean-frame" }
+
+    -- When it reaches presentation with the trial enabled.
+    presentation:Out(record)
+
+    -- Then only icon/group metadata changes; identity and amount stay intact.
+    assert(queued[1] == nil and queued[2] == amount)
+    assert(queued[4] == "icon-8232", "accepted inferred WF icon was removed")
+    local groupIndex = amount == secret and 11 or 12
+    assert(queued[groupIndex] == "wf:clean-frame")
+    assert(result.spell == nil and result.procSpell == nil)
+
+    -- When the same stale marker reaches a disabled profile.
+    trialProfile.inferredWindfuryIcons = false
+    presentation:Out(record)
+
+    -- Then the ordinary number-only output remains the default.
+    assert(queued[1] == nil and queued[4] == nil)
+    trialProfile.inferredWindfuryIcons = true
+end
 print("Ownership presentation tests passed")

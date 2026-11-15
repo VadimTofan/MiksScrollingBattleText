@@ -44,6 +44,7 @@ end
 local function RekeyTarget(old, new)
     if not old or not new or old == new then return end
     ns.mine:Rekey(old, new)
+    if ns.windfuryInference then ns.windfuryInference:Rekey(old, new) end
     ns.RekeyHealing(old, new)
     local function Move(entry)
         if entry.key == old then entry.key = new end
@@ -459,10 +460,15 @@ ns.ProcCandidate = ProcCandidate
 -- Compatibility boundary: active effects cannot prove a damage spell's ID.
 ns.ProcSpell = function() return nil end
 
+local function TracksOutcomes()
+    return ns.mine and (ns.mine.accountingEnabled == true
+        or ns.mine.inferredWindfuryEnabled == true)
+end
+
 local function ConfirmingEvidence(hit, evidence, shared)
     hit.confirmation = evidence or false
     hit.sharedConfirmation = shared == true
-    if not (ns.mine and ns.mine.accountingEnabled) then return end
+    if not TracksOutcomes() then return end
     hit.accountingEvidence = nil
     if not evidence then return end
     if not shared then
@@ -517,7 +523,7 @@ function ns.DecideHit(hit, line, restrict)
     record.result = result
     local confirmation
     if line == true then confirmation = hit.confirmation or false end
-    if ns.mine and ns.mine.accountingEnabled then
+    if TracksOutcomes() then
         record.accounting = {
             at = hit.at, key = hit.key, confirmed = line == true,
             restrict = restrict,
@@ -1399,11 +1405,20 @@ local function OnCast(unit, spell, guid)
     reader.lastCastTarget = { unit = unit, spell = spell, key = key,
         guid = ns.Text(guid) and guid or nil,
         uncertain = uncertain, at = now }
-    if ns.mine.accountingEnabled then
+    if TracksOutcomes() then
         reader.lastCastTarget.observed = observed == true
     end
     ns.mine:Cast(unit, spell, key, now, uncertain)
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
+    if ns.windfuryInference and unit == "player" then
+        local certain = observed == true and uncertain ~= true
+        local conflict = spell ~= 17364 and spell ~= WINDFURY_ATTACK_SPELL_ID
+            and (not facts or (facts.school == ns.SCHOOL_PHYSICAL
+                and facts.damages ~= false))
+        ns.windfuryInference:Cast({ at = now, key = certain and key or nil,
+            spell = spell, guid = ns.Text(guid) and guid or nil,
+            uncertain = not certain, conflict = conflict == true })
+    end
     -- Your pet's casts and your own with no target to hit (Life Tap) are
     -- written too (0.3.16).
     lastCast = { at = now, spell = spell, unit = unit }
@@ -1437,6 +1452,7 @@ local function OnSwing(swingType, swingDuration)
     if not hand then return end
     local times = reader.swingTimes
     local key = ns.TargetKey()
+    if ns.windfuryInference then ns.windfuryInference:Swing(Now(), key, hand) end
     times[#times + 1] = { at = Now(), ranged = hand == "ranged",
         key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
@@ -2199,6 +2215,9 @@ local function OnLogMessage(text, r, g, b, order)
     if line.source == "mine" then reader.sawGrey = true end
     reader.logLines = Prune(reader.logLines, now)
     reader.logLines[#reader.logLines + 1] = line
+    if ns.windfuryInference then
+        ns.windfuryInference:Line(line.at, line.targetContext, source, kind)
+    end
     if Pairs(line) and not MeleeLine(line) then
         for _, hit in ipairs(reader.yourHits) do
             if not hit.pairingResolved and not hit.line and Pairs(line, hit.record)
@@ -2230,6 +2249,12 @@ local function OnEvent(_, event, ...)
     if event == "UNIT_COMBAT" then
         OnUnitCombat(...)
     elseif event == "SPELL_UPDATE_COOLDOWN" then
+        local spell = ...
+        if ns.windfuryInference and ns.Number(spell, 1)
+            and (spell == 10610 or (spell == WINDFURY_ATTACK_SPELL_ID
+                and ActiveWindfurySpell(ns.SCHOOL_PHYSICAL) == 8232)) then
+            ns.windfuryInference:Signal(Now(), spell)
+        end
         WindfuryCooldown(...)
     elseif event == "UNIT_SPELLCAST_SENT" then
         local unit, target, guid, spell = ...

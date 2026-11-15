@@ -225,6 +225,7 @@ function Tracker:ReportText()
         "MSBT Windfury timeline (metadata only; no damage amounts)",
         "Expected counts require an extra-attack grant; estimated counts are heuristic.",
         "Candidate grouping is separate from spell identity; identity=- means unnamed.",
+        "inferredIcon is an optional estimated icon, not a spell identity.",
         "Candidate evidence is timing/enchant based, not proof of spell identity.",
         "Cooldown updates are unconfirmed; targetContext is the current " ..
             "target, not a spell target or ownership evidence.",
@@ -275,14 +276,15 @@ function Tracker:ReportText()
                 "  R%d +%.3f %s school=%s outcome=%s who=%s " ..
                 "melee=%s WF=%s candidateSpell=%s identity=%s " ..
                 "held=%s path=%s attempted=%s " ..
-                "blocked=%s area=%s alpha=%s dispatchIDs=%s", id, e.at - burst.at,
+                "blocked=%s area=%s alpha=%s dispatchIDs=%s inferredIcon=%s",
+                id, e.at - burst.at,
                 Value(e.event), Value(e.school), Value(e.outcome),
                 Value(e.who), Value(e.melee), Value(e.procSpell == 8232),
                 Value(e.procCandidate and e.candidateSpell or nil),
                 Value(e.spell or e.procSpell),
                 Value(e.held), Value(e.path), Value(e.attempted),
                 Value(e.blocked), Value(e.area), Value(e.alpha),
-                table.concat(dispatches, ","))
+                table.concat(dispatches, ","), Value(e.inferredIcon))
             for _, c in ipairs(e.candidates) do
                 local fields = {}
                 for key, value in pairs(c) do

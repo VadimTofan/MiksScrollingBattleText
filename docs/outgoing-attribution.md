@@ -68,6 +68,26 @@ retains legacy timing association; an explicit missing context suppresses it.
 Timing samples use the original evidence within the existing sampling window;
 a mixed-time pool cannot supply an exact gap or teach a spell's timing.
 
+Forever's General tab offers **Show inferred Windfury icons**, disabled by
+default. It decorates only already-owned, unnamed direct physical extras
+after complete source accounting. The icon is an estimate; it does not set a
+damage spell ID or name. Existing skill-icon visibility settings still apply.
+
+The trial requires one same-frame Weapon or Totem signal, a single target
+lifetime, spent native/Stormstrike reservations, and fully accounted own
+confirmation slots. Exactly two residual Weapon outcomes or one Totem outcome
+are required. Misses count toward that capacity and retain their ordinary
+presentation. Combined signals, bleed applications, uncertain recipients,
+ambiguous sources, incomplete counts, and exceeded bounds remain undecorated.
+
+Possible proc numbers wait for completion for at most 1.6 seconds. Complete
+sources release early; an incomplete source releases the same owned records
+without inferred icons. Inferred and plain batches stay separate and avoid a
+second proc-collection delay. Profile changes flush pending records plain;
+world/engine resets cancel old work under the existing lifecycle rules.
+The production stage preserves opaque amounts, ownership, spell IDs, crits,
+and event settings. It runs independently of diagnostic capture.
+
 The Forever reader requires confirmation once its dedicated filter is ready,
 including before the first log line. Unused direct confirmations following
 a melee swing or known physical ability can support delayed weapon-proc
@@ -182,8 +202,12 @@ windows before the matcher spends a reservation and explain whether it was
 already used, eligible, early, or late. Reading these checks does not change
 the windows, learned timing, ownership, or reservation budgets.
 
-This first experiment changes no damage ownership, names, icons, values, or
-display timing. The ledger stores public metadata only and runs only during
+The accounting ledger changes no damage ownership, names, icons, values, or
+display timing. It stores public metadata only and runs only during
 capture. World entry clears its state; stopping capture or the combat engine
-disables receipts. `Combat/SwingAccounting.lua` remains outside release
+disables diagnostic receipts. `Combat/SwingAccounting.lua` remains outside release
 manifests and packaging, alongside the other optional diagnostics.
+The icon trial has its own receipt flag, so stopping capture does not disable
+it. `Combat/WindfuryInference.lua` is a production manifest dependency.
+Windfury reports expose `inferredIcon=8232` separately from the unchanged
+`identity` field when an inferred icon is handed to presentation.

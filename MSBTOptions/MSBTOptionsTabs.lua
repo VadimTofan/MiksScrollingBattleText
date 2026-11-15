@@ -20,6 +20,7 @@ local DisableControls = MSBTPopups.DisableControls
 local fonts = MSBTMedia.fonts
 
 local IsClassic = MikSBT.Compatibility.Client.isClassicContent
+local IsForever = MikSBT.Compatibility.Client.isForever
 
 
 
@@ -136,6 +137,10 @@ GeneralTab_Populate = function()
 	controls.enableNamesCheckbox:SetChecked(not currentProfile.hideSkills)
 	controls.enableIconsCheckbox:SetChecked(not currentProfile.skillIconsDisabled)
 	controls.blizzardDamageCheckbox:SetChecked(currentProfile.blizzardDamageEnabled)
+	if controls.inferredWindfuryIconsCheckbox then
+		controls.inferredWindfuryIconsCheckbox:SetChecked(
+			currentProfile.inferredWindfuryIcons == true)
+	end
 	for _, side in ipairs({ "msbt", "blizzard" }) do
 		for _, category in ipairs({ "Outgoing", "Notifications", "Incoming" }) do
 			controls[side .. category .. "Checkbox"]:SetChecked(
@@ -251,6 +256,18 @@ local function GeneralTab_Create()
 			end)
 			controls[side .. category.name .. "Checkbox"] = control
 		end
+	end
+
+	if IsForever then
+		checkbox = MSBTControls.CreateCheckbox(tabFrame)
+		objLocale = L.CHECKBOXES["inferredWindfuryIcons"]
+		checkbox:Configure(28, objLocale.label, objLocale.tooltip)
+		checkbox:SetPoint("TOPLEFT", controls.msbtIncomingCheckbox,
+			"BOTTOMLEFT", 0, -10)
+		checkbox:SetClickHandler(function(_, isChecked)
+			MSBTProfiles.SetOption(nil, "inferredWindfuryIcons", isChecked)
+		end)
+		controls.inferredWindfuryIconsCheckbox = checkbox
 	end
 
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)

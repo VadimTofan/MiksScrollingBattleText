@@ -37,6 +37,7 @@ Combat\SpellCatalog.lua
 Combat\Mine.lua
 Combat\Spells.lua
 Combat\Healing.lua
+Combat\WindfuryInference.lua
 Combat\Reader.lua
 Components\CombatLogFilter.lua
 Components\CombatPresentation.lua

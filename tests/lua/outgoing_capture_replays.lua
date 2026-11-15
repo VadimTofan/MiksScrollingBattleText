@@ -12,6 +12,7 @@ local Engine = dofile("Components/CombatEngine.lua")
 local Presentation = dofile("Components/CombatPresentation.lua")
 local Batcher = dofile("Components/OutgoingBatcher.lua")
 local ns = MikSBT.CombatEngine
+dofile("Combat/WindfuryInference.lua")
 local now, timers, records, displayed = 100, {}, {}, {}
 local forwarded = {}
 local targetExists = true
@@ -102,6 +103,7 @@ local presentation = Presentation:New({
     getProfile = function() return profile end,
 })
 local engine = Engine:New({
+    getProfile = function() return profile end,
     log = log, getSaved = function() return nil end,
     setSaved = function() end, notify = function() end,
     presentation = {
@@ -151,10 +153,11 @@ end
 local function Hit(amount, unit, school)
     Event("UNIT_COMBAT", unit or "target", "WOUND", "", amount, school or 1)
 end
-local function Start()
+local function Start(inferredIcons)
     if engine.active then engine:Stop() end
     now, timers, records, displayed = now + 10, {}, {}, {}
     forwarded = {}
+    profile.inferredWindfuryIcons = inferredIcons == true
     targetExists = true
     batcher:Reset()
     engine:Start()
@@ -186,6 +189,176 @@ local function Replay(name, test)
     local ok, failure = pcall(test)
     if not ok then failures[#failures + 1] = name .. ": " .. failure end
 end
+
+Replay("opt-in clean Windfury extras receive icons after full accounting", function()
+    for _, stacking in ipairs({ false, true }) do
+        -- Given a clean Weapon source with two owned extras before its normal.
+        local start = Start(true)
+        ns.mine.accountingEnabled = false
+        profile.stackSimilarHits = stacking
+        local first, second, normal = Amount(), Amount(), Amount()
+        Event("PLAYER_SWING", 3.2, 0)
+        Line("swing")
+        Line("spell")
+        Line("spell")
+        Event("SPELL_UPDATE_COOLDOWN", 439440)
+        Hit(first)
+        At(start + 0.216)
+        Hit(second)
+        At(start + 0.3)
+
+        -- Then early candidates wait for the still-unresolved normal swing.
+        assert(Displayed(first) == 0 and Displayed(second) == 0,
+            "early inferred candidates escaped before normal accounting")
+
+        -- When the ordinary swing arrives within its existing window.
+        At(start + 0.585)
+        Hit(normal)
+        At(start + 0.8)
+
+        -- Then both extras retain their amounts and gain only inferred icons.
+        for _, amount in ipairs({ first, second }) do
+            assert(Displayed(amount) == 1,
+                "clean inferred extra did not reach output exactly once")
+            local icon
+            for _, output in ipairs(displayed) do
+                if output.amount == amount then icon = output.icon end
+            end
+            assert(icon == "icon-8232", "clean inferred WF icon is missing")
+            assert(Record(amount).spell == nil and Record(amount).procSpell == nil)
+        end
+        assert(Record(normal).melee and Displayed(normal) == 1)
+        profile.stackSimilarHits = true
+    end
+end)
+
+Replay("profile changes release pending inferred numbers without icons", function()
+    -- Given one owned extra waiting in an enabled profile's incomplete burst.
+    local start = Start(true)
+    profile.stackSimilarHits = false
+    local first = Amount()
+    Event("PLAYER_SWING", 3.2, 0)
+    Line("swing")
+    Line("spell")
+    Line("spell")
+    Event("SPELL_UPDATE_COOLDOWN", 439440)
+    Hit(first)
+    At(start + 0.1)
+    assert(Displayed(first) == 0)
+
+    -- When another enabled profile replaces it before the burst completes.
+    profile = { events = profile.events, stackSimilarHits = false,
+        inferredWindfuryIcons = true }
+    Event("PLAYER_REGEN_ENABLED")
+    At(start + 0.2)
+
+    -- Then the old profile's amount is released once with no inferred icon.
+    assert(Displayed(first) == 1, "profile change kept an old inference pending")
+    for _, output in ipairs(displayed) do
+        if output.amount == first then assert(output.icon == nil) end
+    end
+    At(start + 3)
+    assert(Displayed(first) == 1, "stale profile callback repeated an amount")
+    profile.stackSimilarHits = true
+end)
+
+Replay("queued callbacks cannot infer icons across an enabled profile switch", function()
+    -- Given a complete Stormstrike/Weapon frame awaiting its frame callbacks.
+    local start = Start(true)
+    profile.stackSimilarHits = false
+    local strike, first, second = Amount(), Amount(), Amount()
+    Event("UNIT_SPELLCAST_SENT", "player", nil, "profile-race-strike", 17364)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "profile-race-strike", 17364)
+    for _ = 1, 3 do Line("spell") end
+    Event("SPELL_UPDATE_COOLDOWN", 439440)
+    Hit(strike)
+    Hit(first)
+    Hit(second)
+
+    -- When an enabled replacement profile arrives before any new reader event.
+    profile = { events = profile.events, stackSimilarHits = false,
+        inferredWindfuryIcons = true }
+    At(start + 0.2)
+
+    -- Then callbacks release old amounts without crossing the profile boundary.
+    for _, amount in ipairs({ strike, first, second }) do
+        assert(Displayed(amount) == 1)
+        for _, output in ipairs(displayed) do
+            if output.amount == amount then
+                assert(output.icon ~= "icon-8232",
+                    "old callback inferred damage under a replacement profile")
+            end
+        end
+    end
+    profile.stackSimilarHits = true
+end)
+
+Replay("incomplete and conflicting inferred bursts keep their plain output", function()
+    for _, scenario in ipairs({ "one-extra", "missing-normal", "no-signal",
+        "both-signals", "bleed-application" }) do
+        -- Given an incomplete or conflicting source with owned physical extras.
+        local start = Start(true)
+        profile.stackSimilarHits = true
+        local first, second, normal = Amount(), Amount(), Amount()
+        Event("PLAYER_SWING", 3.2, 0)
+        Line("swing")
+        Line("spell")
+        Line("spell")
+        if scenario ~= "no-signal" then Event("SPELL_UPDATE_COOLDOWN", 439440) end
+        if scenario == "both-signals" then Event("SPELL_UPDATE_COOLDOWN", 10610) end
+        if scenario == "bleed-application" then
+            Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 21949)
+        end
+
+        -- When its available reports arrive and the bounded check expires.
+        At(start + 0.216)
+        Hit(first)
+        if scenario ~= "one-extra" then
+            At(start + 0.252)
+            Hit(second)
+        end
+        if scenario ~= "missing-normal" then
+            At(start + 0.585)
+            Hit(normal)
+        end
+        At(start + 1.7)
+
+        -- Then no icon is guessed and no owned amount is lost or delayed twice.
+        assert(Displayed(first) == 1, scenario .. " lost its first plain extra")
+        if scenario ~= "one-extra" then assert(Displayed(second) == 1) end
+        for _, output in ipairs(displayed) do
+            assert(output.icon ~= "icon-8232", scenario .. " inferred an unsafe icon")
+        end
+        At(start + 3)
+        assert(Displayed(first) == 1)
+    end
+end)
+
+Replay("disabling inferred icons flushes pending owned numbers plain", function()
+    -- Given an owned extra whose clean source has not completed.
+    local start = Start(true)
+    profile.stackSimilarHits = false
+    local first = Amount()
+    Event("PLAYER_SWING", 3.2, 0)
+    Line("swing")
+    Line("spell")
+    Line("spell")
+    Event("SPELL_UPDATE_COOLDOWN", 439440)
+    Hit(first)
+    At(start + 0.1)
+
+    -- When the setting is disabled while combat remains active.
+    profile.inferredWindfuryIcons = false
+    Event("PLAYER_REGEN_ENABLED")
+    At(start + 0.2)
+
+    -- Then the exact amount is released without an icon or a stale replay.
+    assert(Displayed(first) == 1 and not ns.mine.inferredWindfuryEnabled)
+    for _, output in ipairs(displayed) do assert(output.icon == nil) end
+    At(start + 3)
+    assert(Displayed(first) == 1)
+    profile.stackSimilarHits = true
+end)
 
 Replay("captured Stormstrike-triggered delayed physical reports", function()
     -- Given a native swing and its captured normal impact at +0.429 seconds.

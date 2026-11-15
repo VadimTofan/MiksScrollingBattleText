@@ -2,6 +2,15 @@ local OutgoingBatcher = {}
 OutgoingBatcher.__index = OutgoingBatcher
 local WINDFURY_WEAPON_SPELL_ID = 8232
 local WINDFURY_GROUP_DELAY = 1
+local RestrictedValue = MikSBT.API and MikSBT.API.RestrictedValue
+
+local function InferenceGroup(value)
+	if type(value) ~= "string" then return end
+	local group = RestrictedValue and RestrictedValue.String
+		and RestrictedValue:String(value)
+	if not RestrictedValue and type(value) == "string" then group = value end
+	if group and #group > 0 and #group <= 80 then return group end
+end
 
 function OutgoingBatcher:New(config)
 	return setmetatable({
@@ -152,11 +161,12 @@ function OutgoingBatcher:DisplayRestricted(
 	isDot,
 	eventKey,
 	school,
-	candidateSpell
+	candidateSpell,
+	inferenceGroup
 )
 	if self:ShouldStackWindfury(spellID, isPet, isDot, candidateSpell) then
 		self:Queue(spellID, amount, isCrit, effectTexture, forceIsSpell,
-			isPet, isDot, eventKey, true, school, candidateSpell)
+			isPet, isDot, eventKey, true, school, candidateSpell, inferenceGroup)
 		return
 	end
 	if not effectTexture and not isDot and not eventKey then
@@ -186,7 +196,8 @@ function OutgoingBatcher:Queue(
 	eventKey,
 	isRestricted,
 	school,
-	candidateSpell
+	candidateSpell,
+	inferenceGroup
 )
 	if not isRestricted and (not amount or amount <= 0) then
 		return
@@ -204,12 +215,14 @@ function OutgoingBatcher:Queue(
 
 	local stackWindfury = self:ShouldStackWindfury(
 		spellID, isPet, isDot, candidateSpell)
+	inferenceGroup = InferenceGroup(inferenceGroup)
 	local batchKey = (isPet and "pet:" or "") .. (isDot and "dot:" or "")
 		.. tostring(spellID or 0) .. (isCrit and ":crit" or "")
 	if stackWindfury then batchKey = batchKey .. ":stacked" end
 	if candidateSpell then
 		batchKey = batchKey .. ":candidate:" .. candidateSpell
 	end
+	if inferenceGroup then batchKey = batchKey .. ":inference:" .. inferenceGroup end
 	if eventKey then batchKey = eventKey .. ":" .. batchKey end
 	if school then batchKey = batchKey .. ":school:" .. school end
 	local batch = self.batches[batchKey]
@@ -232,7 +245,8 @@ function OutgoingBatcher:Queue(
 			amounts = stackWindfury and {} or nil,
 		}
 		self.batches[batchKey] = batch
-		local delay = stackWindfury and WINDFURY_GROUP_DELAY or self.config.delay
+		local delay = inferenceGroup and 0
+			or (stackWindfury and WINDFURY_GROUP_DELAY or self.config.delay)
 		self.config.after(delay, function()
 			if self.batches[batchKey] == batch then
 				self:Flush(batchKey)

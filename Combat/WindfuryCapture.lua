@@ -69,8 +69,12 @@ function Capture:AccountingOutcome(record)
 end
 
 function Capture:AccountingChecks(record)
-    if not self.ledger then return end
     local entry = self.model:Lookup(record)
+    if entry then
+        local marker = RV:Number(record.inferredWindfuryIcon)
+        entry.inferredIcon = marker == 8232 and marker or nil
+    end
+    if not self.ledger then return end
     local metadata = RV:Table(record.accounting)
     local checks = metadata and RV:Table(metadata.swingChecks)
     if not entry or not checks then return end

@@ -157,3 +157,29 @@ assert(#outputs == beforeCount + 1
 	and displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
 	and displayed[2] == "secret",
 	"restricted skill crit was suppressed when skill hits were disabled")
+
+-- Describe: settled inferred icons cannot decorate another candidate batch.
+-- Given a plain candidate and a separately validated inferred candidate.
+batcher:Reset()
+callbacks, outputs = {}, {}
+local delays = {}
+profile.stackSimilarHits = true
+profile.events.OUTGOING_SPELL_DAMAGE.disabled = nil
+batcher.config.after = function(delay, callback)
+	delays[#delays + 1] = delay
+	callbacks[#callbacks + 1] = callback
+end
+batcher:Queue(nil, 10, false, nil, true, false, false,
+	"OUTGOING_SPELL_DAMAGE", nil, 1, 8232)
+batcher:Queue(nil, 20, false, "wf-icon", true, false, false,
+	"OUTGOING_SPELL_DAMAGE", nil, 1, 8232, "wf:validated")
+
+-- When both groups reach their own output timers.
+for _, callback in ipairs(callbacks) do callback() end
+
+-- Then inferred and plain numbers keep separate icons and no double wait.
+assert(#outputs == 2, "inferred and undecorated candidates merged")
+assert(outputs[1][2] == "10" and outputs[1][3] == nil)
+assert(outputs[2][2] == "20" and outputs[2][3] == "wf-icon")
+assert(delays[1] == 1 and delays[2] == 0,
+	"settled inference group waited through a second proc collection window")

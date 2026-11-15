@@ -479,4 +479,28 @@ assert(stopped == "stopped", "capture changed the engine stop return")
 assert(not capture.active and not ns.mine.accountingEnabled,
     "engine stop left experimental accounting active")
 assert(ns.traceCombat == nil and capture.model.accounting == actualLedger)
+-- Describe: inferred presentation icons remain separate from spell identity.
+capture:Start()
+capture.model:Swing(now, "target1", 0, true)
+for _, marker in ipairs({ 8232, opaque }) do
+    -- Given an unnamed owned report with a public or unreadable icon marker.
+    local record = { event = "damage", school = 1, amount = opaque,
+        result = { who = "you" }, inferredWindfuryIcon = marker }
+    ns.traceCombat("report", { record = record, at = now,
+        key = "target1", unit = "target" })
+
+    -- When the capture observes its presentation handoff.
+    Presentation:Out(record)
+
+    -- Then public inference is recorded without manufacturing a spell ID.
+    local entry = capture.model:Lookup(record)
+    assert(entry.spell == nil and entry.procSpell == nil)
+    if marker == 8232 then
+        assert(entry.inferredIcon == 8232, "inferred icon marker was not captured")
+        assert(capture.model:ReportText():find("inferredIcon=8232", 1, true))
+    else
+        assert(entry.inferredIcon == nil, "unreadable icon marker entered the report")
+    end
+end
+capture:Stop()
 print("Windfury capture pipeline tests passed")
