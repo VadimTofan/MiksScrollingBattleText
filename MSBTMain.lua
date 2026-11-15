@@ -771,7 +771,8 @@ if Client.isMainline or Client.isForever then
 				messageOverride or settings.message or "",
 				record.amount, record.school,
 				nil, nil, nil, name, nil, effect,
-				nil, nil, useEventColor, hideSkills
+				Formatter:FormatBlockedTrailer(record), nil, useEventColor,
+				hideSkills
 			)
 			message = CleanupActionMessage(message)
 			if record.hitCount and record.hitCount > 1
@@ -780,6 +781,9 @@ if Client.isMainline or Client.isForever then
 					.. (L.MSG_HITS or "Hits") .. "]"
 			end
 			return message
+		end,
+		formatBlockedTrailer = function(record)
+			return Formatter:FormatBlockedTrailer(record)
 		end,
 		displayHeal = function(settings, amount, healer, icon, message)
 			-- Public formatting leaves \002 for the healer and %a for the amount.

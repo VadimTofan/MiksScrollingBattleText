@@ -102,3 +102,37 @@ assert(baseline == "Hit |cFFff00004.5k|r",
 assert(hiddenTemplate == "Hit |cFFff0000%s|r",
 	"legacy disabled flags suppressed hidden school coloring")
 assert(Formatter:ColorDamageAmount("42", 999) == "42")
+
+-- Describe: a partial effect's trailer.
+-- Given the Block partial effect's text and color.
+local block = { trailer = " <%a blocked>", colorR = 0.5, colorG = 0, colorB = 1 }
+profile.shortenNumbers = false
+profile.partialColoringDisabled = false
+
+-- When a known and an unknown amount are formatted.
+-- Then the known amount is shown, and the unknown one drops its number.
+assert(Formatter:FormatPartialTrailer(block, 4500)
+	== "|cFF7f00ff <4,500 blocked>|r", "a blocked amount lost its trailer")
+assert(Formatter:FormatPartialTrailer(block, nil)
+	== "|cFF7f00ff <blocked>|r", "an unknown amount kept its placeholder")
+
+-- Given partial coloring off, and then the partial effect itself off.
+profile.partialColoringDisabled = true
+-- Then the trailer is plain, and then empty.
+assert(Formatter:FormatPartialTrailer(block, 12) == " <12 blocked>")
+block.disabled = true
+assert(Formatter:FormatPartialTrailer(block, 12) == "",
+	"a disabled partial effect was still shown")
+
+-- Given the profile's Block partial effect.
+block.disabled = nil
+profile.block = block
+-- When combat engine records are formatted.
+-- Then only a partly blocked hit has a trailer, and none while Block is off.
+assert(Formatter:FormatBlockedTrailer({ blocked = true, blockedAmount = 3 })
+	== " <3 blocked>", "a partly blocked record lost its trailer")
+assert(Formatter:FormatBlockedTrailer({ amount = 3 }) == nil,
+	"an unblocked record gained a trailer")
+block.disabled = true
+assert(Formatter:FormatBlockedTrailer({ blocked = true }) == nil,
+	"a disabled Block partial effect was still shown")

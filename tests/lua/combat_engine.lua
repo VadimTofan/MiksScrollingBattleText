@@ -220,6 +220,50 @@ assert(#incoming == 3 and incoming[1].amount == 50)
 assert(incoming[2].event == "heal" and incoming[2].crit)
 assert(incoming[3].pet)
 
+-- Describe: a partly blocked hit on you carries the amount blocked.
+do
+    local blockSecretCheck, hiddenBlock = issecretvalue, {}
+    local shieldBlock = 25
+    GetShieldBlock = function() return shieldBlock end
+    local function Hit(unit, flag)
+        Event("UNIT_COMBAT", unit, "WOUND", flag, 30, 1)
+        return incoming[#incoming]
+    end
+
+    -- Given your shield block value read out of combat.
+    -- When a hit on you is partly blocked.
+    local blocked = Hit("player", "BLOCK_REDUCED")
+    -- Then it is marked blocked with that value.
+    assert(blocked.blocked and blocked.blockedAmount == 25,
+        "a partial block lost its blocked amount")
+
+    -- Given the value hidden in combat after it was read.
+    issecretvalue = function(value) return value == hiddenBlock end
+    shieldBlock = hiddenBlock
+    -- When the next hit is partly blocked.
+    blocked = Hit("player", "BLOCK_REDUCED")
+    -- Then the last value read is kept.
+    assert(blocked.blocked and blocked.blockedAmount == 25,
+        "a hidden shield block value dropped the last one read")
+
+    -- Given an unblocked hit on you and a partly blocked hit on your pet.
+    -- Then neither takes your shield block value.
+    assert(not Hit("player", "").blocked, "an unblocked hit was marked blocked")
+    assert(not Hit("pet", "BLOCK_REDUCED").blocked,
+        "your shield block went to your pet's block")
+
+    -- Given no value ever read (a reader started in combat).
+    MikSBT.CombatEngine.reader.shieldBlock = nil
+    -- When a hit on you is partly blocked.
+    blocked = Hit("player", "BLOCK_REDUCED")
+    -- Then it is still marked blocked, without an amount.
+    assert(blocked.blocked and blocked.blockedAmount == nil,
+        "a partial block with an unknown amount was not marked")
+
+    issecretvalue = blockSecretCheck
+    GetShieldBlock = nil
+end
+
 -- Given a proc, combat entry and a spell that cannot deal damage.
 Event("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW", 101)
 Event("PLAYER_REGEN_DISABLED")

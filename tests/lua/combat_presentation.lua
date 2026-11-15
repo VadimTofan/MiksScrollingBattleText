@@ -140,3 +140,56 @@ assert(rendered[1][7] == 24 and rendered[2][7] == 48,
 assert(rendered[1][4] == 0 and rendered[1][5] == 1)
 assert(rendered[2][4] == 1 and rendered[2][5] == 0 and rendered[2][6] == 0,
 	"Finish Him did not use red text")
+
+-- Describe: a partly blocked hit on you shows the amount blocked.
+do
+	local shown, hidden, pending = {}, {}, {}
+	local function Trailer(record)
+		if not record.blocked then return nil end
+		return record.blockedAmount
+			and " <" .. record.blockedAmount .. " blocked>" or " <blocked>"
+	end
+	local blocking = Presentation:New({
+		getProfile = function()
+			return { events = { INCOMING_DAMAGE = { message = "-%a" } } }
+		end,
+		after = function(_, callback) pending[#pending + 1] = callback end,
+		formatBlockedTrailer = Trailer,
+		formatMessage = function(settings, record)
+			return settings.message:gsub("%%a", tostring(record.amount))
+				.. (Trailer(record) or "")
+		end,
+		display = function(_, message) shown[#shown + 1] = message end,
+		displayRestricted = function(...) hidden[#hidden + 1] = { ... } end,
+	})
+	local function Flush()
+		for _, callback in ipairs(pending) do callback() end
+		pending = {}
+	end
+
+	-- Given a hidden amount that was partly blocked.
+	-- When it is drawn.
+	blocking:In({ event = "damage", amount = secret, school = 1,
+		blocked = true, blockedAmount = 3 })
+	-- Then the trailer follows the hidden amount.
+	assert(hidden[1][2] == secret and hidden[1][5] == " <3 blocked>",
+		"a hidden partly blocked hit lost its trailer")
+
+	-- Given readable hits merged into one line, two of them partly blocked.
+	for _, blockedAmount in ipairs({ 3, false, 4 }) do
+		blocking:In({ event = "damage", amount = 10, school = 1,
+			blocked = blockedAmount and true or nil,
+			blockedAmount = blockedAmount or nil })
+	end
+	Flush()
+	-- Then the line keeps the total blocked.
+	assert(shown[1] == "-30 <7 blocked>", "merged hits lost their blocked total")
+
+	-- Given a merged line where one blocked amount is unknown.
+	blocking:In({ event = "damage", amount = 10, school = 1,
+		blocked = true, blockedAmount = 3 })
+	blocking:In({ event = "damage", amount = 10, school = 1, blocked = true })
+	Flush()
+	-- Then the total is not guessed.
+	assert(shown[2] == "-20 <blocked>", "a partly unknown total was guessed")
+end

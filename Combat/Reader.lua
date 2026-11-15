@@ -260,6 +260,20 @@ local function Describe(event, flag, amount, school)
 end
 ns.DescribeCombat = Describe
 
+-- A partly blocked hit on you (WOUND with flag BLOCK_REDUCED) reports only
+-- the damage taken. A partial block always stops exactly your shield block
+-- value (a hit it would stop whole is a full Block instead), so that is the
+-- amount blocked. GetShieldBlock is hidden in combat: the last value read
+-- out of combat is kept (at login, gear changes and the end of a fight).
+local SHIELD_BLOCK_SETTLE = 1 -- stats settle a moment after a gear change
+local function ReadShieldBlock()
+    if type(GetShieldBlock) ~= "function" then return end
+    local ok, value = pcall(GetShieldBlock)
+    if ok and ns.Number(value) then
+        reader.shieldBlock = value >= 1 and math.floor(value + 0.5) or nil
+    end
+end
+
 -- Ticks on you: a steady beat of one school and kind.
 local beats = {}
 local function Beat(kind, school, now)
@@ -294,6 +308,11 @@ local function OnUnitCombat(unit, event, flag, amount, school)
         end
         if record.event == "damage" or record.event == "heal" then
             record.tick = Beat((unit == "pet" and "pet" or "") .. record.event, record.school, now)
+        end
+        if unit == "player" and record.event == "damage"
+            and ns.Text(flag) and flag == "BLOCK_REDUCED" then
+            ReadShieldBlock()
+            record.blocked, record.blockedAmount = true, reader.shieldBlock
         end
         if record.event == "heal" then
             -- A heal can arrive before its cast succeeds in the same frame.
@@ -2334,6 +2353,8 @@ local function OnEvent(_, event, ...)
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
         local slot = ...
         if ns.Number(slot) and slot == RANGED_SLOT then UpdateWand() end
+        ReadShieldBlock()
+        C_Timer.After(SHIELD_BLOCK_SETTLE, ReadShieldBlock)
     elseif event == "SPELL_TEXT_UPDATE" then
         local spell = ...
         if ns.Number(spell) then ns.ForgetSpellFacts(spell) end
@@ -2352,6 +2373,7 @@ local function OnEvent(_, event, ...)
         OnCombat(true)
     elseif event == "PLAYER_REGEN_ENABLED" then
         OnCombat(false)
+        ReadShieldBlock()
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
         reader.windfuryCooldownFrame, reader.windfuryNoticeAt = nil, nil
@@ -2365,6 +2387,7 @@ local function OnEvent(_, event, ...)
         ns.mine = ns.NewMine(ns.Learned, ns.Learn, ns.SpellFacts)
         ns.ResetHealing()
         UpdateWand()
+        ReadShieldBlock()
         FindTargetPlate()
     end
 end
@@ -2390,6 +2413,7 @@ end
 
 function ns.StartReader()
     ResetReader()
+    ReadShieldBlock()
     ns.mine = ns.NewMine(ns.Learned, ns.Learn, ns.SpellFacts)
     local frame = reader.frame or CreateFrame("Frame")
     -- Event availability differs between Retail and Classic clients.
