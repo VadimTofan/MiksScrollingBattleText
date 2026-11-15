@@ -1,18 +1,7 @@
--- Describe: inferred Windfury is an explicit, experimental Forever option.
+-- Describe: inferred Windfury is baseline behavior without a General toggle.
 MikSBT = { translations = {} }
 dofile("MSBTOptions/Localization/localization.lua")
 local translations = MikSBT.translations
-
--- Given the English option text displayed in General.
-local locale = translations.CHECKBOXES.inferredWindfuryIcons
-
--- When its label and tooltip are shown.
--- Then the wording distinguishes estimates and leaves ambiguity visible.
-assert(locale, "inferred Windfury option text is missing")
-assert(locale.label == "Show inferred Windfury icons")
-assert(locale.tooltip:find("[Ee]xperimental"))
-assert(locale.tooltip:find("estimated Windfury", 1, true))
-assert(locale.tooltip:find("[Aa]mbiguous hits stay without an icon"))
 
 local function Noop() end
 local function NewControl()
@@ -63,56 +52,13 @@ for _, forever in ipairs({ true, false }) do
     setfenv(build, environment)
     local create, populate = build()
 
-    -- When General opens with the default preference.
+    -- When General opens with an old disabled preference.
     create()
     populate()
     local checkbox = frame.controls.inferredWindfuryIconsCheckbox
 
-    -- Then the trial is offered only on Forever and starts unchecked.
-    if forever then
-        assert(checkbox, "Forever has no inferred Windfury checkbox")
-        assert(checkbox.checked == false)
-        assert(checkbox.label == locale.label)
-        assert(checkbox.tooltip == locale.tooltip)
-
-        -- When the user enables the trial.
-        checkbox.click(checkbox, true)
-        populate()
-
-        -- Then only the explicit icon preference is enabled.
-        assert(profile.inferredWindfuryIcons == true)
-        assert(checkbox.checked == true)
-        assert(#savedKeys == 1 and savedKeys[1] == "inferredWindfuryIcons")
-        assert(profile.skillIconsDisabled == nil)
-
-        -- Given another profile has never opted into the trial.
-        profiles.currentProfile = { animationSpeed = 100 }
-
-        -- When General refreshes after the profile switch.
-        populate()
-
-        -- Then the previous profile's opt-in does not carry over.
-        assert(checkbox.checked == false)
-        assert(profile.inferredWindfuryIcons == true)
-
-        -- Given a malformed saved value is not an explicit opt-in.
-        profiles.currentProfile.inferredWindfuryIcons = "true"
-        -- When its settings populate.
-        populate()
-        -- Then it remains unchecked.
-        assert(checkbox.checked == false)
-
-        -- Given the original profile is selected again.
-        profiles.currentProfile = profile
-        -- When the user turns the trial off.
-        checkbox.click(checkbox, false)
-        populate()
-        -- Then the preference is false and the checkbox is unchecked.
-        assert(profile.inferredWindfuryIcons == false)
-        assert(checkbox.checked == false)
-    else
-        assert(checkbox == nil,
-            "unsupported client offered the Forever icon trial")
-        assert(#savedKeys == 0)
-    end
+    -- Then General exposes no retired inference toggle on either client.
+    assert(checkbox == nil, "General still offers inferred Windfury icons")
+    assert(translations.CHECKBOXES.inferredWindfuryIcons == nil)
+    assert(#savedKeys == 0)
 end

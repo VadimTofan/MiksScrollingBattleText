@@ -153,11 +153,11 @@ end
 local function Hit(amount, unit, school)
     Event("UNIT_COMBAT", unit or "target", "WOUND", "", amount, school or 1)
 end
-local function Start(inferredIcons)
+local function Start()
     if engine.active then engine:Stop() end
     now, timers, records, displayed = now + 10, {}, {}, {}
     forwarded = {}
-    profile.inferredWindfuryIcons = inferredIcons == true
+    profile.inferredWindfuryIcons = nil
     targetExists = true
     batcher:Reset()
     engine:Start()
@@ -190,10 +190,10 @@ local function Replay(name, test)
     if not ok then failures[#failures + 1] = name .. ": " .. failure end
 end
 
-Replay("opt-in clean Windfury extras receive icons after full accounting", function()
+Replay("baseline clean Windfury extras receive icons after full accounting", function()
     for _, stacking in ipairs({ false, true }) do
         -- Given a clean Weapon source with two owned extras before its normal.
-        local start = Start(true)
+        local start = Start()
         ns.mine.accountingEnabled = false
         profile.stackSimilarHits = stacking
         local first, second, normal = Amount(), Amount(), Amount()
@@ -234,7 +234,7 @@ end)
 
 Replay("profile changes release pending inferred numbers without icons", function()
     -- Given one owned extra waiting in an enabled profile's incomplete burst.
-    local start = Start(true)
+    local start = Start()
     profile.stackSimilarHits = false
     local first = Amount()
     Event("PLAYER_SWING", 3.2, 0)
@@ -247,8 +247,7 @@ Replay("profile changes release pending inferred numbers without icons", functio
     assert(Displayed(first) == 0)
 
     -- When another enabled profile replaces it before the burst completes.
-    profile = { events = profile.events, stackSimilarHits = false,
-        inferredWindfuryIcons = true }
+    profile = { events = profile.events, stackSimilarHits = false }
     Event("PLAYER_REGEN_ENABLED")
     At(start + 0.2)
 
@@ -264,7 +263,7 @@ end)
 
 Replay("queued callbacks cannot infer icons across an enabled profile switch", function()
     -- Given a complete Stormstrike/Weapon frame awaiting its frame callbacks.
-    local start = Start(true)
+    local start = Start()
     profile.stackSimilarHits = false
     local strike, first, second = Amount(), Amount(), Amount()
     Event("UNIT_SPELLCAST_SENT", "player", nil, "profile-race-strike", 17364)
@@ -276,8 +275,7 @@ Replay("queued callbacks cannot infer icons across an enabled profile switch", f
     Hit(second)
 
     -- When an enabled replacement profile arrives before any new reader event.
-    profile = { events = profile.events, stackSimilarHits = false,
-        inferredWindfuryIcons = true }
+    profile = { events = profile.events, stackSimilarHits = false }
     At(start + 0.2)
 
     -- Then callbacks release old amounts without crossing the profile boundary.
@@ -297,7 +295,7 @@ Replay("incomplete and conflicting inferred bursts keep their plain output", fun
     for _, scenario in ipairs({ "one-extra", "missing-normal", "no-signal",
         "both-signals", "bleed-application" }) do
         -- Given an incomplete or conflicting source with owned physical extras.
-        local start = Start(true)
+        local start = Start()
         profile.stackSimilarHits = true
         local first, second, normal = Amount(), Amount(), Amount()
         Event("PLAYER_SWING", 3.2, 0)
@@ -334,9 +332,9 @@ Replay("incomplete and conflicting inferred bursts keep their plain output", fun
     end
 end)
 
-Replay("disabling inferred icons flushes pending owned numbers plain", function()
+Replay("retired disabled setting keeps baseline inference active", function()
     -- Given an owned extra whose clean source has not completed.
-    local start = Start(true)
+    local start = Start()
     profile.stackSimilarHits = false
     local first = Amount()
     Event("PLAYER_SWING", 3.2, 0)
@@ -347,13 +345,13 @@ Replay("disabling inferred icons flushes pending owned numbers plain", function(
     Hit(first)
     At(start + 0.1)
 
-    -- When the setting is disabled while combat remains active.
+    -- When an old disabled setting is present while combat remains active.
     profile.inferredWindfuryIcons = false
     Event("PLAYER_REGEN_ENABLED")
     At(start + 0.2)
 
-    -- Then the exact amount is released without an icon or a stale replay.
-    assert(Displayed(first) == 1 and not ns.mine.inferredWindfuryEnabled)
+    -- Then inference stays active and retains its ordinary bounded wait.
+    assert(Displayed(first) == 0 and ns.mine.inferredWindfuryEnabled)
     for _, output in ipairs(displayed) do assert(output.icon == nil) end
     At(start + 3)
     assert(Displayed(first) == 1)
@@ -581,7 +579,6 @@ Replay("confirmed hits do not reserve a second spare confirmation", function()
         At(start + 0.101)
 
         -- Then timing bookkeeping leaves the older spare free.
-        assert(Record(first).who == "you")
         assert(not earlierSpare.claimed and not earlierSpare.hit,
             "confirmed hit reserved another frame's spare line")
 

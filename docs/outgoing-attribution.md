@@ -68,12 +68,12 @@ retains legacy timing association; an explicit missing context suppresses it.
 Timing samples use the original evidence within the existing sampling window;
 a mixed-time pool cannot supply an exact gap or teach a spell's timing.
 
-Forever's General tab offers **Show inferred Windfury icons**, disabled by
-default. It decorates only already-owned, unnamed direct physical extras
+Forever automatically shows inferred Windfury icons without a General
+checkbox. It decorates only already-owned, unnamed direct physical extras
 after complete source accounting. The icon is an estimate; it does not set a
 damage spell ID or name. Existing skill-icon visibility settings still apply.
 
-The trial requires one same-frame Weapon or Totem signal, a single target
+Inference requires one same-frame Weapon or Totem signal, a single target
 lifetime, spent native/Stormstrike reservations, and fully accounted own
 confirmation slots. Exactly two residual Weapon outcomes or one Totem outcome
 are required. Misses count toward that capacity and retain their ordinary

@@ -464,7 +464,6 @@ function Presentation:Out(record)
 		local profile = self.config.getProfile and self.config.getProfile()
 		if inferenceGroup and client and client.isForever
 			and RestrictedValue:Table(profile)
-			and RestrictedValue:Boolean(profile.inferredWindfuryIcons) == true
 			and RestrictedValue:Number(record.inferredWindfuryIcon) == 8232 then
 			icon = self.config.getSpellTexture(8232)
 		end

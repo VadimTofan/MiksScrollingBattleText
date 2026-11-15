@@ -153,12 +153,6 @@ obj["currencyGains"]			= { label="Currency Gains", tooltip="Display notification
 obj["alwaysShowQuestItems"]		= { label="Always show quest items", tooltip="Always show quest items regardless of quality selections."}
 obj["enableIcons"]				= { label="Enable Skill Icons", tooltip="Displays icons for events that have a skill when possible."}
 obj["enableNames"]				= { label="Enable Skill Names", tooltip="Display skill names for incoming and outgoing events."}
-obj["inferredWindfuryIcons"] = {
-	label = "Show inferred Windfury icons",
-	tooltip = "Experimental: show estimated Windfury icons for clean " ..
-		"extra physical hits on Forever. Possible proc numbers may wait up to " ..
-		"1.6 seconds for checks. Ambiguous hits stay without an icon.",
-}
 
 
 

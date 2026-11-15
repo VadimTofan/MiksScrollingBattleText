@@ -3,16 +3,16 @@ import unittest
 from tests.lua_test_runner import run_lua_test
 
 
-# Describe: the optional inferred Windfury icon preference.
+# Describe: baseline inferred Windfury icons.
 class InferredWindfuryOptionsTests(unittest.TestCase):
-    def test_general_checkbox_saves_and_refreshes_only_on_forever(self):
+    def test_general_has_no_inferred_windfury_checkbox(self):
         # Given the real General tab controls and English option text.
         script_name = "inferred_windfury_controls.lua"
 
-        # When the preference is toggled and a different profile is selected.
+        # When General is created and populated on both clients.
         result = run_lua_test(script_name)
 
-        # Then the checkbox reflects the active preference on Forever only.
+        # Then the retired checkbox and its locale text are absent.
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
 

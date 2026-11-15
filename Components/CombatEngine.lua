@@ -13,8 +13,7 @@ function Engine:InferenceEnabled()
 	if not client or not client.isForever or not self.config.getProfile
 		or not RestrictedValue then return false end
 	local profile = RestrictedValue:Table(self.config.getProfile())
-	return profile and RestrictedValue:Boolean(profile.inferredWindfuryIcons) == true
-		or false, profile
+	return profile ~= nil, profile
 end
 
 function Engine:UpdateInference()

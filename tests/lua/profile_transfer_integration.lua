@@ -97,14 +97,14 @@ for _, classic in ipairs({ false, true }) do
 
 	-- Given defaults on either client branch and an existing saved profile.
 	local defaults = profiles.masterProfile
-	assert(defaults.inferredWindfuryIcons == false,
-		"inferred Windfury icons are not disabled by default")
+	assert(defaults.inferredWindfuryIcons == nil,
+		"retired inferred Windfury preference remains in defaults")
 	profiles.savedVariables.profiles.InferredLegacy = {
 		creationVersion = "12.035.0",
 	}
 	profiles.SelectProfile("InferredLegacy")
-	assert(profiles.currentProfile.inferredWindfuryIcons == false,
-		"an existing profile implicitly opted into inferred Windfury icons")
+	assert(profiles.currentProfile.inferredWindfuryIcons == nil,
+		"existing profile inherited a retired preference")
 	profiles.SelectProfile("Default")
 	assert(defaults.lowHealthSoundDisabled == false,
 		"low-health sounds are not enabled by default")
@@ -275,7 +275,6 @@ for _, classic in ipairs({ false, true }) do
 	profiles.SetOption("events.INCOMING_DAMAGE", "soundFile", 5678901)
 	profiles.SetOption(nil, "lowHealthSoundDisabled", true)
 	profiles.SetOption(nil, "lowManaSoundDisabled", false)
-	profiles.SetOption(nil, "inferredWindfuryIcons", true)
 	local exported, errorCode = profiles.ExportProfile("Default")
 
 	-- Then both complete client schemas can be exported.
@@ -353,8 +352,8 @@ assert(profiles.currentProfile.events.PET_OUTGOING_DAMAGE.scrollArea == "Outgoin
 assert(profiles.currentProfile.events.INCOMING_DAMAGE.soundFile == 5678901)
 assert(profiles.currentProfile.lowHealthSoundDisabled == true)
 assert(profiles.currentProfile.lowManaSoundDisabled == false)
-assert(profiles.currentProfile.inferredWindfuryIcons == true,
-	"profile transfer lost the explicit inferred Windfury opt-in")
+assert(profiles.currentProfile.inferredWindfuryIcons == nil,
+	"profile transfer restored a retired preference")
 assert(profiles.currentProfile.partialColoringDisabled)
 assert(profiles.currentProfile.auraTracking["1459"] == false)
 assert(profiles.currentProfile.auraTracking["17"] == true)
@@ -378,38 +377,6 @@ local combatName = assert(profiles.ImportProfile(combatExport, "Combat toggles")
 assert(combatName == "Combat toggles")
 assert(profiles.currentProfile.blizzardDamageEnabled == false,
 	"profile transfer lost the Blizzard damage preference")
-
--- Describe: inferred Windfury icons require a boolean, portable opt-in.
--- Given a profile that opted into inferred icons and then disabled them.
-profiles.SetOption(nil, "inferredWindfuryIcons", false)
-local inferredExport = assert(profiles.ExportProfile("Combat toggles"))
-
--- When the disabled preference is transferred to another profile.
-local inferredName = assert(profiles.ImportProfile(
-	inferredExport, "Inferred icons disabled"))
-
--- Then false survives export/import and becomes the active preference.
-assert(inferredName == "Inferred icons disabled")
-assert(profiles.currentProfile.inferredWindfuryIcons == false)
-
--- Given malformed saved values that are not a boolean opt-in.
-for _, value in ipairs({ "true", 1, {} }) do
-	profiles.currentProfile.inferredWindfuryIcons = value
-
-	-- When the real profile schema validates an export.
-	local invalid, invalidError = profiles.ExportProfile(inferredName)
-
-	-- Then malformed preferences are rejected before they can be imported.
-	assert(invalid == nil and invalidError == "INVALID_DATA",
-		"profile transfer accepted a non-boolean inferred icon preference")
-end
-
--- Given the trial has been enabled on the active profile.
-profiles.SetOption(nil, "inferredWindfuryIcons", true)
--- When the active profile is reset.
-profiles.ResetProfile(inferredName)
--- Then resetting restores the off-by-default behavior.
-assert(profiles.currentProfile.inferredWindfuryIcons == false)
 
 -- Given a saved profile with old solo/group restrictions.
 profiles.savedVariables.profiles.LegacyCombatText = {
