@@ -333,6 +333,101 @@ Replay("same-frame Stormstrike reports exhaust one cast identity", function()
         "same-frame unnamed report reached presentation before candidate tagging")
 end)
 
+Replay("confirmed hits do not reserve a second spare confirmation", function()
+    for _, accountingEnabled in ipairs({ false, true }) do
+        -- Given the captured clock and four own direct confirmations.
+        now = 18056.290
+        local start = Start()
+        ns.mine.accountingEnabled = accountingEnabled
+        local first, fire, second = Amount(), Amount(), Amount()
+        local normal, late, surplus, strike =
+            Amount(), Amount(), Amount(), Amount()
+        Event("PLAYER_SWING", 3.8, 0)
+        Line("swing")
+        Line("spell")
+        Line("spell")
+        local earlierSpare = ns.reader.logLines[#ns.reader.logLines - 1]
+
+        -- When the first hit consumes its own later-frame confirmation.
+        At(start + 0.100)
+        Line("spell")
+        Line("spell")
+        Hit(first)
+        At(start + 0.101)
+
+        -- Then timing bookkeeping leaves the older spare free.
+        assert(Record(first).who == "you")
+        assert(not earlierSpare.claimed and not earlierSpare.hit,
+            "confirmed hit reserved another frame's spare line")
+
+        -- When the remaining reports and an unsupported surplus arrive.
+        At(start + 0.187)
+        Hit(fire, "target", 4)
+        At(start + 0.214)
+        Hit(second)
+        At(start + 0.585)
+        Hit(normal)
+        At(start + 0.905)
+        Hit(late)
+        At(start + 0.930)
+        Hit(surplus)
+        At(start + 0.953)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player",
+            "Cast-independent-strike", 17364)
+        Line("spell")
+        Hit(strike)
+        At(start + 2)
+
+        -- Then each supported report survives once without reusing evidence.
+        for _, amount in ipairs({ first, fire, second, normal, late, strike }) do
+            assert(Record(amount).who == "you")
+            assert(Displayed(amount) == 1)
+        end
+        assert(Record(normal).melee and Record(strike).spell == 17364)
+        assert(Record(surplus).who == "unknown" and Displayed(surplus) == 0)
+        local bindings = {}
+        for _, line in ipairs(ns.reader.logLines) do
+            local record = line.hit and line.hit.record
+            if record and record.amount then
+                local amount = record.amount
+                bindings[amount] = (bindings[amount] or 0) + 1
+                assert(bindings[amount] <= 1,
+                    "one report occupied multiple confirmations")
+            end
+        end
+    end
+end)
+
+Replay("shared confirmations do not reserve a later combat-log line", function()
+    for _, accountingEnabled in ipairs({ false, true }) do
+        -- Given two owned reports confirmed collectively in their own frame.
+        local start, first, second = Start(), Amount(), Amount()
+        ns.mine.accountingEnabled = accountingEnabled
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 17364)
+        Line("spell")
+        Line("spell")
+        Hit(first)
+        Hit(second)
+        At(start + 0.01)
+        assert(Record(first).who == "you" and Record(second).who == "you")
+        for _, hit in ipairs(ns.reader.yourHits) do
+            assert(hit.line == nil,
+                "a shared pool invented an individual confirmation binding")
+        end
+
+        -- When another own line arrives inside the timing association window.
+        At(start + 0.05)
+        Line("spell")
+        local laterLine = ns.reader.logLines[#ns.reader.logLines]
+        At(start + 2)
+
+        -- Then resolved reports cannot reserve that later confirmation.
+        assert(not laterLine.hit and not laterLine.claimed,
+            "a collectively confirmed report occupied a later line")
+        assert(Displayed(first) == 1 and Displayed(second) == 1)
+    end
+end)
+
 Replay("applied bleed cannot take a later Stormstrike miss", function()
     -- Given a bleed whose owned tick already confirms its application.
     local start, tick = Start(), Amount()

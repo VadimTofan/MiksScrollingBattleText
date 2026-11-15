@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Confirmed outgoing reports reuse their original combat-log evidence.
+  Timing bookkeeping no longer occupies a second spare confirmation that
+  a later report could use; shared confirmations remain shared.
 - A confirmed periodic-only effect no longer competes as a fresh application
   miss. Ambiguous direct outcomes no longer acquire Windfury candidate tags.
 - Added opt-in experimental swing accounting to Windfury reports. It tracks

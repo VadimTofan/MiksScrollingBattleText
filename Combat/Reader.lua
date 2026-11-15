@@ -459,7 +459,9 @@ ns.ProcCandidate = ProcCandidate
 -- Compatibility boundary: active effects cannot prove a damage spell's ID.
 ns.ProcSpell = function() return nil end
 
-local function AccountingEvidence(hit, evidence, shared)
+local function ConfirmingEvidence(hit, evidence, shared)
+    hit.confirmation = evidence or false
+    hit.sharedConfirmation = shared == true
     if not (ns.mine and ns.mine.accountingEnabled) then return end
     hit.accountingEvidence = nil
     if not evidence then return end
@@ -513,6 +515,8 @@ function ns.DecideHit(hit, line, restrict)
     end
     TagProcCandidate(result, hit.at, record.school, hit.key)
     record.result = result
+    local confirmation
+    if line == true then confirmation = hit.confirmation or false end
     if ns.mine and ns.mine.accountingEnabled then
         record.accounting = {
             at = hit.at, key = hit.key, confirmed = line == true,
@@ -529,12 +533,16 @@ function ns.DecideHit(hit, line, restrict)
             confirmed = line, restrict = restrict })
     end
     if result.hold then
-        local entry = { record = record, held = result.held, at = hit.at, line = line }
+        local entry = { record = record, held = result.held, at = hit.at,
+            line = line, confirmation = confirmation,
+            sharedConfirmation = hit.sharedConfirmation }
         reader.held[#reader.held + 1] = entry
         if #reader.held == 1 then C_Timer.After(ns.LATE_SWING + 0.02, FlushHeld) end
         return result, entry
     end
-    if ns.OnYourHit and (result.who == "you" or result.who == "pet") then ns.OnYourHit(record, hit.at) end
+    if ns.OnYourHit and (result.who == "you" or result.who == "pet") then
+        ns.OnYourHit(record, hit.at, confirmation, hit.sharedConfirmation)
+    end
     router:Out(record)
     return result
 end
@@ -976,7 +984,7 @@ function DecideGroup(group, frameLines, decided, settled)
     end
     local function Decide(hit, flag, restrict, evidence)
         if flag == true then
-            AccountingEvidence(hit, evidence or frameLines, evidence == nil)
+            ConfirmingEvidence(hit, evidence or frameLines, evidence == nil)
         end
         local result, entry = ns.DecideHit(hit, flag, flag == true and restrict or nil)
         decided[#decided + 1] = { result = result, entry = entry }
@@ -1050,7 +1058,7 @@ function DecideGroup(group, frameLines, decided, settled)
                 -- answers is known: an instant Curse of Exhaustion's cast came
                 -- after its Immune report in the same frame, and the miss took
                 -- an older cast's icon (1.60.1.70374).
-                AccountingEvidence(hit, frameLines, true)
+                ConfirmingEvidence(hit, frameLines, true)
                 C_Timer.After(MISS_SETTLE, function() ns.DecideHit(hit, true, restrict) end)
             else
                 Decide(hit, true, restrict)
@@ -1180,7 +1188,7 @@ function ns.DecideLate(hit)
         end
     end
     if best then best.claimed = true end
-    AccountingEvidence(hit, best)
+    ConfirmingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
 end
 
@@ -1201,7 +1209,7 @@ function ns.DecideLateMiss(hit)
         end
     end
     if best then best.claimed = true end
-    AccountingEvidence(hit, best)
+    ConfirmingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
 end
 
@@ -1440,7 +1448,10 @@ local function OnSwing(swingType, swingDuration)
             if entry.record.accounting then
                 entry.record.accounting.receipt = claimed.accountingReceipt
             end
-            if ns.OnYourHit then ns.OnYourHit(entry.record, entry.at) end
+            if ns.OnYourHit then
+                ns.OnYourHit(entry.record, entry.at,
+                    entry.confirmation or false, entry.sharedConfirmation)
+            end
             local router = Router()
             if router then router:Out(entry.record) end
             return
@@ -1969,7 +1980,10 @@ local function PairWindow()
     return reader.pairWindow
 end
 ns.PairWindow = PairWindow
-local function Close(hit) return hit.line ~= nil and (hit.gap or 0) <= PairWindow() end
+local function Close(hit)
+    return (hit.line ~= nil or hit.confirmed == true)
+        and hit.gap ~= nil and hit.gap <= PairWindow()
+end
 
 -- A ready Forever filter requires confirmation even before its first line.
 -- A recent cast alone cannot establish that an enemy's damage report is ours.
@@ -1980,18 +1994,39 @@ function LinesRunning()
     return MyActionsFilter() and (reader.sawGrey == true or ready)
 end
 
--- A hit known to be yours (or your pet's) takes the line that came with it.
--- When the engine read a spell's school off this hit (a guess, Mine.lua),
--- the line decides it: with one the school is kept, without one (while
--- lines of yours are coming) the hit was someone else's and the guess goes.
-function ns.OnYourHit(record, at)
+-- Shared ownership supplies timing only when claimed lines share one time.
+local function SharedConfirmationGap(lines, at)
+    local confirmedAt
+    for _, line in ipairs(lines) do
+        if line.claimed then
+            if confirmedAt and line.at ~= confirmedAt then return nil end
+            confirmedAt = line.at
+        end
+    end
+    return confirmedAt and math.abs(confirmedAt - at) or nil
+end
+
+-- A known hit reuses its confirmation instead of reserving another line.
+-- Guessed schools use the original timing; omitted context keeps legacy pairing.
+function ns.OnYourHit(record, at, confirmation, shared)
     local now = Now()
     reader.yourHits = Prune(reader.yourHits, now)
-    local hit = { at = at, record = record }
+    local hit = { at = at, record = record,
+        pairingResolved = confirmation ~= nil,
+        confirmed = confirmation ~= nil and confirmation ~= false }
     reader.yourHits[#reader.yourHits + 1] = hit
-    local line = FreeLine(at, nil, record)
-    if line then
+    local line
+    if confirmation and shared then
+        hit.gap = SharedConfirmationGap(confirmation, at)
+    elseif confirmation then
+        line = confirmation
+    elseif confirmation == nil then
+        line = FreeLine(at, nil, record)
+    end
+    if line and (not line.hit or line.hit.record == record) then
         line.hit, hit.line, hit.gap = hit, line, math.abs(line.at - at)
+    end
+    if hit.gap and hit.gap <= LOG_PAIR then
         SampleGap(record, hit.gap)
     end
     local guess = record.result and record.result.guess
@@ -2166,7 +2201,8 @@ local function OnLogMessage(text, r, g, b, order)
     reader.logLines[#reader.logLines + 1] = line
     if Pairs(line) and not MeleeLine(line) then
         for _, hit in ipairs(reader.yourHits) do
-            if not hit.line and Pairs(line, hit.record) and math.abs(hit.at - now) <= LOG_PAIR then
+            if not hit.pairingResolved and not hit.line and Pairs(line, hit.record)
+                and math.abs(hit.at - now) <= LOG_PAIR then
                 line.hit, hit.line, hit.gap = hit, line, math.abs(hit.at - now)
                 SampleGap(hit.record, hit.gap)
                 break

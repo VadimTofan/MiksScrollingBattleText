@@ -61,6 +61,13 @@ Initial application misses, other targets, mixed direct/periodic spells, and
 ambiguous periodic reservations retain their existing outcome rules.
 Ambiguous direct outcomes cannot supply a Windfury candidate tag.
 
+Each confirmed report keeps its original confirmation for timing association.
+Exact lines are reused; shared pools do not invent an individual line binding.
+Those reports cannot reserve another spare or later line. An omitted context
+retains legacy timing association; an explicit missing context suppresses it.
+Timing samples use the original evidence within the existing sampling window;
+a mixed-time pool cannot supply an exact gap or teach a spell's timing.
+
 The Forever reader requires confirmation once its dedicated filter is ready,
 including before the first log line. Unused direct confirmations following
 a melee swing or known physical ability can support delayed weapon-proc
