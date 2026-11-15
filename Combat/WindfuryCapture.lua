@@ -68,6 +68,29 @@ function Capture:AccountingOutcome(record)
     })
 end
 
+function Capture:AccountingChecks(record)
+    if not self.ledger then return end
+    local entry = self.model:Lookup(record)
+    local metadata = RV:Table(record.accounting)
+    local checks = metadata and RV:Table(metadata.swingChecks)
+    if not entry or not checks then return end
+    entry.swingChecks = {}
+    for index = 1, math.min(#checks, 8) do
+        local check = RV:Table(checks[index])
+        if check then
+            entry.swingChecks[#entry.swingChecks + 1] = {
+                at = RV:Number(check.at), hand = RV:String(check.hand),
+                age = RV:Number(check.age), early = RV:Number(check.early),
+                late = RV:Number(check.late),
+                delayedEarly = RV:Number(check.delayedEarly),
+                delayedLate = RV:Number(check.delayedLate),
+                used = RV:Boolean(check.used), eligible = RV:Boolean(check.eligible),
+                reason = RV:String(check.reason),
+            }
+        end
+    end
+end
+
 -- Restore correlation context even if the observed method raises an error.
 function Capture:Wrap(object, method, callback)
     local original = object[method]
@@ -100,6 +123,7 @@ function Capture:Observe(stage, hit, info)
             school = RV:Number(record.school), outcome = RV:String(record.missWord) })
     elseif stage == "decision" then
         self.model:Decision(record, record.result or {})
+        self:AccountingChecks(record)
         if info then self.model:Candidate(record, info) end
     elseif stage == "candidate" then
         self.model:Candidate(record, info)
@@ -111,7 +135,7 @@ function Capture:Event(event, duration, hand, spell)
     local key = ns.TargetKey()
     if event == "PLAYER_SWING" then
         local burst = self.model:Swing(GetTime(), key, Metadata(hand),
-            ns.ActiveWindfurySpell(1) == 8232)
+            ns.ActiveWindfurySpell(1) == 8232, RV:Number(duration))
         if self.ledger then
             local hands = { [0] = "main", [1] = "off", [2] = "ranged" }
             local swingType = RV:Number(hand)
@@ -135,16 +159,25 @@ function Capture:Event(event, duration, hand, spell)
             local weaponTrigger = facts and facts.direct == true
                 and facts.school == 1 and facts.helpful ~= true
                 and not facts.weaponProc
-            self.model:Cast(GetTime(), key, spellID, weaponTrigger)
+            local recipient = ns.reader and ns.reader.lastCastTarget
+            local observed = recipient and recipient.unit == "player"
+                and recipient.spell == spellID and recipient.at == GetTime()
+            local recipientObserved
+            if observed then recipientObserved = RV:Boolean(recipient.observed) end
+            local target = {
+                key = observed and RV:String(recipient.key) or nil,
+                uncertain = not observed or recipientObserved ~= true
+                    or recipient.uncertain == true,
+                observed = recipientObserved,
+                guidReadable = RV:String(hand) ~= nil,
+            }
+            self.model:Cast(GetTime(), key, spellID, weaponTrigger, target)
             if self.ledger and spellID == 17364 then
-                local recipient = ns.reader and ns.reader.lastCastTarget
-                if recipient and recipient.unit == "player"
-                    and recipient.spell == spellID and recipient.at == GetTime() then
-                    self.ledger:Cast({ at = GetTime(),
-                        key = RV:String(recipient.key), spell = spellID, count = 1,
-                        guid = RV:String(hand),
-                        uncertain = recipient.uncertain == true })
-                end
+                local reservationKey
+                if not target.uncertain then reservationKey = target.key end
+                self.ledger:Cast({ at = GetTime(),
+                    key = reservationKey, spell = spellID, count = 1,
+                    guid = RV:String(hand), uncertain = target.uncertain })
             end
         end
     elseif event == "COMBAT_LOG_MESSAGE" then
@@ -212,6 +245,7 @@ function Capture:Install()
     end
     self:Wrap(components.CombatPresentation, "Out", function(original, object, record)
         self.model:Decision(record, record.result or {})
+        self:AccountingChecks(record)
         self:AccountingOutcome(record)
         local entry = self.model:Lookup(record)
         self.ids = entry and { entry.id } or nil

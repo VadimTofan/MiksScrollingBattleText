@@ -246,6 +246,27 @@ Replay("captured Stormstrike-triggered delayed physical reports", function()
     assert(Displayed(unconfirmed) == 0)
 end)
 
+Replay("early unknown reports expose the existing native swing window", function()
+    -- Given a native swing and its own typed swing line.
+    local start = Start()
+    local amount = Amount()
+    Event("PLAYER_SWING", 3.8, 0)
+    Line("swing")
+
+    -- When a physical report arrives just before the existing 0.250 floor.
+    At(start + 0.247)
+    Hit(amount)
+    At(start + 1.2)
+
+    -- Then ownership stays unknown and the diagnostic explains the boundary.
+    assert(Record(amount).who == "unknown" and Displayed(amount) == 0)
+    local info = forwarded[amount].accounting
+    local check = info and info.swingChecks and info.swingChecks[1]
+    assert(check and check.at == start and check.reason == "before-window"
+        and check.early == 0.25 and not check.eligible,
+        "unmatched report lost its native swing eligibility reason")
+end)
+
 Replay("axe bleed application and typed periodic confirmations", function()
     -- Given the captured application and exact seven-second bleed tooltip.
     local start = Start()

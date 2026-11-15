@@ -239,6 +239,8 @@ Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", opaque, 17364)
 assert(#burst.casts == 1 and burst.casts[1].spell == 17364)
 assert(burst.casts[1].weaponTrigger)
 assert(capture.model:ReportText():find("cast +0.000 spell=17364", 1, true))
+assert(capture.model:ReportText():find("recipient=- uncertain=true", 1, true),
+    "capture hid the unresolved cast recipient behind the current target")
 
 -- When a Nature cast is recorded in the same capture.
 Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", opaque, 8042)
@@ -412,7 +414,7 @@ now = sourceAt + 2
 local recipientKey = targetKey
 targetKey = "different-selected-target"
 ns.reader.lastCastTarget = { at = now, key = recipientKey,
-    unit = "player", spell = 17364 }
+    unit = "player", spell = 17364, observed = true }
 
 -- When its cast and spent outcome reach capture after the target switch.
 Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-original", 17364)
@@ -426,6 +428,40 @@ accounting = actualLedger:Summaries()[2]
 assert(accounting.key == recipientKey and accounting.ssMatched == 1)
 ns.traceCombat("rekey", nil, { old = recipientKey, new = "experiment-plate:2" })
 assert(actualLedger:Summaries()[2].key == "experiment-plate:2")
+
+-- Given a real Stormstrike cast with an unresolved recipient.
+now = sourceAt + 2.25
+ns.reader.lastCastTarget = { at = now, unit = "player", spell = 17364,
+    uncertain = true, observed = true }
+
+-- When the public cast is captured without an assignable target lifetime.
+Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-unresolved", 17364)
+
+-- Then the observation remains visible without borrowing the selected target.
+local unresolvedCast
+for _, row in ipairs(actualLedger:Summaries()) do
+    if row.at == now and row.key == nil then unresolvedCast = row end
+end
+assert(unresolvedCast and unresolvedCast.ssReserved == 1
+    and unresolvedCast.ssMatched == 0 and unresolvedCast.targetUnresolved == 1,
+    "an observed Stormstrike disappeared when its recipient was uncertain")
+
+-- Given only a selected-target fallback rather than an observed recipient.
+now = sourceAt + 2.5
+ns.reader.lastCastTarget = { at = now, key = targetKey,
+    unit = "player", spell = 17364, observed = false }
+
+-- When the public cast is captured with that inferred context.
+Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-fallback", 17364)
+
+-- Then accounting retains an untargeted reservation instead of calling it certain.
+local fallbackCast
+for _, row in ipairs(actualLedger:Summaries()) do
+    if row.at == now then fallbackCast = row end
+end
+assert(fallbackCast and fallbackCast.key == nil
+    and fallbackCast.targetUnresolved == 1,
+    "selected-target fallback became a certain cast recipient")
 
 -- Given a world transition while capture remains enabled.
 -- When the event reaches the capture wrapper.

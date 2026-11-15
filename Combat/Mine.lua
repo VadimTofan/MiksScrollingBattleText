@@ -666,6 +666,39 @@ function Mine:SwingsBefore(key, now)
     return found
 end
 
+-- Optional diagnostics observe the same windows without tidying or spending.
+function Mine:AccountingSwingChecks(key, at)
+    if self.accountingEnabled ~= true then return nil end
+    local checks = {}
+    for index = #self.swings, 1, -1 do
+        local swing = self.swings[index]
+        local age = at - swing.at
+        if swing.key == key and swing.hand ~= "ranged"
+            and age <= PairedWindow(swing) then
+            local early, late = self:MeleeWindow(swing.hand)
+            local lag = self:SwingDelay(swing.hand) or USUAL_DELAY
+            local delayedEarly, delayedLate = lag + DELAYED_FROM,
+                lag + DELAYED_TO
+            local fits = (age >= early and age <= late)
+                or (age >= delayedEarly and age <= delayedLate)
+            local eligible = not swing.used and fits
+            local reason
+            if swing.used then reason = "used"
+            elseif eligible then reason = "eligible"
+            elseif age < early then reason = "before-window"
+            else reason = "after-window" end
+            checks[#checks + 1] = {
+                at = swing.at, hand = swing.hand, age = age,
+                early = early, late = late, delayedEarly = delayedEarly,
+                delayedLate = delayedLate, used = swing.used == true,
+                eligible = eligible, reason = reason,
+            }
+            if #checks == 8 then break end
+        end
+    end
+    return checks
+end
+
 local function RekeyCast(cast, old, new, seen)
     if not cast or seen[cast] then return end
     seen[cast] = true

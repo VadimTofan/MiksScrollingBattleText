@@ -5,6 +5,9 @@
 - Added opt-in experimental swing accounting to Windfury reports. It tracks
   observed swings and spent Stormstrike outcomes, excludes periodic damage,
   and reports Weapon/Totem hypotheses without changing damage display.
+- Experimental reports retain untargeted Stormstrike casts and delayed
+  confirmation frames. Swing-window checks explain rejected timing without
+  changing damage attribution.
 - Forever shows a separate Windfury activity notice from an explicit attack
   cast or a Windfury cooldown update corroborated by a player melee trigger
   and direct combat-log line in the same frame. Damage identities and counts

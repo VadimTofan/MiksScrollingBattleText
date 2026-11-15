@@ -69,11 +69,15 @@ local function Append(list, value, limit)
     if #list > limit then table.remove(list, 1) end
 end
 
-local function Header(info)
+local function Header(info, allowUntargeted)
     info = PublicTable(info)
     if not info then return end
-    local at, key = Number(rawget(info, "at")), Text(rawget(info, "key"))
-    if at and at >= 0 and key then return info, at, key end
+    local at, keyValue = Number(rawget(info, "at")), rawget(info, "key")
+    if not at or at < 0 or not Restricted:CanAccess(keyValue) then return end
+    local key = Text(keyValue)
+    if key or (allowUntargeted and keyValue == nil) then
+        return info, at, key
+    end
 end
 
 local function Reservation(frame, value)
@@ -88,11 +92,21 @@ function Accounting:New()
     return setmetatable({ frames = {}, outcomes = {}, signals = {} }, self)
 end
 
-local function SourceFrame(self, at, key)
+local function SourceFrame(self, at, key, kind)
+    kind = kind or "trigger"
     for _, frame in ipairs(self.frames) do
-        if frame.key == key and SameFrame(frame.at, at) then return frame end
+        if frame.key == key and SameFrame(frame.at, at) then
+            if kind == "trigger" then
+                frame.kind, frame.rangedOnly = kind, nil
+            elseif kind == "confirmation" and frame.rangedOnly then
+                frame.kind = kind
+            end
+            return frame
+        end
     end
-    local frame = { at = at, key = key, reservations = {} }
+    local frame = { at = at, key = key,
+        kind = kind == "ranged" and "trigger" or kind,
+        rangedOnly = kind == "ranged", reservations = {} }
     Append(self.frames, frame, MAX_FRAMES)
     return frame
 end
@@ -102,12 +116,13 @@ function Accounting:Swing(info)
     if not input then return end
     local hand = Text(rawget(input, "hand"))
     if hand ~= "main" and hand ~= "off" and hand ~= "ranged" then return end
-    local frame = SourceFrame(self, at, key)
+    local kind = hand == "ranged" and "ranged" or "trigger"
+    local frame = SourceFrame(self, at, key, kind)
     Reservation(frame, { kind = "swing", at = at, hand = hand })
 end
 
 function Accounting:Cast(info)
-    local input, at, key = Header(info)
+    local input, at, key = Header(info, true)
     if not input or Number(rawget(input, "spell")) ~= STORMSTRIKE then
         return
     end
@@ -129,7 +144,7 @@ function Accounting:Cast(info)
             return
         end
     end
-    local uncertain = not BooleanFields(input, { "uncertain" })
+    local uncertain = not key or not BooleanFields(input, { "uncertain" })
         or Boolean(rawget(input, "uncertain")) == true
     for ordinal = 1, count do
         Reservation(frame, { kind = "cast", at = at, spell = STORMSTRIKE,
@@ -187,6 +202,7 @@ end
 local BOOLEAN_FIELDS = { "tick", "melee", "extra", "ambiguous",
     "periodicOnly", "confirmed" }
 local TEXT_FIELDS = { "who", "event", "restrict" }
+local DirectEvidence, CandidateOutcome
 
 function Accounting:Outcome(info)
     local input, at, key = Header(info)
@@ -222,6 +238,39 @@ function Accounting:Outcome(info)
         outcome[field] = Text(rawget(input, field))
     end
     Append(self.outcomes, outcome, MAX_OUTCOMES)
+    local evidence = outcome.evidence
+    if not outcome.receipt and CandidateOutcome(outcome) then
+        local age = outcome.at - evidence.at
+        if evidence.at >= 0 and age >= -HELD_WINDOW and age <= SOURCE_LIFETIME then
+            SourceFrame(self, evidence.at, key, "confirmation")
+        end
+    end
+end
+
+local function MergeFrames(target, source)
+    local hadCast = false
+    for _, entry in ipairs(target.reservations) do
+        if entry.kind == "cast" then hadCast = true end
+    end
+    for _, entry in ipairs(source.reservations) do
+        local competingCast = false
+        if hadCast and entry.kind == "cast" then
+            for _, other in ipairs(target.reservations) do
+                if other.kind == "cast" and (not entry.guid or not other.guid) then
+                    competingCast = true
+                    target.duplicateCast = true
+                end
+            end
+        end
+        if not competingCast then Reservation(target, entry) end
+    end
+    if source.kind == "trigger" and not source.rangedOnly then
+        target.kind, target.rangedOnly = "trigger", nil
+    elseif source.kind == "confirmation" and target.rangedOnly then
+        target.kind = "confirmation"
+    end
+    target.truncated = target.truncated or source.truncated
+    target.duplicateCast = target.duplicateCast or source.duplicateCast
 end
 
 function Accounting:Rekey(old, new)
@@ -229,6 +278,18 @@ function Accounting:Rekey(old, new)
     if not old or not new or old == new then return end
     for _, frame in ipairs(self.frames) do
         if frame.key == old then frame.key = new end
+    end
+    for first = 1, #self.frames do
+        local frame = self.frames[first]
+        if frame and frame.key == new then
+            for second = #self.frames, first + 1, -1 do
+                local alias = self.frames[second]
+                if alias.key == new and SameFrame(frame.at, alias.at) then
+                    MergeFrames(frame, alias)
+                    table.remove(self.frames, second)
+                end
+            end
+        end
     end
     for _, outcome in ipairs(self.outcomes) do
         if outcome.key == old then outcome.key = new end
@@ -245,10 +306,13 @@ function Accounting:Reset()
 end
 
 local function Summary(frame)
-    local summary = { at = frame.at, key = frame.key,
+    local summary = { at = frame.at, key = frame.key, frameKind = frame.kind,
         normalObserved = 0, normalMatched = 0, normalUnresolved = 0,
-        ssReserved = 0, ssMatched = 0, excludedPeriodic = 0,
+        ssObserved = 0, ssReserved = 0, ssMatched = 0, targetUnresolved = 0,
+        excludedPeriodic = 0,
         excludedKnown = 0, ownedPhysicalExtras = 0, unownedPhysical = 0,
+        ownedPhysicalUnassigned = 0,
+        parentUnresolvedFrames = frame.kind == "confirmation" and 1 or 0,
         physicalObserved = 0, ambiguous = 0, unknownSource = 0,
         sourceAmbiguous = 0, sharedEvidence = 0, unlinked = 0,
         weaponSignals = 0, totemSignals = 0,
@@ -257,7 +321,11 @@ local function Summary(frame)
         if entry.kind == "swing" and entry.hand ~= "ranged" then
             summary.normalObserved = summary.normalObserved + 1
         elseif entry.kind == "cast" then
+            summary.ssObserved = summary.ssObserved + 1
             summary.ssReserved = summary.ssReserved + 1
+            if not frame.key or entry.uncertain then
+                summary.targetUnresolved = summary.targetUnresolved + 1
+            end
         end
         if entry.uncertain then summary.ambiguous = summary.ambiguous + 1 end
     end
@@ -323,7 +391,7 @@ local function MatchReceipt(frame, receipt, used)
     end
 end
 
-local function DirectEvidence(outcome)
+DirectEvidence = function(outcome)
     local evidence = outcome.evidence
     if not evidence or evidence.source ~= "mine" or evidence.ambiguous
         or not evidence.at then return false end
@@ -335,6 +403,14 @@ local function DirectEvidence(outcome)
     if outcome.restrict and outcome.restrict ~= "direct"
         and not (extraSwing and outcome.restrict == "swing") then return false end
     return not evidence.shared or (evidence.capacity and evidence.capacity > 0)
+end
+
+CandidateOutcome = function(outcome)
+    return outcome.who == "you" and outcome.confirmed
+        and outcome.school == 1 and not outcome.spell
+        and (outcome.event == "damage" or outcome.event == "miss")
+        and not outcome.tick and not outcome.periodicOnly and not outcome.ambiguous
+        and (not outcome.melee or outcome.extra) and DirectEvidence(outcome)
 end
 
 local function Observe(frame, summary, outcome, used)
@@ -358,10 +434,15 @@ local function Observe(frame, summary, outcome, used)
         else
             summary.ambiguous = summary.ambiguous + 1
         end
-    elseif physical and not outcome.spell and outcome.confirmed
-        and (not outcome.melee or outcome.extra)
-        and PhysicalTrigger(summary) and DirectEvidence(outcome) then
-        summary.ownedPhysicalExtras = summary.ownedPhysicalExtras + 1
+    elseif CandidateOutcome(outcome) then
+        if summary.frameKind == "confirmation" then
+            summary.ownedPhysicalUnassigned = summary.ownedPhysicalUnassigned + 1
+        elseif PhysicalTrigger(summary) then
+            summary.ownedPhysicalExtras = summary.ownedPhysicalExtras + 1
+        else
+            summary.unknownSource = summary.unknownSource + 1
+            return
+        end
         local evidence = outcome.evidence
         if evidence.shared then
             summary.sharedEvidence = summary.sharedEvidence + 1
@@ -378,14 +459,30 @@ local function Verdict(summary)
     summary.weaponCapacity = summary.weaponSignals * 2
     summary.totemCapacity = summary.totemSignals
     local capacity = summary.weaponCapacity + summary.totemCapacity
+    if summary.ownedPhysicalExtras + summary.ownedPhysicalUnassigned > 0 then
+        if summary.weaponSignals > 0 and summary.totemSignals > 0 then
+            summary.familyCandidate = "weapon+totem"
+        elseif summary.weaponSignals > 0 then
+            summary.familyCandidate = "weapon"
+        elseif summary.totemSignals > 0 then
+            summary.familyCandidate = "totem"
+        end
+    end
     summary.verdict, summary.reason = "unresolved", "no-source-frame"
-    if summary.unlinked > 0 or summary.key == nil then return end
+    if summary.unlinked > 0 then return end
+    if summary.targetUnresolved > 0 then
+        summary.reason = "unknown-target"
+        return
+    end
+    if summary.key == nil then return end
     if summary.sourceAmbiguous > 0 then
         summary.reason = "ambiguous-source"
     elseif summary.ambiguous > 0 then
         summary.reason = "ambiguous-outcome"
     elseif summary.unknownSource > 0 then
         summary.reason = "missing-source-evidence"
+    elseif summary.parentUnresolvedFrames > 0 then
+        summary.reason = "parent-unresolved"
     elseif summary.normalUnresolved > 0 or summary.ssMatched < summary.ssReserved then
         summary.reason = "missing-reservation-outcome"
     elseif summary.sharedCapacity and summary.sharedEvidence > summary.sharedCapacity then
@@ -418,7 +515,9 @@ function Accounting:Summaries()
     for _, signal in ipairs(self.signals) do
         local candidates = {}
         for index, frame in ipairs(self.frames) do
-            if PhysicalTrigger(summaries[index]) and SameFrame(frame.at, signal.at) then
+            local eligible = PhysicalTrigger(summaries[index])
+                or frame.kind == "confirmation"
+            if eligible and SameFrame(frame.at, signal.at) then
                 candidates[#candidates + 1] = index
             end
         end
@@ -453,7 +552,7 @@ end
 function Accounting:Rows()
     local rows = {}
     for _, summary in ipairs(self:Summaries()) do
-        rows[#rows + 1] = string.format(
+        local row = string.format(
             "accounting at=%s key=%s normal=%d/%d unresolved=%d SS=%d/%d " ..
             "physical=%d extra=%d unowned=%d excluded-periodic=%d known=%d " ..
             "ambiguous=%d source-ambiguous=%d unknown-source=%d unlinked=%d " ..
@@ -467,6 +566,17 @@ function Accounting:Rows()
             summary.unknownSource, summary.unlinked, summary.weaponSignals,
             summary.weaponCapacity, summary.totemSignals, summary.totemCapacity,
             summary.verdict, summary.reason)
+        if summary.frameKind == "confirmation" then
+            row = row .. string.format(" frame=confirmation unassigned=%d",
+                summary.ownedPhysicalUnassigned)
+        end
+        if summary.targetUnresolved > 0 then
+            row = row .. " target-unresolved=" .. summary.targetUnresolved
+        end
+        if summary.familyCandidate then
+            row = row .. " family-candidate=" .. summary.familyCandidate
+        end
+        rows[#rows + 1] = row
     end
     return rows
 end

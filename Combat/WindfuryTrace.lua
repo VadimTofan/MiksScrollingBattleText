@@ -9,10 +9,11 @@ function Tracker:New()
         seenLines = setmetatable({}, { __mode = "k" }) }, self)
 end
 
-function Tracker:Swing(at, key, hand, active)
+function Tracker:Swing(at, key, hand, active, duration)
     self.nextID = self.nextID + 1
     local burst = { id = self.nextID, at = at, key = key, hand = hand,
-        active = active, reports = {}, lines = {}, casts = {}, cooldowns = {} }
+        active = active, duration = duration,
+        reports = {}, lines = {}, casts = {}, cooldowns = {} }
     self.bursts[#self.bursts + 1] = burst
     if #self.bursts > 8 then
         local expired = table.remove(self.bursts, 1)
@@ -39,11 +40,15 @@ function Tracker:Log(line, key)
     }
 end
 
-function Tracker:Cast(at, key, spell, weaponTrigger)
+function Tracker:Cast(at, key, spell, weaponTrigger, recipient)
     local burst = self:Find(at, key)
     if not burst or #burst.casts >= 32 then return end
     burst.casts[#burst.casts + 1] = {
         at = at, spell = spell, weaponTrigger = weaponTrigger == true,
+        recipientKey = recipient and recipient.key,
+        recipientUncertain = recipient and recipient.uncertain,
+        recipientObserved = recipient and recipient.observed,
+        guidReadable = recipient and recipient.guidReadable,
     }
 end
 
@@ -231,21 +236,24 @@ function Tracker:ReportText()
             "Swing #%d %.3f key=%s hand=%s enchant=%s expected=%d estimated=%d " ..
             "WF damage=%d miss=%d normal=%d raw=%d/%d other=%d unknown=%d " ..
             "forwarded=%d dispatches=%d merged=%s truncated=%s " ..
-            "cooldowns=%d cooldownsTruncated=%s",
+            "cooldowns=%d cooldownsTruncated=%s duration=%s",
             burst.id, burst.at, Value(burst.key), Value(burst.hand),
             Value(burst.active), s.expected, s.estimated, s.damage, s.misses, s.normal,
             s.rawDamage, s.rawMisses, s.rejected, s.unknown,
             s.forwarded, s.displays,
             Value(s.merged), Value(burst.truncated),
-            #burst.cooldowns, Value(burst.cooldownsTruncated))
+            #burst.cooldowns, Value(burst.cooldownsTruncated), Value(burst.duration))
         for _, line in ipairs(burst.lines) do
             rows[#rows + 1] = string.format("  log +%.3f %s %s",
                 line.at - burst.at, Value(line.kind), Value(line.source))
         end
         for _, cast in ipairs(burst.casts) do
             rows[#rows + 1] = string.format(
-                "  cast +%.3f spell=%d weaponTrigger=%s",
-                cast.at - burst.at, cast.spell, Value(cast.weaponTrigger))
+                "  cast +%.3f spell=%d weaponTrigger=%s " ..
+                "recipient=%s uncertain=%s observed=%s guidReadable=%s",
+                cast.at - burst.at, cast.spell, Value(cast.weaponTrigger),
+                Value(cast.recipientKey), Value(cast.recipientUncertain),
+                Value(cast.recipientObserved), Value(cast.guidReadable))
         end
         for _, cooldown in ipairs(burst.cooldowns) do
             rows[#rows + 1] = string.format(
@@ -282,6 +290,15 @@ function Tracker:ReportText()
                 end
                 table.sort(fields)
                 rows[#rows + 1] = "    " .. table.concat(fields, " ")
+            end
+            for _, check in ipairs(e.swingChecks or {}) do
+                rows[#rows + 1] = string.format(
+                    "    accounting-swing at=%s hand=%s age=%s " ..
+                    "primary=%s..%s delayed=%s..%s used=%s eligible=%s reason=%s",
+                    Value(check.at), Value(check.hand), Value(check.age),
+                    Value(check.early), Value(check.late),
+                    Value(check.delayedEarly), Value(check.delayedLate),
+                    Value(check.used), Value(check.eligible), Value(check.reason))
             end
         end
     end

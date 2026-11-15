@@ -578,5 +578,277 @@ Check("cast uncertainty rejects malformed controls as certainty", function()
     issecretvalue = nil
 end)
 
+Check("unknown-target Stormstrike remains an observed unresolved cast", function()
+    -- Given an actual Stormstrike whose recipient could not be resolved.
+    local ledger = Accounting:New()
+    ledger:Cast({ at = 240, spell = 17364, guid = "Cast-unknown-target",
+        uncertain = true })
+
+    -- When that untargeted source frame is summarized.
+    local row = First(ledger)
+
+    -- Then its observation is retained without assigning any selected target.
+    assert(row.key == nil and row.ssObserved == 1 and row.ssReserved == 1)
+    assert(row.ssMatched == 0 and row.targetUnresolved == 1)
+    assert(row.verdict == "unresolved" and row.reason == "unknown-target")
+    assert(table.concat(ledger:Rows(), "\n"):find("target-unresolved=1", 1, true))
+end)
+
+Check("unknown-target casts compete with same-frame targeted signals", function()
+    -- Given a native swing and an untargeted cast in the exact same frame.
+    local ledger = Accounting:New()
+    ledger:Swing({ at = 250, key = "target1", hand = "main" })
+    ledger:Cast({ at = 250, spell = 17364, guid = "Cast-competing-target",
+        uncertain = true })
+    ledger:Signal({ at = 250, spell = 439440 })
+
+    -- When a normal and another own physical report occur on the known target.
+    Normal(ledger, 1, 250, 250.5)
+    ledger:Outcome(Physical(2, 250.7, 250))
+    local rows = ledger:Summaries()
+
+    -- Then the global signal cannot choose the known target over the cast.
+    assert(rows[1].normalMatched == 1 and rows[1].sourceAmbiguous > 0)
+    assert(rows[1].weaponSignals == 0 and rows[1].verdict == "unresolved")
+    assert(rows[2].key == nil and rows[2].ssObserved == 1)
+    assert(rows[2].ssMatched == 0 and rows[2].targetUnresolved == 1)
+end)
+
+Check("untargeted cast deduplication cannot manufacture reservations", function()
+    -- Given repeated GUID-backed and GUID-less observations of one frame.
+    local ledger = Accounting:New()
+    for _ = 1, 3 do
+        ledger:Cast({ at = 260, spell = 17364,
+            guid = "Cast-untargeted-repeat", uncertain = true })
+        ledger:Cast({ at = 260, spell = 17364, uncertain = true })
+    end
+
+    -- When those observations are summarized.
+    local row = First(ledger)
+
+    -- Then the actual untargeted observation remains one uncertain reservation.
+    assert(row.ssObserved == 1 and row.ssMatched == 0)
+    assert(row.targetUnresolved == 1 and row.ambiguous > 0)
+    assert(#ledger.frames == 1)
+end)
+
+Check("delayed confirmation frame retains three unassigned physical outcomes", function()
+    -- Given the captured native swing and later Weapon/Totem confirmation frame.
+    local ledger = Accounting:New()
+    local start, source = 14709.615, 14709.717
+    ledger:Swing({ at = start, key = "target1", hand = "main" })
+    ledger:Signal({ at = source, spell = 439440 })
+    ledger:Signal({ at = source, spell = 10610 })
+
+    -- When three own physical reports retain that exact original evidence time.
+    ledger:Outcome(Physical(1, start + 0.102, source))
+    Normal(ledger, 2, start, start + 0.344)
+    ledger:Outcome(Physical(3, start + 0.680, source))
+    ledger:Outcome(Physical(4, start + 0.690, source))
+    local rows = ledger:Summaries()
+
+    -- Then the later frame stays visible without borrowing the nearby parent.
+    assert(rows[1].normalMatched == 1 and rows[1].ownedPhysicalExtras == 0)
+    assert(#rows == 2, "confirmed physical outcomes remained global orphans")
+    local row = rows[2]
+    assert(row.at == source and row.key == "target1")
+    assert(row.frameKind == "confirmation" and row.physicalObserved == 3)
+    assert(row.ownedPhysicalUnassigned == 3 and row.ownedPhysicalExtras == 0)
+    assert(row.weaponSignals == 1 and row.weaponCapacity == 2)
+    assert(row.totemSignals == 1 and row.totemCapacity == 1)
+    assert(row.familyCandidate == "weapon+totem")
+    assert(row.parentUnresolvedFrames == 1 and row.normalObserved == 0)
+    assert(row.verdict == "unresolved" and row.reason == "parent-unresolved")
+    assert(table.concat(ledger:Rows(), "\n"):find("unassigned=3", 1, true))
+end)
+
+Check("captured same-frame Weapon reports retain the successful candidate", function()
+    -- Given the captured native source with two Weapon reports.
+    local ledger = Accounting:New()
+    local start = 14707.276
+    ledger:Swing({ at = start, key = "target1", hand = "main" })
+    ledger:Signal({ at = start, spell = 439440 })
+
+    -- When the normal receipt resolves between the two extra reports.
+    ledger:Outcome(Physical(1, start + 0.244, start))
+    Normal(ledger, 2, start, start + 0.590)
+    ledger:Outcome(Physical(3, start + 0.992, start))
+    local row = First(ledger)
+
+    -- Then the established result does not become an unassigned frame.
+    assert(row.normalMatched == 1 and row.ownedPhysicalExtras == 2)
+    assert(row.ownedPhysicalUnassigned == 0 and row.frameKind == "trigger")
+    assert(row.verdict == "candidate" and row.reason == "weapon-policy")
+end)
+
+Check("confirmation frame upgrades only when its exact trigger arrives", function()
+    -- Given direct evidence recorded before the actual native event callback.
+    local ledger = Accounting:New()
+    ledger:Signal({ at = 270, spell = 439440 })
+    ledger:Outcome(Physical(1, 270.2, 270))
+    ledger:Outcome(Physical(2, 270.7, 270))
+    local before = First(ledger)
+    assert(before.frameKind == "confirmation" and before.ownedPhysicalUnassigned == 2)
+
+    -- When the real same-frame swing and its already-spent normal receipt arrive.
+    ledger:Swing({ at = 270, key = "target1", hand = "main" })
+    Normal(ledger, 3, 270, 270.5)
+    local after = First(ledger)
+
+    -- Then one frame upgrades without duplicating outcomes or guessing a parent.
+    assert(#ledger.frames == 1 and after.frameKind == "trigger")
+    assert(after.normalMatched == 1 and after.ownedPhysicalUnassigned == 0)
+    assert(after.ownedPhysicalExtras == 2 and after.verdict == "candidate")
+end)
+
+Check("ineligible reports cannot create confirmation source frames", function()
+    -- Given reports that each lack one required public source control.
+    local changes = {
+        function(report) report.who = "unknown" end,
+        function(report) report.who = "pet" end,
+        function(report) report.confirmed = false end,
+        function(report) report.ambiguous = true end,
+        function(report) report.tick = true end,
+        function(report) report.periodicOnly = true end,
+        function(report) report.evidence.ambiguous = true end,
+        function(report) report.evidence.at = nil end,
+        function(report) report.evidence.source = "other" end,
+        function(report) report.evidence.kind = "tick" end,
+        function(report) report.evidence.at = 276 end,
+    }
+    for _, change in ipairs(changes) do
+        local ledger = Accounting:New()
+        local outcome = Physical(1, 280.5, 280)
+        change(outcome)
+
+        -- When a signal accompanies the unsupported report.
+        ledger:Signal({ at = 280, spell = 439440 })
+        ledger:Outcome(outcome)
+
+        -- Then neither report nor signal can invent an eligible source frame.
+        assert(#ledger.frames == 0, "ineligible report created a source frame")
+        assert(First(ledger).reason == "no-source-frame")
+    end
+end)
+
+Check("shared confirmation frame preserves unassigned status", function()
+    -- Given two reports sharing one exact, public confirmation pool.
+    local ledger = Accounting:New()
+    ledger:Signal({ at = 290, spell = 439440 })
+    for id = 1, 2 do
+        local outcome = Physical(id, 290 + id * 0.2, 290)
+        outcome.evidence.shared, outcome.evidence.capacity = true, 2
+        ledger:Outcome(outcome)
+    end
+
+    -- When no actual native parent was observed in that frame.
+    local row = First(ledger)
+
+    -- Then pooled confirmations remain unassigned despite the capacity hint.
+    assert(row.ownedPhysicalUnassigned == 2 and row.ownedPhysicalExtras == 0)
+    assert(row.sharedEvidence == 2 and row.verdict == "unresolved")
+    assert(row.reason == "parent-unresolved")
+end)
+
+Check("confirmation targets cannot each acquire one global signal", function()
+    -- Given own direct evidence on two distinct lifetimes in one exact frame.
+    local ledger = Accounting:New()
+    ledger:Outcome(Physical(1, 300.2, 300, "target1"))
+    ledger:Outcome(Physical(2, 300.3, 300, "target2"))
+    ledger:Signal({ at = 300, spell = 10610 })
+
+    -- When the targetless signal is associated with source observations.
+    local rows = ledger:Summaries()
+
+    -- Then it remains global rather than granting capacity to either target.
+    assert(rows[1].ownedPhysicalUnassigned == 1 and rows[2].ownedPhysicalUnassigned == 1)
+    assert(rows[1].totemSignals == 0 and rows[2].totemSignals == 0)
+    assert(rows[1].sourceAmbiguous > 0 and rows[2].sourceAmbiguous > 0)
+end)
+
+Check("confirmation lifetime follows rekey without adopting an unknown cast", function()
+    -- Given a direct evidence frame and an untargeted Stormstrike elsewhere.
+    local ledger = Accounting:New()
+    ledger:Outcome(Physical(1, 310.2, 310))
+    ledger:Cast({ at = 310.5, spell = 17364, uncertain = true })
+
+    -- When a public alias changes and an exact native source is later observed.
+    ledger:Rekey("target1", "plate:2")
+    ledger:Swing({ at = 310, key = "plate:2", hand = "main" })
+    Normal(ledger, 2, 310, 310.6, "main", "plate:2")
+    local rows = ledger:Summaries()
+
+    -- Then the known lifetime upgrades while the cast remains untargeted.
+    assert(rows[1].key == "plate:2" and rows[1].normalMatched == 1)
+    assert(rows[1].ownedPhysicalExtras == 1 and rows[1].ssObserved == 0)
+    assert(rows[2].key == nil and rows[2].targetUnresolved == 1)
+    assert(rows[2].ssMatched == 0)
+end)
+
+Check("ranged event cannot resolve a physical confirmation parent", function()
+    for _, rangedFirst in ipairs({ false, true }) do
+        -- Given a physical confirmation and a ranged event in either order.
+        local ledger = Accounting:New()
+        if rangedFirst then
+            ledger:Swing({ at = 320, key = "target1", hand = "ranged" })
+        end
+        ledger:Outcome(Physical(1, 320.2, 320))
+
+        -- When the only observed native event in the frame is ranged.
+        if not rangedFirst then
+            ledger:Swing({ at = 320, key = "target1", hand = "ranged" })
+        end
+        local row = First(ledger)
+
+        -- Then the physical report remains unassigned with an unresolved parent.
+        assert(row.frameKind == "confirmation" and row.normalObserved == 0)
+        assert(row.ownedPhysicalUnassigned == 1 and row.ownedPhysicalExtras == 0)
+        assert(row.reason == "parent-unresolved")
+    end
+end)
+
+Check("rekey joins equivalent confirmation and actual source frames", function()
+    -- Given evidence and an actual source recorded through two public aliases.
+    local ledger = Accounting:New()
+    ledger:Outcome(Physical(1, 330.2, 330, "target1"))
+    ledger:Swing({ at = 330, key = "plate:3", hand = "main" })
+    Normal(ledger, 2, 330, 330.5, "main", "plate:3")
+
+    -- When the reader establishes those aliases as the same target lifetime.
+    ledger:Rekey("target1", "plate:3")
+    local row = First(ledger)
+
+    -- Then one source preserves its actual reservation and both reports.
+    assert(#ledger.frames == 1, "equivalent source frames remained duplicated")
+    assert(row.frameKind == "trigger" and row.normalMatched == 1)
+    assert(row.physicalObserved == 2 and row.ownedPhysicalExtras == 1)
+    assert(row.ownedPhysicalUnassigned == 0)
+end)
+
+Check("unknown-key validation and confirmation frames remain bounded", function()
+    -- Given unsupported recipient controls rather than a readable nil key.
+    local opaque = {}
+    issecretvalue = function(value) return rawequal(value, opaque) end
+    local ledger = Accounting:New()
+    for _, key in ipairs({ opaque, 42, {}, "", string.rep("x", 161) }) do
+        ledger:Cast({ at = 340, key = key, spell = 17364, uncertain = true })
+    end
+    assert(#ledger.frames == 0)
+
+    -- When many valid untargeted casts and own confirmation frames are observed.
+    for index = 1, 300 do
+        local at = 350 + index * 5
+        ledger:Cast({ at = at, spell = 17364,
+            guid = "Untargeted-" .. index, uncertain = true })
+        ledger:Outcome(Physical(index, at + 0.3, at + 0.1))
+    end
+    local summaries = ledger:Summaries()
+
+    -- Then new observation types respect the existing capture limits.
+    assert(#ledger.frames <= 32 and #ledger.outcomes <= 256)
+    assert(#summaries <= 33)
+    issecretvalue = nil
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Swing accounting tests passed")

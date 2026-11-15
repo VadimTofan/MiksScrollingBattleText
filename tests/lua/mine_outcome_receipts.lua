@@ -262,5 +262,159 @@ Check("accounting remains optional and never inspects opaque damage", function()
     assert(mine.lastOutcomeReceipt == nil)
 end)
 
+-- Describe: optional swing eligibility snapshots observe existing windows.
+Check("swing checks preserve the initial early boundary", function()
+    -- Given one native swing before a learned delay exists.
+    local mine = New({}, true)
+    mine:Swing("main", "target1", 10, 2)
+    local swing = mine.swings[1]
+    local lags = mine.swingLags
+
+    -- When the diagnostic checks the reports just before that boundary.
+    for _, delay in ipairs({ 0.247, 0.248, 0.249 }) do
+        local checks = mine:AccountingSwingChecks("target1", 10 + delay)
+
+        -- Then the exact existing cutoff explains each rejected candidate.
+        assert(#checks == 1 and checks[1].at == 10)
+        assert(checks[1].hand == "main" and not checks[1].used)
+        assert(math.abs(checks[1].age - delay) < 0.000001)
+        assert(checks[1].early == 0.25 and checks[1].late == 0.9)
+        assert(checks[1].delayedEarly == 0.7)
+        assert(checks[1].delayedLate == 1.35)
+        assert(not checks[1].eligible and checks[1].reason == "before-window")
+        assert(#mine:SwingsBefore("target1", 10 + delay) == 0)
+    end
+
+    -- When the same swing is checked inside its ordinary window.
+    local checks = mine:AccountingSwingChecks("target1", 10.344)
+
+    -- Then its eligibility agrees with the real matcher without spending it.
+    assert(checks[1].eligible and checks[1].reason == "eligible")
+    assert(#mine:SwingsBefore("target1", 10.344) == 1)
+    assert(mine.swings[1] == swing and not swing.used)
+    assert(mine.swingLags == lags and next(lags) == nil)
+    assert(mine.lastOutcomeReceipt == nil)
+end)
+
+Check("swing checks distinguish spent and expired native swings", function()
+    -- Given a native swing consumed by an ordinary physical report.
+    local mine = New({}, true)
+    mine:Swing("off", "target1", 10)
+    local result = mine:Hit("target1", "damage", 1, 10.3,
+        false, true, nil, false, "swing")
+    assert(result.melee and mine.swings[1].used)
+    local receipt = mine.lastOutcomeReceipt
+    local swing = mine.swings[1]
+
+    -- When diagnostics inspect the still-retained spent entry.
+    local checks = mine:AccountingSwingChecks("target1", 10.4)
+
+    -- Then spent capacity is visible without tidying or changing receipts.
+    assert(#checks == 1 and checks[1].used and not checks[1].eligible)
+    assert(checks[1].reason == "used")
+    assert(mine.lastOutcomeReceipt == receipt and mine.swings[1] == swing)
+
+    -- When a snapshot is requested beyond ordinary retained swing lifetime.
+    local expired = mine:AccountingSwingChecks("target1", 12.1)
+
+    -- Then stale entries are omitted without removing them from Mine.
+    assert(#expired == 0 and #mine.swings == 1)
+    assert(mine.swings[1] == swing and swing.used)
+end)
+
+Check("swing checks mirror learned and duration-reset windows", function()
+    -- Given three stable paired impacts for one hand.
+    local mine = New({}, true)
+    for index = 1, 3 do
+        local at = index * 5
+        mine:Swing("main", "target1", at, 2)
+        mine.pairedSwing = mine:SwingsBefore("target1", at + 0.59)[1]
+        local result = mine:Hit("target1", "damage", 1, at + 0.59,
+            false, true, nil, false, "swing")
+        assert(result.melee)
+    end
+    local samples = mine.swingLags.main
+    mine:Swing("main", "target1", 20, 1.8)
+
+    -- When a slightly faster swing reports before that learned window.
+    local checks = mine:AccountingSwingChecks("target1", 20.344)
+
+    -- Then diagnostics preserve the existing tight-window rejection.
+    assert(math.abs(checks[1].early - 0.49) < 0.000001)
+    assert(math.abs(checks[1].late - 0.74) < 0.000001)
+    assert(not checks[1].eligible and checks[1].reason == "before-window")
+    assert(mine.swingLags.main == samples and #samples == 3)
+    assert(#mine:SwingsBefore("target1", 20.344) == 0)
+
+    -- When the report instead falls in the learned delayed window.
+    local delayed = mine:AccountingSwingChecks("target1", 20.9)
+
+    -- Then the diagnostic includes the existing delayed eligibility.
+    assert(delayed[1].eligible and delayed[1].reason == "eligible")
+    assert(#mine:SwingsBefore("target1", 20.9) == 1)
+
+    -- When the native duration changes by more than the existing threshold.
+    mine:Swing("main", "target1", 25, 1.4)
+    local reset = mine:AccountingSwingChecks("target1", 25.249)
+
+    -- Then learning resets as before and its original early floor remains.
+    assert(mine.swingLags.main == nil)
+    assert(reset[1].early == 0.25 and reset[1].late == 0.9)
+    assert(not reset[1].eligible and reset[1].reason == "before-window")
+    assert(#mine:SwingsBefore("target1", 25.249) == 0)
+end)
+
+Check("swing checks bound snapshots to recent same-target melee entries", function()
+    -- Given many native swings plus ranged and unrelated-target entries.
+    local mine = New({}, true)
+    for index = 1, 12 do
+        mine:Swing("main", "target1", 10 + index * 0.01)
+    end
+    mine:Swing("ranged", "target1", 10.13)
+    mine:Swing("off", "target2", 10.14)
+    local count = #mine.swings
+
+    -- When diagnostics inspect the recent same-target melee candidates.
+    local checks = mine:AccountingSwingChecks("target1", 10.2)
+
+    -- Then at most eight newest entries contain public primitive values only.
+    assert(#checks == 8 and #mine.swings == count)
+    for index, check in ipairs(checks) do
+        assert(math.abs(check.at - (10 + (13 - index) * 0.01)) < 0.000001)
+        assert(check.hand == "main")
+        for _, value in pairs(check) do
+            local kind = type(value)
+            assert(kind == "number" or kind == "string" or kind == "boolean")
+        end
+        assert(check.amount == nil and check.swing == nil and check.record == nil)
+    end
+
+    -- When a retained candidate is too late for either timing window.
+    local late = mine:AccountingSwingChecks("target2", 11.7)
+
+    -- Then the report states the timing exclusion without pruning Mine state.
+    assert(#late == 1 and not late[1].eligible)
+    assert(late[1].reason == "after-window" and #mine.swings == count)
+end)
+
+Check("disabled accounting skips all swing diagnostic work", function()
+    for _, enabled in ipairs({ false, "unset" }) do
+        -- Given default or explicitly disabled accounting and unreadable state.
+        local mine = New({})
+        if enabled == false then mine.accountingEnabled = false end
+        mine.swings = setmetatable({}, {
+            __index = function() error("disabled accounting inspected swings") end,
+        })
+        mine.MeleeWindow = function() error("disabled accounting read windows") end
+        mine.SwingDelay = function() error("disabled accounting read delays") end
+
+        -- When a caller requests a swing snapshot.
+        local checks = mine:AccountingSwingChecks("target1", 10)
+
+        -- Then the opt-out returns nil before allocating a snapshot or reading.
+        assert(checks == nil and next(mine.swings) == nil)
+    end
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Mine outcome receipt tests passed")

@@ -150,6 +150,19 @@ recorded separately. Two and one possible extra outcomes are explicit policy
 hints, not confirmed grants or proc counts. Combined signals do not identify
 which amount belongs to which effect. Missing reports never create outcomes.
 
+Observed Stormstrike casts with unresolved recipients remain untargeted
+reservations. They do not borrow the selected target. An owned direct physical
+report can preserve its exact confirmation frame when no native swing or cast
+matches that frame. These confirmation-only rows show unassigned outcomes and
+an unresolved parent; they never attach themselves to the nearest swing.
+Same-frame Weapon and Totem signals remain separate family candidates.
+
+Reports also retain public swing durations, cast-recipient observation flags,
+and up to eight existing swing-window checks per outcome. Checks capture the
+windows before the matcher spends a reservation and explain whether it was
+already used, eligible, early, or late. Reading these checks does not change
+the windows, learned timing, ownership, or reservation budgets.
+
 This first experiment changes no damage ownership, names, icons, values, or
 display timing. The ledger stores public metadata only and runs only during
 capture. World entry clears its state; stopping capture or the combat engine

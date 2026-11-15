@@ -488,6 +488,9 @@ function ns.DecideHit(hit, line, restrict)
     if not router then return end
     local record = hit.record
     local kind = record.event == "miss" and "miss" or record.event
+    local swingChecks = ns.mine and ns.mine.accountingEnabled
+        and (kind == "damage" or kind == "miss")
+        and ns.mine:AccountingSwingChecks(hit.key, hit.at) or nil
     local leech = Leech(hit)
     local result
     if hit.unidentified then
@@ -515,6 +518,7 @@ function ns.DecideHit(hit, line, restrict)
             evidence = line == true and hit.accountingEvidence or nil,
             receipt = kind ~= "heal" and not result.ambiguous
                 and ns.mine.lastOutcomeReceipt or nil,
+            swingChecks = swingChecks,
         }
     end
     reader.pendingHits[hit] = nil
@@ -1385,6 +1389,9 @@ local function OnCast(unit, spell, guid)
     reader.lastCastTarget = { unit = unit, spell = spell, key = key,
         guid = ns.Text(guid) and guid or nil,
         uncertain = uncertain, at = now }
+    if ns.mine.accountingEnabled then
+        reader.lastCastTarget.observed = observed == true
+    end
     ns.mine:Cast(unit, spell, key, now, uncertain)
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     -- Your pet's casts and your own with no target to hit (Life Tap) are
