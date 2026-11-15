@@ -386,6 +386,13 @@ local function SpendDirect(self, spell, cast, key, missed)
     cast.outcomes = cast.outcomes or {}
     local target = key or false
     cast.outcomes[target] = (cast.outcomes[target] or 0) + 1
+    if self.accountingEnabled == true and not cast.ambiguous then
+        self.lastOutcomeReceipt = {
+            kind = "cast", at = cast.at, key = key, sourceKey = cast.key,
+            spell = spell, who = cast.caster, ordinal = cast.outcomes[target],
+            uncertain = cast.targetUncertain == true,
+        }
+    end
     if missed then
         cast.misses = cast.misses or {}
         cast.misses[target] = (cast.misses[target] or 0) + 1
@@ -624,6 +631,12 @@ function Mine:Swing(hand, key, now, duration)
         -- A ranged shot flies, so it never claims a hit from before it (0.3.13).
         if hand ~= "ranged" and not hit.claimed and hit.key == key and (hit.kind == "miss" or SchoolFits(PHYSICAL, hit.school)) then
             hit.claimed = true
+            if self.accountingEnabled == true then
+                hit.accountingReceipt = {
+                    kind = "swing", at = now, key = key, hand = hand,
+                    who = "you", ordinal = 1,
+                }
+            end
             return hit
         end
     end
@@ -748,6 +761,7 @@ end
 -- A line confirms ownership, but close spell identities remain unnamed.
 -- Mixed player/pet candidates cannot safely choose an individual owner.
 local function AmbiguousResult(self, owner, mixedOwners, tick, missed)
+    self.lastOutcomeReceipt = nil
     self.ambiguous = true
     if self.lineNow ~= true or mixedOwners then owner = "unknown" end
     return Result(owner, nil, tick,
@@ -1407,6 +1421,12 @@ local function Yours(self, key, kind, school, now)
                         and SchoolFits(self.wandSchool, school))
                     or (not ranged and SchoolFits(PHYSICAL, school))) then
                 swing.used = true
+                if self.accountingEnabled == true then
+                    self.lastOutcomeReceipt = {
+                        kind = "swing", at = swing.at, key = swing.key,
+                        hand = swing.hand, who = "you", ordinal = 1,
+                    }
+                end
                 -- 0.6.2: the delay of a melee hit paired by its swing's line.
                 local _, usualLate = self:MeleeWindow(swing.hand)
                 if paired and not ranged and since <= usualLate then
@@ -1660,6 +1680,7 @@ end
 -- pairing remains unknown. Reserve compatible evidence without teaching facts
 -- or advancing a guessed rhythm, so a later fallback cannot reuse the group.
 function Mine:ConfirmUnidentified(key, school, now)
+    self.lastOutcomeReceipt = nil
     self.amountNow, self.critNow, self.lineNow = nil, false, true
     self.restrictNow, self.ambiguous = nil, true
     local owner, mixedOwners
@@ -1770,6 +1791,7 @@ end
 -- moment, false when heals on you were read and none matched, nil unknown.
 -- avoid: the game's word for a miss ("PARRY", "DODGE", "MISS", ...), nil unknown.
 function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, restrict, leech, avoid)
+    self.lastOutcomeReceipt = nil
     self:Tidy(now)
     self.amountNow, self.lineNow, self.ambiguous, self.critNow = amount, line, false, crit == true
     -- Which avoid a miss was, and whether your pet attacks its unit (CastTakesMiss).
@@ -1853,6 +1875,7 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, rest
         local guess = self:Likeliest(school, now, self.restrictNow, key)
         -- A hit that healed you is a drain's: never a spell that does not drain.
         if guess and not (self.leechNow == true and not Leeches(self, guess.spell)) then return guess end
+        self.lastOutcomeReceipt = nil
     end
     -- 0.3.49: a hit of yours (its line came) that healed you for its amount
     -- and that nothing above placed is a drain no cast of yours explains:

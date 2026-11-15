@@ -112,6 +112,7 @@ local engine = Engine:New({
                     spell = record.result.spell,
                     procCandidate = record.result.procCandidate,
                     candidateSpell = record.result.candidateSpell,
+                    accounting = record.accounting,
                 }
             end
             presentation:Out(record)
@@ -157,6 +158,7 @@ local function Start()
     batcher:Reset()
     engine:Start()
     Event("PLAYER_ENTERING_WORLD")
+    ns.mine.accountingEnabled = true
     assert(ns.SpellFacts(17364).source == "nameplatesct-reforged")
     return now
 end
@@ -214,6 +216,17 @@ Replay("captured Stormstrike-triggered delayed physical reports", function()
         assert(Displayed(amount) == 1, "owned opaque amount was lost or duplicated")
     end
     assert(Record(normal).melee and Record(strike).spell == 17364)
+    local normalAccounting = forwarded[normal].accounting
+    assert(normalAccounting and normalAccounting.receipt,
+        "normal swing outcome lost its accounting receipt before dispatch")
+    assert(normalAccounting.receipt.kind == "swing"
+        and normalAccounting.receipt.at == start)
+    local strikeAccounting = forwarded[strike].accounting
+    assert(strikeAccounting and strikeAccounting.receipt
+        and strikeAccounting.receipt.kind == "cast"
+        and strikeAccounting.receipt.spell == 17364
+        and strikeAccounting.receipt.at == start + 1.047,
+        "Stormstrike outcome lost its spent cast reservation")
     for _, amount in ipairs({ first, second }) do
         local result = Record(amount)
         assert(result.procCandidate and result.candidateSpell == 8232)
@@ -221,6 +234,11 @@ Replay("captured Stormstrike-triggered delayed physical reports", function()
         assert(forwarded[amount].procCandidate
             and forwarded[amount].candidateSpell == 8232,
             "late candidate metadata was unavailable at presentation dispatch")
+        local accounting = forwarded[amount].accounting
+        assert(accounting and accounting.confirmed
+            and accounting.restrict == "direct" and accounting.evidence
+            and accounting.evidence.at == start + 1.047,
+            "delayed report was grouped by arrival instead of its confirmation")
     end
 
     -- Then the third report cannot reuse either consumed confirmation.

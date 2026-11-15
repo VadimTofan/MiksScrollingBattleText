@@ -10,6 +10,7 @@ ignore:
   - Combat/Trace.lua
   - Combat/WindfuryTrace.lua
   - Combat/WindfuryCapture.lua
+  - Combat/SwingAccounting.lua
   - .pkgmeta
   - .github
   - .vscode

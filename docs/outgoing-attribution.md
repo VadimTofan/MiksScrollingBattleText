@@ -135,3 +135,23 @@ repeated updates are retained. `targetContext` records the selected target
 at arrival, not the spell's victim. These updates never change ownership,
 names, damage, or expected proc counts. The event unregisters when capture
 stops. Live recordings are needed before using this signal for attribution.
+
+On the swing-tracking experiment branch, `/msbttrace wf` also enables a
+parallel accounting ledger. It reserves each observed native swing and the
+supported Stormstrike outcome. Optional receipts identify reservations the
+existing matcher already spent; accounting never spends them again. Delayed
+reports retain the original confirmation frame, and collective confirmations
+retain their shared pool instead of inventing individual line assignments.
+
+The report lists matched and unresolved ordinary outcomes, excluded periodic
+and known spells, unexplained owned physical outcomes, and unowned or unlinked
+reports. Windfury Weapon `439440` and the observed Totem signal `10610` are
+recorded separately. Two and one possible extra outcomes are explicit policy
+hints, not confirmed grants or proc counts. Combined signals do not identify
+which amount belongs to which effect. Missing reports never create outcomes.
+
+This first experiment changes no damage ownership, names, icons, values, or
+display timing. The ledger stores public metadata only and runs only during
+capture. World entry clears its state; stopping capture or the combat engine
+disables receipts. `Combat/SwingAccounting.lua` remains outside release
+manifests and packaging, alongside the other optional diagnostics.

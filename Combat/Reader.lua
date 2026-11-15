@@ -51,6 +51,19 @@ local function RekeyTarget(old, new)
         if entry.record and entry.record.victimKey == old then
             entry.record.victimKey = new
         end
+        local accounting = entry.record and entry.record.accounting
+        if accounting then
+            if accounting.key == old then accounting.key = new end
+            local receipt = accounting.receipt
+            if receipt then
+                if receipt.key == old then receipt.key = new end
+                if receipt.sourceKey == old then receipt.sourceKey = new end
+            end
+            local evidence = accounting.evidence
+            if evidence and evidence.targetContext == old then
+                evidence.targetContext = new
+            end
+        end
         if entry.held and entry.held.key == old then entry.held.key = new end
     end
     for _, field in ipairs({ "swingTimes", "swingHits", "frameHits",
@@ -445,6 +458,31 @@ ns.ProcCandidate = ProcCandidate
 -- Compatibility boundary: active effects cannot prove a damage spell's ID.
 ns.ProcSpell = function() return nil end
 
+local function AccountingEvidence(hit, evidence, shared)
+    if not (ns.mine and ns.mine.accountingEnabled) then return end
+    hit.accountingEvidence = nil
+    if not evidence then return end
+    if not shared then
+        hit.accountingEvidence = {
+            at = evidence.at, source = evidence.source, kind = evidence.kind,
+            targetContext = evidence.targetContext, shared = false, capacity = 1,
+        }
+        return
+    end
+    local first = evidence[1]
+    if not first then return end
+    local info = { at = first.at, source = first.source, kind = first.kind,
+        shared = true, capacity = #evidence }
+    for _, line in ipairs(evidence) do
+        if line.at ~= info.at or line.source ~= info.source then
+            info.at, info.source, info.ambiguous = nil, nil, true
+            break
+        end
+        if line.kind ~= info.kind then info.kind = nil end
+    end
+    hit.accountingEvidence = info
+end
+
 function ns.DecideHit(hit, line, restrict)
     local router = Router()
     if not router then return end
@@ -470,6 +508,15 @@ function ns.DecideHit(hit, line, restrict)
     end
     TagProcCandidate(result, hit.at, record.school, hit.key)
     record.result = result
+    if ns.mine and ns.mine.accountingEnabled then
+        record.accounting = {
+            at = hit.at, key = hit.key, confirmed = line == true,
+            restrict = restrict,
+            evidence = line == true and hit.accountingEvidence or nil,
+            receipt = kind ~= "heal" and not result.ambiguous
+                and ns.mine.lastOutcomeReceipt or nil,
+        }
+    end
     reader.pendingHits[hit] = nil
     if ns.traceCombat then
         ns.traceCombat("decision", hit, { stage = "decision",
@@ -921,7 +968,10 @@ function DecideGroup(group, frameLines, decided, settled)
     local function Claim(count)
         for index = 1, math.min(count, #frameLines) do frameLines[index].claimed = true end
     end
-    local function Decide(hit, flag, restrict)
+    local function Decide(hit, flag, restrict, evidence)
+        if flag == true then
+            AccountingEvidence(hit, evidence or frameLines, evidence == nil)
+        end
         local result, entry = ns.DecideHit(hit, flag, flag == true and restrict or nil)
         decided[#decided + 1] = { result = result, entry = entry }
     end
@@ -974,7 +1024,7 @@ function DecideGroup(group, frameLines, decided, settled)
             end
             if best then
                 line.claimed = true
-                Decide(table.remove(remaining, best), true, "tick")
+                Decide(table.remove(remaining, best), true, "tick", line)
             end
         end
     end
@@ -994,6 +1044,7 @@ function DecideGroup(group, frameLines, decided, settled)
                 -- answers is known: an instant Curse of Exhaustion's cast came
                 -- after its Immune report in the same frame, and the miss took
                 -- an older cast's icon (1.60.1.70374).
+                AccountingEvidence(hit, frameLines, true)
                 C_Timer.After(MISS_SETTLE, function() ns.DecideHit(hit, true, restrict) end)
             else
                 Decide(hit, true, restrict)
@@ -1018,12 +1069,12 @@ function DecideGroup(group, frameLines, decided, settled)
                 swingLine.claimed, swingLine.hit = true, { at = hit.at, record = record }
 
                 ns.mine.pairedSwing = swing
-                Decide(hit, true, LineRestrict(swingLine))
+                Decide(hit, true, LineRestrict(swingLine), swingLine)
             elseif orphan then
                 orphan.claimed, orphan.hit = true, { at = hit.at, record = record }
 
                 ns.mine.orphanSwing = true
-                Decide(hit, true, LineRestrict(orphan))
+                Decide(hit, true, LineRestrict(orphan), orphan)
             end
         end
         for _, hit in ipairs(rest) do
@@ -1033,7 +1084,7 @@ function DecideGroup(group, frameLines, decided, settled)
                 procLine.claimed, procLine.hit = true, { at = hit.at, record = record }
 
                 ns.mine.procSwing = true
-                Decide(hit, true, LineRestrict(procLine))
+                Decide(hit, true, LineRestrict(procLine), procLine)
             elseif record.event == "damage" and ns.mine:InFlight(hit.key, record.school, hit.at) then
                 if settled then
                     -- Periodic matching already waited for this hit's line.
@@ -1046,7 +1097,7 @@ function DecideGroup(group, frameLines, decided, settled)
                 flight.claimed, flight.hit = true, { at = hit.at, record = record }
 
                 ns.mine.procSwing = true
-                Decide(hit, true, LineRestrict(flight))
+                Decide(hit, true, LineRestrict(flight), flight)
             elseif record.event == "miss" and ns.LineKindsActive and ns.LineKindsActive() then
                 -- 0.3.49: a miss's report can come a frame after its line
                 -- (DecideLateMiss).
@@ -1123,6 +1174,7 @@ function ns.DecideLate(hit)
         end
     end
     if best then best.claimed = true end
+    AccountingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
 end
 
@@ -1143,6 +1195,7 @@ function ns.DecideLateMiss(hit)
         end
     end
     if best then best.claimed = true end
+    AccountingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
 end
 
@@ -1375,6 +1428,9 @@ local function OnSwing(swingType, swingDuration)
     for _, entry in ipairs(reader.held) do
         if entry.held == claimed then
             entry.record.result = { who = "you", melee = true, hand = hand, missed = entry.record.event == "miss" }
+            if entry.record.accounting then
+                entry.record.accounting.receipt = claimed.accountingReceipt
+            end
             if ns.OnYourHit then ns.OnYourHit(entry.record, entry.at) end
             local router = Router()
             if router then router:Out(entry.record) end

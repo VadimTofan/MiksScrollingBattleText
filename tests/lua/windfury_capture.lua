@@ -34,6 +34,20 @@ ns.SpellFacts = function(spell)
 end
 ns.ProcSpell = function() error("capture confused enchant with damage identity") end
 ns.reader = { logLines = {} }
+ns.mine = {}
+local ledgerEvents = {}
+MikSBT.SwingAccounting = { New = function()
+    local ledger = {}
+    for _, method in ipairs({ "Swing", "Cast", "Signal", "Outcome", "Rekey" }) do
+        local name = method
+        ledger[name] = function(_, info, other)
+            ledgerEvents[#ledgerEvents + 1] = { name, info, other }
+        end
+    end
+    ledger.Reset = function() ledgerEvents = {} end
+    ledger.Rows = function() return { "accounting test metadata" } end
+    return ledger
+end }
 MikSBT.Print = function() end
 MikSBT.Compatibility = { Client = { isForever = true } }
 local function Pack(...) return { n = select("#", ...), ... } end
@@ -45,7 +59,10 @@ hooksecurefunc = function(object, method, callback)
         return unpack(result, 1, result.n)
     end
 end
-local Engine = { HandleEvent = function() return "first", nil, "third" end }
+local Engine = {
+    HandleEvent = function() return "first", nil, "third" end,
+    Stop = function() return "stopped" end,
+}
 MikSBT.Components.CombatEngine = Engine
 local profile = { events = {
     OUTGOING_SPELL_DAMAGE = { textCategory = "Outgoing", scrollArea = "Outgoing" },
@@ -121,10 +138,16 @@ cooldownAvailable = false
 
 -- When capture starts on an unsupported client.
 capture:Start()
+assert(capture.ledger and capture.model.accounting == capture.ledger,
+    "capture did not attach the experimental accounting report")
+assert(ns.mine.accountingEnabled == true,
+    "capture did not opt into Mine outcome receipts")
 
 -- Then it does not create or register a cooldown observer.
 assert(#eventFrames == 0, "unsupported cooldown event was registered")
 capture:Stop()
+assert(not ns.mine.accountingEnabled,
+    "stopped capture left outcome accounting enabled")
 
 -- Given no API can positively establish the event's availability.
 local eventUtils = C_EventUtils
@@ -317,4 +340,107 @@ Advance(4)
 -- Then they cannot freeze the new capture or overwrite its report.
 assert(capture.active and reports == 1)
 capture:Stop()
+
+-- Describe: real accounting follows the capture without reading amounts.
+-- Given a real ledger and the recorded delayed Windfury sequence.
+dofile("Combat/SwingAccounting.lua")
+targetKey, now = "experiment-target", 1000
+capture:Start()
+local actualLedger = capture.ledger
+local sourceAt = now
+Swing()
+capture.eventFrame:Fire(COOLDOWN_EVENT, 439440, nil, 0, 0, nil)
+local function Accounted(at, result, receipt, evidenceAt, key)
+    now = at
+    local record = { event = "damage", school = 1, amount = opaque,
+        result = result, accounting = {
+            at = at, key = key or targetKey, confirmed = true,
+            restrict = receipt and receipt.kind == "swing" and "swing" or "direct",
+            receipt = receipt,
+            evidence = evidenceAt and {
+                at = evidenceAt, source = "mine", kind = "spell",
+            } or nil,
+        } }
+    ns.traceCombat("report", { record = record, at = at,
+        key = key or targetKey, unit = "target" })
+    Presentation:Out(record)
+    return record
+end
+
+-- When the normal swing arrives between the two delayed extra outcomes.
+Accounted(sourceAt + 0.215, { who = "you" }, nil, sourceAt)
+Accounted(sourceAt + 0.588, { who = "you", melee = true }, {
+    kind = "swing", at = sourceAt, key = targetKey, hand = "main",
+    ordinal = 1, who = "you",
+})
+Accounted(sourceAt + 1.002, { who = "you" }, nil, sourceAt)
+
+-- Then the report separates observed outcomes from the capacity hypothesis.
+local accounting = actualLedger:Summaries()[1]
+assert(accounting.normalObserved == 1 and accounting.normalMatched == 1)
+assert(accounting.ownedPhysicalExtras == 2 and accounting.weaponSignals == 1)
+assert(accounting.verdict == "candidate")
+assert(capture.model:ReportText():find("Experimental swing accounting", 1, true))
+assert(capture.model:ReportText():find("Weapon=1(hint=2)", 1, true))
+
+-- Given a valid source frame but unreadable outcome classification controls.
+local observed = #actualLedger.outcomes
+local controls = { "tick", "melee", "extra", "ambiguous", "spell" }
+
+-- When each hidden result field or restriction reaches the capture boundary.
+for _, field in ipairs(controls) do
+    local result = { who = "you" }
+    result[field] = opaque
+    capture:AccountingOutcome({ event = "damage", school = 1, amount = opaque,
+        result = result, accounting = {
+            at = now, key = targetKey, confirmed = true, restrict = "direct",
+            evidence = { at = sourceAt, source = "mine", kind = "spell" },
+        } })
+end
+capture:AccountingOutcome({ event = "damage", school = 1, amount = opaque,
+    result = { who = "you" }, accounting = {
+        at = now, key = targetKey, confirmed = true, restrict = opaque,
+        evidence = { at = sourceAt, source = "mine", kind = "spell" },
+    } })
+
+-- Then unreadability remains uncertain instead of becoming an absent field.
+assert(#actualLedger.outcomes == observed,
+    "capture erased secret controls and admitted a physical candidate")
+
+-- Given a successful Stormstrike whose captured recipient is no longer selected.
+now = sourceAt + 2
+local recipientKey = targetKey
+targetKey = "different-selected-target"
+ns.reader.lastCastTarget = { at = now, key = recipientKey,
+    unit = "player", spell = 17364 }
+
+-- When its cast and spent outcome reach capture after the target switch.
+Engine:HandleEvent("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-original", 17364)
+Accounted(now, { who = "you", spell = 17364 }, {
+    kind = "cast", at = now, key = recipientKey, sourceKey = recipientKey,
+    spell = 17364, ordinal = 1, who = "you",
+}, nil, recipientKey)
+
+-- Then accounting uses the original recipient, not the selected target.
+accounting = actualLedger:Summaries()[2]
+assert(accounting.key == recipientKey and accounting.ssMatched == 1)
+ns.traceCombat("rekey", nil, { old = recipientKey, new = "experiment-plate:2" })
+assert(actualLedger:Summaries()[2].key == "experiment-plate:2")
+
+-- Given a world transition while capture remains enabled.
+-- When the event reaches the capture wrapper.
+Engine:HandleEvent("PLAYER_ENTERING_WORLD")
+
+-- Then old source reservations are cleared and receipts stay opt-in.
+assert(#actualLedger:Summaries() == 0 and ns.mine.accountingEnabled)
+
+-- Given the user disables the combat engine during the experiment.
+-- When the engine stops.
+local stopped = Engine:Stop()
+
+-- Then capture stops with it, preserving its report and clearing receipt flags.
+assert(stopped == "stopped", "capture changed the engine stop return")
+assert(not capture.active and not ns.mine.accountingEnabled,
+    "engine stop left experimental accounting active")
+assert(ns.traceCombat == nil and capture.model.accounting == actualLedger)
 print("Windfury capture pipeline tests passed")

@@ -3,10 +3,69 @@ local Capture = { generation = 0 }
 MikSBT.WindfuryCapture = Capture
 local RV = MikSBT.API.RestrictedValue
 local COOLDOWN_EVENT = "SPELL_UPDATE_COOLDOWN"
+local ACCOUNTING_RESULT_FIELDS = {
+    who = "string", spell = "number", procSpell = "number",
+    tick = "boolean", melee = "boolean", extra = "boolean", ambiguous = "boolean",
+}
+local ACCOUNTING_INFO_FIELDS = {
+    at = "number", key = "string", confirmed = "boolean", restrict = "string",
+    receipt = "table", evidence = "table",
+}
+
+local function PublicFields(info, fields)
+    if not RV:Table(info) then return false end
+    for field, expectedType in pairs(fields) do
+        local value = rawget(info, field)
+        if not RV:CanAccess(value)
+            or (value ~= nil and type(value) ~= expectedType) then return false end
+    end
+    return true
+end
 
 local function Pack(...) return { n = select("#", ...), ... } end
 local function Metadata(value)
     return RV:String(value) or RV:Number(value) or RV:Boolean(value)
+end
+
+function Capture:EnableAccounting()
+    if not self.ledger then return end
+    local mine = MikSBT.CombatEngine.mine
+    if self.accountingMine == mine then return end
+    if self.accountingMine then
+        self.accountingMine.accountingEnabled = self.previousAccounting
+        self.accountingMine.lastOutcomeReceipt = nil
+    end
+    self.accountingMine = mine
+    self.previousAccounting = mine and mine.accountingEnabled or nil
+    if mine then mine.accountingEnabled = true end
+end
+
+function Capture:AccountingOutcome(record)
+    if not self.ledger or (record.event ~= "damage"
+        and record.event ~= "miss") then return end
+    local result = record.result or {}
+    local info = record.accounting or self.model:Lookup(record) or {}
+    if not PublicFields(result, ACCOUNTING_RESULT_FIELDS)
+        or not PublicFields(info, ACCOUNTING_INFO_FIELDS) then return end
+    local id = self.accountingIDs[record]
+    if not id then
+        self.accountingNextID = self.accountingNextID + 1
+        id = self.accountingNextID
+        self.accountingIDs[record] = id
+    end
+    local spell = RV:Number(result.spell or result.procSpell)
+    local facts = spell and MikSBT.CombatEngine.SpellFacts
+        and MikSBT.CombatEngine.SpellFacts(spell)
+    self.ledger:Outcome({
+        id = id, at = RV:Number(info.at), key = RV:String(info.key),
+        who = RV:String(result.who), event = RV:String(record.event),
+        school = RV:Number(record.school), spell = spell,
+        tick = RV:Boolean(result.tick), melee = RV:Boolean(result.melee),
+        extra = RV:Boolean(result.extra), ambiguous = RV:Boolean(result.ambiguous),
+        periodicOnly = facts and facts.direct == false and facts.ticks == true,
+        confirmed = RV:Boolean(info.confirmed), restrict = RV:String(info.restrict),
+        receipt = info.receipt, evidence = info.evidence,
+    })
 end
 
 -- Restore correlation context even if the observed method raises an error.
@@ -30,6 +89,7 @@ function Capture:Observe(stage, hit, info)
     if not self.active then return end
     if stage == "rekey" then
         self.model:Rekey(info.old, info.new)
+        if self.ledger then self.ledger:Rekey(info.old, info.new) end
         return
     end
     local record = hit.record
@@ -52,6 +112,12 @@ function Capture:Event(event, duration, hand, spell)
     if event == "PLAYER_SWING" then
         local burst = self.model:Swing(GetTime(), key, Metadata(hand),
             ns.ActiveWindfurySpell(1) == 8232)
+        if self.ledger then
+            local hands = { [0] = "main", [1] = "off", [2] = "ranged" }
+            local swingType = RV:Number(hand)
+            self.ledger:Swing({ at = GetTime(), key = RV:String(key),
+                hand = swingType and hands[swingType] or nil })
+        end
         local generation, model = self.generation, self.model
         C_Timer.After(3.1, function()
             if not self.active or self.generation ~= generation then return end
@@ -70,17 +136,33 @@ function Capture:Event(event, duration, hand, spell)
                 and facts.school == 1 and facts.helpful ~= true
                 and not facts.weaponProc
             self.model:Cast(GetTime(), key, spellID, weaponTrigger)
+            if self.ledger and spellID == 17364 then
+                local recipient = ns.reader and ns.reader.lastCastTarget
+                if recipient and recipient.unit == "player"
+                    and recipient.spell == spellID and recipient.at == GetTime() then
+                    self.ledger:Cast({ at = GetTime(),
+                        key = RV:String(recipient.key), spell = spellID, count = 1,
+                        guid = RV:String(hand),
+                        uncertain = recipient.uncertain == true })
+                end
+            end
         end
     elseif event == "COMBAT_LOG_MESSAGE" then
         local lines = ns.reader and ns.reader.logLines
         local line = lines and lines[#lines]
         if line and line.at == GetTime() then self.model:Log(line, key) end
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        if self.ledger then self.ledger:Reset() end
+        self:EnableAccounting()
     end
 end
 
 function Capture:Cooldown(spellID, baseSpellID, category,
     startRecoveryCategory, itemID)
     if not self.active then return end
+    if self.ledger then
+        self.ledger:Signal({ at = GetTime(), spell = RV:Number(spellID) })
+    end
     self.model:Cooldown(GetTime(), RV:String(MikSBT.CombatEngine.TargetKey()), {
         spellID = RV:Number(spellID), baseSpellID = RV:Number(baseSpellID),
         category = RV:Number(category),
@@ -123,8 +205,14 @@ function Capture:Install()
     hooksecurefunc(components.CombatEngine, "HandleEvent", function(_, ...)
         if self.active then self:Event(...) end
     end)
+    if type(components.CombatEngine.Stop) == "function" then
+        hooksecurefunc(components.CombatEngine, "Stop", function()
+            if self.active then self:Stop() end
+        end)
+    end
     self:Wrap(components.CombatPresentation, "Out", function(original, object, record)
         self.model:Decision(record, record.result or {})
+        self:AccountingOutcome(record)
         local entry = self.model:Lookup(record)
         self.ids = entry and { entry.id } or nil
         return original(object, record)
@@ -188,6 +276,11 @@ function Capture:Start()
     end
     self:Stop()
     self.model = MikSBT.WindfuryTraceModel:New()
+    self.ledger = MikSBT.SwingAccounting and MikSBT.SwingAccounting:New() or nil
+    self.model.accounting = self.ledger
+    self.accountingIDs = setmetatable({}, { __mode = "k" })
+    self.accountingNextID = 0
+    self:EnableAccounting()
     self.batchIDs = setmetatable({}, { __mode = "k" })
     self:Install()
     self.observer = function(...) self:Observe(...) end
@@ -201,6 +294,11 @@ end
 
 function Capture:Stop()
     self.active = false
+    if self.accountingMine then
+        self.accountingMine.accountingEnabled = self.previousAccounting
+        self.accountingMine.lastOutcomeReceipt = nil
+        self.accountingMine = nil
+    end
     if self.eventFrame then self.eventFrame:UnregisterEvent(COOLDOWN_EVENT) end
     self.generation = self.generation + 1
     local ns = MikSBT.CombatEngine

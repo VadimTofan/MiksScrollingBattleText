@@ -28,6 +28,7 @@ class CombatTraceTests(unittest.TestCase):
             self.assertNotIn("Combat/Trace.lua", files)
             self.assertNotIn("Combat/WindfuryTrace.lua", files)
             self.assertNotIn("Combat/WindfuryCapture.lua", files)
+            self.assertNotIn("Combat/SwingAccounting.lua", files)
 
         # Given / When
         exclusions = (ROOT / ".pkgmeta").read_text(encoding="utf-8")
@@ -36,3 +37,4 @@ class CombatTraceTests(unittest.TestCase):
         self.assertIn("  - Combat/Trace.lua\n", exclusions)
         self.assertIn("  - Combat/WindfuryTrace.lua\n", exclusions)
         self.assertIn("  - Combat/WindfuryCapture.lua\n", exclusions)
+        self.assertIn("  - Combat/SwingAccounting.lua\n", exclusions)

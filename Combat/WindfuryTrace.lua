@@ -285,6 +285,12 @@ function Tracker:ReportText()
             end
         end
     end
+    if self.accounting then
+        rows[#rows + 1] = ""
+        rows[#rows + 1] = "Experimental swing accounting (predictions only; " ..
+            "no damage or display changes)"
+        for _, row in ipairs(self.accounting:Rows()) do rows[#rows + 1] = row end
+    end
     return table.concat(rows, "\n")
 end
 
