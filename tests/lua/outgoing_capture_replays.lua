@@ -247,6 +247,58 @@ Replay("captured Stormstrike-triggered delayed physical reports", function()
     assert(Displayed(unconfirmed) == 0)
 end)
 
+Replay("mixed reports cannot assume the normal swing already arrived", function()
+    for _, physicalFirst in ipairs({ false, true }) do
+        -- Given the captured swing and one earlier confirmed physical extra.
+        now = 22504.612
+        local start = Start()
+        local extra, physical, fire, normal =
+            Amount(), Amount(), Amount(), Amount()
+        local strike, laterExtra, surplus = Amount(), Amount(), Amount()
+        Event("PLAYER_SWING", 3.2, 0)
+        Line("swing")
+        Line("spell")
+        At(start + 0.216)
+        Hit(extra)
+
+        -- When one spell line accompanies two reports of unresolved ownership.
+        At(start + 1.076)
+        Line("spell")
+        if physicalFirst then Hit(physical) end
+        Hit(fire, "target", 4)
+        if not physicalFirst then Hit(physical) end
+
+        -- A later normal is a valid alternative to assigning the earlier pair.
+        At(start + 1.2)
+        Hit(normal)
+
+        -- When the later Stormstrike and extra have two new confirmations.
+        At(start + 1.321)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 17364)
+        Line("spell")
+        Line("spell")
+        Hit(strike)
+        Hit(laterExtra)
+        At(start + 1.5)
+        Hit(surplus)
+        At(start + 3)
+
+        -- Then ambiguous reports cannot consume the actual normal's evidence.
+        assert(Record(physical).who == "unknown" and Displayed(physical) == 0,
+            "mixed physical report consumed an unproven swing reservation")
+        assert(Record(fire).who == "unknown" and Displayed(fire) == 0,
+            "one spell line proved two mixed reports' ownership")
+        assert(Record(normal).who == "you" and Record(normal).melee)
+        local receipt = forwarded[normal].accounting.receipt
+        assert(receipt and receipt.kind == "swing" and receipt.at == start)
+        assert(Record(strike).spell == 17364)
+        for _, amount in ipairs({ extra, normal, strike, laterExtra }) do
+            assert(Record(amount).who == "you" and Displayed(amount) == 1)
+        end
+        assert(Record(surplus).who == "unknown" and Displayed(surplus) == 0)
+    end
+end)
+
 Replay("early unknown reports expose the existing native swing window", function()
     -- Given a native swing and its own typed swing line.
     local start = Start()

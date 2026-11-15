@@ -94,6 +94,12 @@ amounts are confirmed but their direct/periodic roles cannot be assigned,
 they remain numeric and unnamed without teaching a rhythm or reopening
 possible spell outcomes.
 
+A mixed fire/physical frame with one direct line cannot assume the physical
+report used an earlier native swing. The direct line might instead describe
+that physical proc, with the normal swing still delayed. A compatible later
+normal report must retain its unused swing evidence. Native timing eligibility
+and total candidate capacity alone do not establish both reports' ownership.
+
 Readable cast GUIDs join SENT recipient evidence to successful casts and
 channel starts. Public target, focus, mouseover, and nameplate aliases are
 checked together. Duplicate or unreadable recipients stay uncertain. Older
