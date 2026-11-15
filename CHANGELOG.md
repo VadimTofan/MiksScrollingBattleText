@@ -1,7 +1,15 @@
 # Changelog
 
-## Unreleased
+## v12.053
 
+- Scrolling text now moves on every frame for smoother motion at high
+  frame rates.
+- Combat-text settings are written only when changed, reducing unnecessary
+  updates at fight boundaries.
+- Forever partial blocks show the blocked amount using the last readable
+  shield-block value, or a numberless trailer when no value is available.
+- Updated translations for recent controls and notifications, including
+  missing German event-code help.
 - Restricted flat partial-block amounts to Forever so Retail block armor
   is never displayed as damage blocked.
 - Made inferred Windfury icons baseline on Forever and removed the General
