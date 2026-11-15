@@ -113,6 +113,8 @@ local searchEditbox
 local shownFrame
 local snapshots
 local baseSnapshot
+local baseMechanics
+local switchesChanged
 local keepBaseOnHide
 local CheckboxEnable
 local DropdownDisable, DropdownEnable, DropdownClear, DropdownRemoveItem
@@ -810,13 +812,65 @@ local function CurrentProfileName()
 end
 
 
+-- The switches that stand for a client setting are written to the client at once and their marks
+-- sit in the profile outside the profile snapshots, so Cancel puts them back from a record taken
+-- when the window opened. With the profiles module's Take and Restore functions the record is
+-- theirs and opaque; with only the older text functions it holds the two effect values.
+local function HasRecordFunctions()
+	return MSBTProfiles.TakeBlizzardSwitches and MSBTProfiles.RestoreBlizzardSwitches
+end
+
+
+local function TakeMechanics()
+	if HasRecordFunctions() then return { record = MSBTProfiles.TakeBlizzardSwitches() } end
+	if not (MSBTProfiles.GetSpellMechanicsText and MSBTProfiles.SetSpellMechanicsText) then return end
+	local own, others = MSBTProfiles.GetSpellMechanicsText()
+	return { texts = { own = own, others = others } }
+end
+
+
+local function RestoreMechanics()
+	if not baseMechanics then return end
+	if baseMechanics.record then
+		MSBTProfiles.RestoreBlizzardSwitches(baseMechanics.record)
+		return
+	end
+	local own, others = MSBTProfiles.GetSpellMechanicsText()
+	local current = { own = own, others = others }
+	for which, value in pairs(baseMechanics.texts) do
+		if current[which] ~= nil and current[which] ~= value then
+			MSBTProfiles.SetSpellMechanicsText(which, value)
+		end
+	end
+end
+
+
+local function SameValue(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then return left == right end
+	for key, value in pairs(left) do
+		if not SameValue(value, right[key]) then return false end
+	end
+	for key in pairs(right) do
+		if left[key] == nil then return false end
+	end
+	return true
+end
+
+
 -- Runs after every profile write while the window exists, so it must not create tables.
 local function UpdateState()
 	if not frame:IsShown() then return end
 	profileDropdown:SetSelectedID(CurrentProfileName())
 	changesButton:SetLabel(string.format(L.WINDOW.changesCount,
 		snapshots:Count(snapshots:GetLoginSnapshot())))
-	if snapshots:Count(baseSnapshot, 1) > 0 then applyButton:Enable() else applyButton:Disable() end
+	if snapshots:Count(baseSnapshot, 1) > 0 or switchesChanged then applyButton:Enable() else applyButton:Disable() end
+end
+
+
+-- The switches are written to the client, which no profile hook sees, so the page tells the window.
+local function RefreshSwitches()
+	switchesChanged = baseMechanics ~= nil and not SameValue(TakeMechanics(), baseMechanics)
+	UpdateState()
 end
 
 
@@ -1068,6 +1122,8 @@ local function CreateFooter()
 	applyButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 9)
 	applyButton:SetClickHandler(function()
 		baseSnapshot = snapshots:Take()
+		baseMechanics = TakeMechanics()
+		switchesChanged = false
 		UpdateState()
 	end)
 	SkinButton(applyButton, true)
@@ -1077,6 +1133,7 @@ local function CreateFooter()
 	button:SetPoint("RIGHT", applyButton, "LEFT", -10, 0)
 	button:SetClickHandler(function()
 		snapshots:Restore(baseSnapshot)
+		RestoreMechanics()
 		module.Hide()
 	end)
 	SkinButton(button)
@@ -1144,6 +1201,7 @@ local function CreateWindow()
 	frame:SetScript("OnShow", function()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
 		baseSnapshot = baseSnapshot or snapshots:Take()
+		baseMechanics = baseMechanics or TakeMechanics()
 		SelectPage(currentKey)
 	end)
 	-- Still shown here means only a parent was hidden, as when the interface is hidden.
@@ -1152,7 +1210,7 @@ local function CreateWindow()
 		PlaySound(799)
 		MSBTOptMain.HidePopups()
 		if not keepBaseOnHide then
-			baseSnapshot = nil
+			baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
 			MSBTOptions.Popups.UseDesignPopups("classic")
 		end
 	end)
@@ -1201,7 +1259,7 @@ local function CreateWindow()
 	-- Another design takes its popups when it opens, which ends a moment this window was put
 	-- away for: its Cancel base is stale then.
 	hooksecurefunc(MSBTOptions.Popups, "UseDesignPopups", function(key)
-		if key ~= "forever" and not frame:IsShown() then baseSnapshot = nil end
+		if key ~= "forever" and not frame:IsShown() then baseSnapshot, baseMechanics, switchesChanged = nil, nil, false end
 	end)
 end
 
@@ -1312,6 +1370,7 @@ local function Show()
 	frame:SetScale(math.min(MSBTProfiles.savedVariables.optionsScale or 1, MaxScale()))
 	-- With the interface hidden, Show runs no OnShow, but writes still need a base.
 	baseSnapshot = baseSnapshot or snapshots:Take()
+	baseMechanics = baseMechanics or TakeMechanics()
 	MSBTOptions.Popups.UseDesignPopups("forever")
 	frame:Show()
 end
@@ -1320,7 +1379,7 @@ end
 -- keepBase leaves Cancel's base in place while the window is put away for a moment.
 local function Hide(keepBase)
 	if not frame then return end
-	if not keepBase then baseSnapshot = nil end
+	if not keepBase then baseSnapshot, baseMechanics, switchesChanged = nil, nil, false end
 	keepBaseOnHide = keepBase
 	frame:Hide()
 	keepBaseOnHide = nil
@@ -1350,6 +1409,7 @@ module.SkinListbox		= SkinListbox
 module.SkinScrollFrame	= SkinScrollFrame
 module.SkinPopup		= SkinPopup
 module.RegisterPage		= RegisterPage
+module.RefreshSwitches	= RefreshSwitches
 module.Show				= Show
 module.Hide				= Hide
 module.IsShown			= IsShown

@@ -1,8 +1,8 @@
 -- Describe: the General, Fonts & Colors, Sounds and Profile pages of the new options window.
 local env = dofile("tests/lua/options_window_env.lua")
 local calls, Profiles, L, tabs, Window = env.calls, env.Profiles, env.L, env.tabs, env.Window
-local Find, FindAll, Labelled, Click, ClickEntry, IsInWindow =
-	env.Find, env.FindAll, env.Labelled, env.Click, env.ClickEntry, env.IsInWindow
+local Find, FindAll, Labelled, Click, ClickEntry, IsInWindow, Footer =
+	env.Find, env.FindAll, env.Labelled, env.Click, env.ClickEntry, env.IsInWindow, env.Footer
 
 -- Which icon each icon button was built with.
 local skinned = {}
@@ -43,11 +43,30 @@ MikSBT.API = { Sounds = { NormalizeFile = function(_, file) return file end } }
 Profiles.savedMedia.sounds = { Alarm = "b.ogg", Beep = "a.ogg" }
 -- The game resolves missing values from the master profile; this store has none.
 for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
+-- The game's own text over a target: the client's values live outside the profile.
+local mechanics = { own = false, others = true }
+function Profiles.GetSpellMechanicsText() return mechanics.own, mechanics.others end
+function Profiles.SetSpellMechanicsText(which, isShown)
+	shown[#shown + 1] = { "SetSpellMechanicsText", which, isShown }
+	mechanics[which] = isShown
+end
+L.CHECKBOXES.spellMechanicsOwn = { label = "Effects on targets", tooltip = "Effects tip" }
+L.CHECKBOXES.spellMechanicsOthers = { label = "Effects on other players' targets", tooltip = "Others tip" }
 dofile("MSBTOptions/MSBTOptionsSounds.lua")
 dofile("MSBTOptions/Designs/Forever/Pages.lua")
 local general = MSBTOptions.Tabs.general
 
 local function Last() return shown[#shown] end
+local function NoteTop()
+	local note = Find(MSBTOptionsWindowFrame, function(frame)
+		for _, region in ipairs(frame.regions) do
+			if region.GetText and region:GetText() == L.LANGUAGE_INFO then return true end
+		end
+	end)
+	for _, region in ipairs(note.regions) do
+		if region.GetText and region:GetText() == L.LANGUAGE_INFO then return region.points.TOPLEFT.y end
+	end
+end
 local function Checkboxes(label)
 	return FindAll(MSBTOptionsWindowFrame, function(region)
 		return region.checkFrame and region.fontString:GetText() == label and region.shown
@@ -117,6 +136,159 @@ do
 	ClickEntry("general")
 	assert(not Checkboxes(L.CHECKBOXES.enableNames.label)[1]:GetChecked(), "the page did not refresh")
 	Profiles.currentProfile.hideSkills = nil
+end
+
+-- Rule: the Blizzard part shows the client's text-over-target switches and saves through the profiles module.
+do
+	ClickEntry("general")
+	local own = Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)
+	local others = Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)
+	assert(#own == 1 and #others == 1, "the two switches were not built once")
+
+	-- Then each is checked as the client says, with no write to the profile.
+	assert(own[1]:GetChecked() == false and others[1]:GetChecked() == true, "the switches differ from the client")
+
+	-- And they look like the other switches.
+	assert(own[1].Enable == Checkboxes(L.CHECKBOXES.enableNames.label)[1].Enable, "the switch is not skinned")
+
+	-- When one is clicked, then the profiles module is asked with the part and the new state.
+	MikSBT.EraseTable(calls)
+	local profileBefore = {}
+	for key, value in pairs(Profiles.currentProfile) do profileBefore[key] = value end
+	Toggle(own[1], true)
+	assert(Last()[1] == "SetSpellMechanicsText" and Last()[2] == "own" and Last()[3] == true, "own was not set")
+	Toggle(others[1], false)
+	assert(Last()[2] == "others" and Last()[3] == false, "others was not set")
+	assert(#calls == 0, "a click wrote to the profile")
+	for key, value in pairs(Profiles.currentProfile) do
+		assert(profileBefore[key] == value, "a click changed the profile field " .. key)
+	end
+	for key in pairs(profileBefore) do
+		assert(Profiles.currentProfile[key] ~= nil, "a click removed the profile field " .. key)
+	end
+
+	-- When the client value changed elsewhere, then the next show has it.
+	mechanics.own, mechanics.others = true, false
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(own[1]:GetChecked() == true and others[1]:GetChecked() == false, "the page did not take the client's values")
+
+	-- When a client lacks one setting, then its switch is hidden and the other one moves up.
+	mechanics.own = nil
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(#Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label) == 0, "a nil value kept its switch")
+	assert(others[1].points.TOPLEFT.y == own[1].points.TOPLEFT.y, "the remaining switch did not move up")
+	mechanics.own = false
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(#Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label) == 1, "the switch did not return")
+
+	-- Then the section grew by the two rows, and the sections below keep their gaps within the page.
+	local function Section(top)
+		return Find(MSBTOptionsWindowFrame, function(region)
+			local point = region.points and region.points.TOPLEFT
+			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
+		end)
+	end
+	assert(Section(0) and Section(180) and Section(340) and Section(0).height == 170
+		and Section(180).height == 150 and Section(340).height == 116, "the sections do not follow the new rows")
+	assert(own[1].points.TOPLEFT.y == -114 and others[1].points.TOPLEFT.y == -138, "the rows are not below the sub-options")
+	-- At the left edge of the Blizzard column, like its own switch, not indented as a sub-option.
+	local blizzard = Checkboxes(L.CHECKBOXES.enableBlizzardDamage.label)[1]
+	assert(own[1].points.TOPLEFT.x == blizzard.points.TOPLEFT.x, "the switches are indented")
+	-- The language note moved up with the third section.
+	assert(NoteTop() == -66, "the language note did not move with the section")
+end
+
+-- Rule: Cancel and Undo all put the client's text settings back to their values from when the window opened.
+do
+	local function Sets()
+		local found = {}
+		for _, entry in ipairs(shown) do
+			if entry[1] == "SetSpellMechanicsText" then found[#found + 1] = entry end
+		end
+		return found
+	end
+	local function Open(own, others)
+		Window.Hide()
+		mechanics.own, mechanics.others = own, others
+		Window.Show()
+		ClickEntry("general")
+		MikSBT.EraseTable(shown)
+	end
+	local function Cancel() Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.cancel))) end
+
+	-- When only one changed, then Cancel writes only that one back.
+	Open(false, true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 1 and Sets()[1][2] == "own" and Sets()[1][3] == false, "Cancel did not put back only the changed one")
+	assert(mechanics.own == false and mechanics.others == true, "Cancel left the client changed")
+
+	-- When both changed, then both go back.
+	Open(false, true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)[1], false)
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 2 and mechanics.own == false and mechanics.others == true, "Cancel did not put both back")
+
+	-- When nothing changed, then Cancel writes nothing.
+	Open(false, true)
+	Cancel()
+	assert(#Sets() == 0, "Cancel wrote an unchanged setting")
+
+	-- When a client lacks a setting, then Cancel does not write it.
+	Open(nil, true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)[1], false)
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 1 and Sets()[1][2] == "others" and mechanics.own == nil, "Cancel wrote a setting the client lacks")
+
+	-- When the client lost a setting meanwhile, then Cancel does not write it.
+	Open(false, true)
+	mechanics.own = nil
+	Cancel()
+	assert(#Sets() == 0 and mechanics.own == nil, "Cancel wrote a setting the client lacks")
+
+	-- When the window was put away for a moment and shown again, then Cancel goes back to the opening.
+	Open(false, true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Window.Hide(true)
+	Window.Show()
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 1 and mechanics.own == false, "Cancel took the changed state as its base after a short hide")
+
+	-- When Apply was clicked (it needs a profile change to be enabled), then Cancel goes back to that state.
+	Open(false, true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Profiles.SetOption(nil, "animationSpeed", 60)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)))
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 0 and mechanics.own == true, "Cancel went back past Apply")
+	Profiles.SetOption(nil, "animationSpeed", 100)
+
+	-- When Undo all is clicked, then the client's settings are left alone: only Cancel covers them.
+	Open(false, true)
+	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Profiles.SetOption(nil, "animationSpeed", 50)
+	Click(Footer())
+	MikSBT.EraseTable(shown)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.undoAll)))
+	assert(#Sets() == 0 and mechanics.own == true, "Undo all touched the client setting")
+	Profiles.SetOption(nil, "animationSpeed", 100)
+	-- Undo all restored the login state, which has no speed; the later rules expect the window open on General.
+	for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
+	Window.Hide()
+	mechanics.own, mechanics.others = false, true
+	Window.Show()
+	ClickEntry("general")
+	MikSBT.EraseTable(shown)
+	MikSBT.EraseTable(calls)
 end
 
 -- Rule: the Options Design dropdown lists the registered designs, shows the chosen one and switches.

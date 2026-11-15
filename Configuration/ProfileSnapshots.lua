@@ -6,6 +6,10 @@ local EraseTable = MikSBT.EraseTable
 
 local EMPTY = {}
 
+-- The marks of the Blizzard text switches live in each profile but stay out of the snapshots:
+-- they are not listed, counted, reverted or restored here, as they follow the client.
+local MARKS = "blizzardSwitches"
+
 function ProfileSnapshots:New(options)
 	local snapshots = setmetatable({}, self)
 
@@ -28,7 +32,11 @@ function ProfileSnapshots:GetState()
 end
 
 function ProfileSnapshots:Take()
-	return CopyTable(self:GetState())
+	local snapshot = CopyTable(self:GetState())
+	for _, profile in pairs(snapshot.profiles) do
+		if type(profile) == "table" then profile[MARKS] = nil end
+	end
+	return snapshot
 end
 
 function ProfileSnapshots:Apply(state)
@@ -44,6 +52,7 @@ function ProfileSnapshots:Restore(snapshot)
 	-- Existing profile tables are refilled because the running addon holds them.
 	for name, saved in pairs(snapshot.profiles) do
 		local profile = profiles[name]
+		local marks = profile and rawget(profile, MARKS)
 		if profile then
 			EraseTable(profile)
 		else
@@ -51,8 +60,9 @@ function ProfileSnapshots:Restore(snapshot)
 			profiles[name] = profile
 		end
 		for key, value in pairs(saved) do
-			profile[key] = type(value) == "table" and CopyTable(value) or value
+			if key ~= MARKS then profile[key] = type(value) == "table" and CopyTable(value) or value end
 		end
+		profile[MARKS] = marks
 	end
 	self:Apply(snapshot)
 end
@@ -63,6 +73,7 @@ local found, limit, master
 
 -- Profiles sit at depth 2; inside one, a missing raw value is the master value at that path.
 local function CompareValues(entries, path, depth, key, old, new, default)
+	if depth == 3 and key == MARKS then return end
 	path[depth] = key
 	local oldIsTable, newIsTable = type(old) == "table", type(new) == "table"
 	-- A profile on one side only is one entry, so a revert copies or removes it whole.
