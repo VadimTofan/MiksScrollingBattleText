@@ -442,4 +442,29 @@ do
 	assert(#bare.regions == 0, "the bare scroll frame was changed")
 end
 
+-- Rule: a popup that hangs its content lower, clear of the picture in the classic header, gets it
+-- back at its corner in the new design, where that header is gone; a popup without such a frame is
+-- skinned as before.
+do
+	-- Given a popup whose content hangs on a frame of its own, 30 below the corner, and one without.
+	local popup = CreateFrame("Frame")
+	popup.content = CreateFrame("Frame", nil, popup)
+	popup.content:SetPoint("TOPLEFT", popup, "TOPLEFT", 0, -30)
+	local label = popup:CreateFontString()
+	label:SetPoint("TOPLEFT", popup.content, "TOPLEFT", 30, -48)
+	local plain = CreateFrame("Frame")
+
+	-- When both are skinned.
+	Window.SkinPopup(popup)
+	Window.SkinPopup(plain)
+
+	-- Then the frame stands at the popup's corner, and what hangs on it was left alone.
+	local corner = Point(popup.content, "TOPLEFT")
+	assert(corner.relative == popup and corner.relativePoint == "TOPLEFT" and corner.x == 0 and corner.y == 0,
+		"the content of the popup is not at its corner")
+	assert(Point(label, "TOPLEFT").relative == popup.content and Point(label, "TOPLEFT").y == -48,
+		"what hangs on the content was moved")
+	assert(plain.content == nil, "a popup without a content frame got one")
+end
+
 print("Options Blizzard look tests passed")

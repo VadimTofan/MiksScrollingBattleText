@@ -784,6 +784,9 @@ local function SkinPopup(popup)
 	HideTextures(popup:GetRegions())
 	Box(popup, COLORS.window)
 	SkinTree(popup:GetChildren())
+	-- A popup may hang its content on a frame of its own that stands lower by the picture in the corner
+	-- of the classic header. The header is gone here, so that frame goes back to the popup's corner.
+	if popup.content then popup.content:SetPoint("TOPLEFT", popup, "TOPLEFT", 0, 0) end
 	if popup.moverFrames then
 		scrollAreaConfig = popup
 		setmetatable(popup.moverFrames, { __newindex = function(movers, key, mover)
