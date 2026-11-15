@@ -99,6 +99,7 @@ local batcher = Batcher:New({
 })
 local presentation = Presentation:New({
     batcher = batcher, getSpellTexture = C_Spell.GetSpellTexture,
+    getProfile = function() return profile end,
 })
 local engine = Engine:New({
     log = log, getSaved = function() return nil end,
@@ -125,7 +126,7 @@ local engine = Engine:New({
 local function Event(event, ...) engine:HandleEvent(event, ...) end
 local function Line(kind)
     local event = ({ swing = "SWING_DAMAGE", spell = "SPELL_DAMAGE",
-        tick = "SPELL_PERIODIC_DAMAGE" })[kind]
+        spellMiss = "SPELL_MISSED", tick = "SPELL_PERIODIC_DAMAGE" })[kind]
     local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[event]
     Event("COMBAT_LOG_MESSAGE", "opaque combat-log text",
         rgb.r, rgb.g, rgb.b, Enum.CombatLogMessageOrder.Newest)
@@ -330,6 +331,65 @@ Replay("same-frame Stormstrike reports exhaust one cast identity", function()
         and forwarded[second].procCandidate == true
         and forwarded[second].candidateSpell == 8232,
         "same-frame unnamed report reached presentation before candidate tagging")
+end)
+
+Replay("applied bleed cannot take a later Stormstrike miss", function()
+    -- Given a bleed whose owned tick already confirms its application.
+    local start, tick = Start(), Amount()
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 21949)
+    At(start + 0.761)
+    Line("tick")
+    Hit(tick)
+    At(start + 1)
+    assert(Record(tick).spell == 21949 and Record(tick).tick)
+
+    -- When the captured certain Stormstrike cast and direct miss arrive.
+    At(start + 1.746)
+    Event("UNIT_SPELLCAST_SENT", "player", nil, "strike-after-bleed", 17364)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "strike-after-bleed", 17364)
+    Line("spellMiss")
+    Event("UNIT_COMBAT", "target", "MISS", "", 0, 1)
+    At(start + 2)
+
+    -- Then the miss spends Stormstrike once without becoming a WF candidate.
+    local result = Record(nil)
+    assert(result.who == "you" and result.spell == 17364,
+        "already-applied bleed kept the Stormstrike miss ambiguous")
+    assert(not result.ambiguous and not result.procCandidate)
+    assert(result.candidateSpell == nil)
+    assert(ns.mine.lastOutcomeReceipt
+        and ns.mine.lastOutcomeReceipt.kind == "cast"
+        and ns.mine.lastOutcomeReceipt.spell == 17364,
+        "Stormstrike miss did not retain its spent cast receipt")
+end)
+
+Replay("ambiguous Stormstrike miss never becomes a Windfury candidate", function()
+    -- Given the captured earlier totem cast and a confirmed normal swing.
+    local start, normal = Start(), Amount()
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 3599)
+    At(start + 0.462)
+    Event("PLAYER_SWING", 3.2, 0)
+    Line("swing")
+    At(start + 0.892)
+    Hit(normal)
+
+    -- When a certain Stormstrike cast overlaps another possible miss source.
+    At(start + 2.208)
+    Event("UNIT_SPELLCAST_SENT", "player", nil, "stormstrike-miss", 17364)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "stormstrike-miss", 17364)
+    Line("spellMiss")
+    Event("UNIT_COMBAT", "target", "MISS", "", 0, 1)
+    At(start + 2.5)
+
+    -- Then ownership survives, but ambiguous identity cannot imply a proc.
+    local result = Record(nil)
+    assert(result.who == "you" and result.ambiguous,
+        "captured overlapping miss did not preserve its identity ambiguity")
+    assert(result.spell == nil and result.procSpell == nil)
+    assert(not result.procCandidate and result.candidateSpell == nil,
+        "ambiguous Stormstrike miss acquired a Windfury candidate")
+    assert(not result.proc,
+        "ambiguous direct miss was promoted to unexplained proc damage")
 end)
 
 Replay("hostile report without own confirmation stays hidden", function()

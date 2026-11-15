@@ -1197,7 +1197,21 @@ local function PhysicalSourceNear(self, key, now, pet)
     end
     return false
 end
-local function CastTakesMiss(self, spell, key, now, avoid, pet, restrict)
+local function PeriodicApplicationConfirmed(self, spell, cast, key, now)
+    local facts = self.facts(spell)
+    if type(facts) ~= "table" or facts.direct ~= false
+        or facts.ticks ~= true then return false end
+    for _, dot in ipairs(self.dots) do
+        if dot.cast == cast and dot.key == key and dot.confirmedAt
+            and dot.confirmedAt <= now then return true end
+    end
+    return false
+end
+
+local function CastTakesMiss(self, spell, cast, key, now, avoid, pet, restrict)
+    if PeriodicApplicationConfirmed(self, spell, cast, key, now) then
+        return false
+    end
     if not avoid then return true end
     if ns.SpellCanAvoid and not ns.SpellCanAvoid(spell, avoid) then return false end
     if restrict ~= "direct" and avoid == "MISS"
@@ -1216,7 +1230,7 @@ local function MatchDirectMiss(self, key, now)
             and (facts.helpful == true or facts.healthCost ~= nil)
         for _, cast in ipairs(casts) do
             if not helpful and DirectAvailable(self, spell, cast, key, now, true) then
-                if CastTakesMiss(self, spell, key, now, self.avoidNow,
+                if CastTakesMiss(self, spell, cast, key, now, self.avoidNow,
                     self.petNow, self.restrictNow) then
                     local candidate = { spell = spell, caster = cast.caster,
                         cast = cast }
@@ -1542,7 +1556,7 @@ function Mine:Fit(key, kind, school, now, amount, restrict, crit, avoid, pet)
         if not entry.used and entry.key == key
             and DirectAvailable(self, entry.spell, entry.cast, key, now) then
             if kind == "miss" then
-                if CastTakesMiss(self, entry.spell, key, now,
+                if CastTakesMiss(self, entry.spell, entry.cast, key, now,
                     avoid, pet, restrict) then Take(0.5)
                 -- A spell's miss line still makes the miss yours (Hit).
                 elseif restrict == "direct" then Take(0.9) end

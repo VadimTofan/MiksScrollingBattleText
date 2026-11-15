@@ -258,5 +258,97 @@ Check("a resisted periodic-only application cannot identify later ticks", functi
     assert(unknown.who == "unknown" and unknown.spell == nil)
 end)
 
+-- Describe: confirmed periodic applications do not compete as fresh misses.
+Check("a confirmed bleed tick leaves the later miss to Stormstrike", function()
+    -- Given a periodic-only bleed with an unambiguous tick on this target.
+    local mine = New({
+        [21949] = { damages = true, direct = false, ticks = true,
+            school = 1, duration = 7 },
+        [17364] = Direct(),
+    })
+    mine:Cast("player", 21949, "t", 10)
+    local tick = mine:Hit("t", "damage", 1, 10.761, false, true,
+        nil, false, "tick")
+    assert(tick.spell == 21949 and tick.tick and not tick.ambiguous)
+    mine:Cast("player", 17364, "t", 11.746)
+
+    -- When an owned direct miss accompanies that Stormstrike cast.
+    local missed = Hit(mine, "t", 11.746, "miss")
+
+    -- Then the successful bleed application cannot obscure the strike.
+    assert(missed.who == "you" and missed.spell == 17364
+        and missed.missed and not missed.ambiguous,
+        "confirmed bleed application competed with Stormstrike's miss")
+end)
+
+Check("an ambiguous periodic reservation cannot prove application success", function()
+    -- Given periodic capacity reserved without a positive named tick.
+    local mine = New({
+        [21949] = { damages = true, direct = false, ticks = true,
+            school = 1, duration = 7 },
+        [17364] = Direct(),
+    })
+    mine:Cast("player", 21949, "t", 10)
+    local unidentified = mine:ConfirmUnidentified("t", 1, 10.761)
+    local bleed = mine.casts[21949][1]
+    assert(unidentified.ambiguous and unidentified.spell == nil)
+    assert(bleed.periodicOutcomes.t == 10.761)
+    assert(mine.dots[1].confirmedAt == nil)
+    mine:Cast("player", 17364, "t", 11.746)
+
+    -- When an owned direct miss could answer either application.
+    local missed = Hit(mine, "t", 11.746, "miss")
+
+    -- Then reserved periodic capacity cannot remove a competing identity.
+    assert(missed.who == "you" and missed.spell == nil
+        and missed.ambiguous and missed.missed,
+        "ambiguous periodic reservation resolved a direct miss")
+end)
+
+Check("an area tick cannot confirm application success on another target", function()
+    -- Given an area DoT confirmed only on its original target.
+    local mine = New({
+        [1] = { damages = true, direct = false, ticks = true,
+            school = 1, duration = 7, area = true },
+        [17364] = Direct(),
+    })
+    mine:Cast("player", 1, "a", 10)
+    local tick = mine:Hit("a", "damage", 1, 10.761, false, true,
+        nil, false, "tick")
+    assert(tick.spell == 1 and tick.tick and not tick.ambiguous)
+    mine:Cast("player", 17364, "b", 11.746)
+
+    -- When a direct miss on the other target could answer either cast.
+    local missed = Hit(mine, "b", 11.746, "miss")
+
+    -- Then another target's tick cannot resolve this application outcome.
+    assert(missed.who == "you" and missed.spell == nil
+        and missed.ambiguous and missed.missed,
+        "another target's confirmed tick eliminated an application miss")
+end)
+
+Check("a mixed spell keeps its unspent direct miss after a confirmed tick", function()
+    -- Given a mixed spell whose periodic component has already landed.
+    local mine = New({
+        [1] = { damages = true, direct = true, ticks = true,
+            school = 1, duration = 7 },
+        [17364] = Direct(),
+    })
+    mine:Cast("player", 1, "t", 10)
+    local tick = mine:Hit("t", "damage", 1, 10.761, false, true,
+        nil, false, "tick")
+    assert(tick.spell == 1 and tick.tick and not tick.ambiguous)
+    assert(mine.casts[1][1].outcomes == nil)
+    mine:Cast("player", 17364, "t", 11.746)
+
+    -- When a direct miss could still be either unspent direct component.
+    local missed = Hit(mine, "t", 11.746, "miss")
+
+    -- Then the periodic tick does not eliminate the mixed spell's direct part.
+    assert(missed.who == "you" and missed.spell == nil
+        and missed.ambiguous and missed.missed,
+        "a mixed spell lost its unspent direct miss after ticking")
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Cast outcome tests passed")

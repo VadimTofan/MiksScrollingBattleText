@@ -55,6 +55,12 @@ the cast is old. A cooldown is not a display lockout: successful casts and
 their supported outcomes govern naming. Additional confirmed hits whose
 multiplicity is not known remain visible without reusing a spent name.
 
+A named, unambiguous tick confirms that its periodic-only cast applied to
+that target. The same application cannot then compete as a new direct miss.
+Initial application misses, other targets, mixed direct/periodic spells, and
+ambiguous periodic reservations retain their existing outcome rules.
+Ambiguous direct outcomes cannot supply a Windfury candidate tag.
+
 The Forever reader requires confirmation once its dedicated filter is ready,
 including before the first log line. Unused direct confirmations following
 a melee swing or known physical ability can support delayed weapon-proc

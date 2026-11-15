@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A confirmed periodic-only effect no longer competes as a fresh application
+  miss. Ambiguous direct outcomes no longer acquire Windfury candidate tags.
 - Added opt-in experimental swing accounting to Windfury reports. It tracks
   observed swings and spent Stormstrike outcomes, excludes periodic damage,
   and reports Weapon/Totem hypotheses without changing damage display.

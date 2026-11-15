@@ -194,7 +194,8 @@ end
 local LinesRunning, DecideGroup
 local WeaponProcTrigger
 local function TagProcCandidate(result, at, school, key)
-    if not result.proc or result.spell or result.drain then return end
+    if result.ambiguous or not result.proc or result.spell
+        or result.drain then return end
     local candidate = ns.ProcCandidate and ns.ProcCandidate(at, school, key)
     result.procCandidate = candidate ~= nil
     result.candidateSpell = candidate
@@ -503,6 +504,7 @@ function ns.DecideHit(hit, line, restrict)
             ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech, record.avoid)
     end
     if line == true and restrict == "direct" and result.who == "you"
+        and not result.ambiguous
         and not result.spell and not result.melee and not result.tick
         and WeaponProcTrigger(hit.at, hit.key)
         and ProcCandidate(hit.at, record.school, hit.key)
