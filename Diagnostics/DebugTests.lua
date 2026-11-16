@@ -86,7 +86,7 @@ addon.tests = {
 	{
 		key = "display",
 		label = "Display: every line handed to the display",
-		tooltip = "Watches MikSBT.Display.Service:DisplayEvent, through which the events reach the screen, and logs"
+		tooltip = "Watches the display service of the addon, through which the events reach the screen, and logs"
 			.. " every line handed to it, shown or not: per line the event, scroll area, whether it is sticky, whether"
 			.. " the display takes the line or why it drops it, the text or template and the further arguments."
 			.. " Ends itself after 300 rows.",
@@ -184,9 +184,9 @@ addon.tests = {
 	{
 		key = "trace",
 		label = "Trace: a strike through the addon",
-		tooltip = "Watches CombatEngine:HandleEvent, CombatPresentation:Out, OutgoingBatcher:Queue and"
-			.. " :DisplayRestricted and Display.Service:DisplayEvent, as /msbttrace does. Logs each stage, and"
-			.. " draws it into the rows of this window with the amount as the client draws it.",
+		tooltip = "Watches the five functions of the addon that /msbttrace watches, from the combat engine to the"
+			.. " display. Logs each stage, and draws it into the rows of this window with the amount as the"
+			.. " client draws it.",
 		run = function(t)
 			-- The first rows of a run are logged; after that the stages only go round the rows the
 			-- window draws into.
@@ -288,11 +288,12 @@ addon.tests = {
 	{
 		key = "windfury",
 		label = "Windfury: capture and report",
-		tooltip = "Starts the addon's own Windfury capture (MikSBT.WindfuryCapture, Combat\\WindfuryCapture.lua)"
-			.. " and, when the capture pauses itself, logs its report (its model's ReportText) and ends itself."
+		tooltip = "Starts the addon's own Windfury capture and, when the capture pauses itself, logs its report and"
+			.. " ends itself."
 			.. " The capture puts its own wrappers on functions of the addon for the session and opens its own"
 			.. " report window when it pauses, which takes the keyboard (Escape lets go). Ticking the test"
-			.. " discards a capture that already runs. Needs the capture's files in the manifest.",
+			.. " discards a capture that already runs. Needs the capture's two files in the manifest; the log"
+			.. " names them.",
 		run = function(t)
 			local capture = MikSBT.WindfuryCapture
 			if not (capture and MikSBT.WindfuryTraceModel) then

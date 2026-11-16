@@ -1576,6 +1576,11 @@ do
 			assert(type(test.key) == "string" and type(test.label) == "string" and type(test.run) == "function",
 				"a listed test lacks its key, label or function")
 			assert(test.key ~= "custom" and not byKey[test.key], "two tests share the key " .. test.key)
+			-- The client wraps a tooltip only between words, and a word wider than the tooltip cuts the rest off.
+			for word in (test.tooltip or ""):gmatch("%S+") do
+				assert(#word <= 24, "the tooltip of the test " .. test.key .. " has the word " .. word
+					.. ", longer than 24 letters")
+			end
 			byKey[test.key] = test
 		end
 	end
