@@ -35,7 +35,7 @@ class TargetEffectTests(unittest.TestCase):
                 lines[spells + 1:spells + 3],
                 ["Combat\\SpellMechanics.lua", "Combat\\Effects.lua"],
             )
-        self.assertIn("ns.NoteEffectCast(unit, spell, now)", reader)
+        self.assertIn("ns.NoteEffectCast(unit, spell, now, key)", reader)
         self.assertIn("ns.NoteEffectHit(record, at)", reader)
         self.assertIn("router.Effect = ", engine)
         self.assertEqual(read("MSBTProfiles.lua").count("\tOUTGOING_EFFECT = {"), 2)

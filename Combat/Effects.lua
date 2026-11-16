@@ -10,9 +10,14 @@ local ns = MikSBT.CombatEngine
 -- target in the frame of the cast, or in the frame of the hit that cast is
 -- named for when its missile flies. What the spell does comes from the
 -- game's data (SpellMechanics.lua), since no function tells it. A resisted
--- or dodged cast changes no aura and shows nothing. Only the moment is seen,
--- not the aura: another aura changing on the target in that frame counts as
--- well (predicted, not yet seen in client).
+-- or dodged cast changes no aura and shows nothing. Where the client hides
+-- the aura, only the moment is seen: another aura changing on the target in
+-- that frame counts as well (predicted, not yet seen in client). Where it
+-- shows the aura, one that reads as not harmful, not from you or your pet,
+-- or as a spell that does something else is not the cast's. A moment and a
+-- cast count only for the target they came on: a cast at another unit, or at
+-- one the reader cannot name, is not watched, and selecting another target
+-- drops what was seen and what waits.
 
 -- Mechanic id to the global string that names it. The client translates them.
 local WORDS = {
@@ -34,34 +39,77 @@ local WORDS = {
 -- counts for EFFECT_FLIGHT after its cast.
 local EFFECT_FRAME, EFFECT_SETTLE, EFFECT_FLIGHT = 0.05, 0.2, 3
 local KEEP = 8
-local auraTimes, casts = {}, {}
+local moments, casts = {}, {}
 
-local function Present(list)
-    if not ns.Public(list) then return true end
-    return type(list) == "table" and #list > 0
+-- Which target you had: the reader counts every one you select (Reader.lua).
+local function Epoch() return ns.reader and ns.reader.epoch end
+
+-- What an aura added or refreshed on your target could be: nil when it reads
+-- as someone else's (not harmful, not from you or your pet) or as a spell
+-- with another effect or none, true when nothing readable tells, else the
+-- effect of its spell.
+local function Effect(aura)
+    if not ns.Public(aura) or type(aura) ~= "table" then return true end
+    local harmful, mine, source = aura.isHarmful, aura.isFromPlayerOrPlayerPet, aura.sourceUnit
+    if (ns.Bool(harmful) and not harmful) or (ns.Bool(mine) and not mine)
+        or (ns.Text(source) and source ~= "player" and source ~= "pet") then return nil end
+    local spell = aura.spellId
+    if not ns.Number(spell, 1) then return true end
+    return ns.SPELL_MECHANICS and ns.SPELL_MECHANICS[spell]
 end
 
--- UNIT_AURA of your target: only the time is kept, and only when something
--- was added or refreshed (a hidden list counts as present).
+-- A refreshed aura comes as its id; a refused look-up hides it.
+local function Refreshed(id)
+    local lookup = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
+    if not lookup or not ns.Number(id) then return true end
+    local ok, aura = pcall(lookup, "target", id)
+    if not ok then return true end
+    return Effect(aura)
+end
+
+-- mark.any: any effect could be yours; mark[mechanic]: that one could.
+local function Count(mark, effect)
+    if effect == true then mark.any = true elseif effect then mark[effect] = true end
+end
+
+-- UNIT_AURA of your target: the moment, the target it came on and what the
+-- auras added or refreshed could be, kept when one could be yours (a hidden
+-- list could hold anything).
 function ns.NoteTargetAura(info)
-    if ns.Public(info) then
-        if type(info) ~= "table" then return end
-        if not (Present(info.addedAuras) or Present(info.updatedAuraInstanceIDs)) then return end
+    local mark = {}
+    if not ns.Public(info) then
+        mark.any = true
+    elseif type(info) == "table" then
+        local added, refreshed = info.addedAuras, info.updatedAuraInstanceIDs
+        if not ns.Public(added) then
+            mark.any = true
+        elseif type(added) == "table" then
+            for _, aura in ipairs(added) do Count(mark, Effect(aura)) end
+        end
+        if not ns.Public(refreshed) then
+            mark.any = true
+        elseif type(refreshed) == "table" then
+            for _, id in ipairs(refreshed) do Count(mark, Refreshed(id)) end
+        end
     end
-    auraTimes[#auraTimes + 1] = GetTime()
-    while #auraTimes > KEEP do table.remove(auraTimes, 1) end
+    if next(mark) == nil then return end
+    mark.at, mark.epoch = GetTime(), Epoch()
+    moments[#moments + 1] = mark
+    while #moments > KEEP do table.remove(moments, 1) end
 end
 
-local function AuraNear(at)
-    for _, time in ipairs(auraTimes) do
-        if math.abs(time - at) <= EFFECT_FRAME then return true end
+local function AuraNear(cast, at)
+    for _, mark in ipairs(moments) do
+        if mark.epoch == cast.epoch and math.abs(mark.at - at) <= EFFECT_FRAME
+            and (mark.any or mark[cast.mechanic]) then return true end
     end
     return false
 end
 
 local function Watch(spell, cast, moment)
     C_Timer.After(EFFECT_SETTLE, function()
-        if cast.shown or not AuraNear(moment) then return end
+        -- Dropped once you have selected another target since.
+        if cast.shown or cast.epoch ~= Epoch() or not AuraNear(cast, moment) then return end
         local word = _G[WORDS[cast.mechanic]]
         local router = ns.liveRouter
         if type(word) ~= "string" or not router then return end
@@ -70,12 +118,15 @@ local function Watch(spell, cast, moment)
     end)
 end
 
--- A cast of yours (Reader.lua, OnCast).
-function ns.NoteEffectCast(unit, spell, now)
+-- A cast of yours (Reader.lua, OnCast) and the key of the unit it went to,
+-- nil when the reader cannot tell. Only your target's auras are seen: a cast
+-- at another unit, or at one unknown, is not watched.
+function ns.NoteEffectCast(unit, spell, now, key)
     if unit ~= "player" then return end
     local mechanic = ns.SPELL_MECHANICS and ns.SPELL_MECHANICS[spell]
     if not mechanic or not WORDS[mechanic] then return end
-    local cast = { at = now, mechanic = mechanic }
+    if key == nil or key ~= ns.TargetKey() then return end
+    local cast = { at = now, mechanic = mechanic, epoch = Epoch() }
     casts[spell] = cast
     Watch(spell, cast, now)
 end

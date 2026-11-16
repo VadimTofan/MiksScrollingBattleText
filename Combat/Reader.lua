@@ -1426,7 +1426,7 @@ local function OnCast(unit, spell, guid)
         -- cast is taken to be at your target and its line decides (0.3.18).
         if PetAttacking("target") or (ns.mine.petLines and LinesRunning and LinesRunning()) then key = ns.TargetKey() end
     end
-    if ns.NoteEffectCast then ns.NoteEffectCast(unit, spell, now) end
+    if ns.NoteEffectCast then ns.NoteEffectCast(unit, spell, now, key) end
     if ns.NoteHealCast then ns.NoteHealCast(unit, spell, key, now, guid) end
     reader.lastCastTarget = { unit = unit, spell = spell, key = key,
         guid = ns.Text(guid) and guid or nil,
