@@ -9,6 +9,8 @@ local function NewControl()
 	function control:SetChecked(value) self.checked = value end
 	function control:SetValue(value) self.value = value end
 	function control:SetPoint(...) self.point = { ... } end
+	-- As wide as its label, like a checkbox of the client.
+	function control:GetWidth() return #tostring(self.label or "") * 7 end
 	return control
 end
 
@@ -31,6 +33,7 @@ local frame = { CreateFontString = NewControl, CreateTexture = NewControl }
 local applied = 0
 local environment = {
 	ipairs = ipairs,
+	math = math,
 	tabFrames = { general = frame },
 	MSBTControls = {
 		CreateCheckbox = NewControl,
@@ -168,3 +171,15 @@ assert(not disabled and profile.blizzardDamageEnabled == false)
 assert(controls.enableCheckbox.checked == true)
 assert(controls.blizzardDamageCheckbox.checked == false,
 	"enabling MSBT left the Blizzard damage checkbox checked")
+
+-- Given labels of different lengths in the column that hangs from its bottom checkbox.
+local widest = 0
+for _, name in ipairs({ "shortenNumbers", "stackSimilarHits", "stickyCrits", "enableIcons", "enableNames" }) do
+	widest = math.max(widest, controls[name .. "Checkbox"]:GetWidth())
+end
+local bottom = controls.shortenNumbersCheckbox
+assert(widest > bottom:GetWidth(), "the labels do not differ in length")
+
+-- Then the column stands left by what its widest label needs, so no label runs past the window.
+assert(bottom.point[1] == "BOTTOMRIGHT" and bottom.point[4] == bottom:GetWidth() - widest - 30,
+	"a label longer than the bottom one runs past the window")

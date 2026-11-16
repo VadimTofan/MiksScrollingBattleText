@@ -363,6 +363,15 @@ local function GeneralTab_Create()
 	end)
 	controls.enableNamesCheckbox = checkbox
 
+	-- The column hangs from the left edge of its bottom checkbox, so a longer label above it
+	-- would run past the window: the column moves left by what its widest label needs.
+	local columnWidth = 0
+	for _, name in ipairs({ "shortenNumbers", "stackSimilarHits", "stickyCrits", "enableIcons", "enableNames" }) do
+		columnWidth = math.max(columnWidth, controls[name .. "Checkbox"]:GetWidth())
+	end
+	checkbox = controls.shortenNumbersCheckbox
+	checkbox:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", checkbox:GetWidth() - columnWidth - 30, 15)
+
 	local slider = MSBTControls.CreateSlider(tabFrame)
 	objLocale = L.SLIDERS["animationSpeed"]
 	slider:Configure(180, objLocale.label, objLocale.tooltip)
