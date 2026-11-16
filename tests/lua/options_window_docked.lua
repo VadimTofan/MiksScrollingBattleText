@@ -176,6 +176,17 @@ do
 	profile.buttonFrame.scripts.OnClick(profile.buttonFrame)
 	local list = Find(profile, function(region) return region.strata == "FULLSCREEN_DIALOG" end)
 	assert(list and list:IsShown(), "the dropdown list is not above the settings window")
+
+	-- Then the list stands above every other frame of the window, the controls beside its field
+	-- included: in the game, Raise alone left it under the sliders of a popup.
+	local function Highest(region)
+		local level = region.level or 0
+		for _, child in ipairs(region.children) do
+			if child ~= list then level = math.max(level, Highest(child)) end
+		end
+		return level
+	end
+	assert(list:GetFrameLevel() > Highest(frame), "the dropdown list does not stand above the frames beside its field")
 	CloseSettings()
 end
 

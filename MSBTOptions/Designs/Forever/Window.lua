@@ -50,6 +50,9 @@ local SEARCH_HEIGHT = 46
 local BLIZZARD_GROUP_HEIGHT = 30
 local BLIZZARD_GROUP_GAP = 18
 local DROPDOWN_LINE_HEIGHT = 20
+-- The dropdown list hangs in its field, and Raise leaves it under the controls beside the field,
+-- such as the sliders of a popup; it stands this many frame levels above the field instead.
+local DROPDOWN_LIST_LIFT = 50
 -- Blizzard's menu ground under the dropdown list: how far it reaches above and below the entries,
 -- the height of the art, and the margin beside the panel it draws at full size.
 local GROUND_TOP, GROUND_BOTTOM, GROUND_ART_HEIGHT, GROUND_SIDE = 18, 29, 90, 16.3
@@ -586,6 +589,7 @@ local function ToggleDropdownList(this)
 	list.dropdown = dropdown
 	list:SetParent(dropdown)
 	list:SetFrameStrata("FULLSCREEN_DIALOG")
+	list:SetFrameLevel(dropdown:GetFrameLevel() + DROPDOWN_LIST_LIFT)
 	list:ClearAllPoints()
 	list:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", list.insetX, -list.insetY)
 	local count = #dropdown.items
