@@ -27,7 +27,7 @@ MSBTOptions.Popups = {
 	UseDesignPopups = env.Popups.UseDesignPopups,
 }
 MSBTOptions.Tabs = { general = {
-	ShowMasterFont = Recorder("ShowMasterFont"),
+	ShowMasterFont = Recorder("ShowMasterFont"), ShowAddFont = Recorder("ShowAddFont"),
 	ResetBlizzardSCT = Recorder("ResetBlizzardSCT"), ReportImport = Recorder("ReportImport"),
 } }
 MSBTOptions.ProfileTransfer = { ShowExport = Recorder("ShowExport"), ShowImport = Recorder("ShowImport") }
@@ -365,6 +365,54 @@ do
 	end
 end
 
+-- Rule: Fonts & Colors offers the classic General tab's custom font dialog in the row below the master fonts.
+do
+	ClickEntry("fontsColors")
+	local function Shown(kind, text)
+		return FindAll(MSBTOptionsWindowFrame, function(region)
+			return region.kind == kind and region:GetText() == text and region.shown
+		end)
+	end
+	local edits, adds = Shown("Button", L.WINDOW.edit), Shown("Button", L.WINDOW.add)
+	local add = adds[1]
+
+	-- Then the entry has the classic button's label and help as its name and hint, and an Add button.
+	assert(#adds == 1 and #edits == 4, "Fonts & Colors does not offer the custom font entry beside the four others")
+	assert(#Shown("FontString", L.CUSTOM_FONTS.add) == 1 and #Shown("FontString", L.CUSTOM_FONTS.help) == 1
+		and add.tooltip == L.CUSTOM_FONTS.help, "the entry does not show the classic button's texts")
+
+	-- And it is the second of five rows 70 apart, which still fit the page.
+	local function Top(text) return Shown("FontString", text)[1].points.TOPLEFT.y end
+	local master = Top(L.BUTTONS.masterFont.label)
+	assert(Top(L.CUSTOM_FONTS.add) == master - 70 and Top(L.BUTTONS.partialEffects.label) == master - 140
+		and Top(L.BUTTONS.classColors.label) == master - 280 and add.points.TOPRIGHT.y == master - 78,
+		"the entry is not the row below the master fonts")
+	local section = add:GetParent()
+	assert(section.height == 5 * 70 + 10 and section.height <= section:GetParent():GetParent():GetHeight(),
+		"the entries do not fit the page")
+
+	-- When its button is clicked, then the classic export opens the dialog over the page at the button,
+	-- as the master fonts open, and the other entries wait until it hides.
+	Click(add)
+	local call = Last()
+	assert(call[1] == "ShowAddFont" and call[2] == section and IsInWindow(call[2]:GetParent()) and call[3] == add
+		and call[4] == "TOPRIGHT" and call[5] == "BOTTOMRIGHT", "the custom font dialog did not open at its button")
+	for _, button in ipairs(edits) do
+		assert(not button:IsEnabled(), "an entry stayed enabled behind the custom font dialog")
+	end
+	call[6]()
+	assert(add:IsEnabled() and edits[1]:IsEnabled(), "closing the dialog did not enable the entries")
+
+	-- When another entry's popup is open, then the entry waits too.
+	Click(edits[1])
+	assert(Last()[1] == "ShowMasterFont" and Last()[2] == section and not add:IsEnabled(),
+		"the custom font entry stayed enabled behind the master fonts")
+	Click(add)
+	assert(Last()[1] == "ShowMasterFont", "the custom font dialog opened over the master fonts")
+	Last()[6]()
+	assert(add:IsEnabled(), "closing the master fonts did not enable the custom font entry")
+end
+
 -- Rule: Sounds lists, plays and removes custom sounds through the classic functions.
 do
 	ClickEntry("sounds")
@@ -485,7 +533,8 @@ do
 	Window.Hide()
 end
 
--- Rule: the German texts give the Sounds and Profile pages their own hints and Inherit a word of its own.
+-- Rule: the German texts give the Sounds and Profile pages their own hints, Inherit a word of its own
+-- and the custom font entry its button word.
 do
 	local classic = L.CHECKBOXES.inheritField.label
 	-- English keeps its classic word, as every language does that defines no other.
@@ -503,6 +552,7 @@ do
 		== "Erbt den Wert der \195\188bergeordneten Einstellung.\n\nHaken entfernen, um ihn zu \195\188berschreiben.",
 		"Inherit has no German word of its own")
 	assert(L.CHECKBOXES.inheritValue.label ~= L.WINDOW.apply, "Inherit reads like Apply")
+	assert(L.WINDOW.add == "Hinzuf\195\188gen", "the custom font entry's button is not German")
 	assert(L.CHECKBOXES.inheritField.label == "\195\156bernehmen" and classic == "Inherit",
 		"the classic Inherit label changed")
 end

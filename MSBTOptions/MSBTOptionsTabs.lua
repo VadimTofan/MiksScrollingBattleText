@@ -223,27 +223,30 @@ local function GeneralTab_ValidateFont(name, path)
 	path = NormalizeFontPath(path)
 	if not path then return locale.invalidPath end
 	local validator = tabFrames.general.fontPathValidationFontString
+	-- The General tab makes its string when first shown; another design may validate before that.
+	if not validator then
+		validator = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		tabFrames.general.fontPathValidationFontString = validator
+	end
 	local ok, loaded = pcall(validator.SetFont, validator, path, 14, "")
 	if not ok or loaded ~= true then return locale.invalidPath end
 end
 
-local function GeneralTab_AddFont(button)
-	local tabFrame = tabFrames.general
+local function GeneralTab_ShowAddFont(parentFrame, anchorFrame, anchorPoint, relativePoint, hideHandler)
 	local locale = L.CUSTOM_FONTS
-	DisableControls(tabFrame.controls)
 	MSBTPopups.ShowInput({
 		title = locale.add,
-		parentFrame = tabFrame,
-		anchorFrame = button,
-		anchorPoint = "BOTTOMLEFT",
-		relativePoint = "TOPLEFT",
+		parentFrame = parentFrame,
+		anchorFrame = anchorFrame,
+		anchorPoint = anchorPoint,
+		relativePoint = relativePoint,
 		editboxLabel = locale.name,
 		editboxTooltip = locale.nameHelp,
 		showSecondEditbox = true,
 		secondEditboxLabel = locale.path,
 		secondEditboxTooltip = locale.pathHelp,
 		validateHandler = GeneralTab_ValidateFont,
-		hideHandler = GeneralTab_EnableControls,
+		hideHandler = hideHandler,
 		saveHandler = function(settings)
 			local name = TrimFontInput(settings.inputText)
 			local path = NormalizeFontPath(settings.secondInputText)
@@ -256,6 +259,12 @@ local function GeneralTab_AddFont(button)
 			end
 		end,
 	})
+end
+
+local function GeneralTab_AddFont(button)
+	local tabFrame = tabFrames.general
+	DisableControls(tabFrame.controls)
+	GeneralTab_ShowAddFont(tabFrame, button, "BOTTOMLEFT", "TOPLEFT", GeneralTab_EnableControls)
 end
 
 
@@ -2324,6 +2333,7 @@ module.scrollAreas = {
 -- The designs' General, Fonts & Colors and Profile pages share these.
 module.general = {
 	ShowMasterFont = GeneralTab_ShowMasterFont,
+	ShowAddFont = GeneralTab_ShowAddFont,
 	ResetBlizzardSCT = ResetBlizzardSCTTab_ConfirmReset,
 	ReportImport = ProfileTab_ReportImport,
 }

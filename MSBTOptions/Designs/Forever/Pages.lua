@@ -38,8 +38,11 @@ local SUB_OPTIONS = {
 	{ "Notifications", "disableNotifications" },
 	{ "Incoming", "disableIncoming" },
 }
+-- Each entry opens what its classic General button opens: a popup that takes the shared config, or
+-- the classic export of that name, which takes the anchor.
 local FONTS_COLORS = {
-	{ "masterFont" },
+	{ "masterFont", "ShowMasterFont" },
+	{ "addFont", "ShowAddFont" },
 	{ "partialEffects", MSBTPopups.ShowPartialEffects },
 	{ "damageColors", MSBTPopups.ShowDamageColors },
 	{ "classColors", MSBTPopups.ShowClassColors },
@@ -313,27 +316,36 @@ end
 local function OnClickFontsColors(this)
 	for _, button in ipairs(fontsColorsButtons) do button:Disable() end
 	local parent = this:GetParent()
-	if this.show then
+	if type(this.show) == "string" then
+		MSBTGeneral[this.show](parent, this, "TOPRIGHT", "BOTTOMRIGHT", EnableFontsColors)
+	else
 		PopupConfig(parent, this, EnableFontsColors)
 		config.anchorPoint, config.relativePoint = "TOPRIGHT", "BOTTOMRIGHT"
 		this.show(config)
-	else
-		MSBTGeneral.ShowMasterFont(parent, this, "TOPRIGHT", "BOTTOMRIGHT", EnableFontsColors)
 	end
+end
+
+
+-- The name, hint and button word of an entry: the label and tooltip of its classic button, which
+-- for adding a font are the custom font texts.
+local function FontsColorsTexts(key)
+	if key == "addFont" then return L.CUSTOM_FONTS.add, L.CUSTOM_FONTS.help, L.WINDOW.add end
+	local locale = L.BUTTONS[key]
+	return locale.label, locale.tooltip, L.WINDOW.edit
 end
 
 
 local function CreateFontsColors(page)
 	local section = CreateSection(page, 0, #FONTS_COLORS * 70 + 10)
 	for index, entry in ipairs(FONTS_COLORS) do
-		local locale = L.BUTTONS[entry[1]]
+		local label, tooltip, word = FontsColorsTexts(entry[1])
 		local top = 10 + (index - 1) * 70
-		local fontString = CreateText(section, "GameFontNormal", COLORS.gold, locale.label)
+		local fontString = CreateText(section, "GameFontNormal", COLORS.gold, label)
 		fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -top)
-		fontString = CreateText(section, "GameFontHighlightSmall", COLORS.hint, locale.tooltip)
+		fontString = CreateText(section, "GameFontHighlightSmall", COLORS.hint, tooltip)
 		fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -top - 20)
 		fontString:SetWidth(520)
-		local button = CreateButton(section, L.WINDOW.edit, locale.tooltip, OnClickFontsColors)
+		local button = CreateButton(section, word, tooltip, OnClickFontsColors)
 		button:SetPoint("TOPRIGHT", section, "TOPRIGHT", -12, -top - 8)
 		button.show = entry[2]
 		fontsColorsButtons[index] = button
