@@ -133,6 +133,221 @@ assert(Designs.Select("classic") and saved.optionsDesign == nil and Events() == 
 docked = false
 windows.classic.shown = false
 
+-- Given another design stands in the game's settings window, and the classic window does not.
+windows.other.shown = true
+local otherDocked = true
+function windows.other.IsDocked() return otherDocked end
+-- When the options are opened.
+Designs.Show()
+-- Then no window opens beside it, whichever design stands there.
+assert(Events() == "", "a window opened beside another design standing in the game's settings window")
+-- When that design leaves the game's settings window.
+otherDocked = false
+Designs.Show()
+-- Then the options open as usual.
+assert(Events() == "hide other, show classic", "a design that left the game's settings window kept the options from opening")
+windows.classic.shown = false
+windows.other.IsDocked = nil
+windows.other.shown = false
+
+-- Rule: a choice that differs from the design the game's settings window shows leaves a switch pending.
+do
+	local printed, questions = {}, {}
+	MikSBT.Print = function(message) printed[#printed + 1] = message end
+	StaticPopup_Show = function(which) questions[#questions + 1] = which end
+
+	-- Given the window shows no design yet, as before the options are registered.
+	-- When a design is chosen.
+	Designs.Select("other")
+	-- Then no switch is pending.
+	assert(not Designs.IsSwitchPending(), "a switch was pending before the game's settings window was set up")
+
+	-- Given the game's settings window shows the classic design.
+	Designs.SetSettingsDesign("classic")
+	-- When the other design is chosen outside the game's settings window.
+	Designs.Select("other")
+	-- Then the switch is pending, and nothing is printed or asked.
+	assert(Designs.IsSwitchPending(), "a choice differing from the settings window left no switch pending")
+	assert(#printed == 0 and #questions == 0, "a choice outside the settings window printed or asked")
+	-- When the same design as the settings window is chosen, and one that is not there.
+	Designs.Select("classic")
+	assert(not Designs.IsSwitchPending(), "the settings window's own design left a switch pending")
+	Designs.Select("other")
+	Designs.Select("gone")
+	-- Then the earlier choice still stands.
+	assert(Designs.IsSwitchPending(), "a design that is not there ended the pending switch")
+
+	-- Given the game's settings window shows the other design.
+	Designs.SetSettingsDesign("other")
+	-- Then the other design as the choice is no switch.
+	assert(not Designs.IsSwitchPending(), "the settings window's own further design left a switch pending")
+	-- When the classic design is chosen.
+	Designs.Select("classic")
+	-- Then the switch is pending.
+	assert(Designs.IsSwitchPending(), "a choice differing from a further design in the settings window left no switch pending")
+	saved.optionsDesign = nil
+	Designs.SetSettingsDesign(nil)
+end
+
+-- Rule: a differing choice made inside the game's settings window asks to reload.
+do
+	local printed, questions, reloads, flagAtReload = {}, {}, 0, nil
+	MikSBT.Print = function(message) printed[#printed + 1] = message end
+	MikSBT.translations = { MSG_DESIGN_ASK_RELOAD = "reload now?" }
+	StaticPopupDialogs = {}
+	YES, NO = "Yes", "No"
+	StaticPopup_Show = function(which) questions[#questions + 1] = which end
+	ReloadUI = function()
+		reloads = reloads + 1
+		flagAtReload = saved.openSettingsAfterReload
+	end
+	Designs.SetSettingsDesign("classic")
+
+	-- Given the options stand in the game's settings window.
+	docked = true
+	-- When the other design is chosen.
+	Designs.Select("other")
+	-- Then the question is shown, nothing is printed, and nothing is reloaded yet.
+	assert(#questions == 1 and #printed == 0, "a choice inside the settings window did not ask to reload")
+	local dialog = StaticPopupDialogs[questions[1]]
+	assert(dialog and dialog.text == "reload now?" and dialog.button1 == "Yes" and dialog.button2 == "No"
+		and dialog.timeout == 0 and dialog.whileDead and dialog.hideOnEscape, "the question is not as expected")
+	assert(reloads == 0 and saved.openSettingsAfterReload == nil, "the interface reloaded before the answer")
+
+	-- When the question is accepted.
+	dialog.OnAccept()
+	-- Then the flag is saved before the interface reloads.
+	assert(reloads == 1 and flagAtReload == "settings", "accepting did not save the flag before the reload")
+
+	-- When the same design as the settings window shows is chosen.
+	Designs.Select("classic")
+	-- Then nothing is asked and nothing is printed.
+	assert(#questions == 1 and #printed == 0, "the choice of the settings window's own design said something")
+
+	-- Given the options stand outside the game's settings window.
+	docked = false
+	-- When the other design is chosen.
+	Designs.Select("other")
+	-- Then nothing is printed and no further question is shown.
+	assert(#printed == 0 and #questions == 1, "a choice outside the settings window printed or asked")
+	saved.optionsDesign = nil
+	saved.openSettingsAfterReload = nil
+	Designs.SetSettingsDesign(nil)
+end
+
+-- Rule: the reload for a design saves where the interface opens afterwards.
+do
+	local reloads, flagAtReload = 0, nil
+	ReloadUI = function()
+		reloads = reloads + 1
+		flagAtReload = saved.openSettingsAfterReload
+	end
+	-- When the interface is reloaded for the options window.
+	Designs.ReloadForDesign("window")
+	-- Then the flag holds that place when the interface reloads.
+	assert(reloads == 1 and flagAtReload == "window", "the reload did not save where to open afterwards")
+	saved.openSettingsAfterReload = nil
+end
+
+-- Rule: after a reload for a new design, the game's settings window opens once at the first PLAYER_ENTERING_WORLD.
+do
+	local waiting, opened = {}, 0
+	CreateFrame = function()
+		local frame = { scripts = {}, events = {} }
+		function frame:RegisterEvent(event) self.events[event] = true end
+		function frame:UnregisterEvent(event) self.events[event] = nil end
+		function frame:SetScript(event, handler) self.scripts[event] = handler end
+		waiting[#waiting + 1] = frame
+		return frame
+	end
+	local function Open() opened = opened + 1 end
+	local function EnterWorld()
+		for _, frame in ipairs(waiting) do
+			if frame.events.PLAYER_ENTERING_WORLD then frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD") end
+		end
+	end
+
+	-- Given no flag is saved.
+	-- When the settings design is set and the world is entered.
+	Designs.SetSettingsDesign("classic", Open)
+	EnterWorld()
+	-- Then nothing waits and nothing opens.
+	assert(#waiting == 0 and opened == 0, "the settings window opened without the flag")
+
+	-- Given the flag is saved.
+	saved.openSettingsAfterReload = true
+	-- When the settings design is set.
+	Designs.SetSettingsDesign("classic", Open)
+	-- Then the flag is cleared and the window waits for the world.
+	assert(saved.openSettingsAfterReload == nil, "the flag was not cleared")
+	assert(opened == 0, "the settings window opened before the world was entered")
+	-- When the world is entered, twice.
+	EnterWorld()
+	EnterWorld()
+	-- Then the window opens once.
+	assert(opened == 1, "the settings window did not open exactly once")
+
+	-- Given the flag of an earlier build, which is true.
+	saved.openSettingsAfterReload = true
+	-- When the settings design is set and the world is entered.
+	Designs.SetSettingsDesign("classic", Open)
+	EnterWorld()
+	-- Then the game's settings window opens once more, and the flag is cleared.
+	assert(opened == 2 and saved.openSettingsAfterReload == nil, "the flag of an earlier build did not open the settings window")
+
+	-- Given the flag is saved but there is no opener.
+	saved.openSettingsAfterReload = true
+	-- When the settings design is set.
+	Designs.SetSettingsDesign("classic")
+	-- Then the flag is cleared and nothing waits.
+	assert(saved.openSettingsAfterReload == nil and #waiting == 2, "a missing opener left the flag or a waiting frame")
+	Designs.SetSettingsDesign(nil)
+end
+
+-- Rule: after a reload for the options window, that window opens once in the chosen design.
+do
+	local waiting, opened = {}, 0
+	CreateFrame = function()
+		local frame = { scripts = {}, events = {} }
+		function frame:RegisterEvent(event) self.events[event] = true end
+		function frame:UnregisterEvent(event) self.events[event] = nil end
+		function frame:SetScript(event, handler) self.scripts[event] = handler end
+		waiting[#waiting + 1] = frame
+		return frame
+	end
+	local function Open() opened = opened + 1 end
+	local function EnterWorld()
+		for _, frame in ipairs(waiting) do
+			if frame.events.PLAYER_ENTERING_WORLD then frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD") end
+		end
+	end
+	Designs, windows = LoadDesigns("classic", "other")
+	saved.optionsDesign = "other"
+	Events()
+
+	-- Given the flag says the options window.
+	saved.openSettingsAfterReload = "window"
+	-- When the settings design is set with an opener.
+	Designs.SetSettingsDesign("classic", Open)
+	-- Then the flag is cleared and nothing opens before the world is entered.
+	assert(saved.openSettingsAfterReload == nil and Events() == "", "the options opened before the world was entered")
+	-- When the world is entered, twice.
+	EnterWorld()
+	EnterWorld()
+	-- Then the chosen design opens once, and the settings window does not.
+	assert(Events() == "show other" and opened == 0, "the options window did not open once in the chosen design")
+
+	-- Given the flag says the settings window, as in the game's own question.
+	windows.other.shown = false
+	saved.openSettingsAfterReload = "settings"
+	Designs.SetSettingsDesign("classic", Open)
+	EnterWorld()
+	-- Then only the settings window opens.
+	assert(opened == 1 and Events() == "", "the settings flag opened the options window")
+	saved.optionsDesign = nil
+	Designs.SetSettingsDesign(nil)
+end
+
 -- The General tab's functions with its controls replaced by recorders.
 local tabs = Read("MSBTOptions/MSBTOptionsTabs.lua")
 local function BuildGeneralTab(designs)
@@ -142,10 +357,14 @@ local function BuildGeneralTab(designs)
 		function control:SetChangeHandler(handler) self.change = handler end
 		function control:SetSelectedID(id) self.selected = id end
 		function control:GetWidth() return 0 end
+		function control:Show() self.shown = true end
+		function control:Hide() self.shown = false end
+		function control:SetClickHandler(handler) self.click = handler end
 		return control
 	end
 	local build = assert(loadstring(
-		assert(tabs:match("local function GeneralTab_Create%b()%s*.-\nend")) .. "\n"
+		assert(tabs:match("local function GeneralTab_ShowReloadButton%b()%s*.-\nend")) .. "\n"
+		.. assert(tabs:match("local function GeneralTab_Create%b()%s*.-\nend")) .. "\n"
 		.. assert(tabs:match("GeneralTab_Populate = function%b()%s*.-\nend"))
 		.. "\nreturn GeneralTab_Create, GeneralTab_Populate"))
 	local frame = { CreateFontString = NewControl, CreateTexture = NewControl }
@@ -161,12 +380,13 @@ local function BuildGeneralTab(designs)
 			return setmetatable({}, { __index = function(_, key) return { label = key } end })
 		end }),
 		MSBTDesigns = designs,
+		MSBTOptMain = MSBTOptions.Main,
 		MSBTProfiles = { currentProfile = {}, savedVariables = saved, IsModDisabled = Noop },
 	})
 	local create, populate = build()
 	create()
 	populate()
-	return frame.controls.optionsDesignDropdown
+	return frame.controls.optionsDesignDropdown, frame.controls, populate
 end
 
 -- Given two designs, the second one chosen.
@@ -182,6 +402,51 @@ assert(dropdown.selected == "other", "the selected design is not shown")
 dropdown.change(dropdown, "classic")
 -- Then the pick is saved.
 assert(saved.optionsDesign == nil, "a pick in the General tab was not saved")
+
+-- Rule: the General tab shows a reload button beside the design choice while a switch is pending.
+do
+	local reloads, flagAtReload = 0, nil
+	ReloadUI = function()
+		reloads = reloads + 1
+		flagAtReload = saved.openSettingsAfterReload
+	end
+	-- Given the game's settings window shows the classic design, which is chosen.
+	Designs.SetSettingsDesign("classic")
+	saved.optionsDesign = nil
+	-- When the General tab is opened.
+	local dropdown, controls, populate = BuildGeneralTab(Designs)
+	-- Then the button is hidden.
+	assert(controls.reloadDesignButton and controls.reloadDesignButton.shown == false,
+		"the reload button shows without a pending switch")
+	-- When the other design is picked.
+	dropdown.change(dropdown, "other")
+	-- Then the button shows.
+	assert(controls.reloadDesignButton.shown == true, "the reload button did not show for a pending switch")
+	-- When the classic design is picked again.
+	dropdown.change(dropdown, "classic")
+	-- Then it is hidden again.
+	assert(controls.reloadDesignButton.shown == false, "the reload button stayed after the switch was undone")
+	-- When the choice changes elsewhere and the tab is filled again.
+	saved.optionsDesign = "other"
+	populate()
+	-- Then the button shows.
+	assert(controls.reloadDesignButton.shown == true, "filling the tab did not show the reload button")
+
+	-- When the button is clicked outside the game's settings window.
+	docked = false
+	controls.reloadDesignButton.click()
+	-- Then the interface reloads to open the options window.
+	assert(reloads == 1 and flagAtReload == "window", "the button outside the settings window did not reload for the window")
+	-- When it is clicked inside the game's settings window.
+	docked = true
+	controls.reloadDesignButton.click()
+	-- Then the interface reloads to open the settings window.
+	assert(reloads == 2 and flagAtReload == "settings", "the button inside the settings window did not reload for it")
+	docked = false
+	saved.optionsDesign = nil
+	saved.openSettingsAfterReload = nil
+	Designs.SetSettingsDesign(nil)
+end
 
 -- Given the classic design alone.
 local alone = LoadDesigns("classic")

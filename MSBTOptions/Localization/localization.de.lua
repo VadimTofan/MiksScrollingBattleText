@@ -20,6 +20,7 @@ L.MSG_ITEM_ALREADY_EXISTS			= "Gegenstandsname exisiert bereits."
 L.MSG_INVALID_ITEM_NAME				= "Ungültiger Gegenstandsname."
 L.MSG_CLASSIC_DESIGN				= "Klassisch"
 L.MSG_FOREVER_DESIGN				= "Forever"
+L.MSG_DESIGN_ASK_RELOAD				= "Das Optionsfenster des Spiels zeigt das neue Design erst nach dem Neuladen der Oberfläche. Jetzt neu laden?"
 
 obj = L.WINDOW
 obj.subtitle = "Optionen \194\183 %s"
@@ -470,6 +471,7 @@ L.DROPDOWNS["sound"]				= { label="Sound:", tooltip="Wählt den Sound aus, der a
 L.BUTTONS["addCustomSound"]			= { label="Sound hinzufügen", tooltip="Fügt einen benutzerdefinierten Sound zu der Liste der verfügbaren Sounds.\n\nWARNUNG: Die Datei muss in dem Ziel-Verzeichnis existieren, *BEVOR* WoW gestartet wurde.\n\nEs wird empfohlen, die Datei in den MikScrollingBattleText\\Sounds Ordner zu kopieren um Fehler zu vermeiden."}
 L.BUTTONS["customSound"]				= { tooltip="Klicken, um eine benutzerdefinierte Sound-Datei auszuwählen." }
 L.BUTTONS["playSound"]				= { label="Abspielen", tooltip="Klicken, um den ausgewählten Sound abzuspielen."}
+L.BUTTONS["reloadDesign"]			= { label="Neu laden", tooltip="Das Optionsfenster des Spiels zeigt das gewählte Design erst nach dem Neuladen der Oberfläche."}
 L.EDITBOXES["customSoundName"]	= { label="Sound Name:", tooltip="Der Name wird benutzt um den Sound zu identifizieren.\n\nBeispiel: Mein Sound"}
 L.EDITBOXES["customSoundPath"]	= { label="Sound Pfad:", tooltip="Der Pfad zu der Sound Datei.\n\nNOTIZ: Wenn die Datei in dem empfohlenen MikScrollingBattleText\\Sounds Ordner ist, muss nur der Dateiname hier eingegeben werden anstatt der ganze Pfad.\n\nBeispiel: mySound.ogg "}
 L.EDITBOXES["soundFile"]		= { label="Sound-Dateiname:", tooltip="Der Name der Sound Datei zum Abspielen wenn das Ereignis erscheint."}

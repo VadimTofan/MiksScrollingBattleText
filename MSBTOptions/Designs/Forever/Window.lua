@@ -56,6 +56,13 @@ local GROUND_TOP, GROUND_BOTTOM, GROUND_ART_HEIGHT, GROUND_SIDE = 18, 29, 90, 16
 local MIN_THUMB_HEIGHT = 24
 local MIN_SCALE = 0.8
 local MAX_SCALE = 2
+-- Inside the game's settings window the header, the page and the footer's Changes and Reset Profile
+-- buttons stay, without the sidebar, the border, the size grip, Cancel and Apply. The window then
+-- fits the settings panel with the margin and the largest scale the classic design uses.
+local DOCKED_LEFT = 20
+local DOCKED_WIDTH = PAGE_WIDTH + 2 * DOCKED_LEFT
+local DOCK_PADDING = 16
+local DOCK_MAX_SCALE = 1.6
 local GRIP_TEXTURE = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-"
 local MOVER_BACKDROP = { bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 }
 local MOVER_COLOR = { 0.090, 0.075, 0.055, 0.55 }
@@ -104,6 +111,8 @@ local hintFontString
 local profileDropdown
 local changesButton
 local applyButton
+local cancelButton
+local resetButton
 local entryButtons = {}
 local pages = {}
 local pageFrames = {}
@@ -116,6 +125,12 @@ local baseSnapshot
 local baseMechanics
 local switchesChanged
 local keepBaseOnHide
+local chrome = {}
+local divider
+local dockedPanel
+local dockedKey
+local dockedOpeners
+local reopenSettings
 local CheckboxEnable
 local DropdownDisable, DropdownEnable, DropdownClear, DropdownRemoveItem
 local hasBlizzardArt
@@ -787,7 +802,7 @@ local function SkinPopup(popup)
 	Box(popup, COLORS.window)
 	SkinTree(popup:GetChildren())
 	-- A popup may hang its content on a frame of its own that stands lower by the picture in the corner
-	-- of the classic header. The header is gone here, so that frame goes back to the popup's corner.
+	-- of the classic header. The flat popup has no such header, so that frame goes back to the popup's corner.
 	if popup.content then popup.content:SetPoint("TOPLEFT", popup, "TOPLEFT", 0, 0) end
 	if popup.moverFrames then
 		scrollAreaConfig = popup
@@ -960,6 +975,13 @@ local function OnSearchChanged(this)
 end
 
 
+-- The label of an entry, also where no sidebar is built.
+local function EntryLabel(entry)
+	local tabLocale = entry.tab and L.TABS[entry.tab]
+	return L.WINDOW[entry.key] or tabLocale.label
+end
+
+
 local function CreateEntry(parent, entry)
 	local button = CreateFrame("Button", nil, parent)
 	button:SetWidth(SIDEBAR_WIDTH - 17)
@@ -980,7 +1002,7 @@ local function CreateEntry(parent, entry)
 	button.fontString = fontString
 
 	local tabLocale = entry.tab and L.TABS[entry.tab]
-	button.label = L.WINDOW[entry.key] or tabLocale.label
+	button.label = EntryLabel(entry)
 	button.hint = L.WINDOW[entry.key .. "Hint"] or tabLocale.tooltip:match("^[^\n]*")
 	fontString:SetText(button.label)
 
@@ -993,6 +1015,7 @@ end
 
 local function CreateSidebar()
 	local sidebar = CreateFrame("Frame", nil, frame)
+	chrome[#chrome + 1] = sidebar
 	sidebar:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -HEADER_HEIGHT - 1)
 	sidebar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", SIDEBAR_WIDTH, FOOTER_HEIGHT + 1)
 	Fill(sidebar, COLORS.panel)
@@ -1034,6 +1057,27 @@ local function CreateSidebar()
 end
 
 
+-- The close button leaves the right corner free while the window is docked.
+local function PlaceProfileDropdown(isDocked)
+	profileDropdown:ClearAllPoints()
+	profileDropdown:SetPoint("TOPRIGHT", frame, "TOPRIGHT", isDocked and -16 or -56, -12)
+end
+
+
+-- The game's settings window has its own Close button and applies changes at once, so docked the
+-- footer keeps neither Cancel nor Apply, and Reset Profile takes the corner of Apply.
+local function PlaceFooterButtons(isDocked)
+	applyButton:SetShown(not isDocked)
+	cancelButton:SetShown(not isDocked)
+	resetButton:ClearAllPoints()
+	if isDocked then
+		resetButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 9)
+	else
+		resetButton:SetPoint("RIGHT", cancelButton, "LEFT", -10, 0)
+	end
+end
+
+
 local function CreateHeader()
 	local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	fontString:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -14)
@@ -1046,12 +1090,13 @@ local function CreateHeader()
 	SetTextColor(fontString, COLORS.hint)
 
 	local closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+	chrome[#chrome + 1] = closeButton
 	closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -16)
 
 	local objLocale = L.DROPDOWNS["profile"]
 	profileDropdown = MSBTControls.CreateDropdown(frame)
 	profileDropdown:Configure(180, objLocale.label, objLocale.tooltip)
-	profileDropdown:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -56, -12)
+	PlaceProfileDropdown(false)
 	-- An open popup saves to a key of the old profile, so it closes before the switch.
 	profileDropdown:SetChangeHandler(function(this, id)
 		MSBTOptMain.HidePopups()
@@ -1128,19 +1173,19 @@ local function CreateFooter()
 	end)
 	SkinButton(applyButton, true)
 
-	local button = MSBTControls.CreateOptionButton(frame)
-	button:Configure(30, L.WINDOW.cancel, L.WINDOW.cancelTooltip)
-	button:SetPoint("RIGHT", applyButton, "LEFT", -10, 0)
-	button:SetClickHandler(function()
+	cancelButton = MSBTControls.CreateOptionButton(frame)
+	cancelButton:Configure(30, L.WINDOW.cancel, L.WINDOW.cancelTooltip)
+	cancelButton:SetPoint("RIGHT", applyButton, "LEFT", -10, 0)
+	cancelButton:SetClickHandler(function()
 		snapshots:Restore(baseSnapshot)
 		RestoreMechanics()
 		module.Hide()
 	end)
-	SkinButton(button)
+	SkinButton(cancelButton)
 
-	local resetButton = MSBTControls.CreateOptionButton(frame)
+	resetButton = MSBTControls.CreateOptionButton(frame)
 	resetButton:Configure(30, L.WINDOW.resetProfile, L.BUTTONS["resetProfile"].tooltip)
-	resetButton:SetPoint("RIGHT", button, "LEFT", -10, 0)
+	resetButton:SetPoint("RIGHT", cancelButton, "LEFT", -10, 0)
 	local confirmReset = {
 		parentFrame = frame, anchorFrame = resetButton,
 		anchorPoint = "BOTTOMRIGHT", relativePoint = "TOPRIGHT",
@@ -1155,12 +1200,16 @@ local function CreateFooter()
 	changesButton = MSBTControls.CreateOptionButton(frame)
 	changesButton:Configure(30, "", L.WINDOW.changesHint)
 	changesButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 16, 9)
-	changesButton:SetClickHandler(function() SelectPage("changes") end)
+	-- The game's settings list has no entry that this window can switch to by itself.
+	changesButton:SetClickHandler(function()
+		if dockedOpeners then dockedOpeners.changes() else SelectPage("changes") end
+	end)
 	SkinButton(changesButton)
 
 	-- The factory's button brings the tooltip, the client's size grabber replaces its symbol, and
 	-- it lies above the Apply button, whose corner it shares.
 	local grip = MSBTControls.CreateIconButton(frame, "Configure")
+	chrome[#chrome + 1] = grip
 	grip:SetTooltip(L.WINDOW.resizeTooltip)
 	grip:SetScript("OnClick", nil)
 	grip:SetScript("OnMouseDown", OnMouseDownGrip)
@@ -1182,6 +1231,22 @@ local function CreateRule(anchor, offsetY)
 	texture:SetPoint(anchor .. "LEFT", frame, anchor .. "LEFT", 1, offsetY)
 	texture:SetPoint(anchor .. "RIGHT", frame, anchor .. "RIGHT", -1, offsetY)
 	texture:SetHeight(1)
+	return texture
+end
+
+
+-- The page title, the hint, the divider and the page area start at left.
+local function PlaceContent(left)
+	titleFontString:ClearAllPoints()
+	titleFontString:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -HEADER_HEIGHT - 16)
+	if divider then
+		divider:ClearAllPoints()
+		divider:SetPoint("TOPLEFT", frame, "TOPLEFT", left, 3 - PAGE_TOP)
+	end
+	hintFontString:ClearAllPoints()
+	hintFontString:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -HEADER_HEIGHT - 42)
+	pageArea:ClearAllPoints()
+	pageArea:SetPoint("TOPLEFT", frame, "TOPLEFT", left, -PAGE_TOP)
 end
 
 
@@ -1198,16 +1263,17 @@ local function CreateWindow()
 	frame:SetWidth(WIDTH)
 	frame:SetHeight(HEIGHT)
 	frame:SetPoint("CENTER")
+	-- The game's settings window plays its own sounds.
 	frame:SetScript("OnShow", function()
-		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+		if not dockedPanel then PlaySound(SOUNDKIT.IG_MAINMENU_OPTION) end
 		baseSnapshot = baseSnapshot or snapshots:Take()
 		baseMechanics = baseMechanics or TakeMechanics()
-		SelectPage(currentKey)
+		SelectPage(dockedKey or currentKey)
 	end)
 	-- Still shown here means only a parent was hidden, as when the interface is hidden.
 	frame:SetScript("OnHide", function(self)
 		if self:IsShown() then return end
-		PlaySound(799)
+		if not dockedPanel then PlaySound(799) end
 		MSBTOptMain.HidePopups()
 		if not keepBaseOnHide then
 			baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
@@ -1218,32 +1284,30 @@ local function CreateWindow()
 	frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 	table.insert(UISpecialFrames, frame:GetName())
 
-	Fill(frame, COLORS.border)
-	Fill(frame, COLORS.window, "BORDER", 1)
+	chrome[#chrome + 1] = Fill(frame, COLORS.border)
+	chrome[#chrome + 1] = Fill(frame, COLORS.window, "BORDER", 1)
 	CreateRule("TOP", -HEADER_HEIGHT)
 	CreateRule("BOTTOM", FOOTER_HEIGHT)
 
 	-- Blizzard's page title is white over a divider; the flat title is gold.
 	local art = HasBlizzardArt()
 	titleFontString = frame:CreateFontString(nil, "OVERLAY", art and "GameFontHighlightHuge" or "GameFontNormalHuge")
-	titleFontString:SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT, -HEADER_HEIGHT - 16)
 	if art then
 		-- Below the hint line, which ends 6 above the page.
-		AtlasTexture(frame, "Options_HorizontalDivider", "ARTWORK"):SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT, 3 - PAGE_TOP)
+		divider = AtlasTexture(frame, "Options_HorizontalDivider", "ARTWORK")
 	else
 		SetTextColor(titleFontString, COLORS.gold)
 	end
 
 	hintFontString = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	hintFontString:SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT, -HEADER_HEIGHT - 42)
 	hintFontString:SetWidth(PAGE_WIDTH)
 	hintFontString:SetJustifyH("LEFT")
 	SetTextColor(hintFontString, COLORS.hint)
 
 	pageArea = CreateFrame("Frame", nil, frame)
-	pageArea:SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT, -PAGE_TOP)
 	pageArea:SetWidth(PAGE_WIDTH)
 	pageArea:SetHeight(PAGE_HEIGHT)
+	PlaceContent(PAGE_LEFT)
 
 	CreateHeader()
 	CreateSidebar()
@@ -1259,7 +1323,10 @@ local function CreateWindow()
 	-- Another design takes its popups when it opens, which ends a moment this window was put
 	-- away for: its Cancel base is stale then.
 	hooksecurefunc(MSBTOptions.Popups, "UseDesignPopups", function(key)
-		if key ~= "forever" and not frame:IsShown() then baseSnapshot, baseMechanics, switchesChanged = nil, nil, false end
+		if key ~= "forever" and not frame:IsShown() then
+			baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+			reopenSettings = nil
+		end
 	end)
 end
 
@@ -1365,6 +1432,13 @@ end
 
 
 local function Show()
+	-- Put away from the game's settings window, the options come back there.
+	if reopenSettings then
+		local reopen = reopenSettings
+		reopenSettings = nil
+		reopen()
+		return
+	end
 	if not frame then CreateWindow() end
 	-- The saved scale, held to this screen: it may have been saved on a larger one.
 	frame:SetScale(math.min(MSBTProfiles.savedVariables.optionsScale or 1, MaxScale()))
@@ -1376,11 +1450,148 @@ local function Show()
 end
 
 
--- keepBase leaves Cancel's base in place while the window is put away for a moment.
+local function GetSettingsFrame()
+	return SettingsPanel or InterfaceOptionsFrame
+end
+
+
+local function IsSettingsShown()
+	local settingsFrame = GetSettingsFrame()
+	return settingsFrame ~= nil and settingsFrame:IsShown()
+end
+
+
+-- Escape belongs to the game's settings window while the frame stands in it.
+local function SetSpecialFrame(isSpecial)
+	local frameName = frame:GetName()
+	for index, name in ipairs(UISpecialFrames) do
+		if name == frameName then
+			if not isSpecial then table.remove(UISpecialFrames, index) end
+			return
+		end
+	end
+	if isSpecial then table.insert(UISpecialFrames, frameName) end
+end
+
+
+local function SetChromeShown(isShown)
+	for _, region in ipairs(chrome) do
+		region:SetShown(isShown)
+	end
+end
+
+
+-- The frame is scaled to fit inside the panel and keeps its proportions.
+local function UpdateDockedLayout()
+	if not dockedPanel then return end
+	local width, height = dockedPanel:GetWidth(), dockedPanel:GetHeight()
+	local scale = 1
+	if width and width > DOCK_PADDING * 2 and height and height > DOCK_PADDING * 2 then
+		scale = math.min(DOCK_MAX_SCALE, (width - DOCK_PADDING * 2) / DOCKED_WIDTH,
+			(height - DOCK_PADDING * 2) / HEIGHT)
+	end
+	frame:SetScale(scale)
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", dockedPanel, "TOPLEFT", DOCK_PADDING / scale, -DOCK_PADDING / scale)
+end
+
+
+-- The pages of the sidebar, in its order, for the game's settings list.
+local function DockPages()
+	local list = {}
+	for _, entry in ipairs(ENTRIES) do
+		if entry.key and (entry.tab or pages[entry.key]) then
+			list[#list + 1] = { key = entry.key, label = EntryLabel(entry) }
+		end
+	end
+	return list
+end
+
+
+-- Puts the window into a panel of the game's settings window with the page of key. A category
+-- switch there hides one panel and shows the next while the settings window stays open.
+local function Dock(panel, key, openers)
+	if not frame then CreateWindow() end
+	reopenSettings = nil
+	-- Another design's window closes while the game's settings window shows the options.
+	MSBTOptions.Designs.HideOthers("forever")
+	baseSnapshot = baseSnapshot or snapshots:Take()
+	baseMechanics = baseMechanics or TakeMechanics()
+	MSBTOptions.Popups.UseDesignPopups("forever")
+	dockedPanel, dockedKey, dockedOpeners = panel, key, openers
+	frame:SetParent(panel)
+	frame:SetFrameStrata(panel:GetFrameStrata())
+	frame:EnableMouse(false)
+	frame:SetClampedToScreen(false)
+	SetSpecialFrame(false)
+	SetChromeShown(false)
+	frame:SetWidth(DOCKED_WIDTH)
+	frame:SetHeight(HEIGHT)
+	PlaceContent(DOCKED_LEFT)
+	PlaceProfileDropdown(true)
+	PlaceFooterButtons(true)
+	UpdateDockedLayout()
+	if not panel.msbtDesignLayoutHooked then
+		panel.msbtDesignLayoutHooked = true
+		panel:HookScript("OnSizeChanged", function(this)
+			if dockedPanel == this then UpdateDockedLayout() end
+		end)
+	end
+	if frame:IsShown() then SelectPage(key) else frame:Show() end
+end
+
+
+-- The window leaves the panel and is the standalone window again. The session ends with the
+-- game's settings window; a category switch keeps Cancel's base. When the settings window closes,
+-- the frame is hidden with it, and its OnHide takes that for a hidden interface and does nothing;
+-- hiding it here runs no OnHide then. So the popups close and the session ends here.
+local function Undock(panel)
+	if not dockedPanel or dockedPanel ~= panel then return end
+	local isEnding = not keepBaseOnHide and not IsSettingsShown()
+	local wasKeeping = keepBaseOnHide
+	keepBaseOnHide = true
+	frame:Hide()
+	keepBaseOnHide = wasKeeping
+	MSBTOptMain.HidePopups()
+	if isEnding then
+		baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+		MSBTOptions.Popups.UseDesignPopups("classic")
+	end
+	dockedPanel, dockedKey, dockedOpeners = nil, nil, nil
+	frame:SetParent(UIParent)
+	frame:SetFrameStrata("DIALOG")
+	frame:EnableMouse(true)
+	frame:SetClampedToScreen(true)
+	SetSpecialFrame(true)
+	SetChromeShown(true)
+	frame:SetWidth(WIDTH)
+	frame:SetHeight(HEIGHT)
+	PlaceContent(PAGE_LEFT)
+	PlaceProfileDropdown(false)
+	PlaceFooterButtons(false)
+	frame:ClearAllPoints()
+	frame:SetPoint("CENTER")
+end
+
+
+local function IsDocked()
+	return dockedPanel ~= nil
+end
+
+
+-- keepBase leaves Cancel's base in place while the window is put away for a moment. In the game's
+-- settings window that window closes, and the next Show opens it again at this page.
 local function Hide(keepBase)
 	if not frame then return end
 	if not keepBase then baseSnapshot, baseMechanics, switchesChanged = nil, nil, false end
 	keepBaseOnHide = keepBase
+	if dockedPanel then
+		if keepBase then reopenSettings = dockedOpeners[dockedKey] end
+		local settingsFrame = GetSettingsFrame()
+		if settingsFrame and settingsFrame:IsShown() then HideUIPanel(settingsFrame) end
+		-- Still docked means the settings window had no hide to run it.
+		if dockedPanel then Undock(dockedPanel) end
+	end
 	frame:Hide()
 	keepBaseOnHide = nil
 end
@@ -1413,7 +1624,12 @@ module.RefreshSwitches	= RefreshSwitches
 module.Show				= Show
 module.Hide				= Hide
 module.IsShown			= IsShown
+module.DockPages		= DockPages
+module.Dock				= Dock
+module.Undock			= Undock
+module.IsDocked			= IsDocked
 
 MSBTOptions.Designs.Register("forever", {
 	label = L.MSG_FOREVER_DESIGN, Show = Show, Hide = Hide, IsShown = IsShown, SkinPopup = SkinPopup,
+	DockPages = DockPages, Dock = Dock, Undock = Undock, IsDocked = IsDocked,
 })

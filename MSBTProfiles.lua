@@ -2460,8 +2460,8 @@ local function SetupBlizzardOptions()
 			if isSubcategory then
 				registered = Settings.RegisterCanvasLayoutSubcategory(category, panel, panel.name)
 			else
+				-- The category keeps the number the game gives it: the function that opens the settings takes a number.
 				registered = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-				registered.ID = panel.name
 				Settings.RegisterAddOnCategory(registered)
 				category = registered
 			end
@@ -2487,7 +2487,35 @@ local function SetupBlizzardOptions()
 		end)
 	end
 
+	-- A design that can stand in the game's settings window shows its own pages there, one
+	-- category for each page, and takes over the panels' scripts.
+	local designs = MSBTOptions.Designs
+	local selected = designs.GetSelected()
+	local design = designs.designs[selected]
+	local dockPages = design.DockPages and design.DockPages()
+	if dockPages and #dockPages > 0 then
+		local openers = {}
+		for index, page in ipairs(dockPages) do
+			local panel = frame
+			if index > 1 then
+				panel = CreateFrame("Frame")
+				panel:Hide()
+				panel.name = page.label
+			end
+			openers[page.key] = Register(panel, index > 1)
+			panel:SetScript("OnShow", function(this)
+				design.Dock(this, page.key, openers)
+			end)
+			panel:SetScript("OnHide", function(this)
+				design.Undock(this)
+			end)
+		end
+		designs.SetSettingsDesign(selected, openers[dockPages[1].key])
+		return
+	end
+
 	local reopen = Register(frame)
+	designs.SetSettingsDesign("classic", reopen)
 
 	local tabs = optionsMain.GetTabs()
 	local generalIndex

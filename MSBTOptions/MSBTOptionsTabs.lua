@@ -128,6 +128,13 @@ local function GeneralTab_EnableControls()
 end
 
 
+-- The reload button stays while the chosen design differs from the one the game's settings window shows.
+local function GeneralTab_ShowReloadButton()
+	local button = tabFrames.general.controls.reloadDesignButton
+	if MSBTDesigns.IsSwitchPending() then button:Show() else button:Hide() end
+end
+
+
 GeneralTab_Populate = function()
 	local currentProfile = MSBTProfiles.currentProfile
 	local controls = tabFrames.general.controls
@@ -148,6 +155,7 @@ GeneralTab_Populate = function()
 	controls.animationSpeedSlider:SetValue(currentProfile.animationSpeed)
 	if controls.optionsDesignDropdown then
 		controls.optionsDesignDropdown:SetSelectedID(MSBTDesigns.GetSelected())
+		GeneralTab_ShowReloadButton()
 	end
 end
 
@@ -436,8 +444,23 @@ local function GeneralTab_Create()
 		for _, key in ipairs(MSBTDesigns.keys) do
 			dropdown:AddItem(MSBTDesigns.designs[key].label, key)
 		end
-		dropdown:SetChangeHandler(function(this, id) MSBTDesigns.Select(id) end)
+		dropdown:SetChangeHandler(function(this, id)
+			MSBTDesigns.Select(id)
+			GeneralTab_ShowReloadButton()
+		end)
 		controls.optionsDesignDropdown = dropdown
+
+		-- Beside the field, which stands at the bottom of the dropdown's frame. It shows while the
+		-- choice waits for a reload.
+		local reload = MSBTControls.CreateOptionButton(tabFrame)
+		objLocale = L.BUTTONS["reloadDesign"]
+		reload:Configure(20, objLocale.label, objLocale.tooltip)
+		reload:SetPoint("BOTTOMLEFT", dropdown, "BOTTOMRIGHT", 10, 2)
+		reload:SetClickHandler(function()
+			MSBTDesigns.ReloadForDesign(MSBTOptMain.IsDocked() and "settings" or "window")
+		end)
+		reload:Hide()
+		controls.reloadDesignButton = reload
 	end
 
 

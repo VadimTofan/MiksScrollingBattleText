@@ -57,6 +57,7 @@ L.MSG_ITEM_ALREADY_EXISTS			= "Item name already exists."
 L.MSG_INVALID_ITEM_NAME				= "Invalid item name."
 L.MSG_CLASSIC_DESIGN				= "Classic"
 L.MSG_FOREVER_DESIGN				= "Forever"
+L.MSG_DESIGN_ASK_RELOAD				= "The game's settings window shows the new design after the interface is reloaded. Reload now?"
 
 L.WINDOW = {
 	subtitle = "Options \194\183 %s",
@@ -239,6 +240,7 @@ obj["copyProfile"]				= { label="Copy Profile", tooltip="Copies the profile to a
 obj["resetProfile"]				= { label="Reset Profile", tooltip="Resets the profile to the default settings."}
 obj["deleteProfile"]			= { label="Delete Profile", tooltip="Deletes the profile."}
 obj["resetBlizzardSCT"]		= { label="Reset Blizzard SCT", tooltip="Restore Blizzard scrolling combat text settings and stop MSBT from overriding them."}
+obj["reloadDesign"]		= { label="Reload", tooltip="The game's settings window shows the chosen design after the interface is reloaded."}
 obj["masterFont"]				= { label="Master Fonts", tooltip="Allows you to setup the master font settings which will be inherited by all scroll areas and events within them, unless overridden."}
 obj["partialEffects"]			= { label="Partial Effects", tooltip="Allows you to setup which partial effects will be shown, if they are color coded, and in what color."}
 obj["damageColors"]				= { label="Damage Colors", tooltip="Choose the colors used for each damage school."}

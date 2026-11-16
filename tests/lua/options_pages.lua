@@ -321,6 +321,56 @@ do
 	assert(env.Popups.design == "forever", "the new window opened with the classic popups")
 end
 
+-- Rule: a reload button stands beside the design dropdown while the chosen design differs from the game's settings window.
+do
+	local Designs = MSBTOptions.Designs
+	local reloads, flagAtReload = 0, nil
+	ReloadUI = function()
+		reloads = reloads + 1
+		flagAtReload = Profiles.savedVariables.openSettingsAfterReload
+	end
+	local function Button()
+		return Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.reloadDesign.label))
+	end
+	local dropdown = Find(MSBTOptionsWindowFrame, function(region)
+		return region.labelFontString and region.labelFontString:GetText() == L.DROPDOWNS.optionsDesign.label
+	end)
+
+	-- Given the game's settings window shows the new design, which is chosen.
+	Designs.SetSettingsDesign("forever")
+	Designs.Select("forever")
+	ClickEntry("sounds")
+	ClickEntry("general")
+	-- Then the button is hidden.
+	assert(Button() and not Button().shown, "the reload button shows without a pending switch")
+
+	-- Given the game's settings window shows the classic design.
+	Designs.SetSettingsDesign("classic")
+	ClickEntry("sounds")
+	ClickEntry("general")
+	-- Then the button shows, beside the dropdown and clear of the reset button.
+	assert(Button().shown, "the reload button does not show for a pending switch")
+	local point = Button().points.BOTTOMLEFT
+	assert(point and point.relative == dropdown and point.relativePoint == "BOTTOMRIGHT",
+		"the reload button does not stand beside the dropdown")
+
+	-- When it is clicked while the options stand in their own window.
+	Click(Button())
+	-- Then the interface reloads to open the options window.
+	assert(reloads == 1 and flagAtReload == "window", "the button did not reload for the options window")
+
+	-- When Classic is picked, which ends the pending switch.
+	dropdown:changeHandler("classic")
+	-- Then the button is hidden.
+	assert(not Button().shown, "the reload button stayed after the switch was undone")
+	-- When the new design is chosen again.
+	Designs.Select("forever")
+	-- Then it shows again.
+	assert(Button().shown, "the reload button did not show for a switch chosen in the dropdown")
+	Profiles.savedVariables.openSettingsAfterReload = nil
+	Designs.SetSettingsDesign(nil)
+end
+
 -- Rule: Reset Blizzard SCT asks first and runs the classic reset.
 do
 	Click(Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.resetBlizzardSCT.label)))

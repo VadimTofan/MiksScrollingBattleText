@@ -61,6 +61,7 @@ local soundNames = {}
 local msbtCheckbox
 local speedSlider
 local designDropdown
+local reloadDesignButton
 local soundsPage
 local soundListbox
 local noSoundsFontString
@@ -205,12 +206,19 @@ end
 
 
 
+-- The reload button stays while the chosen design differs from the one the game's settings window shows.
+local function RefreshReloadButton()
+	if MSBTDesigns.IsSwitchPending() then reloadDesignButton:Show() else reloadDesignButton:Hide() end
+end
+
+
 local function RefreshGeneral()
 	msbtCheckbox:SetChecked(not MSBTProfiles.IsModDisabled())
 	PopulateSwitches(generalSwitches)
 	if #mechanicsSwitches > 0 then PopulateMechanics() end
 	speedSlider:SetValue(MSBTProfiles.currentProfile.animationSpeed)
 	designDropdown:SetSelectedID(MSBTDesigns.GetSelected())
+	RefreshReloadButton()
 end
 
 
@@ -223,6 +231,11 @@ end
 local function OnClickResetBlizzardSCT(this)
 	PopupConfig(this:GetParent(), this).acknowledgeHandler = ResetBlizzardSCT
 	MSBTPopups.ShowAcknowledge(config)
+end
+
+
+local function OnClickReloadDesign()
+	MSBTDesigns.ReloadForDesign(MSBTWindow.IsDocked() and "settings" or "window")
 end
 
 
@@ -291,8 +304,16 @@ local function CreateGeneral(page)
 	for _, key in ipairs(MSBTDesigns.keys) do
 		designDropdown:AddItem(MSBTDesigns.designs[key].label, key)
 	end
-	designDropdown:SetChangeHandler(function(this, id) MSBTDesigns.Select(id) end)
+	designDropdown:SetChangeHandler(function(this, id)
+		MSBTDesigns.Select(id)
+		RefreshReloadButton()
+	end)
 	MSBTWindow.SkinDropdown(designDropdown)
+	-- Beside the field, which stands at the bottom of the dropdown's frame, clear of the field's ground.
+	locale = L.BUTTONS["reloadDesign"]
+	reloadDesignButton = CreateButton(section, locale.label, locale.tooltip, OnClickReloadDesign)
+	reloadDesignButton:SetPoint("BOTTOMLEFT", designDropdown, "BOTTOMRIGHT", 14, 0)
+	reloadDesignButton:Hide()
 
 	locale = L.BUTTONS["resetBlizzardSCT"]
 	local button = CreateButton(section, locale.label, locale.tooltip, OnClickResetBlizzardSCT)
