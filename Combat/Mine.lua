@@ -934,6 +934,34 @@ local function AmbiguousDirectResult(self, key, school, now, bestScore)
     return AmbiguousResult(self, owner, mixedOwners, false)
 end
 
+-- The unit keyed key took cast, sent to a name several units carried
+-- (cast.candidates, set by Reader.lua's OnCast; SettleSharedName), when the
+-- report of its frame there can be its own: a miss, or a hit its spell makes
+-- at once. A spell whose missile flies lands after its cast's frame, so such
+-- a report is another's and its recipient stays unknown.
+function Mine:Settle(cast, key, kind, school, now)
+    local facts = self.facts(cast.spell)
+    if type(facts) == "table" and facts.travels then return end
+    if kind == "damage" then
+        local fits = false
+        for _, entry in ipairs(self.pending) do
+            if entry.cast == cast
+                and DirectCandidateScore(self, entry, key, school, now) then
+                fits = true
+            end
+        end
+        if not fits then return end
+    end
+    cast.key, cast.targetUncertain, cast.candidates = key, false, nil
+    for _, list in ipairs({ self.pending, self.dots }) do
+        for _, entry in ipairs(list) do
+            if entry.cast == cast then
+                entry.key, entry.targetUncertain = key, false
+            end
+        end
+    end
+end
+
 local function RememberAmount(self, spell)
     local amount = self.amountNow
     if self.lineNow ~= true or self.ambiguous or type(amount) ~= "number" or amount <= 0 then return end
