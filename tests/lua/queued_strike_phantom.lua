@@ -177,3 +177,55 @@ you, pet = Shown(before)
 assert(#you == 1 and you[1].result.spell == STRIKE,
     "the strike's swing took the pet's blow as the player's Auto Attack")
 assert(#pet == 1 and pet[1].result.melee and pet[1].amount == opaqueSwing)
+
+-- Given the pet's swing line, then a queued strike, a pet cast and the
+-- strike's swing event in one frame.
+Advance(4)
+before = #outgoing
+Event("COMBAT_LOG_MESSAGE", "swing")
+Advance(0.2)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, STRIKE)
+Event("UNIT_SPELLCAST_SUCCEEDED", "pet", nil, CLAW)
+Event("PLAYER_SWING", 3.3, 0)
+Event("UNIT_COMBAT", "target", "WOUND", "", opaqueZero, 1)
+Event("UNIT_COMBAT", "target", "WOUND", "", opaqueDamage, 1)
+Event("COMBAT_LOG_MESSAGE", "spell")
+Advance(0.02)
+
+-- When the pet's blow is reported inside what would be that swing's window.
+Advance(0.43)
+Event("UNIT_COMBAT", "target", "WOUND", "", opaqueSwing, 1)
+Settle()
+
+-- Then the pet cast between them does not turn the strike's swing back into
+-- a swing of the player's that takes the pet's blow.
+for index = before + 1, #outgoing do
+    local record = outgoing[index]
+    assert(not (record.amount == opaqueSwing and record.result.who == "you"),
+        "a pet cast before the strike's swing let it take the pet's blow as the player's Auto Attack")
+end
+
+-- Given a queued strike, then main-hand and off-hand swing events in its
+-- cast's frame (dual wield).
+local mine = MikSBT.CombatEngine.mine
+local function SwingsAt(at)
+    local hands = {}
+    for _, swing in ipairs(mine.swings) do
+        if swing.at == at then hands[swing.hand] = (hands[swing.hand] or 0) + 1 end
+    end
+    return hands
+end
+Advance(4)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, STRIKE)
+Event("PLAYER_SWING", 3.3, 0)
+Event("PLAYER_SWING", 2.6, 1)
+
+-- Then only the main hand's swing is the strike's; the off hand's is kept.
+local hands = SwingsAt(now)
+assert(not hands.main, "the strike's main-hand swing was kept as a swing")
+assert(hands.off == 1, "the off-hand swing in the strike's frame was dropped")
+
+-- Given a later main-hand swing with no strike queued, then it is a swing again.
+Advance(3.3)
+Event("PLAYER_SWING", 3.3, 0)
+assert(SwingsAt(now).main == 1, "a main-hand swing after the strike was not kept")

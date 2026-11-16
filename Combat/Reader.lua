@@ -1331,6 +1331,7 @@ local function CastTarget(unit, spell, guid, now, consume)
 end
 
 local lastCast
+local queuedStrike
 local WINDFURY_ATTACK_SPELL_ID = 439440
 local MAX_WINDFURY_NOTICES = 16
 
@@ -1443,6 +1444,9 @@ local function OnCast(unit, spell, guid)
     -- Your pet's casts and your own with no target to hit (Life Tap) are
     -- written too (0.3.16).
     lastCast = { at = now, spell = spell, unit = unit }
+    -- A queued strike of yours is kept apart from lastCast: a pet cast in the
+    -- same frame must not hide that the next main-hand swing is the strike's.
+    if unit == "player" and QUEUED_STRIKES[spell] then queuedStrike = { at = now, spell = spell } end
     if unit == "player" and facts and facts.weaponProc then
         reader.procSources[facts.weaponProc] = { spell = spell, at = now, kind = facts.weaponProc, school = facts.procSchool }
     end
@@ -1474,12 +1478,15 @@ local function OnSwing(swingType, swingDuration)
     local times = reader.swingTimes
     local key = ns.TargetKey()
     if ns.windfuryInference then ns.windfuryInference:Swing(Now(), key, hand) end
-    -- A queued strike (Raptor Strike) sends this swing in its cast's frame on
-    -- Forever, and its hit is the strike's. Kept as a swing of yours, it took
-    -- the pet's next blow in its window as your Auto Attack.
-    local strike = hand ~= "ranged" and lastCast and lastCast.unit == "player"
-        and math.abs(lastCast.at - Now()) <= SWING_FRAME
-        and QUEUED_STRIKES[lastCast.spell] or nil
+    -- A queued strike (Raptor Strike) replaces the main hand's swing and sends
+    -- it in its cast's frame on Forever; its hit is the strike's. Kept as a
+    -- swing of yours, it took the pet's next blow in its window as your Auto
+    -- Attack. Only that one swing is the strike's: an off-hand swing in the
+    -- same frame is a real one.
+    local strike
+    if hand == "main" and queuedStrike and math.abs(queuedStrike.at - Now()) <= SWING_FRAME then
+        strike, queuedStrike = true, nil
+    end
     times[#times + 1] = { at = Now(), ranged = hand == "ranged", strike = strike,
         key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
@@ -2418,7 +2425,7 @@ local function ResetReader()
     -- Delayed groups retain their hits after frameHits has been drained.
     -- Weak keys let those live callbacks participate in target rekeying.
     reader.pendingHits = setmetatable({}, { __mode = "k" })
-    lastCast, lastInterrupt = nil, 0
+    lastCast, lastInterrupt, queuedStrike = nil, 0, nil
     beats = {}
 end
 
