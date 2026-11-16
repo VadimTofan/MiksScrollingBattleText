@@ -1,5 +1,18 @@
 # Changelog
 
+## v12.054
+
+- Improved player killing-blow classification using a recent victim's recorded
+  player status, without requiring a separate readable death flag. Uniquely
+  matched PvP kills use Player Killing Blows independently of the NPC toggle;
+  stale or ambiguous kills retain the NPC fallback.
+- Added General > Add custom font. Register an installed font by name and path
+  for use in the existing font menus. Font files must be installed separately.
+- Automatic inferred Windfury icons now apply only to Shamans on Forever.
+  The retired opt-in preference no longer controls them.
+- Kept the General tab's right column inside the window when translated labels
+  have different widths. Thanks to CornyMaster for the contribution.
+
 ## v12.053
 
 - Scrolling text now moves on every frame for smoother motion at high
