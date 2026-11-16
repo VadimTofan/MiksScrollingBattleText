@@ -198,6 +198,62 @@ local function GeneralTab_SaveFontSettings(fontSettings)
 end
 
 
+local function TrimFontInput(value)
+	if type(value) ~= "string" then return "" end
+	return value:match("^%s*(.-)%s*$")
+end
+
+local function NormalizeFontPath(path)
+	path = TrimFontInput(path):gsub("/", "\\")
+	if path == "" then return end
+	if not path:find("\\", 1, true) then path = DEFAULT_FONT_PATH .. path end
+	return path
+end
+
+local function GeneralTab_ValidateFont(name, path)
+	local locale = L.CUSTOM_FONTS
+	name = TrimFontInput(name)
+	if name == "" or name:find("%c") then return locale.invalidName end
+	if fonts[name] then return locale.duplicateName end
+	path = NormalizeFontPath(path)
+	if not path then return locale.invalidPath end
+	local validator = tabFrames.general.fontPathValidationFontString
+	local ok, loaded = pcall(validator.SetFont, validator, path, 14, "")
+	if not ok or loaded ~= true then return locale.invalidPath end
+end
+
+local function GeneralTab_AddFont(button)
+	local tabFrame = tabFrames.general
+	local locale = L.CUSTOM_FONTS
+	DisableControls(tabFrame.controls)
+	MSBTPopups.ShowInput({
+		title = locale.add,
+		parentFrame = tabFrame,
+		anchorFrame = button,
+		anchorPoint = "BOTTOMLEFT",
+		relativePoint = "TOPLEFT",
+		editboxLabel = locale.name,
+		editboxTooltip = locale.nameHelp,
+		showSecondEditbox = true,
+		secondEditboxLabel = locale.path,
+		secondEditboxTooltip = locale.pathHelp,
+		validateHandler = GeneralTab_ValidateFont,
+		hideHandler = GeneralTab_EnableControls,
+		saveHandler = function(settings)
+			local name = TrimFontInput(settings.inputText)
+			local path = NormalizeFontPath(settings.secondInputText)
+			local problem = GeneralTab_ValidateFont(name, path)
+			if problem then Print(problem); return end
+			if MSBTMedia.RegisterFont(name, path) then
+				local saved = MSBTProfiles.savedMedia
+				if type(saved.fonts) ~= "table" then saved.fonts = {} end
+				saved.fonts[name] = path
+			end
+		end,
+	})
+end
+
+
 local function GeneralTab_Create()
 	local tabFrame = tabFrames.general
 	tabFrame.controls = {}
@@ -410,6 +466,12 @@ local function GeneralTab_Create()
 		end
 	)
 	controls.masterFontButton = button
+
+	button = MSBTControls.CreateOptionButton(tabFrame)
+	button:Configure(20, L.CUSTOM_FONTS.add, L.CUSTOM_FONTS.help)
+	button:SetPoint("BOTTOMLEFT", controls.masterFontButton, "TOPLEFT", 0, 10)
+	button:SetClickHandler(GeneralTab_AddFont)
+	controls.addFontButton = button
 
 	local fontString = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	fontString:SetPoint("BOTTOMRIGHT", tabFrame, "BOTTOMRIGHT", 0, 0)

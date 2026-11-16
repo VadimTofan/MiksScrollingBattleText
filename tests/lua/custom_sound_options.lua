@@ -305,3 +305,80 @@ input:Hide()
 assert(not MikSBT.Media.sounds["Cancelled Bell"])
 assert(not MikSBT.Profiles.savedMedia.sounds["Cancelled Bell"])
 assert(controls.addCustomSoundButton.enabled)
+
+-- Describe: custom fonts use the real General tab and persistent media registry.
+-- Given WoW's font loader can accept, reject, or throw for a font file.
+local fontPath
+function Widget:SetFont(path)
+	fontPath = path
+	if path:find("error", 1, true) then error("font unavailable") end
+	return not path:find("missing", 1, true)
+end
+function Widget:GetValue() return self.value end
+function Widget:SetListboxHeight() end
+function Widget:SetChangeHandler() end
+
+local fontButton = assert(general.controls.addFontButton,
+	"General has no Add custom font control")
+for _, forever in ipairs({ false, true }) do
+	MikSBT.Compatibility.Client.isForever = forever
+	local name = forever and "Forever font" or "Retail font"
+	local path = "Interface\\AddOns\\MyFonts\\custom.ttf"
+	-- When opening the font form and validating its inputs.
+	fontButton.clickHandler(fontButton)
+	assert(input.shown and input.showSecondEditbox)
+	assert(not general.controls.masterFontButton:IsEnabled())
+	assert(input.validateHandler("", path), "empty font name was accepted")
+	assert(input.validateHandler(name, ""), "empty path was accepted")
+	assert(input.validateHandler(name, "missing.ttf"),
+		"unloadable font was accepted")
+	assert(input.validateHandler(name, "error.ttf"),
+		"font loader failure was accepted")
+	assert(not input.validateHandler(name, "custom.ttf"))
+	assert(fontPath == "Interface\\AddOns\\MikScrollingBattleText\\Fonts\\custom.ttf")
+	assert(not input.validateHandler(name, " Interface/AddOns/MyFonts/custom.ttf "))
+	assert(fontPath == path)
+	input.inputEditbox:SetText(" " .. name .. " ")
+	input.secondInputEditbox:SetText(" Interface/AddOns/MyFonts/custom.ttf ")
+	input.okayButton.clickHandler(input.okayButton)
+	-- Then registration persists without changing the selected profile font.
+	assert(MikSBT.Media.fonts[name] == path)
+	assert(MikSBT.Profiles.savedMedia.fonts[name] == path)
+	assert(general.controls.masterFontButton:IsEnabled())
+	assert(MikSBT.Profiles.currentProfile.normalFontName == nil)
+
+	-- Given the registered font is already in shared media.
+	-- When attempting to register it again or cancelling another draft.
+	fontButton.clickHandler(fontButton)
+	assert(input.validateHandler(" " .. name .. " ", path),
+		"duplicate font name was accepted")
+	input.inputEditbox:SetText("Cancelled font")
+	input.secondInputEditbox:SetText("custom.ttf")
+	input:Hide()
+	-- Then existing registrations remain intact and drafts are discarded.
+	assert(not MikSBT.Media.fonts["Cancelled font"])
+	assert(not MikSBT.Profiles.savedMedia.fonts["Cancelled font"])
+	assert(fontButton:IsEnabled())
+end
+
+-- Given custom font registrations saved by a previous session.
+MikSBT.Media.fonts["Retail font"] = nil
+-- When media initialization restores saved registrations.
+MikSBT.Media.OnVariablesInitialized()
+-- Then the restored font appears in both existing font dropdowns.
+assert(MikSBT.Media.fonts["Retail font"] ==
+	"Interface\\AddOns\\MyFonts\\custom.ttf")
+local profile = MikSBT.Profiles.currentProfile
+profile.normalFontName, profile.critFontName = "Retail font", "Forever font"
+profile.normalFontSize, profile.critFontSize = 18, 24
+profile.normalFontAlpha, profile.critFontAlpha = 100, 100
+profile.normalOutlineIndex, profile.critOutlineIndex = 1, 1
+general.controls.masterFontButton.clickHandler(general.controls.masterFontButton)
+local fontFrame
+for _, widget in ipairs(widgets) do
+	if widget.normalFontDropdown then fontFrame = widget end
+end
+assert(fontFrame and fontFrame.normalFontDropdown.items["Retail font"])
+assert(fontFrame.critFontDropdown.items["Forever font"])
+fontFrame:Hide()
+assert(fontButton:IsEnabled())
