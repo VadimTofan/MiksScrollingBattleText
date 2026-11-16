@@ -1,4 +1,4 @@
--- Describe: a kill uses a uniquely matched dead victim, never a later target.
+-- Describe: kills reuse a unique recent victim's recorded player status.
 MikSBT = { API = {}, Components = {} }
 dofile("API/RestrictedValue.lua")
 for _, file in ipairs({ "Context", "Helpers", "Mine", "Spells", "Healing", "Reader" }) do
@@ -80,10 +80,10 @@ local function SpellHit()
 	Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
 end
 
--- Given a single dying player or NPC hit by the player's own spell.
+-- Given a player or NPC hit while death information is not yet available.
 for _, player in ipairs({ true, false }) do
 	Start()
-	victimPlayer = player
+	victimPlayer, victimDead = player, false
 	-- When its killing line arrives and the target changes before display.
 	SpellHit()
 	Line("PARTY_KILL")
@@ -94,6 +94,109 @@ for _, player in ipairs({ true, false }) do
 	assert(#alerts == 1 and alerts[1].victimIsPlayer == player,
 		"killing blow did not retain its matched victim type")
 end
+
+-- Given one recent victim with missing, hidden, or failing death information.
+for _, state in ipairs({ "alive", "secret", "missing", "failed" }) do
+	Start()
+	victimPlayer, victimDead = true, false
+	local deathReads = 0
+	UnitIsDead = state ~= "missing" and function()
+		deathReads = deathReads + 1
+		if state == "failed" then error("death unavailable") end
+		return state == "secret" and secret or false
+	end or nil
+	-- When its confirmed killing line arrives after the damage report.
+	SpellHit()
+	Advance(0.2)
+	Line("PARTY_KILL")
+	Advance(0.2)
+	-- Then its recorded player status is sufficient without querying death.
+	assert(#alerts == 1 and alerts[1].victimIsPlayer == true,
+		"known player kill required a readable death flag")
+	assert(deathReads == 0, "kill classification still queried death")
+end
+UnitIsDead = function() return victimDead end
+
+-- Given an owned hit shortly before, or just after, its killing line.
+for _, player in ipairs({ true, false }) do
+	for _, gap in ipairs({ -0.05, 0.05, 0.25, 0.5 }) do
+		Start()
+		victimPlayer, victimDead = player, false
+		-- When damage and the kill arrive in separate frames.
+		if gap < 0 then
+			ns.reader.sawGrey = true
+			Line("PARTY_KILL")
+			Advance(-gap)
+			SpellHit()
+		else
+			SpellHit()
+			Advance(gap)
+			Line("PARTY_KILL")
+		end
+		Advance(0.2)
+		-- Then the unique player's or NPC's type survives the timing gap.
+		assert(#alerts == 1 and alerts[1].victimIsPlayer == player,
+			"recent victim was lost between the hit and kill frames")
+	end
+end
+
+-- Given an owned hit whose target disappears before the killing line.
+Start()
+victimPlayer, victimDead = true, false
+SpellHit()
+Advance(0.1)
+exists = false
+Event("PLAYER_TARGET_CHANGED")
+-- When the kill arrives without a readable corpse.
+Line("PARTY_KILL")
+Advance(0.2)
+-- Then the original hit supplies the victim's type.
+assert(alerts[1].victimIsPlayer == true)
+
+-- Given stale hits, two recent victims, or an already-used kill window.
+for _, scenario in ipairs({ "expired", "two-victims", "previous-kill",
+	"late-new-hit" }) do
+	Start()
+	victimPlayer, victimDead = true, false
+	SpellHit()
+	if scenario == "expired" then
+		Advance(0.51)
+	elseif scenario == "two-victims" then
+		Advance(0.1)
+		Event("PLAYER_TARGET_CHANGED")
+		victimPlayer = false
+		SpellHit()
+	elseif scenario == "previous-kill" then
+		Line("PARTY_KILL")
+		Advance(0.2)
+	elseif scenario == "late-new-hit" then
+		Advance(0.6)
+	end
+	-- When a kill cannot be tied to a single fresh victim.
+	Line("PARTY_KILL")
+	if scenario == "late-new-hit" then
+		Advance(0.11)
+		SpellHit()
+	end
+	Advance(0.2)
+	-- Then old or conflicting evidence never turns an unknown kill into PvP.
+	assert(alerts[#alerts].victimIsPlayer == nil,
+		"ambiguous or stale evidence classified a kill: " .. scenario)
+end
+
+-- Given a known player hit followed by an unreadable hit on the same victim.
+Start()
+victimPlayer, victimDead = true, false
+SpellHit()
+Advance(0.1)
+victimPlayer = secret
+-- When the later hit and kill retain the original victim key.
+SpellHit()
+Line("PARTY_KILL")
+Advance(0.2)
+-- Then the earlier readable status supplies the same victim's type.
+assert(alerts[1].victimIsPlayer == true,
+	"same-victim hit discarded an earlier readable player status")
 
 -- Given two different dying targets struck in the same frame.
 Start()
@@ -116,22 +219,19 @@ SpellHit()
 victimDead = true
 Line("PARTY_KILL")
 Advance(0.2)
--- Then the still-matching unit can establish the original victim's death.
+-- Then the recorded victim's type remains available when death becomes readable.
 assert(alerts[1].victimIsPlayer == true)
 
--- Given an alive target, missing identity, or multiple killing lines.
-for _, scenario in ipairs({ "alive", "secret", "missing", "multiple", "no-hit",
-    "secret-death", "failed-death" }) do
+-- Given missing or hidden player identity, or multiple killing lines.
+for _, scenario in ipairs({ "secret", "missing", "failed", "multiple", "no-hit" }) do
 	Start()
-	if scenario == "alive" then victimDead = false end
 	if scenario == "secret" then victimPlayer = secret end
 	if scenario == "missing" then UnitIsPlayer = nil end
-	if scenario == "secret-death" then victimDead = secret end
-	if scenario == "failed-death" then
-		UnitIsDead = function() error("unit unavailable") end
+	if scenario == "failed" then
+		UnitIsPlayer = function() error("unit unavailable") end
 	end
 	if scenario ~= "no-hit" then SpellHit() else ns.reader.sawGrey = true end
-	-- When one or more kill signals arrive without a unique typed death.
+	-- When one or more kill signals arrive without a unique recorded victim.
 	Line("PARTY_KILL")
 	if scenario == "multiple" then Line("PARTY_KILL") end
 	Advance(0.2)
@@ -166,8 +266,8 @@ Event("NAME_PLATE_UNIT_ADDED", "nameplate1")
 victimPlayer, victimDead = false, true
 Line("PARTY_KILL")
 Advance(0.2)
--- Then the later corpse cannot supply the old hit's victim type or death.
-assert(alerts[1].victimIsPlayer == nil)
+-- Then the original hit's player status survives; the new corpse is not read.
+assert(alerts[1].victimIsPlayer == true)
 UnitExists = targetExists
 UnitIsUnit = function(left, right) return left == right end
 
@@ -199,6 +299,52 @@ for _, player in ipairs({ true, false }) do
 		-- Then it gets its own notification rather than being suppressed.
 		assert(#alerts + #outgoing == 2,
 			"duplicate prevention suppressed a separate kill")
+	end
+end
+
+-- Given a delayed killing line for a melee swing without a damage report.
+for _, player in ipairs({ true, false }) do
+	Start()
+	victimPlayer, victimDead = player, false
+	Event("PLAYER_SWING", 2, 1)
+	Line("SWING_DAMAGE")
+	-- When its kill arrives in a later frame with no readable death.
+	Advance(0.2)
+	Line("PARTY_KILL")
+	Advance(3)
+	-- Then the confirmed swing supplies the original victim's type once.
+	assert(#alerts + #outgoing == 1)
+	assert((alerts[1] or outgoing[1]).victimIsPlayer == player)
+end
+
+-- Describe: the real reader feeds the independent player/NPC display toggles.
+local Presentation = dofile("Components/CombatPresentation.lua")
+for _, player in ipairs({ true, false, secret }) do
+	-- Given only Player Killing Blows is enabled.
+	Start()
+	victimPlayer, victimDead = player, false
+	local shown = {}
+	local events = {
+		NOTIFICATION_PC_KILLING_BLOW = { message = "Player kill" },
+		NOTIFICATION_NPC_KILLING_BLOW = { disabled = true, message = "NPC kill" },
+	}
+	local presentation = Presentation:New({
+		getProfile = function() return { events = events } end,
+		formatMessage = function(settings) return settings.message end,
+		display = function(settings) shown[#shown + 1] = settings end,
+	})
+	ns.liveRouter.Alert = function(_, record) presentation:Alert(record) end
+	-- When a recent victim's killing line arrives after the hit.
+	SpellHit()
+	Advance(0.2)
+	Line("PARTY_KILL")
+	Advance(0.2)
+	-- Then player kills display without enabling NPC or unknown kills.
+	if player == true then
+		assert(#shown == 1 and shown[1] == events.NOTIFICATION_PC_KILLING_BLOW,
+			"known PvP kill required the NPC killing-blow option")
+	else
+		assert(#shown == 0, "NPC or unknown kill escaped the NPC toggle")
 	end
 end
 print("Killing-blow victim type tests passed")
