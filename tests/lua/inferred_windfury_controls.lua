@@ -13,6 +13,7 @@ local function NewControl()
     end
     function control:SetClickHandler(handler) self.click = handler end
     function control:SetChecked(value) self.checked = value end
+    function control:GetWidth() return #tostring(self.label or "") * 7 end
     return control
 end
 
@@ -40,7 +41,7 @@ for _, forever in ipairs({ true, false }) do
         end,
     }
     local environment = {
-        ipairs = ipairs, IsForever = forever, L = translations,
+        ipairs = ipairs, math = math, IsForever = forever, L = translations,
         tabFrames = { general = frame }, MSBTProfiles = profiles,
         MSBTControls = {
             CreateCheckbox = NewControl, CreateSlider = NewControl,

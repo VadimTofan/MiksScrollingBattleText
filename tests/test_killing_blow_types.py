@@ -3,7 +3,7 @@ import unittest
 from tests.lua_test_runner import run_lua_test
 
 
-# Describe: killing blows route only when the dying victim is identifiable.
+# Describe: killing blows reuse a unique recent victim's recorded type.
 class KillingBlowTypeTests(unittest.TestCase):
     def test_reader_keeps_player_npc_and_ambiguous_victims_separate(self):
         # Given
