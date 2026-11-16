@@ -16,6 +16,20 @@ local function SerializeArgs(packed)
 	for index = 1, packed.n do parts[index] = Serialize(packed[index]) end
 	return table.concat(parts, ",")
 end
+-- Options as text with sorted keys, as the options window reads them: a table that reads what it
+-- does not hold from another, as a profile from the master profile, is dumped with those values.
+local function DumpOptions(value)
+	if type(value) ~= "table" then return tostring(value) end
+	local keys, parts = {}, {}
+	for key in pairs(value) do keys[key] = true end
+	local defaults = getmetatable(value) and getmetatable(value).__index
+	if type(defaults) == "table" then
+		for key in pairs(defaults) do keys[key] = true end
+	end
+	for key in pairs(keys) do parts[#parts + 1] = tostring(key) .. "=" .. DumpOptions(value[key]) end
+	table.sort(parts)
+	return "{" .. table.concat(parts, ",") .. "}"
+end
 
 -- A frame API stub that keeps every visual setting an object receives. An object is named by
 -- its parent, its kind and the function that created it, so creation order elsewhere is moot.
@@ -26,7 +40,8 @@ local STATES = { "Normal", "Pushed", "Disabled", "Highlight", "Checked", "Disabl
 local function NewWorld()
 	local G = setmetatable({}, { __index = _G })
 	G._G = G
-	local world = { G = G, all = {}, counts = {}, steps = {}, dirty = {}, skinned = {}, shownClassic = 0 }
+	local world = { G = G, all = {}, counts = {}, steps = {}, dirty = {}, skinned = {}, shownClassic = 0, options = {},
+		opened = 0 }
 	local Methods, Meta, cache = {}, {}, {}
 	local Touch, Fire
 
@@ -286,8 +301,9 @@ local function NewProfiles(world)
 		master[name] = { colorR = 1, colorG = 1, colorB = 1, trailer = "" }
 	end
 	for _, profile in pairs(saved.profiles) do setmetatable(profile, { __index = master }) end
+	-- The loot alerts' item lists start from the master profile's lists.
 	local Profiles = { savedVariables = saved, currentProfile = saved.profiles.Default,
-		masterProfile = { scrollAreas = {} }, savedMedia = { sounds = {} } }
+		masterProfile = { scrollAreas = {}, itemsAllowed = {}, itemExclusions = {} }, savedMedia = { sounds = {} } }
 	local function Select(name) perChar.currentProfileName = name Profiles.currentProfile = saved.profiles[name] end
 	function Profiles.SetOption(section, key, value)
 		local target = Profiles.currentProfile
@@ -315,11 +331,14 @@ local function NewProfiles(world)
 			critOutlineIndex = 1, critFontSize = 24, critFontAlpha = 100, animationSpeed = 100 }
 	end
 	master.scrollAreas = areas
+	-- Resolving an aura and normalizing a sound file find nothing, as the real ones do for the empty
+	-- inputs of the walks.
 	G.MikSBT = {
 		VERSION_STRING = "test", translations = {}, Profiles = Profiles, Print = Noop,
 		Compatibility = { Client = { hasModernAPI = true, isClassicContent = false } },
-		Configuration = { AuraTracking = {} }, Services = { Formatter = setmetatable({}, { __index = function()
-			return function() return "" end end }) }, API = { Spells = {}, Sounds = {} },
+		Configuration = { AuraTracking = { Resolve = Noop } },
+		Services = { Formatter = setmetatable({}, { __index = function()
+			return function() return "" end end }) }, API = { Spells = {}, Sounds = { NormalizeFile = Noop } },
 		EraseTable = function(value) for key in next, value do value[key] = nil end end,
 		Animations = { scrollAreas = areas, animationStyles = styles, stickyAnimationStyles = styles,
 			UpdateScrollAreas = Noop },
@@ -470,16 +489,38 @@ local function CheckClassicPopups(world, label)
 	end
 end
 
--- Presses every visible option button that opens a popup, with the dropdowns in it.
+-- Buttons that change the options or the window themselves stay unpressed: pressed in one walk, they
+-- would change what the classic window of that walk shows. They are the new window's footer (Apply,
+-- Cancel, Reset Profile, Changes), switching every listed event on or off, undoing changes, the format
+-- code chips that write into an event's message, and the preview and the scroll area configuration,
+-- which put the window away (the walks open that configuration apart).
+local function ChangesStateItself(world, button)
+	local G = world.G
+	local L = G.MikSBT.translations
+	local text = button:GetText()
+	return button.parent == G.MSBTOptionsWindowFrame
+		or button.clickHandler == G.MSBTOptions.Tabs.scrollAreas.ConfigureOnScreen
+		or text == L.BUTTONS.toggleAll.label or text == L.WINDOW.allOn or text == L.WINDOW.allOff
+		or text == L.WINDOW.undo or text == L.WINDOW.undoAll or text == L.BUTTONS.scrollAreasPreview.label
+		or text:sub(1, 1) == "%"
+end
+
+-- Presses every other visible option button, which opens a popup or only reads its input, with the
+-- dropdowns in the popup. An option button is a button with the factory's label function; its frame
+-- comes from the factory's general button function, so the site does not tell option buttons apart.
 local function OpenPopups(world, label)
 	local popups = {}
 	for _, button in ipairs(Collect(world, function(obj)
-		return obj.site == "CreateOptionButton" and Visible(obj) and obj.enabled
+		return obj.kind == "Button" and rawget(obj, "SetLabel") and Visible(obj) and obj.enabled
+			and not ChangesStateItself(world, obj)
 	end)) do
 		popups[#popups + 1] = button
 	end
 	for _, button in ipairs(popups) do
 		if Visible(button) and Try(world, label .. "/" .. button.id, Click, button) then
+			for popup in pairs(world.popups) do
+				if popup.shown then world.opened = world.opened + 1 break end
+			end
 			CheckClassicPopups(world, label)
 			Snap(world, label .. " popup of " .. button.id)
 			OpenDropdowns(world, label .. " popup")
@@ -577,6 +618,10 @@ local function ClassicWalk(world, round)
 	local Main = world.G.MSBTOptions.Main
 	Command(world, "classic")
 	assert(world.G.MSBTMainOptionsFrame.shown, "the classic window did not open")
+	-- The classic window shows the options, so both walks must start the round with the same ones.
+	local MikSBT = world.G.MikSBT
+	world.options[round] = DumpOptions({ MikSBT.Profiles.savedVariables, MikSBT.Profiles.savedMedia,
+		MikSBT.Animations.scrollAreas })
 		Snap(world, round .. " opened")
 	for _, tab in ipairs(Main.GetTabs()) do
 		Try(world, round .. " tab " .. tab.text, SelectTab, world, tab)
@@ -937,6 +982,14 @@ for _, message in ipairs(classic.errors) do print("alone: " .. message) end
 for _, message in ipairs(mixed.errors) do print("mixed: " .. message) end
 for index = 1, math.min(#failures, 40) do print(failures[index]) end
 assert(#classic.errors == 0 and #mixed.errors == 0, "a walk step failed")
+-- And the buttons opened popups, in the classic window and, as the mixed walk opened more, in the new one.
+assert(classic.opened > 0 and mixed.opened > classic.opened,
+	"the walks opened no popup with a button, so they prove nothing")
+-- And both walks started each classic round with the same options, so what differs is the window's own.
+for _, round in ipairs({ "classic1", "classic2" }) do
+	assert(classic.options[round] == mixed.options[round],
+		round .. " started with other options after the new window was used")
+end
 assert(#failures == 0, #failures .. " classic properties differ after the new window was used")
 -- And the walks reached the movers: the classic ones were compared, the new design's wear its skin.
 local classicMovers, skinnedMovers = 0, 0
@@ -951,8 +1004,8 @@ end
 assert(classicMovers > 0 and skinnedMovers > 0, "the walks compared no classic mover or skinned none of the new design")
 local objectCount = 0
 for _ in pairs(objects) do objectCount = objectCount + 1 end
-print(string.format("classic design intact: 2 rounds, %d steps, %d objects, %d properties compared",
-	steps, objectCount, compared))
+print(string.format("classic design intact: 2 rounds, %d steps, %d objects, %d properties compared;"
+	.. " buttons opened %d popups alone, %d mixed", steps, objectCount, compared, classic.opened, mixed.opened))
 
 -- Given the new design used first and the classic view then docked once per tab.
 local docked = Run(function(world)
