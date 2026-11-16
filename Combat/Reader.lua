@@ -1340,20 +1340,47 @@ end
 -- The target's auras are secret in a fight (GetAuraDataByIndex is refused,
 -- addedAuras is a secret table), but their event still came in the frame of
 -- the cast, three times of three; a recast came with a plain payload and no
--- added aura. So only the moment counts: an aura added or refreshed on the
--- target within LAND_FRAME of the cast is taken to be its doing. A resisted
+-- added aura. So the moment counts: an aura added or refreshed on the
+-- target within LAND_FRAME of the cast is taken to be its doing, unless
+-- what the payload lets you read speaks against it (Contradicts) or the
+-- target is not shown to be the cast's recipient (WatchLanding). A resisted
 -- cast takes its miss and a strike its hit within LAND_SETTLE (a miss waits
 -- MISS_SETTLE, a hit up to LATE_LINE for its line), and those speak for
 -- themselves; so does a hit left unnamed because it might be another cast's
--- (a recipient the client hides, or two units of one name). A miss left
--- unnamed for that reason marks no cast, so any spell's miss line of yours
--- within LAND_FRAME of the cast speaks for it (SpellMissLine). A spell
--- whose missile flies puts its aura there later and is left to its hit
--- (the rule as a whole is predicted, not yet seen in client).
+-- (one of yours or your pet's in its moment). A miss left unnamed for that
+-- reason marks no cast, so any spell's miss line of yours within LAND_FRAME
+-- of the cast speaks for it (SpellMissLine). A spell whose missile flies
+-- puts its aura there later and is left to its hit (the rule as a whole is
+-- predicted, not yet seen in client).
 local LAND_FRAME, LAND_SETTLE = 0.05, 0.2
-local function Present(list)
+-- An aura the payload lets you read is not the cast's when it shows as
+-- helpful or as put there by another than you or your pet (a party
+-- member's buff on the target in the moment of the cast); one it hides may
+-- be. Its spell is not asked: a cast can leave an aura of another spell
+-- (Pounce its bleed, Charge its stun).
+local function Contradicts(aura)
+    if type(aura) ~= "table" or not ns.Public(aura) then return false end
+    local harmful, source = aura.isHarmful, aura.sourceUnit
+    if ns.Bool(harmful) and not harmful then return true end
+    return ns.Text(source) and source ~= "player" and source ~= "pet"
+end
+-- A refreshed aura comes as its id; it is looked up as yours are, unless
+-- the client says it is secret.
+local function TargetAura(id)
+    if not (ns.Number(id) and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID)
+        or ns.AuraSecret("ShouldUnitAuraInstanceBeSecret", "target", id) then return end
+    return C_UnitAuras.GetAuraDataByAuraInstanceID("target", id)
+end
+-- Whether a list of the payload, hidden or read, holds an aura that may be
+-- the cast's.
+local function Evidence(list, lookup)
     if not ns.Public(list) then return true end
-    return type(list) == "table" and #list > 0
+    if type(list) ~= "table" then return false end
+    for _, entry in ipairs(list) do
+        if lookup then entry = lookup(entry) end
+        if not Contradicts(entry) then return true end
+    end
+    return false
 end
 local function SpellMissLine(at)
     for _, line in ipairs(reader.logLines or {}) do
@@ -1364,7 +1391,7 @@ end
 local function OnTargetAura(info)
     if ns.Public(info) then
         if type(info) ~= "table" then return end
-        if not (Present(info.addedAuras) or Present(info.updatedAuraInstanceIDs)) then return end
+        if not (Evidence(info.addedAuras) or Evidence(info.updatedAuraInstanceIDs, TargetAura)) then return end
     end
     local now = Now()
     reader.targetAuraAt = now
@@ -1372,10 +1399,12 @@ local function OnTargetAura(info)
     if watch and now - watch.at <= LAND_FRAME then watch.aura = true end
 end
 local function WatchLanding(spell, cast, now)
-    -- A cast whose recipient is another unit (the target changed while it
-    -- was cast, or it went to the focus) puts its aura there, not on the
-    -- target selected now. One whose recipient is unknown is still watched.
-    if cast.key and cast.key ~= ns.TargetKey() then return end
+    -- Only a cast shown to be at the target selected now is watched. One
+    -- whose recipient is another unit (the target changed while it was
+    -- cast, or it went to the focus) puts its aura there; one whose
+    -- recipient is uncertain (hidden, or a name another unit shares) has no
+    -- key and may have put it there too.
+    if cast.targetUncertain or cast.key ~= ns.TargetKey() then return end
     local auraAt = reader.targetAuraAt
     local watch = { at = now, aura = auraAt ~= nil and now - auraAt <= LAND_FRAME }
     reader.landing = watch

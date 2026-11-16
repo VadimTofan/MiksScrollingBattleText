@@ -215,33 +215,34 @@ do
     Settle()
     -- Then the miss and the hit speak for themselves.
     assert(#landed == 3, "a spell with a result of its own was shown as landed")
-    -- Given a spell that hits a recipient the client hides, with an aura
-    -- event in its frame: its hit is shown without a name.
+    -- Given a spell of yours and the same spell of your pet's in one frame,
+    -- with an aura event in it: their hit is shown without a name.
+    petExists = true
     Advance(4)
-    Event("UNIT_SPELLCAST_SENT", "player", hiddenRecipient, "hidden-recipient", 101)
-    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "hidden-recipient", 101)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "pet", nil, 101)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
     Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
     Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
     Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
     -- When the wait is over.
     Settle()
-    assert(outgoing[#outgoing].result.who == "you" and not outgoing[#outgoing].result.spell,
-        "the hit on a hidden recipient was named")
-    -- Then its hit, though unnamed, speaks for it.
+    petExists = false
+    assert(not outgoing[#outgoing].result.spell, "the hit of two casts was named")
+    -- Then the hit, though unnamed, speaks for your cast.
     assert(#landed == 3, "a spell with an unnamed hit of its own was shown as landed")
-    -- Given a spell resisted by a recipient the client hides, with an aura
-    -- event in its frame: its miss is shown without a name.
+    -- Given two spells of yours in one frame, one of them resisted, with an
+    -- aura event in it: the miss is shown without a name.
     Advance(4)
-    Event("UNIT_SPELLCAST_SENT", "player", hiddenRecipient, "hidden-resist", 503)
-    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "hidden-resist", 503)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
     engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
     Event("UNIT_COMBAT", "target", "RESIST", "", 0, 8)
     Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
     -- When the wait is over.
     Settle()
     assert(outgoing[#outgoing].result.missed and not outgoing[#outgoing].result.spell,
-        "the miss on a hidden recipient was named")
-    -- Then its miss, though unnamed, speaks for it.
+        "the miss of one of two casts was named")
+    -- Then the miss, though unnamed, speaks for the debuff.
     assert(#landed == 3, "a spell with an unnamed miss of its own was shown as landed")
 
     -- Given an aura event on the target, then another target and a cast on it
@@ -305,8 +306,9 @@ do
     Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-hidden", 503)
     Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
     Settle()
-    -- Then the spell is shown as landed, as the target may be its recipient.
-    assert(#landed == 7, "a debuff sent to a hidden recipient was not shown")
+    -- Then the spell is not shown as landed: the target is not shown to be
+    -- its recipient.
+    assert(#landed == 6, "the target's aura counted for a cast with a hidden recipient")
 
     -- Given a spell of yours resisted a moment before a debuff, then a swing
     -- of yours parried and an aura event in the debuff's frame.
@@ -416,6 +418,95 @@ Advance(0.13)
 -- Then the buffered final hit still retains Eye Beam's identity.
 assert(#outgoing == previous + 1, "final channel hit disappeared")
 assert(outgoing[#outgoing].result.spell == 403)
+
+-- Describe: an aura event on the target counts for a debuff's landing only
+-- when the target is shown to be the cast's recipient and what the event
+-- lets you read does not speak against the cast.
+do
+    local landed = {}
+    engine.config.presentation.Landed = function(_, spell) landed[#landed + 1] = spell end
+    local hiddenAuras, hiddenRecipient = {}, {}
+    local plainSecretCheck, harmful = issecretvalue, C_Spell.IsSpellHarmful
+    issecretvalue = function(value) return value == hiddenAuras or value == hiddenRecipient end
+    C_Spell.IsSpellHarmful = function() return true end
+    local hidden = { isFullUpdate = false, addedAuras = hiddenAuras }
+    local function Lands(info, recipient, guid)
+        Advance(4)
+        if guid then Event("UNIT_SPELLCAST_SENT", "player", recipient, guid, 503) end
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", guid, 503)
+        Event("UNIT_AURA", "target", info)
+        Advance(0.016) Advance(0.05) Advance(0.2)
+        return #landed
+    end
+
+    -- Given a cast sent to the focus, a unit other than the target and
+    -- without a nameplate, and an aura event on the target in its frame.
+    local unitName, unitExists = UnitName, UnitExists
+    UnitName = function(unit)
+        if unit == "target" then return "Target B" end
+        if unit == "focus" then return "Focus A" end
+    end
+    UnitExists = function(unit) return unit == "focus" or unitExists(unit) end
+    -- When the wait is over.
+    local shown = Lands(hidden, "Focus A", "sent-to-focus")
+    UnitName, UnitExists = unitName, unitExists
+    -- Then the target's aura does not count for the focus's cast.
+    assert(shown == 0, "the target's aura counted for a cast on the focus")
+    -- Given yourself as the target, a cast whose recipient the client hides
+    -- and an aura event on the target, you, in its frame.
+    targetIsPlayer = true
+    Event("PLAYER_TARGET_CHANGED")
+    -- When the wait is over.
+    shown = Lands(hidden, hiddenRecipient, "sent-hidden-self")
+    targetIsPlayer = false
+    Event("PLAYER_TARGET_CHANGED")
+    -- Then your own aura does not count for the cast either.
+    assert(shown == 0, "an aura of yours counted for a cast with a hidden recipient")
+
+    -- Given auras the payload shows as not the cast's: a buff a party member
+    -- put on the target, a debuff of another's, a buff of yours, and a
+    -- refreshed aura the client lets you look up, a party member's buff.
+    local function Aura(isHarmful, sourceUnit)
+        return { auraInstanceID = 999, spellId = 1126, isHarmful = isHarmful, sourceUnit = sourceUnit }
+    end
+    local unitAuras, refreshed = C_UnitAuras, Aura(false, "party1")
+    C_UnitAuras = { GetAuraDataByAuraInstanceID = function(unit, id)
+        if unit == "target" and id == 999 then return refreshed end
+    end }
+    -- When the wait is over.
+    -- Then none of them is shown as landed.
+    assert(Lands({ isFullUpdate = false, addedAuras = { { auraInstanceID = 999,
+        spellId = 1126, isHarmful = false, sourceUnit = "party1" } } }) == 0,
+        "a party member's buff counted as landed")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(true, "party1") } }) == 0,
+        "another's debuff counted as landed")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(false, "player") } }) == 0,
+        "a buff of yours counted as landed")
+    assert(Lands({ isFullUpdate = false, updatedAuraInstanceIDs = { 999 } }) == 0,
+        "a party member's refreshed buff counted as landed")
+    -- Given a debuff of yours beside a party member's buff, a debuff of your
+    -- pet's, and an aura the payload hides beside a party member's buff.
+    -- When the wait is over.
+    -- Then each is shown as landed.
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(false, "party1"), Aura(true, "player") } }) == 1,
+        "a debuff of yours beside another's buff was not shown")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(true, "pet") } }) == 2,
+        "a debuff of your pet's was not shown")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(false, "party1"), hiddenAuras } }) == 3,
+        "a hidden aura beside another's buff was not shown")
+    -- Given the client saying the target's auras are secret, and a refreshed
+    -- aura in the cast's frame.
+    local secrets, looked = C_Secrets, false
+    C_Secrets = { ShouldAurasBeSecret = function() return true end }
+    C_UnitAuras.GetAuraDataByAuraInstanceID = function() looked = true return refreshed end
+    -- When the wait is over.
+    shown = Lands({ isFullUpdate = false, updatedAuraInstanceIDs = { 999 } })
+    C_UnitAuras, C_Secrets = unitAuras, secrets
+    -- Then the aura is not looked up, and the refresh counts as hidden ones do.
+    assert(not looked, "a secret aura of the target was looked up")
+    assert(shown == 4, "a refresh hidden by the client was not shown")
+    issecretvalue, C_Spell.IsSpellHarmful = plainSecretCheck, harmful
+end
 
 -- Given incoming damage and healing.
 -- When the game reports them on the player and pet.
