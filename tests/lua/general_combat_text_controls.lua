@@ -35,6 +35,7 @@ local environment = {
 	ipairs = ipairs,
 	math = math,
 	tabFrames = { general = frame },
+	MSBTDesigns = { keys = {} },
 	MSBTControls = {
 		CreateCheckbox = NewControl,
 		CreateSlider = NewControl,

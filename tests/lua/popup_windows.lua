@@ -341,7 +341,8 @@ MikSBT.Animations.stickyAnimationStyles = { Pow = {} }
 MikSBT.Animations.UpdateScrollAreas = Noop
 MSBTAnimations = MikSBT.Animations
 GetLocale = function() return "enUS" end
-MSBTOptions.Main.ShowMainFrame = Noop
+local reopened = 0
+MSBTOptions.Designs = { Show = function() reopened = reopened + 1 end }
 MikSBT.Profiles.currentProfile.animationSpeed = 100
 
 -- When the preview is changed, then cancelled using the new header button.
@@ -355,6 +356,7 @@ positioning.headerCloseButton.scripts.OnClick(positioning.headerCloseButton)
 assert(MikSBT.Profiles.currentProfile["scrollAreas.Incoming"].offsetX == 0)
 assert(not positioning.shown)
 assert(not positioning.moverFrames.Incoming.shown)
+assert(reopened == 1, "closing the positioning did not reopen the options")
 
 -- Given the event editor and its actual sound controls.
 NONE = "None"

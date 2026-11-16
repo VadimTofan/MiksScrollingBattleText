@@ -47,7 +47,7 @@ for _, name in ipairs({ "SetPoint", "ClearAllPoints", "EnableMouse", "SetMovable
 	"RegisterForDrag", "SetFrameStrata", "SetClampedToScreen", "SetBackdrop",
 	"Raise", "SetAlpha", "SetTooltip", "SetFocus", "Sort", "SetMinMaxValues",
 	"SetValueStep", "SetLabel", "SetEscapeHandler", "SetEnterHandler",
-	"SetTextChangedHandler", "SetValueChangedHandler" }) do
+	"SetTextChangedHandler", "SetValueChangedHandler", "SetChangeHandler" }) do
 	Widget[name] = function() end
 end
 for _, name in ipairs({ "SetTexture", "SetColorTexture", "SetTexCoord", "SetSize",
@@ -90,7 +90,7 @@ Widget.CreateTexture = NewWidget
 CreateFrame = function(_, _, parent) return NewWidget(parent) end
 UIParent = NewWidget()
 local tabs, tabOrder = {}, {}
-MSBTOptions = { Controls = {}, Main = {
+MSBTOptions = { Controls = {}, Designs = { keys = {} }, Main = {
 	RegisterPopupFrame = function() end,
 	AddTab = function(frame, label)
 		tabs[label] = frame

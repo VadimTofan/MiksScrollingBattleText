@@ -58,10 +58,19 @@ MikSBT = {
 }
 MSBTOptions = {Controls = {CreateListbox = function(parent)
 	return NewFrame(nil, parent)
-end}}
+end}, Popups = {UseDesignPopups = function() end}}
 CreateFrame = function(_, name, parent) return NewFrame(name, parent) end
+MikSBT.Profiles = {savedVariables = {}}
+dofile("MSBTOptions/MSBTOptionsDesigns.lua")
 dofile("MSBTOptions/MSBTOptionsMain.lua")
 local options = MSBTOptions.Main
+local designs = MSBTOptions.Designs
+-- Another design whose window is open.
+local other = {shown = true}
+function other.Show() other.shown = true end
+function other.Hide() other.shown = false end
+function other.IsShown() return other.shown end
+designs.Register("other", other)
 local general, scrollAreas = NewFrame(), NewFrame()
 options.AddTab(general, "General")
 options.AddTab(scrollAreas, "Scroll Areas")
@@ -107,6 +116,7 @@ Settings.OpenToCategory(1)
 local main = frames.MSBTMainOptionsFrame
 assert(main:GetParent() == panels[1] and general:IsShown(),
 	"General did not dock when its category opened")
+assert(not other.shown, "another design's window stayed open beside Settings")
 Settings.OpenToCategory(2)
 
 -- Then the selected tab is visible in its matching category.
@@ -114,22 +124,32 @@ assert(main:GetParent() == panels[2] and scrollAreas:IsShown(),
 	"Scroll Areas did not dock when its category opened")
 assert(not general:IsShown(), "previous tab stayed visible")
 
+-- When the other design is chosen there and the options are requested.
+designs.Select("other")
+designs.Show()
+
+-- Then the choice is saved and Settings keeps showing the options.
+assert(MikSBT.Profiles.savedVariables.optionsDesign == "other" and not other.shown
+	and SettingsPanel:IsShown() and main:GetParent() == panels[2],
+	"a design opened beside Settings")
+
 -- Given the user temporarily closes Settings to configure scroll areas.
-options.HideMainFrame()
+designs.Hide()
 assert(not SettingsPanel:IsShown(), "Settings stayed open over configuration")
 
 -- When configuration finishes and reopens the options.
-options.ShowMainFrame()
+designs.Show()
 
--- Then the same Settings category is restored.
-assert(SettingsPanel:IsShown() and main:GetParent() == panels[2],
+-- Then the same Settings category is restored, whichever design is chosen.
+assert(SettingsPanel:IsShown() and main:GetParent() == panels[2] and not other.shown,
 	"configuration did not reopen the Scroll Areas category")
 
--- Given the user closes Settings normally.
+-- Given the user closes Settings normally and chooses the classic design.
 HideUIPanel(SettingsPanel)
+designs.Select("classic")
 
 -- When standalone options are requested.
-options.ShowMainFrame()
+designs.Show()
 
 -- Then the window belongs to UIParent and is visible again.
 assert(main:GetParent() == UIParent and main:IsShown(),

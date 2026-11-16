@@ -47,6 +47,7 @@ for _, forever in ipairs({ true, false }) do
             CreateCheckbox = NewControl, CreateSlider = NewControl,
             CreateOptionButton = NewControl,
         },
+        MSBTDesigns = { keys = {} },
     }
     local build = assert(loadstring(createSource .. "\n" .. populateSource ..
         "\nreturn GeneralTab_Create, GeneralTab_Populate"))
