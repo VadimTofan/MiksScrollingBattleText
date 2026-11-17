@@ -25,6 +25,15 @@ local MAX_ERRORS = 5
 -- seconds. Select all shows every row.
 local LIVE_ROWS = 100
 local REFRESH_DELAY = 0.5
+-- A recording keeps at most this many rows of the log, and the row that reaches the number ends it.
+local MAX_RECORDED_ROWS = 10000
+-- The saved settings keep this many recordings and drop the oldest beyond that.
+local MAX_RECORDINGS = 3
+-- What the button for the recording says, and the red marker in front of the count while it runs.
+local RECORD_LABEL, STOP_RECORD_LABEL = "Record", "Stop recording"
+local RECORDING_MARKER = "|cffff4040Recording|r - "
+-- The names of the dialogs that ask before a recording starts and offer a reload when it has stopped.
+local START_POPUP, SAVE_POPUP = "MSBT_DEBUG_RECORD_START", "MSBT_DEBUG_RECORD_SAVE"
 -- The pasted test has a page of its own after the listed ones, and its key marks its rows.
 local CUSTOM_KEY = "custom"
 local CUSTOM_LABEL = "custom test"
@@ -83,6 +92,14 @@ local chosenPage
 -- Whether something is drawn, so that the log leaves room for the drawing area. Like the page, it is
 -- the same in every look's window and not saved.
 local isDrawn = false
+-- The running recording, nil while there is none: the rows written since it began with the moment of
+-- each, the keys of the tests that ran, and what the stop needs to save it. Like the log it is the
+-- same for every look's window.
+local recording
+-- The frame that hears the game while a recording runs, built when the first one starts.
+local recorder
+-- Defined with the recording, below the pages; the log and the window's button reach them from above.
+local StopRecording, ToggleRecording
 
 
 -- Lets the log end where the state of the drawing says. Only a change of that state anchors anew,
@@ -120,8 +137,8 @@ local function Refresh(isFull)
 	editbox.shownText = text
 	editbox:SetText(text)
 	editbox:SetCursorPosition(#text)
-	window.countFontString:SetText(first == 1 and #rows .. " rows"
-		or #rows .. " rows, the newest " .. LIVE_ROWS .. " shown")
+	window.countFontString:SetText((recording and RECORDING_MARKER or "") .. (first == 1 and #rows .. " rows"
+		or #rows .. " rows, the newest " .. LIVE_ROWS .. " shown"))
 end
 
 
@@ -132,15 +149,35 @@ local function QueueRefresh()
 end
 
 
+-- The moment in seconds with fractions, as the client keeps it for the combat log's clock.
+local function Precise()
+	if GetTimePreciseSec then return GetTimePreciseSec() end
+	return GetTime()
+end
+
+
+-- Writes a row to the log and, while a recording runs, to the recording as well. The row that brings
+-- the recording to its limit ends it, and the rows its end writes are kept beyond the limit.
 local function Log(key, ...)
 	logStart = logStart or GetTime()
 	local parts = { string.format("%.3f", GetTime() - logStart), key }
 	for index = 1, select("#", ...) do
 		parts[#parts + 1] = Describe((select(index, ...)))
 	end
+	local row = table.concat(parts, " ")
 	if #rows == MAX_ROWS then table.remove(rows, 1) end
-	rows[#rows + 1] = table.concat(parts, " ")
+	rows[#rows + 1] = row
+	local current = recording
+	if current then
+		current.rows[#current.rows + 1] = row
+		current.times[#current.times + 1] = Precise()
+	end
 	QueueRefresh()
+	if current and #current.rows >= MAX_RECORDED_ROWS and not (current.isLimited or current.isEnding) then
+		current.isLimited, current.truncated = true, true
+		Log("record", "limit reached", MAX_RECORDED_ROWS)
+		StopRecording("limit")
+	end
 end
 
 
@@ -373,6 +410,10 @@ local function StartTest(key, label, body)
 	local run = setmetatable({ key = key, handlers = {}, listener = Listener(key), watched = {}, stopCallbacks = {},
 		isActive = true, errors = 0, rows = DRAWN_ROWS }, Run)
 	running[key] = run
+	if recording and not recording.seen[key] then
+		recording.seen[key] = true
+		recording.tests[#recording.tests + 1] = key
+	end
 	Log(key, "started", label)
 	run:Call(body, run)
 end
@@ -516,8 +557,17 @@ local function CreateWindow()
 	window.selectButton:SetPoint("TOPLEFT", logPanel, "BOTTOMLEFT", 0, -4)
 	window.clearButton = CreateButton(window, "Clear", "Empties the log and what tests drew.", ClearLog)
 	window.clearButton:SetPoint("LEFT", window.selectButton, "RIGHT", 8, 0)
+	window.recordButton = CreateButton(window, RECORD_LABEL,
+		"Records the log together with the game's combat log until it is stopped. Asks first, and says where"
+		.. " the recording is kept.", ToggleRecording)
+	window.recordButton:SetPoint("LEFT", window.clearButton, "RIGHT", 8, 0)
+	-- The count takes the room right of the record button up to the right edge of the log, level with the
+	-- middle of the buttons, which stand 4 below the log. While a recording runs, the button is wider and
+	-- the count longer: a count too long for its room goes on to a second line instead of out of the window.
 	window.countFontString = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	window.countFontString:SetPoint("LEFT", window.clearButton, "RIGHT", 12, 0)
+	window.countFontString:SetPoint("LEFT", window.recordButton, "RIGHT", 12, 0)
+	window.countFontString:SetPoint("RIGHT", logPanel, "BOTTOMRIGHT", 0, -4 - window.recordButton:GetHeight() / 2)
+	window.countFontString:SetJustifyH("LEFT")
 
 	-- What tests draw stands below the log: the rows from the top down, each cut to one line, and
 	-- the free text in the same place, which grows downward.
@@ -619,6 +669,198 @@ local function UpdateTests(window)
 end
 
 
+-- Shows in a window whether a recording runs, as the button's label; the count of rows carries the
+-- marker in Refresh.
+local function ShowRecordState(window)
+	window.recordButton:SetLabel(recording and STOP_RECORD_LABEL or RECORD_LABEL)
+end
+
+
+-- A change of the state shows in the open window at once.
+local function UpdateRecordState()
+	if shownWindow then ShowRecordState(shownWindow) end
+	Refresh()
+end
+
+
+-- A moment on the game's clock as the combat log writes the time of day: hours, minutes, seconds
+-- and thousandths. wall is the moment in seconds since the epoch, with fractions.
+local function WallText(wall)
+	local whole = math.floor(wall)
+	return date("%H:%M:%S", whole) .. string.format(".%03d", math.floor((wall - whole) * 1000))
+end
+
+
+-- time() counts whole seconds, so the frame in which it steps is the one in which a second began.
+-- That gives the difference between the wall clock and the game's clock, accurate to one frame, which
+-- places every row of the recording on the combat log's clock.
+local function AlignClock()
+	local current = recording
+	local second = time()
+	if not current or second == current.second then return end
+	current.clockOffset = second - Precise()
+	recorder:SetScript("OnUpdate", nil)
+end
+
+
+-- The frame that hears the game while a recording runs, built once.
+local function Recorder()
+	if not recorder then
+		recorder = CreateFrame("Frame")
+		recorder:SetScript("OnEvent", function(this, event, ...)
+			if event == "PLAYER_LOGOUT" then
+				StopRecording("logout")
+			else
+				Log("record", "logging changed", ...)
+			end
+		end)
+	end
+	return recorder
+end
+
+
+-- Begins a recording: the combat log is switched on, the clock is aligned, and every running test starts
+-- anew so that its start is in the recording. Rows written before are not kept.
+local function StartRecording()
+	if recording then return end
+	local current = { rows = {}, times = {}, tests = {}, seen = {}, startedAt = Precise(), date = date("%m/%d/%Y"),
+		second = time(), combatLog = "unavailable" }
+	recording = current
+	local isLogging = type(LoggingCombat) == "function"
+	if isLogging then current.combatLog = LoggingCombat() and "already on" or "switched on" end
+	Log("record", "started", "combat log " .. current.combatLog)
+	local hearing = Recorder()
+	for _, event in ipairs({ "CHAT_LOGGING_CHANGED", "PLAYER_LOGOUT" }) do
+		if not pcall(hearing.RegisterEvent, hearing, event) then Log("record", "event unavailable", event) end
+	end
+	hearing:SetScript("OnUpdate", AlignClock)
+	-- The game logs the fight only while the combat log is on, and the stop switches it off. It writes the file
+	-- in blocks: the last one can come minutes after the stop, since neither the stop nor a reload writes it.
+	if isLogging then LoggingCombat(true) end
+	if C_ChatInfo and C_ChatInfo.IsLoggingCombat then
+		Log("record", "combat log state", C_ChatInfo.IsLoggingCombat())
+	end
+	for _, page in ipairs(module.pages or {}) do
+		for _, test in ipairs(page.tests or {}) do
+			if running[test.key] then StartTest(test.key, test.label, test.run) end
+		end
+	end
+	if running[CUSTOM_KEY] then
+		StartCustomTest(shownWindow and shownWindow.customEditbox:GetText() or "")
+	end
+	UpdateRecordState()
+end
+
+
+-- Asks before a recording starts, since it starts the tests anew and switches the combat log on.
+local function ShowStartPopup()
+	if not StaticPopupDialogs[START_POPUP] then
+		StaticPopupDialogs[START_POPUP] = {
+			-- The client wraps the text only between words, and a word wider than the dialog cuts the rest
+			-- off, so the places of the files are named in short words.
+			text = "Record the log together with the game's combat log?\n\nThe ticked tests start anew, and tests"
+				.. " ticked while it records are recorded from their start. The combat log is switched on now and"
+				.. " switched off when the recording stops.\n\nThe game writes the recording to disk only when the"
+				.. " interface reloads or on logout: into the saved variables of MikScrollingBattleText, in the folders"
+				.. " WTF, your account, SavedVariables. The combat log goes to the folder Logs, into a WoWCombatLog file."
+				.. " A reload is offered when the recording stops. At most "
+				.. MAX_RECORDINGS .. " recordings are kept, the oldest goes.",
+			button1 = "Start",
+			button2 = "Cancel",
+			OnAccept = StartRecording,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+		}
+	end
+	StaticPopup_Show(START_POPUP)
+end
+
+
+-- Says that the recording is saved and that the game writes it to disk only later, and offers the reload.
+local function ShowSavePopup(entry)
+	if not StaticPopupDialogs[SAVE_POPUP] then
+		StaticPopupDialogs[SAVE_POPUP] = {
+			text = "%s",
+			button1 = "Reload now",
+			button2 = "Later",
+			OnAccept = function()
+				local reload = ReloadUI or (C_UI and C_UI.Reload)
+				if reload then reload() end
+			end,
+			OnCancel = function() Log("record", "kept until the next reload or logout") end,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+		}
+	end
+	StaticPopup_Show(SAVE_POPUP, string.format("Recording kept: %d rows, from %s to %s on %s.\n\nThe game writes it to"
+		.. " disk only when the interface reloads or on logout. Reload now?", #entry.rows, entry.started,
+		entry.stopped, entry.date))
+end
+
+
+-- Ends the recording that runs, whichever way it ends: the tests stop, the combat log is switched off, and
+-- the recording is saved with the settings. Anything but a logout then offers the reload that makes the
+-- game write the settings to disk.
+function StopRecording(reason)
+	local current = recording
+	if not current or current.isEnding then return end
+	current.isEnding = true
+	for _, key in ipairs(current.tests) do StopTest(key) end
+	if shownWindow then UpdateTests(shownWindow) end
+	if type(LoggingCombat) == "function" then LoggingCombat(false) end
+	Log("record", "stopped", reason, #current.rows + 1)
+	recorder:UnregisterAllEvents()
+	recorder:SetScript("OnUpdate", nil)
+
+	local offset, clock = current.clockOffset, "exact"
+	if not offset then offset, clock = time() - Precise(), "approximate" end
+	local texts = {}
+	for index, row in ipairs(current.rows) do
+		texts[index] = WallText(offset + current.times[index]) .. " " .. row
+	end
+	local version, buildNumber = GetBuildInfo()
+	local guid = UnitGUID("player")
+	local entry = {
+		date = current.date,
+		started = WallText(offset + current.startedAt),
+		stopped = WallText(offset + Precise()),
+		clock = clock,
+		build = tostring(version) .. " " .. tostring(buildNumber),
+		player = not RestrictedValue:IsRestricted(guid) and guid or nil,
+		combatLog = current.combatLog,
+		reason = reason,
+		truncated = current.truncated,
+		tests = current.tests,
+		rows = texts,
+	}
+	recording = nil
+	UpdateRecordState()
+
+	local savedVariables = MikSBT.Profiles.savedVariables
+	local kept = savedVariables.debugRecordings
+	if not kept then
+		kept = {}
+		savedVariables.debugRecordings = kept
+	end
+	kept[#kept + 1] = entry
+	while #kept > MAX_RECORDINGS do
+		local dropped = table.remove(kept, 1)
+		Log("record", "dropped the oldest recording", dropped.date, dropped.started)
+	end
+	if reason ~= "logout" then ShowSavePopup(entry) end
+end
+
+
+-- The button of the window: a click asks before it starts a recording, and ends the one that runs.
+function ToggleRecording()
+	if recording then StopRecording("stopped") else ShowStartPopup() end
+end
+
+
 -- Puts the window where it was last dragged to. Without that it stays where it was built.
 local function Place(window)
 	local position = MikSBT.Profiles.savedVariables.debugWindowPosition
@@ -652,6 +894,7 @@ local function Open()
 	shownWindow = window
 	Place(window)
 	UpdateTests(window)
+	ShowRecordState(window)
 	ShowPage(window)
 	FitLog(window)
 	window:Show()
