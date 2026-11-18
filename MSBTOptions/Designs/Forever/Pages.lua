@@ -324,9 +324,11 @@ end
 local function CreateSubOptions(section, side, enable)
 	for index, option in ipairs(SUB_OPTIONS) do
 		-- Blizzard's outgoing switch stands for the client's numbers over targets where the profiles
-		-- module has the functions for it, and then says so in its tooltip.
+		-- module has the functions for it, and then says so in its tooltip. The tooltip text is what only
+		-- the numbers switch brings; without it the switch stays on its profile option.
 		local numbers = side == "blizzard" and option[2] == "disableOutgoing"
-			and MSBTProfiles.GetBlizzardSwitch and MSBTProfiles.SetBlizzardSwitch and true or nil
+			and MSBTProfiles.GetBlizzardSwitch and MSBTProfiles.SetBlizzardSwitch
+			and L.CHECKBOXES[option[2]].blizzardTooltip and true or nil
 		local checkbox = CreateSwitch(section, generalSwitches, option[2], side .. option[1] .. "Disabled", false, true,
 			numbers and L.CHECKBOXES[option[2]].blizzardTooltip)
 		checkbox.numbers = numbers

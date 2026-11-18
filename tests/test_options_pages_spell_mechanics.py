@@ -116,5 +116,16 @@ class OptionsPagesSpellMechanicsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
 
+    def test_blizzard_outgoing_stays_on_its_profile_option_without_the_numbers_text(self):
+        # Given
+        script_name = "options_pages_blizzard_outgoing_without_numbers.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
