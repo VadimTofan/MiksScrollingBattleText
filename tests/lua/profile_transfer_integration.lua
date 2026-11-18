@@ -30,7 +30,18 @@ end
 RAID_CLASS_COLORS = {}
 Enum = { ItemQuality = { Poor = 0 } }
 SlashCmdList = {}
-SetCVar = Noop
+-- The client has every text setting on.
+local cvars = {}
+for _, name in ipairs({
+	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
+	"floatingCombatTextCombatLogPeriodicSpells_v2", "floatingCombatTextPetMeleeDamage_v2",
+	"floatingCombatTextPetSpellDamage_v2", "floatingCombatTextCombatHealing_v2",
+	"floatingCombatTextSpellMechanics_v2", "floatingCombatTextSpellMechanicsOther_v2",
+	"floatingCombatTextRepChanges_v2", "floatingCombatTextHonorGains_v2",
+}) do cvars[name] = "1" end
+GetCVar = function(name) return cvars[name] end
+GetCVarBool = function(name) return cvars[name] == "1" end
+SetCVar = function(name, value) cvars[name] = tostring(value) end
 InterfaceOptions_AddCategory = Noop
 IsInGroup = function() return false end
 IsInRaid = function() return false end
@@ -52,6 +63,16 @@ MikSBT = {
 	Print = Noop,
 	CopyTable = CopyTable,
 	EraseTable = function(value) for key in pairs(value) do value[key] = nil end end,
+	-- A deep copy, as MikSBT.lua makes it.
+	CopyTable = function(source)
+		local function Copy(value)
+			if type(value) ~= "table" then return value end
+			local copy = {}
+			for key, child in pairs(value) do copy[key] = Copy(child) end
+			return copy
+		end
+		return Copy(source)
+	end,
 	SplitString = function(value, pattern, target)
 		for part in value:gmatch("[^.]+") do target[#target + 1] = part end
 	end,
@@ -438,6 +459,48 @@ assert(profiles.currentProfile.scrollAreas.Incoming.skillIconsDisabled)
 assert(MSBTProfiles_SavedVarsPerChar.currentProfileName == "Portable")
 assert(updates == updateCount + 2)
 
+-- Describe: the switches for effects, reputation and honor belong to each profile.
+-- Given a copy of the selected profile with the own effects hidden and honor shown.
+local portableName = MSBTProfiles_SavedVarsPerChar.currentProfileName
+profiles.CopyProfile(portableName, "Texts")
+profiles.SelectProfile("Texts")
+profiles.SetBlizzardSwitch("effectsOwn", false)
+profiles.SetBlizzardSwitch("honor", true)
+-- When it is copied and the copy is selected.
+profiles.CopyProfile("Texts", "Texts copy")
+profiles.SelectProfile("Texts copy")
+-- Then the copy keeps both marks in a table of its own.
+local textMarks = rawget(profiles.savedVariables.profiles["Texts copy"], "blizzardSwitches")
+assert(textMarks ~= rawget(profiles.savedVariables.profiles.Texts, "blizzardSwitches"),
+	"the copy shares the switches of its source")
+assert(textMarks and textMarks.effectsOwn == 0 and textMarks.honor == 1, "the copy lost the switches")
+
+-- Given the client shows the own effects again, changed elsewhere.
+cvars.floatingCombatTextSpellMechanics_v2 = "1"
+-- When a profile without set switches is selected.
+profiles.SelectProfile(portableName)
+-- Then the client's setting stays as it is and shows.
+assert(cvars.floatingCombatTextSpellMechanics_v2 == "1", "a profile without set switches wrote them")
+local effectShown, effectSet = profiles.GetBlizzardSwitch("effectsOwn")
+assert(effectShown == true and effectSet == false, "a profile without set switches does not mirror the client")
+-- When the copy is selected again.
+profiles.SelectProfile("Texts copy")
+-- Then its switches are forced again.
+assert(cvars.floatingCombatTextSpellMechanics_v2 == "0", "selecting a profile does not force its switches")
+
+-- Given the copy is exported.
+local textExport = assert(profiles.ExportProfile("Texts copy"))
+-- When it is imported.
+assert(profiles.ImportProfile(textExport, "Texts import"))
+-- Then the switches come back as they were.
+local importedTexts = rawget(profiles.currentProfile, "blizzardSwitches")
+assert(importedTexts.effectsOwn == 0 and importedTexts.honor == 1
+	and importedTexts.effectsOthers == nil and importedTexts.reputation == nil,
+	"an import of a new export changed the switches")
+-- Back to the profile selected before, with the client's setting as it was.
+profiles.SelectProfile(portableName)
+cvars.floatingCombatTextSpellMechanics_v2 = "1"
+
 -- Describe: the new damage preference survives profile transfer and migration.
 -- Given a user disables Blizzard damage on the selected profile.
 profiles.SetOption(nil, "blizzardDamageEnabled", false)
@@ -469,6 +532,9 @@ assert(rawget(profiles.currentProfile, "disableOutgoingInGroup") == nil)
 assert(profiles.currentProfile.normalFontSize == 24)
 
 -- Given the migrated profile has Blizzard damage disabled.
+-- Given it also has the own effects and honor set.
+profiles.SetBlizzardSwitch("effectsOwn", true)
+profiles.SetBlizzardSwitch("honor", true)
 -- When the existing Blizzard reset action runs.
 profiles.ResetOfficialBlizzardCombatText()
 
@@ -479,7 +545,12 @@ assert(profiles.IsModDisabled() == true)
 -- Describe: enabling MSBT clears Blizzard damage without resetting it on reload.
 -- Given MSBT is off and Blizzard damage is on after the reset action.
 local combatTextWrites = {}
-SetCVar = function(key, value) combatTextWrites[key] = value end
+SetCVar = function(key, value)
+	combatTextWrites[key] = value
+	cvars[key] = tostring(value)
+end
+-- Given the client's text feed was turned off since, as in the game's menu.
+cvars.enableFloatingCombatText = "0"
 
 -- When MSBT is enabled through its real profile action.
 profiles.SetOptionUserDisabled(false)
@@ -488,13 +559,25 @@ profiles.SetOptionUserDisabled(false)
 assert(not profiles.IsModDisabled())
 assert(profiles.currentProfile.blizzardDamageEnabled == false,
 	"enabling MSBT did not clear the Blizzard damage preference")
+-- Then the reset action and enabling MSBT left the effect and text switches as they were, and
+-- wrote none of their settings.
+assert(select(2, profiles.GetBlizzardSwitch("effectsOwn")) == true, "the reset cleared an effect switch")
+assert(select(2, profiles.GetBlizzardSwitch("honor")) == true, "the reset cleared a text switch")
+assert(combatTextWrites.floatingCombatTextSpellMechanics_v2 == nil
+	and combatTextWrites.floatingCombatTextSpellMechanicsOther_v2 == nil,
+	"enabling MSBT wrote an effect text")
+assert(select(2, profiles.GetBlizzardSwitch("effectsOthers")) == false,
+	"enabling MSBT set an effect switch")
+assert(combatTextWrites.floatingCombatTextRepChanges_v2 == nil
+	and combatTextWrites.floatingCombatTextHonorGains_v2 == nil, "enabling MSBT wrote a text setting")
+assert(select(2, profiles.GetBlizzardSwitch("reputation")) == false, "enabling MSBT set the reputation switch")
 for _, key in ipairs({
 	"floatingCombatTextCombatHealing_v2",
 	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
 	"floatingCombatTextCombatLogPeriodicSpells_v2",
 	"floatingCombatTextPetMeleeDamage_v2", "floatingCombatTextPetSpellDamage_v2",
 }) do
-	assert(combatTextWrites[key] == 0, key .. " remained enabled")
+	assert(cvars[key] == "0", key .. " remained enabled")
 end
 assert(combatTextWrites.enableFloatingCombatText == 1,
 	"enabling MSBT disabled the aura notice feed")

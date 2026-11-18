@@ -11,9 +11,7 @@ local damageSettings = {
 	floatingCombatTextPetSpellDamage_v2 = true,
 }
 local body = assert(source:match(
-	"local function SetBlizzardCombatTextV2Enabled%b()%s*.-\nend"))
-local action = assert(loadstring(body ..
-	"\nreturn SetBlizzardCombatTextV2Enabled"))()
+	"(local BLIZZARD_SWITCH_SETTINGS.-)local function SetAddonEnabled"))
 
 for _, modern in ipairs({ true, false }) do
 	for _, enabled in ipairs({ true, false }) do
@@ -33,8 +31,11 @@ for _, modern in ipairs({ true, false }) do
 			CombatText_UpdateDisplayedMessages = function()
 				refreshes = refreshes + 1
 			end,
+			pairs = pairs, ipairs = ipairs, type = type, tostring = tostring, pcall = pcall,
 		}
+		local action = assert(loadstring(body .. "\nreturn SetBlizzardCombatTextV2Enabled"))
 		setfenv(action, environment)
+		action = action()
 
 		-- When damage is toggled.
 		action(enabled)

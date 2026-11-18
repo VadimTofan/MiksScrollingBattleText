@@ -139,6 +139,22 @@ GeneralTab_Populate = function()
 	controls.enableNamesCheckbox:SetChecked(not currentProfile.hideSkills)
 	controls.enableIconsCheckbox:SetChecked(not currentProfile.skillIconsDisabled)
 	controls.blizzardDamageCheckbox:SetChecked(currentProfile.blizzardDamageEnabled)
+	-- The boxes below Blizzard's sub-options, for effects, reputation and honor, stand for the
+	-- client's own settings: each shows the profile's value once set there, else the client's,
+	-- which may have changed elsewhere. The boxes are shown only where the profiles module offers
+	-- them.
+	local get = MSBTProfiles.GetBlizzardSwitch
+	for _, row in ipairs({
+		{ "ownSpellMechanicsCheckbox", "effectsOwn" }, { "othersSpellMechanicsCheckbox", "effectsOthers" },
+		{ "blizzardReputationCheckbox", "reputation" }, { "blizzardHonorCheckbox", "honor" },
+	}) do
+		local control = controls[row[1]]
+		if control then
+			local isShown = get and get(row[2])
+			control:SetChecked(isShown == true)
+			if isShown == nil then control:Hide() else control:Show() end
+		end
+	end
 	for _, side in ipairs({ "msbt", "blizzard" }) do
 		for _, category in ipairs({ "Outgoing", "Notifications", "Incoming" }) do
 			controls[side .. category .. "Checkbox"]:SetChecked(
@@ -304,9 +320,29 @@ local function GeneralTab_Create()
 	)
 	controls.enableCheckbox = checkbox
 
+	-- The boxes of the client's own text settings come in two pairs, effects on targets and the
+	-- text at the character. A pair is made only where the client has one of its settings.
+	local get = MSBTProfiles.GetBlizzardSwitch
+	local switchRows = {}
+	for _, pair in ipairs({
+		{
+			{ "ownSpellMechanicsCheckbox", "effectsOwn", "spellMechanicsOwn" },
+			{ "othersSpellMechanicsCheckbox", "effectsOthers", "spellMechanicsOthers" },
+		},
+		{
+			{ "blizzardReputationCheckbox", "reputation", "blizzardReputation" },
+			{ "blizzardHonorCheckbox", "honor", "blizzardHonor" },
+		},
+	}) do
+		if get and (get(pair[1][2]) ~= nil or get(pair[2][2]) ~= nil) then
+			switchRows[#switchRows + 1] = pair[1]
+			switchRows[#switchRows + 1] = pair[2]
+		end
+	end
+
 	local divider = tabFrame:CreateTexture(nil, "ARTWORK")
 	divider:SetColorTexture(0.6, 0.6, 0.6, 0.8)
-	divider:SetSize(1, 108)
+	divider:SetSize(1, #switchRows > 0 and 102 + 24 * #switchRows or 108)
 	divider:SetPoint("TOPLEFT", controls.enableCheckbox, "TOPRIGHT", 15, 0)
 
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
@@ -341,6 +377,17 @@ local function GeneralTab_Create()
 			end)
 			controls[side .. category.name .. "Checkbox"] = control
 		end
+	end
+
+	for index, row in ipairs(switchRows) do
+		local control = MSBTControls.CreateCheckbox(tabFrame)
+		local locale = L.CHECKBOXES[row[3]]
+		control:Configure(24, locale.label, locale.tooltip)
+		control:SetPoint("TOPLEFT", controls.blizzardDamageCheckbox, "TOPLEFT", 0, -102 - (index - 1) * 24)
+		control:SetClickHandler(function(_, checked)
+			MSBTProfiles.SetBlizzardSwitch(row[2], checked)
+		end)
+		controls[row[1]] = control
 	end
 
 	checkbox = MSBTControls.CreateCheckbox(tabFrame)
@@ -408,7 +455,9 @@ local function GeneralTab_Create()
 	local slider = MSBTControls.CreateSlider(tabFrame)
 	objLocale = L.SLIDERS["animationSpeed"]
 	slider:Configure(180, objLocale.label, objLocale.tooltip)
-	slider:SetPoint("BOTTOMRIGHT", controls.enableNamesCheckbox, "TOPRIGHT", 0, 10)
+	-- With both pairs of boxes the Blizzard column ends right above the slider, which then stands
+	-- lower, halfway between the last box and the column below.
+	slider:SetPoint("BOTTOMRIGHT", controls.enableNamesCheckbox, "TOPRIGHT", 0, #switchRows > 2 and 2 or 10)
 	slider:SetMinMaxValues(20, 250)
 	slider:SetValueStep(10)
 	slider:SetValueChangedHandler(

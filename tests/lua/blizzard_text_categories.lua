@@ -3,7 +3,7 @@ local file = assert(io.open("MSBTProfiles.lua", "r"))
 local source = file:read("*a")
 file:close()
 local body = assert(source:match(
-    "(local blizzardCategoryState.-)local function SetAddonEnabled"))
+    "(local BLIZZARD_SWITCH_SETTINGS.-)local function SetAddonEnabled"))
 local build = assert(loadstring(body ..
     "\nreturn SetBlizzardCombatTextV2Enabled"))
 local writes, hooks = {}, {}

@@ -457,6 +457,14 @@ L.CHECKBOXES.disableOutgoing.tooltip = "Ausgehenden Schaden und Heilung für die
 L.CHECKBOXES.disableNotifications.label = "Benachrichtigungen deaktivieren"
 L.CHECKBOXES.disableNotifications.tooltip = "Stärkungszauber, Kampfmeldungen und andere Hinweise dieses Systems " ..
     "ausblenden."
+L.CHECKBOXES.spellMechanicsOwn.label = "Effekte auf Zielen"
+L.CHECKBOXES.spellMechanicsOwn.tooltip = "Blizzards Text über dem Kopf deines Ziels für Effekte wie Verlangsamt oder Blutung. Das ist die Einstellung des Spiels (Text auf Ziel: Effekte)."
+L.CHECKBOXES.spellMechanicsOthers.label = "Effekte auf Zielen anderer Spieler"
+L.CHECKBOXES.spellMechanicsOthers.tooltip = "Blizzards Text über den Köpfen der Ziele anderer Spieler für Effekte wie Verlangsamt oder Blutung. Das ist die Einstellung des Spiels (Text auf Ziel: Für Ziele anderer Spieler anzeigen)."
+L.CHECKBOXES.blizzardReputation.label = "Rufänderung"
+L.CHECKBOXES.blizzardReputation.tooltip = "Blizzards Text an deiner Spielfigur, wenn sich dein Ruf bei einer Fraktion ändert. Das ist die Einstellung des Spiels (Text über mir: Rufänderung). Er erscheint nur, solange Blizzard-Kampftext aktivieren angehakt ist und Blizzards Benachrichtigungen deaktivieren nicht. Eine Änderung wirkt nach dem nächsten Neuladen der Oberfläche."
+L.CHECKBOXES.blizzardHonor.label = "Ehrenhafte Siege"
+L.CHECKBOXES.blizzardHonor.tooltip = "Blizzards Text an deiner Spielfigur für die Ehre, die du durch das Töten anderer Spieler erhältst. Das ist die Einstellung des Spiels (Text über mir: Ehrenhafte Siege). Er erscheint nur, solange Blizzard-Kampftext aktivieren angehakt ist und Blizzards Benachrichtigungen deaktivieren nicht. Eine Änderung wirkt nach dem nächsten Neuladen der Oberfläche."
 L.CHECKBOXES.enableNames.label = "Fähigkeitsnamen anzeigen"
 L.CHECKBOXES.enableNames.tooltip = "Fähigkeitsnamen bei eingehenden und ausgehenden Ereignissen " ..
     "anzeigen."
