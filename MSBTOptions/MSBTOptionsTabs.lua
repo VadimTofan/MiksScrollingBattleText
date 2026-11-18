@@ -2232,6 +2232,101 @@ end
 
 
 
+local DEVELOPER_TABLES_TOP = 120
+local DEVELOPER_LINE_HEIGHT = 16
+
+-- The developer tab is offered while the debug window is loaded, which stands in no release
+-- manifest and loads after this file.
+local function DeveloperTab_IsOffered()
+	local debug = MSBTOptions.Debug
+	return debug ~= nil and type(debug.Toggle) == "function"
+end
+
+local function DeveloperTab_ToggleDebugWindow()
+	MSBTOptions.Debug.Toggle()
+end
+
+-- The generated tables that named their source in MikSBT.TABLE_BUILDS, by name, each with how the
+-- running client stands to that source.
+local function DeveloperTab_GetTables()
+	local client = MikSBT.Compatibility.Client
+	local tables = {}
+	for name, record in pairs(MikSBT.TABLE_BUILDS or {}) do
+		tables[#tables + 1] = {
+			name = name, build = record.build, script = record.script,
+			state = client.CompareTableBuild(record),
+		}
+	end
+	table.sort(tables, function(a, b) return a.name < b.name end)
+	return tables
+end
+
+-- The tables do not change while the game runs, so the tab is written once.
+local function DeveloperTab_Create()
+	local tabFrame = tabFrames.developer
+	tabFrame.controls = {}
+	local locale = L.DEVELOPER
+
+	local header = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	header:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 10, -18)
+	header:SetText(L.TABS.developer.label)
+
+	local build = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	build:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -12)
+	build:SetText(locale.client:format(MikSBT.Compatibility.Client.GetBuild()))
+
+	local button = MSBTControls.CreateOptionButton(tabFrame)
+	button:Configure(20, locale.debugWindow, locale.debugWindowTooltip)
+	button:SetPoint("TOPLEFT", build, "BOTTOMLEFT", 0, -12)
+	button:SetClickHandler(DeveloperTab_ToggleDebugWindow)
+	tabFrame.controls.debugWindowButton = button
+
+	local title = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	title:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 10, -DEVELOPER_TABLES_TOP)
+	title:SetText(locale.tables)
+
+	-- A table whose source differs from the client stands out in the game's orange, apart from the
+	-- gold of the titles, and names its script below.
+	local tables = DeveloperTab_GetTables()
+	local top = DEVELOPER_TABLES_TOP + 24
+	for _, entry in ipairs(tables) do
+		local fits = entry.state == "fits"
+		local line = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		line:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 10, -top)
+		line:SetText(entry.name .. ": " .. entry.build .. ", " .. locale[entry.state])
+		top = top + DEVELOPER_LINE_HEIGHT
+		if not fits then
+			line:SetTextColor(1, 0.5, 0.25)
+			line = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			line:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 24, -top)
+			line:SetText(locale.regenerate:format(entry.script))
+			top = top + DEVELOPER_LINE_HEIGHT
+		end
+		top = top + 6
+	end
+	if #tables == 0 then
+		local line = tabFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		line:SetPoint("TOPLEFT", tabFrame, "TOPLEFT", 10, -top)
+		line:SetText(locale.noTables)
+	end
+
+	tabFrame.created = true
+end
+
+local function DeveloperTab_OnShow()
+	if (not tabFrames.developer.created) then DeveloperTab_Create() end
+end
+
+-- A design's developer page shows the same through these.
+module.developer = {
+	IsOffered = DeveloperTab_IsOffered,
+	GetBuild = MikSBT.Compatibility.Client.GetBuild,
+	GetTables = DeveloperTab_GetTables,
+	ToggleDebugWindow = DeveloperTab_ToggleDebugWindow,
+}
+
+
+
 local objLocale = L.TABS.general
 local tabFrame = CreateFrame("Frame")
 tabFrame:Hide()
@@ -2289,6 +2384,14 @@ tabFrame:Hide()
 tabFrame:SetScript("OnShow", ResetBlizzardSCTTab_OnShow)
 tabFrames.resetBlizzardSCT = tabFrame
 MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 9000)
+
+-- Below Profile, at the end of the upper list.
+objLocale = L.TABS.developer
+tabFrame = CreateFrame("Frame")
+tabFrame:Hide()
+tabFrame:SetScript("OnShow", DeveloperTab_OnShow)
+tabFrames.developer = tabFrame
+MSBTOptMain.AddTab(tabFrame, objLocale.label, objLocale.tooltip, 8999.75, DeveloperTab_IsOffered)
 
 
 

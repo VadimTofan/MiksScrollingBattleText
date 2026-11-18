@@ -40,6 +40,19 @@ L.RESET_BLIZZARD_INFO = "Restore Blizzard's text for damage, periodic damage, " 
 	"and pet damage. This enables Blizzard damage and turns off MSBT. " ..
 	"You can change either option in General."
 L.MSG_BLIZZARD_TEXT_RESTORED = "Blizzard scrolling combat text restored."
+L.DEVELOPER = {
+	client = "Client build: %s",
+	tables = "Generated tables",
+	noTables = "No generated table has registered.",
+	fits = "fits",
+	clientNewer = "client is newer",
+	clientOlder = "client is older",
+	otherVersion = "other version",
+	otherClient = "other client",
+	regenerate = "Regenerate with %s",
+	debugWindow = "Debug Window",
+	debugWindowTooltip = "Open the debug window, or close it when it is open.",
+}
 L.AURA_TRACKING_TITLE = "Custom auras appear above. Uncheck to hide."
 L.AURA_TRACKING_INPUT = "Aura spell ID or name"
 L.AURA_TRACKING_ADD = "Add aura"
@@ -112,6 +125,7 @@ obj["sounds"] = {
 obj["lootAlerts"]	= { label="Loot Alerts", tooltip="Display options for loot related notifications."}
 obj["language"]		= { label="Language", tooltip="Shows the current game locale and how language selection works for MSBT."}
 obj["resetBlizzardSCT"] = { label="Reset Blizzard SCT", tooltip="Enable Blizzard damage and turn off MSBT."}
+obj["developer"]	= { label="Developer", tooltip="Display the client build, the generated tables and the debug window."}
 
 
 

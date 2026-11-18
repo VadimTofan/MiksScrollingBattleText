@@ -23,6 +23,8 @@ local mainFrame
 local popupFrames = {}
 
 local tabData = {}
+-- Tabs that say when they are offered wait here until the tabs are first asked for.
+local waitingTabs = {}
 local tabListbox
 local resetTabListbox
 local languageTabListbox
@@ -52,7 +54,14 @@ local pendingReopen
 	end
 
 
-local function AddTab(frame, text, tooltip, order)
+-- isOffered is for a tab that depends on a file loading later: it is asked once, when the tabs
+-- are first listed or the window is built, and the tab is left out when it returns false.
+local function AddTab(frame, text, tooltip, order, isOffered)
+	if isOffered then
+		waitingTabs[#waitingTabs + 1] = { frame, text, tooltip, order, isOffered }
+		return
+	end
+
 	local tabInfo = {}
 	tabInfo.text = text
 	tabInfo.frame = frame
@@ -78,6 +87,15 @@ local function AddTab(frame, text, tooltip, order)
 		else
 			tabListbox:AddItem(tabIndex)
 		end
+	end
+end
+
+
+local function AddWaitingTabs()
+	local waiting = waitingTabs
+	waitingTabs = {}
+	for _, tab in ipairs(waiting) do
+		if tab[5]() then AddTab(tab[1], tab[2], tab[3], tab[4]) end
 	end
 end
 
@@ -187,6 +205,7 @@ end
 
 
 local function CreateMainFrame()
+	AddWaitingTabs()
 	mainFrame = CreateFrame("Frame", "MSBTMainOptionsFrame", UIParent)
 	mainFrame:EnableMouse(true)
 	mainFrame:SetMovable(true)
@@ -468,6 +487,7 @@ end
 
 
 local function GetTabs()
+	AddWaitingTabs()
 	local tabs = {}
 	for index, info in ipairs(tabData) do
 		tabs[#tabs + 1] = {
