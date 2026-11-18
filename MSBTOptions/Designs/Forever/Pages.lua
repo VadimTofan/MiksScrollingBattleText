@@ -36,6 +36,8 @@ local LANGUAGE_NOTE_SHIFT = 30
 local CHARACTER_ROWS_HEIGHT = 140
 local CHARACTER_ROW_HEIGHT = 24
 local CHARACTER_NOTE_SHIFT = 44
+-- The reset button stands in the second section, under the slider that ends 60 below its top.
+local RESET_TOP = 74
 -- Switches for the game's reputation and honor text at the character, through the Blizzard switches
 -- of the profiles module: the name there and the locale key of each. They follow the effect switches
 -- in the Blizzard column.
@@ -378,6 +380,14 @@ local function CreateGeneral(page)
 		MSBTProfiles.SetOption(nil, "animationSpeed", value)
 	end)
 	MSBTWindow.SkinSlider(speedSlider)
+	-- Below the slider, where the column is free with every number of rows above. The third section
+	-- is too low with all of them to hold the button's hint above the language note.
+	locale = L.BUTTONS["resetBlizzardSCT"]
+	local button = CreateButton(section, locale.label, locale.tooltip, OnClickResetBlizzardSCT)
+	button:SetPoint("TOPLEFT", section, "TOPLEFT", COLUMN, -RESET_TOP)
+	local fontString = CreateText(section, "GameFontHighlightSmall", COLORS.hint, L.TABS.resetBlizzardSCT.tooltip)
+	fontString:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -6)
+	fontString:SetWidth(320)
 
 	section = CreateSection(page, 150 + extra + middleHeight, 156 - extra + 150 - middleHeight)
 	locale = L.DROPDOWNS["optionsDesign"]
@@ -397,13 +407,6 @@ local function CreateGeneral(page)
 	reloadDesignButton = CreateButton(section, locale.label, locale.tooltip, OnClickReloadDesign)
 	reloadDesignButton:SetPoint("BOTTOMLEFT", designDropdown, "BOTTOMRIGHT", 14, 0)
 	reloadDesignButton:Hide()
-
-	locale = L.BUTTONS["resetBlizzardSCT"]
-	local button = CreateButton(section, locale.label, locale.tooltip, OnClickResetBlizzardSCT)
-	button:SetPoint("TOPLEFT", section, "TOPLEFT", COLUMN, -18)
-	local fontString = CreateText(section, "GameFontHighlightSmall", COLORS.hint, L.TABS.resetBlizzardSCT.tooltip)
-	fontString:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -6)
-	fontString:SetWidth(320)
 
 	fontString = CreateText(section, "GameFontHighlightSmall", COLORS.text, L.LANGUAGE_INFO)
 	local noteShift = isTight and CHARACTER_NOTE_SHIFT or (extra > 0 and LANGUAGE_NOTE_SHIFT or 0)

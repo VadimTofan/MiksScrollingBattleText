@@ -338,6 +338,16 @@ do
 			assert(region.points.TOPLEFT.y == -52, "the language note did not follow the third section")
 		end
 	end
+	-- And the reset button stands with its hint under the slider of the second section, so the
+	-- third holds no text but the note, which may take two lines there.
+	local reset = Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.resetBlizzardSCT.label))
+	local top = -reset.points.TOPLEFT.y
+	assert(reset.parent == Section(228) and reset.points.TOPLEFT.x == 345, "the reset button left the second section")
+	assert(top >= 30 + 30, "the reset button is not below the slider")
+	assert(top + reset.height + 6 + 2 * 12 <= Section(228).height, "the hint of the reset button leaves the section")
+	for _, region in ipairs(Section(378).regions) do
+		assert(region.kind ~= "FontString" or region:GetText() == L.LANGUAGE_INFO, "a text shares the third section with the note")
+	end
 
 	-- When one is clicked, then the profiles module is asked with its name and the new state.
 	Toggle(honor, true)
