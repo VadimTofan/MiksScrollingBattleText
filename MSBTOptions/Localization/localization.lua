@@ -118,15 +118,16 @@ obj["resetBlizzardSCT"] = { label="Reset Blizzard SCT", tooltip="Enable Blizzard
 obj = L.CHECKBOXES
 obj["enableMSBT"] = {
 	label = "Enable Mik's Scrolling Battle Text",
-	tooltip = "Enable MSBT and turn off all Blizzard combat text.",
+	tooltip = "Enable MSBT and turn off Blizzard's combat text, except the effect texts on targets.",
 }
 obj["enableBlizzardDamage"] = {
 	label = "Enable Blizzard Text",
-	tooltip = "Enable Blizzard combat text with the category choices below.",
+	tooltip = "Show Blizzard's combat text at your character, with the categories chosen below. The numbers over your targets have their own box (Disable outgoing).",
 }
 obj["disableOutgoing"] = {
 	label = "Disable outgoing",
 	tooltip = "Hide outgoing damage and healing text for this system.",
+	blizzardTooltip = "Hide Blizzard's damage and healing numbers over your targets. This is the game's own setting: the box shows it until it is set here, by a click or by enabling MSBT; then this profile keeps it. Reset Blizzard SCT gives it back to the game.",
 }
 obj["disableNotifications"] = {
 	label = "Disable notifications",

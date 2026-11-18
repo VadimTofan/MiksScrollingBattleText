@@ -3,12 +3,13 @@ local source = file:read("*a")
 file:close()
 
 -- Describe: combat text settings are written only when they change.
+-- The function is taken with the switches of the client's text settings, which it applies.
 local body = assert(source:match(
-	"local function SetBlizzardCombatTextV2Enabled%b()%s*.-\nend"))
-local action = assert(loadstring(body ..
-	"\nreturn SetBlizzardCombatTextV2Enabled"))()
+	"(local BLIZZARD_SWITCH_SETTINGS.-)local function SetAddonEnabled"))
+local build = assert(loadstring(body ..
+	"\nreturn SetBlizzardCombatTextV2Enabled"))
 
-local cvars, writes
+local cvars, writes, action
 local function Environment(getCVar)
 	writes = {}
 	local frame = { Hide = function() end, Show = function() end }
@@ -21,8 +22,10 @@ local function Environment(getCVar)
 		end,
 		GetCVar = getCVar,
 		pcall = pcall, tostring = tostring,
+		pairs = pairs, ipairs = ipairs, type = type,
 	}
-	setfenv(action, environment)
+	setfenv(build, environment)
+	action = build()
 	return environment
 end
 local function Read(name) return cvars[name] end
@@ -31,8 +34,11 @@ local function Read(name) return cvars[name] end
 cvars = { enableFloatingCombatText = "0", floatingCombatTextCombatDamage_v2 = "1" }
 Environment(Read)
 
--- When MSBT applies its profile: Blizzard's damage off, its text hidden.
-action(false, true)
+-- When MSBT applies its profile: Blizzard's damage off by its switch, its text hidden. Blizzard's
+-- master, the first argument, no longer writes the numbers over targets. They follow the switch
+-- the profile keeps in blizzardSwitches, which is written only where the client's value differs.
+local profile = { blizzardSwitches = { version = 1, numbers = 0 } }
+action(false, true, profile)
 
 -- Then what differed was written.
 assert(cvars.enableFloatingCombatText == "1")
@@ -41,15 +47,16 @@ assert(#writes > 0, "nothing written on the first apply")
 
 -- When the same profile is applied again, as each fight starts and ends.
 Environment(Read)
-action(false, true)
-action(false, true)
+action(false, true, profile)
+action(false, true, profile)
 
 -- Then nothing is written: no CVAR_UPDATE for settings already right.
 assert(#writes == 0, "rewrote unchanged settings: " .. table.concat(writes, ", "))
 
--- When the player turns Blizzard's damage back on.
+-- When the player turns Blizzard's damage back on, with its switch.
 Environment(Read)
-action(true, true)
+profile.blizzardSwitches.numbers = 1
+action(false, true, profile)
 
 -- Then only the damage settings change.
 for _, name in ipairs(writes) do
@@ -64,14 +71,16 @@ Environment(function() error("no such cvar") end)
 -- When the profile is applied.
 action(false, true)
 
--- Then the settings are still written, as before.
-assert(cvars.floatingCombatTextCombatDamage_v2 == "0")
+-- Then the settings are still written, as before: without a profile that is the feed alone,
+-- although it is already on.
+assert(writes[1] == "enableFloatingCombatText")
 assert(#writes > 0)
 
 -- Given a client with no way to read settings.
 Environment(nil)
 action(true, true)
 
--- Then every setting is written, as before.
-assert(cvars.floatingCombatTextCombatDamage_v2 == "1")
-assert(#writes >= 5)
+-- Then every setting is written, as before: the feed, and no number, as the master no longer
+-- writes them.
+assert(writes[1] == "enableFloatingCombatText")
+assert(#writes == 1)

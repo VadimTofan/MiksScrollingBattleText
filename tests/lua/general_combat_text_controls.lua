@@ -4,7 +4,7 @@ local function NewControl()
 	local control = setmetatable({}, {
 		__index = function() return Noop end,
 	})
-	function control:Configure(_, label) self.label = label end
+	function control:Configure(_, label, tooltip) self.label, self.tooltip = label, tooltip end
 	function control:SetClickHandler(handler) self.click = handler end
 	function control:SetChecked(value) self.checked = value end
 	function control:SetValue(value) self.value = value end
@@ -31,6 +31,9 @@ local profile = {
 }
 local frame = { CreateFontString = NewControl, CreateTexture = NewControl }
 local applied = 0
+-- The client's numbers over targets as their switch shows them: on.
+local client = { numbers = true }
+local clientWrites = {}
 local environment = {
 	ipairs = ipairs,
 	math = math,
@@ -43,7 +46,8 @@ local environment = {
 	},
 	L = setmetatable({}, { __index = function()
 		return setmetatable({}, { __index = function(_, key)
-			return { label = key }
+			return { label = key, tooltip = key .. ".tooltip",
+				blizzardTooltip = key .. ".blizzardTooltip" }
 		end })
 	end }),
 	MSBTProfiles = {
@@ -51,10 +55,18 @@ local environment = {
 		IsModDisabled = function() return disabled end,
 		SetOptionUserDisabled = function(value)
 			disabled = value
-			if not value then profile.blizzardDamageEnabled = false end
+			if not value then
+				profile.blizzardDamageEnabled = false
+				client.numbers = false
+			end
 		end,
 		SetOption = function(_, key, value) profile[key] = value end,
 		ApplyContextOptions = function() applied = applied + 1 end,
+		GetBlizzardSwitch = function(name) return client[name] end,
+		SetBlizzardSwitch = function(name, value)
+			clientWrites[#clientWrites + 1] = name .. "=" .. tostring(value)
+			client[name] = value
+		end,
 	},
 }
 setfenv(build, environment)
@@ -77,16 +89,55 @@ for _, side in ipairs({ "msbt", "blizzard" }) do
 		assert(control and not control.checked, key .. " did not populate")
 
 		-- When only this category is disabled.
+		applied = 0
 		control.click(control, true)
 		populate()
 
 		-- Then the preference persists without disabling either system.
-		assert(profile[key] == true and control.checked)
+		if key == "blizzardOutgoingDisabled" then
+			-- Then Blizzard's outgoing box hides the client's numbers, not a profile option.
+			assert(client.numbers == false and profile[key] == nil,
+				"Blizzard's outgoing box does not switch the numbers")
+			assert(clientWrites[#clientWrites] == "numbers=false",
+				"Blizzard's outgoing box does not switch the numbers")
+		else
+			assert(profile[key] == true and applied == 1, key .. " is not saved and applied")
+		end
+		assert(control.checked, key .. " does not show the click")
 		assert(not disabled and profile.blizzardDamageEnabled)
 		control.click(control, false)
 	end
 end
+assert(client.numbers == true, "unchecking Blizzard's outgoing box does not show the numbers")
 applied = 0
+clientWrites = {}
+
+-- Then Blizzard's outgoing box says what it switches, and MSBT's keeps its text.
+assert(controls.blizzardOutgoingCheckbox.tooltip == "disableOutgoing.blizzardTooltip",
+	"Blizzard's outgoing box has the tooltip of MSBT's")
+assert(controls.msbtOutgoingCheckbox.tooltip == "disableOutgoing.tooltip",
+	"MSBT's outgoing box lost its tooltip")
+
+-- Given the numbers over targets are switched off elsewhere.
+client.numbers = false
+-- When General is populated.
+populate()
+-- Then Blizzard's outgoing box shows them as disabled.
+assert(controls.blizzardOutgoingCheckbox.checked == true, "the outgoing box does not show the numbers")
+client.numbers = true
+populate()
+assert(controls.blizzardOutgoingCheckbox.checked == false, "the outgoing box does not show the numbers")
+-- Given the box shows the numbers as disabled, and then a client without the setting it reads.
+client.numbers = false
+populate()
+client.numbers = nil
+-- When General is populated.
+populate()
+-- Then the box is not checked, as only numbers known to be hidden check it.
+assert(controls.blizzardOutgoingCheckbox.checked == false,
+	"the outgoing box is checked where the client lacks the setting")
+client.numbers = true
+populate()
 
 assert(controls.animationSpeedSlider.value == 100)
 assert(controls.enableSoundsCheckbox == nil)
@@ -101,6 +152,36 @@ assert(controls.shortenNumbersCheckbox.point[2] == frame,
 assert(controls.shortenNumbersCheckbox.point[5] ==
 	controls.classColorsButton.point[5],
 	"appearance checkboxes do not align with the bottom controls")
+
+-- Given a profiles module that does not offer the switches.
+local offeredGet = environment.MSBTProfiles.GetBlizzardSwitch
+environment.MSBTProfiles.GetBlizzardSwitch = nil
+profile.blizzardOutgoingDisabled = true
+-- When General is populated.
+populate()
+-- Then Blizzard's outgoing box shows the profile's option, as before the switch.
+assert(controls.blizzardOutgoingCheckbox.checked == true, "the outgoing box breaks without the functions")
+profile.blizzardOutgoingDisabled = nil
+environment.MSBTProfiles.GetBlizzardSwitch = offeredGet
+populate()
+
+-- Given MSBT is off and the numbers over targets are shown.
+disabled, client.numbers, clientWrites = true, true, {}
+-- When Blizzard text is unchecked and checked again.
+controls.blizzardDamageCheckbox.click(controls.blizzardDamageCheckbox, false)
+controls.blizzardDamageCheckbox.click(controls.blizzardDamageCheckbox, true)
+populate()
+-- Then the numbers are left to their own box.
+assert(#clientWrites == 0 and client.numbers == true, "the Blizzard text box switched the numbers")
+assert(controls.blizzardOutgoingCheckbox.checked == false, "the Blizzard text box switched the numbers")
+-- When MSBT is enabled.
+controls.enableCheckbox.click(controls.enableCheckbox, true)
+-- Then Blizzard's outgoing box shows the numbers as disabled.
+assert(controls.blizzardOutgoingCheckbox.checked == true,
+	"enabling MSBT left the numbers over targets shown")
+-- Back to MSBT and Blizzard text on, with the numbers shown, for the rules below.
+profile.blizzardDamageEnabled, client.numbers, clientWrites, applied = true, true, {}, 0
+populate()
 
 -- Given the default profile hides skill names.
 local namesCheckbox = controls.enableNamesCheckbox
