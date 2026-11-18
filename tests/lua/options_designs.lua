@@ -360,6 +360,7 @@ local function BuildGeneralTab(designs)
 		function control:Show() self.shown = true end
 		function control:Hide() self.shown = false end
 		function control:SetClickHandler(handler) self.click = handler end
+		function control:SetPoint(...) self.point = { ... } end
 		return control
 	end
 	local build = assert(loadstring(
@@ -418,6 +419,10 @@ do
 	-- Then the button is hidden.
 	assert(controls.reloadDesignButton and controls.reloadDesignButton.shown == false,
 		"the reload button shows without a pending switch")
+	-- And it stands under the choice at its left edge, clear of the Blizzard column beside it.
+	local point = controls.reloadDesignButton.point
+	assert(point[1] == "TOPLEFT" and point[2] == dropdown and point[3] == "BOTTOMLEFT" and point[4] == 0,
+		"the reload button does not stand under the design choice")
 	-- When the other design is picked.
 	dropdown.change(dropdown, "other")
 	-- Then the button shows.

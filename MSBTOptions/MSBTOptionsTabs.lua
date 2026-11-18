@@ -450,12 +450,12 @@ local function GeneralTab_Create()
 		end)
 		controls.optionsDesignDropdown = dropdown
 
-		-- Beside the field, which stands at the bottom of the dropdown's frame. It shows while the
-		-- choice waits for a reload.
+		-- Under the field, at its left edge, so it stays left of the divider however far the Blizzard
+		-- column reaches down. It shows while the choice waits for a reload.
 		local reload = MSBTControls.CreateOptionButton(tabFrame)
 		objLocale = L.BUTTONS["reloadDesign"]
 		reload:Configure(20, objLocale.label, objLocale.tooltip)
-		reload:SetPoint("BOTTOMLEFT", dropdown, "BOTTOMRIGHT", 10, 2)
+		reload:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -4)
 		reload:SetClickHandler(function()
 			MSBTDesigns.ReloadForDesign(MSBTOptMain.IsDocked() and "settings" or "window")
 		end)
