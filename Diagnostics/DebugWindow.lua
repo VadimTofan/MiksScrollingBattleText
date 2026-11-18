@@ -29,9 +29,10 @@ local REFRESH_DELAY = 0.5
 local MAX_RECORDED_ROWS = 10000
 -- The saved settings keep this many recordings and drop the oldest beyond that.
 local MAX_RECORDINGS = 3
--- What the button for the recording says, and the red marker in front of the count while it runs.
+-- What the button for the recording says, and the red marker in front of the count while it runs. The marker
+-- counts the rows of the recording, which keeps more of them than the log of the window.
 local RECORD_LABEL, STOP_RECORD_LABEL = "Record", "Stop recording"
-local RECORDING_MARKER = "|cffff4040Recording|r - "
+local RECORDING_MARKER = "|cffff4040Recording: %d rows|r - log: "
 -- The names of the dialogs that ask before a recording starts and offer a reload when it has stopped.
 local START_POPUP, SAVE_POPUP = "MSBT_DEBUG_RECORD_START", "MSBT_DEBUG_RECORD_SAVE"
 -- The pasted test has a page of its own after the listed ones, and its key marks its rows.
@@ -137,7 +138,8 @@ local function Refresh(isFull)
 	editbox.shownText = text
 	editbox:SetText(text)
 	editbox:SetCursorPosition(#text)
-	window.countFontString:SetText((recording and RECORDING_MARKER or "") .. (first == 1 and #rows .. " rows"
+	local marker = recording and RECORDING_MARKER:format(#recording.rows) or ""
+	window.countFontString:SetText(marker .. (first == 1 and #rows .. " rows"
 		or #rows .. " rows, the newest " .. LIVE_ROWS .. " shown"))
 end
 
@@ -328,6 +330,14 @@ end
 -- Several run in the order they were given.
 function Run:OnStop(callback)
 	self.stopCallbacks[#self.stopCallbacks + 1] = callback
+end
+
+
+-- The limit a test sets itself, in rows or seconds, after which it ends or stops logging. While a
+-- recording runs it is at least the recording's own limit, so that the test goes on with the recording.
+function Run:Limit(limit)
+	if recording then return math.max(limit, MAX_RECORDED_ROWS) end
+	return limit
 end
 
 

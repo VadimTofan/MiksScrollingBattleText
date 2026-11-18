@@ -1680,11 +1680,15 @@ do
 
 		assert(#combatLogCalls == 1 and combatLogCalls[1] == true and combatLogOn, "Accept did not switch the combat log on")
 		assert(button.label == "Stop recording", "the button reads " .. tostring(button.label) .. " while it records")
-		assert(window.countFontString:GetText():find("^|cffff4040Recording|r %- "), "the count has no marker: "
+		assert(window.countFontString:GetText():find("^|cffff4040Recording: %d+ rows|r %- log: "), "the count has no marker: "
 			.. window.countFontString:GetText())
 		assert(Hears("CHAT_LOGGING_CHANGED") and Hears("PLAYER_LOGOUT") and Updating() == 1, "the recorder does not listen")
 		local all = AllLines(window)
 		local started = assert(Find(all, "record started combat log switched on$"), "no row says the recording started")
+		-- And the marker counts the rows of the recording, those since its start, while the log counts its own.
+		local recorded, logged = window.countFontString:GetText():match("^|cffff4040Recording: (%d+) rows|r %- log: (%d+) rows")
+		assert(tonumber(recorded) == tonumber(logged) - started + 1, "the marker counts " .. tostring(recorded)
+			.. " rows of the recording, not the " .. tostring(tonumber(logged) - started + 1) .. " since its start")
 		assert(Find(all, "record combat log state true false$", started), "no row says what the game reports of the combat log")
 		assert((Find(all, "echo stopped$", started)) and (Find(all, "echo started Echo$", started)),
 			"the running listed test did not start anew behind the record row")
@@ -1927,6 +1931,10 @@ do
 	assert(#Debug.pages == 2 and Debug.pages[1].key == "game" and Debug.pages[2].key == "addon",
 		"the listed pages are not game and addon")
 	assert(byKey.sources and Debug.pages[1].tests[1] == byKey.sources, "the test of the sources is not listed first on the page game")
+	-- And the tests that set a limit themselves say that a recording lifts it.
+	for _, key in ipairs({ "sources", "display", "trace" }) do
+		assert(not byKey[key] or byKey[key].tooltip:find("recording", 1, true), "the tooltip of the test " .. key .. " does not say that a recording lifts its limit")
+	end
 
 	-- When a design is chosen whose window is built with the listed tests.
 	Slash()
@@ -1954,6 +1962,73 @@ function Display.service:DisplayEvent(settings, message, texture, mute, formatAr
 end
 Display.Show = function(...) return Display.service:DisplayEvent(...) end
 MikSBT.Display = { Service = Display.service }
+
+-- A recording as the game runs it, around a body: the clocks and the dialogs the recorder asks of the
+-- client are stubbed, the recording is started with its button and, when the body is done, stopped with
+-- it. Gives the recording as it was saved.
+local function Recording(body)
+	local names = { "time", "date", "GetTimePreciseSec", "StaticPopupDialogs", "StaticPopup_Show", "UnitGUID", "GetBuildInfo" }
+	local before = {}
+	for _, name in ipairs(names) do before[name] = _G[name] end
+	function time() return 1700000000 end
+	function date(format, at) return os.date("!" .. format, math.floor(at or 1700000000)) end
+	function GetTimePreciseSec() return 500 end
+	StaticPopupDialogs = {}
+	function StaticPopup_Show() end
+	function UnitGUID() return "Player-1-0A1B2C3D" end
+	function GetBuildInfo() return "1.60.1", "70888", "Nov 1 2026", 160001 end
+	saved.debugRecordings = nil
+	Click(window.recordButton)
+	StaticPopupDialogs.MSBT_DEBUG_RECORD_START.OnAccept()
+	assert(window.recordButton.label == "Stop recording", "the recording did not start")
+	body()
+	assert(window.recordButton.label == "Stop recording", "the recording ended before its body was done")
+	Click(window.recordButton)
+	local entry = saved.debugRecordings[#saved.debugRecordings]
+	saved.debugRecordings = nil
+	for _, name in ipairs(names) do _G[name] = before[name] end
+	return entry
+end
+-- How many of the lines hold the text.
+local function Count(lines, text)
+	local count = 0
+	for _, line in ipairs(lines) do
+		if line:find(text, 1, true) then count = count + 1 end
+	end
+	return count
+end
+
+-- Rule: t:Limit gives the limit a test sets itself, and while a recording runs at least the recording's own
+-- limit, which is 10000 rows.
+do
+	-- Given a pasted test that asks for a limit and is stopped after it asked.
+	local function Asked(limit)
+		Click(window.pageButtons.custom)
+		window.customEditbox:SetText("limitAsked = t:Limit(" .. limit .. ")")
+		Click(window.runButton)
+		Click(window.stopButton)
+		Click(window.pageButtons.game)
+		local asked = limitAsked
+		limitAsked = nil
+		return asked
+	end
+
+	-- When no recording runs, then a test gets the limit it asked for.
+	local small, large = Asked(300), Asked(20000)
+	assert(small == 300, "t:Limit(300) gave " .. tostring(small) .. " while no recording runs, not 300")
+	assert(large == 20000, "t:Limit(20000) gave " .. tostring(large) .. " while no recording runs, not 20000")
+
+	-- When a recording runs, then a smaller limit is lifted to the recording's and a larger one stays.
+	Recording(function()
+		small, large = Asked(300), Asked(20000)
+		assert(small == 10000, "t:Limit(300) gave " .. tostring(small) .. " while a recording runs, not 10000")
+		assert(large == 20000, "t:Limit(20000) gave " .. tostring(large) .. " while a recording runs, not 20000")
+	end)
+
+	-- When the recording has stopped, then a new run has its own limit again.
+	small = Asked(300)
+	assert(small == 300, "t:Limit(300) gave " .. tostring(small) .. " after the recording stopped, not 300")
+end
 
 -- Rule: the test of the sources records the client's build, each resource gain with the fields of its
 -- payload, the first twenty combat log messages and the player's casts, and ends itself after 30 seconds.
@@ -2018,6 +2093,21 @@ do
 	assert(not Listening() and not window.testCheckboxes.sources:GetChecked(), "the test of the sources did not end after 30 seconds")
 	assert(lines[#lines - 1] == "1.000 sources END gains 2 log messages 25" and lines[#lines] == "1.000 sources stopped",
 		"the test of the sources ended with " .. lines[#lines - 1] .. " | " .. lines[#lines])
+
+	-- When a recording runs, then the test goes on past 30 seconds, up to the recording's limit taken as seconds.
+	do
+		Click(window.clearButton)
+		Tick(window, "sources", true)
+		local recorded = Recording(function()
+			RunTimers(30)
+			assert(window.testCheckboxes.sources:GetChecked(), "the test of the sources ended after 30 seconds while a recording runs")
+			RunTimers(9999)
+			assert(window.testCheckboxes.sources:GetChecked(), "the test of the sources ended before 10000 seconds while a recording runs")
+			RunTimers(10000)
+			assert(not window.testCheckboxes.sources:GetChecked(), "the test of the sources did not end after 10000 seconds while a recording runs")
+		end)
+		assert(recorded.rows[#recorded.rows - 2]:find(" sources END gains 0 log messages 0$"), "the recording lacks the end of the test of the sources")
+	end
 
 	-- When the client has no call for the build and the call for the payload of a gain fails, and in
 	-- another run lacks that call.
@@ -2255,6 +2345,21 @@ do
 		"the test of the display ended with " .. lines[304])
 	assert(not window.testCheckboxes.display:GetChecked(), "the test of the display kept its tick after its limit")
 
+	-- When a recording runs, then the test logs past 300 lines, says no limit and does not end itself.
+	do
+		Click(window.clearButton)
+		local recorded = Recording(function()
+			Tick(window, "display", true)
+			for index = 1, 350 do Display.Show(changed, "line " .. index) end
+			assert(window.testCheckboxes.display:GetChecked(), "the test of the display ended itself while a recording runs")
+			local all = AllLines(window)
+			assert(Count(all, " display LINE ") == 350, Count(all, " display LINE ") .. " of 350 lines were logged while a recording runs")
+			assert(Count(all, "limit of") == 0, "the test of the display said a limit while a recording runs")
+		end)
+		assert(Count(recorded.rows, " display LINE ") == 350 and Count(recorded.rows, " display END lines seen 350") == 1,
+			"the recording lacks the 350 lines of the display")
+	end
+
 	-- When the addon has no display service, then the test says so.
 	MikSBT.Display = nil
 	Click(window.clearButton)
@@ -2476,6 +2581,21 @@ do
 		"the limit is said as " .. lines[303])
 	assert(lines[304] == "0.000 trace END stages seen 305 logged 300", "the test of the trace ended with " .. lines[304])
 	assert(Row(11) == "305 BATCH - 305 305 " and Row(12):find("^292 BATCH "), "the drawing did not go on after the limit: " .. Row(11) .. "|" .. Row(12))
+
+	-- When a recording runs, then the stages are logged past 300 and no limit is said.
+	do
+		Click(window.clearButton)
+		local recorded = Recording(function()
+			Tick(window, "trace", true)
+			for index = 1, 350 do Batcher:Queue(index, index) end
+			local all = AllLines(window)
+			assert(Count(all, " trace BATCH ") == 350, Count(all, " trace BATCH ") .. " of 350 stages were logged while a recording runs")
+			assert(Count(all, "limit of") == 0, "the test of the trace said a limit while a recording runs")
+			Tick(window, "trace", false)
+		end)
+		assert(Count(recorded.rows, " trace BATCH ") == 350 and Count(recorded.rows, " trace END stages seen 350 logged 350") == 1,
+			"the recording lacks the 350 stages of the trace")
+	end
 
 	-- When the time of the tracked swing is hidden, then it counts as none.
 	reader.swingTimes = { { at = 499.8 } }
