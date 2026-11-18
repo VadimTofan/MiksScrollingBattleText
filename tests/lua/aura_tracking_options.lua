@@ -45,7 +45,7 @@ local function Frame(parent)
 	end
 	function frame:SetChangeHandler(handler) self.change = handler end
 	function frame:SetSelectedID(id) self.selected = id end
-	function frame:GetSelectedID() return self.selected end
+	function frame:GetSelectedID() return rawget(self, "selected") end
 	function frame:GetSelectedText() return "Notification" end
 	function frame:SetEnterHandler(handler) self.enter = handler end
 	function frame:SetCreateLineHandler(handler) self.createLine = handler end
@@ -148,7 +148,7 @@ MikSBT.Profiles.currentProfile.events.NOTIFICATION_BUFF = {
     fontName = "Default",
 }
 MSBTOptions.Main = { AddTab = function(frame, label) tabs[label] = frame end }
-local eventPopup, fontPopup
+local eventPopup, fontPopup, movePopup
 MSBTOptions.Popups = {
     DisableControls = function(controls)
         for _, control in pairs(controls) do
@@ -157,6 +157,7 @@ MSBTOptions.Popups = {
     end,
     ShowEvent = function(config) eventPopup = config end,
     ShowFont = function(config) fontPopup = config end,
+    ShowScrollAreaSelection = function(config) movePopup = config end,
 }
 MSBTOptions.Controls.CreateDropdown = Frame
 PET = "Pet"
@@ -437,3 +438,93 @@ assert(language.currentLocaleFontString.text == "当前语言：简体中文（z
 assert(language.languageInfoFontString.text == L.LANGUAGE_INFO)
 assert(reset.headerFontString.text == "重置暴雪战斗文字")
 assert(reset.bodyFontString.text == L.RESET_BLIZZARD_INFO)
+
+-- Describe: Events can be viewed by the scroll area assigned to each row.
+-- Given a custom area added after the Events tab was first opened.
+local profile = MikSBT.Profiles.currentProfile
+MikSBT.Animations.scrollAreas = {
+	Notification = { name = "Notification" },
+	Outgoing = { name = "Outgoing" },
+	Custom1 = { name = "Hunter" },
+}
+profile.events.OUTGOING_DAMAGE = {
+	message = "Weapon %a", scrollArea = "Custom1",
+}
+profile.events.OUTGOING_SPELL_DAMAGE = {
+	message = "Skill %a", scrollArea = "Outgoing",
+}
+profile.auraTracking["1459"] = true
+profile.auraSettings = { ["1459"] = { scrollArea = "Custom1" } }
+MikSBT.Profiles.SetOption = function(path, field, value)
+	if path then
+		local eventType = assert(path:match("^events%.(.+)$"))
+		profile.events[eventType][field] = value
+	else
+		profile[field] = value
+	end
+end
+
+-- When the tab is reopened and the custom area is selected.
+events.scripts.OnShow()
+local dropdown = controls.eventCategoryDropdown
+local names = {}
+for _, label in ipairs(dropdown.items) do names[label] = true end
+assert(names["Scroll Area - Hunter"], "new area is missing from Event Category")
+assert(names["Scroll Area - Outgoing"] and names["Outgoing Player"])
+local function SelectCategory(id)
+	dropdown:SetSelectedID(id)
+	dropdown:change(id)
+end
+SelectCategory("scrollArea:Custom1")
+
+-- Then the view shows exactly the event and aura assigned to Hunter.
+assert(#list.lines == 2)
+assert(list.lines[1].auraLine.auraID == "1459")
+assert(list.lines[2].eventType == "OUTGOING_DAMAGE")
+
+-- When the event is moved back from its Configure popup.
+list.lines[2].settingsButton:click()
+eventPopup.saveHandler({
+	message = "Weapon %a", scrollArea = "Outgoing",
+}, eventPopup.saveArg1)
+
+-- Then it moves to the new area view immediately and keeps its event category.
+assert(#list.lines == 1 and list.lines[1].auraLine.auraID == "1459")
+SelectCategory("scrollArea:Outgoing")
+assert(#list.lines == 2)
+assert(list.lines[1].eventType == "OUTGOING_DAMAGE")
+assert(list.lines[2].eventType == "OUTGOING_SPELL_DAMAGE")
+SelectCategory("OUTGOING_PLAYER_EVENTS")
+assert(#list.lines > 2)
+
+-- When all rows in Hunter are moved to Outgoing.
+SelectCategory("scrollArea:Custom1")
+profile.events.OUTGOING_DAMAGE.scrollArea = "Hunter"
+events.scripts.OnShow()
+assert(#list.lines == 2, "legacy scroll-area names should resolve to their key")
+controls.moveButton:clickHandler()
+movePopup.saveHandler("Outgoing")
+
+-- Then the event and aura leave Hunter and other event assignments stay put.
+assert(#list.lines == 0)
+assert(profile.events.OUTGOING_DAMAGE.scrollArea == "Outgoing")
+assert(profile.auraSettings["1459"].scrollArea == "Outgoing")
+assert(profile.events.OUTGOING_SPELL_DAMAGE.scrollArea == "Outgoing")
+assert(profile.events.NOTIFICATION_BUFF.scrollArea == "Notification")
+
+-- When the selected area is renamed and then deleted.
+SelectCategory("scrollArea:Custom1")
+MikSBT.Animations.scrollAreas.Custom1.name = "Hunter renamed"
+events.scripts.OnShow()
+assert(dropdown:GetSelectedID() == "scrollArea:Custom1")
+local renamed
+for _, label in ipairs(dropdown.items) do
+	assert(label ~= "Scroll Area - Hunter")
+	if label == "Scroll Area - Hunter renamed" then renamed = true end
+end
+assert(renamed)
+MikSBT.Animations.scrollAreas.Custom1 = nil
+events.scripts.OnShow()
+
+-- Then the picker returns to its first event category.
+assert(dropdown:GetSelectedID() == "INCOMING_PLAYER_EVENTS")

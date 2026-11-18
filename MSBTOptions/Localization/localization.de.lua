@@ -143,6 +143,7 @@ obj[2] = "Eingehend Begleiter"
 obj[3] = "Ausgehend Spieler"
 obj[4] = "Ausgehend Begleiter"
 obj[5] = "Benachrichtigung"
+L.EVENT_SCROLL_AREA_LABEL = "Scrollbereich - %s"
 
 
 

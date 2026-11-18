@@ -30,6 +30,7 @@ local _
 local DEFAULT_PROFILE_NAME = "Default"
 local DEFAULT_FONT_NAME = L.DEFAULT_FONT_NAME
 local DEFAULT_SCROLL_AREA = "Notification"
+local SCROLL_AREA_CATEGORY_PREFIX = "scrollArea:"
 local DEFAULT_FONT_PATH = "Interface\\AddOns\\MikScrollingBattleText\\Fonts\\"
 
 local EVENT_CATEGORY_MAP = {
@@ -1184,10 +1185,46 @@ local function EventsTab_SetupEvents()
 end
 
 
+local function EventsTab_ScrollArea(category)
+	return category and category:match("^" .. SCROLL_AREA_CATEGORY_PREFIX .. "(.+)$")
+end
+
+
+local function EventsTab_EventArea(settings)
+	local area = settings.scrollArea or DEFAULT_SCROLL_AREA
+	local areas = MSBTAnimations.scrollAreas
+	if areas[area] then return area end
+
+	for key, entry in pairs(areas) do
+		if entry.name == area then return key end
+	end
+	return DEFAULT_SCROLL_AREA
+end
+
+
+local function EventsTab_EventsInArea(areaKey)
+	local events = {}
+	local profileEvents = MSBTProfiles.currentProfile.events
+	for _, category in ipairs(EVENT_CATEGORY_MAP) do
+		for _, row in ipairs(orderedEvents[category]) do
+			local settings = profileEvents[row.eventType]
+			if EventsTab_EventArea(settings) == areaKey then
+				events[#events + 1] = row
+			end
+		end
+	end
+	return events
+end
+
+
 local function EventsTab_ChangeEventCategory(category, firstAuraID)
 	local controls = tabFrames.events.controls
+	local areaKey = EventsTab_ScrollArea(category)
+	controls.visibleEvents = areaKey and EventsTab_EventsInArea(areaKey)
+		or orderedEvents[category]
 
 	controls.eventsListbox:Clear()
+	controls.visibleAuras = nil
 	if category == "NOTIFICATION_EVENTS" then
 		controls.eventsListbox:Configure(400, 250, 25)
 		MSBTOptions.Auras.AddRows(controls.eventsListbox, firstAuraID)
@@ -1195,8 +1232,17 @@ local function EventsTab_ChangeEventCategory(category, firstAuraID)
 	else
 		controls.eventsListbox:Configure(400, 300, 25)
 		controls.auraPanel:Hide()
+		if areaKey then
+			local profile = MSBTProfiles.currentProfile
+			local tracking = MikSBT.Configuration.AuraTracking
+			controls.visibleAuras = MSBTOptions.Auras.AddRows(
+				controls.eventsListbox, nil, function(id)
+					local settings = tracking:GetSettings(profile, id)
+					return EventsTab_EventArea(settings) == areaKey
+				end)
+		end
 	end
-	for index in ipairs(orderedEvents[category]) do
+	for index in ipairs(controls.visibleEvents) do
 		controls.eventsListbox:AddItem(index)
 	end
 end
@@ -1210,9 +1256,16 @@ end
 
 
 local function EventsTab_MoveAll(scrollArea)
-	local events = orderedEvents[tabFrames.events.controls.eventCategoryDropdown:GetSelectedID()]
-	for index, eventData in ipairs(events) do
+	local controls = tabFrames.events.controls
+	for _, eventData in ipairs(controls.visibleEvents) do
 		MSBTProfiles.SetOption("events." .. eventData.eventType, "scrollArea", scrollArea)
+	end
+	local category = controls.eventCategoryDropdown:GetSelectedID()
+	if EventsTab_ScrollArea(category) then
+		for _, id in ipairs(controls.visibleAuras) do
+			MSBTOptions.Auras.SaveSetting(id, "scrollArea", scrollArea)
+		end
+		EventsTab_ChangeEventCategory(category)
 	end
 end
 
@@ -1266,7 +1319,13 @@ local function EventsTab_SaveEventSettings(settings, eventType)
 	EventsTab_SaveOption(eventType, "message", settings.message)
 	EventsTab_SaveOption(eventType, "alwaysSticky", settings.alwaysSticky)
 
-	tabFrames.events.controls.eventsListbox:Refresh()
+	local controls = tabFrames.events.controls
+	local category = controls.eventCategoryDropdown:GetSelectedID()
+	if EventsTab_ScrollArea(category) then
+		EventsTab_ChangeEventCategory(category)
+	else
+		controls.eventsListbox:Refresh()
+	end
 end
 
 
@@ -1461,7 +1520,7 @@ local function EventsTab_DisplayLine(this, line, key, isSelected)
 		return
 	end
 	line.auraLine:Hide()
-	local events = orderedEvents[tabFrames.events.controls.eventCategoryDropdown:GetSelectedID()]
+	local events = tabFrames.events.controls.visibleEvents
 	local eventType = events[key].eventType
 	local eventSettings = MSBTProfiles.currentProfile.events[eventType]
 	local objLocale = events[key]
@@ -1512,11 +1571,10 @@ local function EventsTab_Create()
 	button:SetPoint("BOTTOMLEFT", controls.moveButton, "TOPLEFT", 0, 10)
 	button:SetClickHandler(
 		function (this)
-			local events = orderedEvents[controls.eventCategoryDropdown:GetSelectedID()]
-			for index, eventData in ipairs(events) do
+			for _, eventData in ipairs(controls.visibleEvents) do
 				MSBTProfiles.SetOption("events." .. eventData.eventType, "disabled", not MSBTProfiles.currentProfile.events[eventData.eventType].disabled)
-				controls.eventsListbox:Refresh()
 			end
+			controls.eventsListbox:Refresh()
 		end
 	)
 	controls.toggleButton = button
@@ -1545,12 +1603,6 @@ local function EventsTab_Create()
 
 	EventsTab_SetupEvents()
 
-	for index, category in ipairs(L.EVENT_CATEGORIES) do
-		dropdown:AddItem(category, EVENT_CATEGORY_MAP[index])
-	end
-	dropdown:SetSelectedID(EVENT_CATEGORY_MAP[1])
-	EventsTab_ChangeEventCategory(EVENT_CATEGORY_MAP[1])
-
 	tabFrame.created = true
 end
 
@@ -1558,8 +1610,28 @@ end
 local function EventsTab_OnShow()
 	if (not tabFrames.events.created) then EventsTab_Create() end
 
-	EventsTab_ChangeEventCategory(
-		tabFrames.events.controls.eventCategoryDropdown:GetSelectedID())
+	local dropdown = tabFrames.events.controls.eventCategoryDropdown
+	local selected = dropdown:GetSelectedID()
+	dropdown:Clear()
+	for index, category in ipairs(L.EVENT_CATEGORIES) do
+		dropdown:AddItem(category, EVENT_CATEGORY_MAP[index])
+	end
+
+	local areaNames = {}
+	for key, settings in pairs(MSBTAnimations.scrollAreas or {}) do
+		areaNames[key] = settings.name
+	end
+	for _, key in ipairs(SortKeysByValue(areaNames)) do
+		local category = SCROLL_AREA_CATEGORY_PREFIX .. key
+		dropdown:AddItem(L.EVENT_SCROLL_AREA_LABEL:format(areaNames[key]), category)
+	end
+
+	local areaKey = EventsTab_ScrollArea(selected)
+	if not selected or (areaKey and not areaNames[areaKey]) then
+		selected = EVENT_CATEGORY_MAP[1]
+	end
+	dropdown:SetSelectedID(selected)
+	EventsTab_ChangeEventCategory(selected)
 end
 
 

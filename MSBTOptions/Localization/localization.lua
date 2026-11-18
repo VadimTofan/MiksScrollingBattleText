@@ -261,6 +261,7 @@ obj[2] = "Incoming Pet"
 obj[3] = "Outgoing Player"
 obj[4] = "Outgoing Pet"
 obj[5] = "Notification"
+L.EVENT_SCROLL_AREA_LABEL = "Scroll Area - %s"
 
 
 
