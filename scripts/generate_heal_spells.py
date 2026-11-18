@@ -7,10 +7,11 @@ data and shipped as a table of spell id to heal facts, for every spell whose
 own effects heal. The addon reads the table on Forever only.
 
 Usage:
-    python scripts/generate_heal_spells.py SpellEffect.csv SpellMisc.csv SpellDuration.csv Spell.csv BUILD
+    python scripts/generate_heal_spells.py --build BUILD --csv-dir FOLDER
 
-The four files are CSV exports of the tables of the same name for the client
-build named BUILD (for example 1.60.1.70888); Spell.csv is the English one. A
+FOLDER holds SpellEffect.csv, SpellMisc.csv, SpellDuration.csv and Spell.csv, CSV
+exports of the tables of the same name for the client build named BUILD (for
+example 1.60.1.70888); Spell.csv is the English one. A
 spell heals at once when one of its effects heals (Effect 10, 67, 75 or 136)
 and over time when one of its effects applies a periodic heal aura (EffectAura
 8, or 20 for a percentage) with a period. It heals your pet when such an
@@ -24,8 +25,9 @@ its description as for a spell newer than the table. The highest spell id of
 the build is written too: the table takes a spell up to it that is in neither
 list not to heal, which misses a heal through an effect it does not read.
 """
+import argparse
 import csv
-import sys
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +41,26 @@ HIDDEN_EFFECTS = {3, 28, 64, 77, 140, 142}
 # Dummy, periodic trigger spell, proc trigger spell, periodic dummy, periodic trigger with value.
 HIDDEN_AURAS = {4, 23, 42, 226, 227}
 PER_LINE = 6
+TABLE = "HealSpells"
+SCRIPT = "scripts/generate_heal_spells.py"
+# The client's name in the data the CSV files come from.
+PRODUCT = "wowf"
+BUILD_PATTERN = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
+
+
+def build_argument(text):
+    if not BUILD_PATTERN.match(text):
+        raise argparse.ArgumentTypeError("a build looks like 1.60.1.70888, not %r" % text)
+    return text
+
+
+# The two lines by which the table names its source: the product and build of the data, and this script.
+def registration(build):
+    return [
+        "MikSBT.TABLE_BUILDS = MikSBT.TABLE_BUILDS or {}",
+        'MikSBT.TABLE_BUILDS.%s = { product = "%s", build = "%s", script = "%s" }'
+        % (TABLE, PRODUCT, build, SCRIPT),
+    ]
 
 
 def read(path):
@@ -92,9 +114,10 @@ def render(found, unknown, last, build):
         "-- dummy effect, a triggered spell or a summoned unit; their description",
         "-- decides. A spell id up to HEAL_SPELLS_LAST in neither list is taken not",
         "-- to heal.",
-        "MikSBT.CombatEngine.HEAL_SPELLS_LAST = %d" % last,
-        "MikSBT.CombatEngine.HEAL_SPELLS = {",
     ]
+    lines += registration(build)
+    lines.append("MikSBT.CombatEngine.HEAL_SPELLS_LAST = %d" % last)
+    lines.append("MikSBT.CombatEngine.HEAL_SPELLS = {")
     entries = ["[%d]={%d,%s,%s,%d}," % (spell, facts[0], seconds(facts[1]), seconds(facts[2]), facts[3])
                for spell, facts in sorted(found.items())]
     for start in range(0, len(entries), PER_LINE):
@@ -108,11 +131,20 @@ def render(found, unknown, last, build):
     return "\n".join(lines) + "\n"
 
 
+def generate(csv_dir, build):
+    return render(*heal_facts(read(csv_dir / "SpellEffect.csv"), read(csv_dir / "SpellMisc.csv"),
+                              read(csv_dir / "SpellDuration.csv"), read(csv_dir / "Spell.csv")), build)
+
+
 def main():
-    effects, misc, durations, spells, build = sys.argv[1:6]
-    found, unknown, last = heal_facts(read(effects), read(misc), read(durations), read(spells))
-    OUTPUT.write_text(render(found, unknown, last, build), encoding="utf-8", newline="\n")
-    print("%d spells and %d unknown written to %s" % (len(found), len(unknown), OUTPUT.relative_to(ROOT)))
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--build", required=True, type=build_argument,
+                        help="client build of the CSV files, for example 1.60.1.70888")
+    parser.add_argument("--csv-dir", required=True, type=Path,
+                        help="folder with SpellEffect.csv, SpellMisc.csv, SpellDuration.csv and the English Spell.csv")
+    args = parser.parse_args()
+    OUTPUT.write_text(generate(args.csv_dir, args.build), encoding="utf-8", newline="\n")
+    print("%s written from build %s" % (OUTPUT.relative_to(ROOT), args.build))
 
 
 if __name__ == "__main__":

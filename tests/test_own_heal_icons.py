@@ -1,3 +1,6 @@
+import argparse
+import os
+import re
 import unittest
 from pathlib import Path
 
@@ -99,6 +102,43 @@ class OwnHealIconTests(unittest.TestCase):
                             toc + " loads the heal table before Context.lua")
             self.assertLess(lines.index("Combat\\HealSpells.lua"), lines.index("Combat\\Healing.lua"),
                             toc + " loads the heal table after Healing.lua")
+
+    def test_the_heal_table_names_the_build_of_its_source(self):
+        # Given
+        from scripts import generate_heal_spells as generator
+
+        root = Path(__file__).resolve().parents[1]
+        lines = (root / "Combat" / "HealSpells.lua").read_text(encoding="utf-8").splitlines()
+
+        # When
+        start = lines.index("MikSBT.TABLE_BUILDS = MikSBT.TABLE_BUILDS or {}")
+        build = re.search(r'build = "([^"]*)"', lines[start + 1]).group(1)
+        header = re.search(r"build (\d+\.\d+\.\d+\.\d+)[.,]", "\n".join(lines[:start]))
+
+        # Then
+        self.assertEqual(lines[start:start + 2], generator.registration(build))
+        self.assertEqual(lines.count(lines[start]), 1)
+        self.assertRegex(build, generator.BUILD_PATTERN)
+        self.assertEqual(header and header.group(1), build, "the header names another build than the entry")
+        self.assertTrue((root / generator.SCRIPT).is_file())
+        with self.assertRaises(argparse.ArgumentTypeError):
+            generator.build_argument("test")
+
+    @unittest.skipUnless(os.environ.get("MSBT_CSV_DIR"),
+                         "MSBT_CSV_DIR names no folder with the CSV files of the table's build")
+    def test_the_shipped_heal_table_is_what_its_generator_writes(self):
+        # Given
+        from scripts import generate_heal_spells as generator
+
+        root = Path(__file__).resolve().parents[1]
+        table = (root / "Combat" / "HealSpells.lua").read_text(encoding="utf-8")
+        build = re.search(r'TABLE_BUILDS\.\w+ = \{[^}]*build = "([^"]*)"', table).group(1)
+
+        # When
+        written = generator.generate(Path(os.environ["MSBT_CSV_DIR"]), build)
+
+        # Then
+        self.assertEqual(table, written, "regenerate with the CSV files of build " + build)
 
 
 if __name__ == "__main__":
