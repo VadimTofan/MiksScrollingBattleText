@@ -532,6 +532,126 @@ do
 		"the empty-list text is not on the list")
 end
 
+-- Rule: Sounds offers the two alert thresholds as sliders that show the profile and write on input only.
+do
+	local function Slider(option)
+		return Find(MSBTOptionsWindowFrame, function(region)
+			return region.labelFontString and region.sliderFrame and region.shown
+				and region.labelFontString:GetText():find(L.SLIDERS[option].label, 1, true) == 1
+		end)
+	end
+	local function Writes()
+		local found = {}
+		for _, call in ipairs(calls) do
+			if call[1] == "SetOption" and (call[3] == "lowHealthThreshold" or call[3] == "lowManaThreshold") then
+				found[#found + 1] = call
+			end
+		end
+		return found
+	end
+	local function Cancel() Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.cancel))) end
+	-- Opening the page writes nothing, whatever the profile holds.
+	local function Open()
+		Window.Hide()
+		MikSBT.EraseTable(calls)
+		Window.Show()
+		ClickEntry("sounds")
+		assert(#Writes() == 0, "opening the page wrote a threshold")
+		MikSBT.EraseTable(calls)
+	end
+
+	-- Then both are there, with the classic range, step and tooltip, in the skin of the other sliders.
+	Profiles.currentProfile.lowHealthThreshold = 40
+	Profiles.currentProfile.lowManaThreshold = 20
+	Open()
+	local health, mana = Slider("lowHealthThreshold"), Slider("lowManaThreshold")
+	assert(health and mana, "a threshold slider is missing")
+	local minValue, maxValue = health.sliderFrame:GetMinMaxValues()
+	assert(minValue == 1 and maxValue == 99, "the range differs")
+	assert(health.sliderFrame.stepSet == 1 and mana.sliderFrame.stepSet == 1, "the step was not set to 1")
+	assert(health.sliderFrame.tooltip == L.SLIDERS.lowHealthThreshold.tooltip, "the tooltip differs")
+	local speed = Find(MSBTOptionsWindowFrame, function(region)
+		return region.labelFontString and region.sliderFrame and region.labelFontString:GetText():find(L.SLIDERS.animationSpeed.label, 1, true) == 1
+	end)
+	assert(health.sliderFrame.backdropColor and health.sliderFrame.backdropColor[1] == speed.sliderFrame.backdropColor[1],
+		"the slider is not skinned")
+
+	-- And they show the profile; a missing or invalid value shows the default.
+	assert(health:GetValue() == 40 and mana:GetValue() == 20, "the sliders do not show the profile")
+	for _, value in ipairs({ 0, 100, "x", true }) do
+		Profiles.currentProfile.lowManaThreshold = value
+		Open()
+		assert(Slider("lowManaThreshold"):GetValue() == 35, "an invalid value did not show the default")
+	end
+	Profiles.currentProfile.lowManaThreshold = nil
+	Open()
+	assert(Slider("lowManaThreshold"):GetValue() == 35, "a missing value did not show the default")
+	assert(Slider("lowManaThreshold").labelFontString:GetText():find("35", 1, true), "the label does not show the value")
+
+	-- When the page shows again, then nothing is written, whatever the profile holds.
+	Profiles.currentProfile.lowHealthThreshold = 55
+	ClickEntry("general")
+	ClickEntry("sounds")
+	assert(Slider("lowHealthThreshold"):GetValue() == 55 and #Writes() == 0, "showing the page again wrote a threshold")
+
+	-- When the player moves one, then the rounded value is saved in the profile.
+	Profiles.currentProfile.lowHealthThreshold = 40
+	Open()
+	Slider("lowHealthThreshold").sliderFrame:SetValue(61.6)
+	local writes = Writes()
+	assert(#writes == 1 and writes[1][2] == nil and writes[1][3] == "lowHealthThreshold" and writes[1][4] == 62
+		and writes[1][5] == nil, "the health slider saved the wrong value")
+	Slider("lowManaThreshold").sliderFrame:SetValue(10)
+	writes = Writes()
+	assert(#writes == 2 and writes[2][3] == "lowManaThreshold" and writes[2][4] == 10, "the mana slider saved the wrong value")
+
+	-- Then the change counts like any profile change.
+	assert(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)).enabled, "the change did not enable Apply")
+
+	-- When Cancel puts the profile back, then the sliders show it on the next show and nothing is written.
+	MikSBT.EraseTable(calls)
+	Cancel()
+	assert(Profiles.currentProfile.lowHealthThreshold == 40, "Cancel did not put the profile back")
+	Window.Show()
+	ClickEntry("sounds")
+	assert(Slider("lowHealthThreshold"):GetValue() == 40 and Slider("lowManaThreshold"):GetValue() == 35,
+		"the sliders did not follow Cancel")
+	assert(#Writes() == 0, "Cancel wrote a threshold")
+
+	-- And Undo all does the same through the login snapshot.
+	Open()
+	Slider("lowHealthThreshold").sliderFrame:SetValue(70)
+	Click(Footer())
+	MikSBT.EraseTable(calls)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.undoAll)))
+	assert(#Writes() == 0, "Undo all wrote a threshold")
+	ClickEntry("sounds")
+	assert(Slider("lowHealthThreshold"):GetValue() == 35 and #Writes() == 0, "the sliders did not follow Undo all")
+	-- Undo all restored the login state, which has no speed; the General page of the later rules needs one.
+	for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
+	Profiles.currentProfile.lowHealthThreshold, Profiles.currentProfile.lowManaThreshold = nil, nil
+
+	-- And the sliders stand one below the other under the switches, in a section that holds both, and the
+	-- list below it fills the page to its bottom (456 high).
+	Window.Hide()
+	Window.Show()
+	ClickEntry("sounds")
+	local rows = FindAll(MSBTOptionsWindowFrame, function(region) return region.nameFontString and region.shown end)
+	local listbox = rows[1]:GetParent():GetParent()
+	local section = Find(MSBTOptionsWindowFrame, function(region)
+		local point = region.points and region.points.TOPLEFT
+		return region.height and point and point.y == 0 and point.x == 0 and region.points.TOPRIGHT
+			and region ~= MSBTOptionsWindowFrame and region:GetParent() == listbox:GetParent()
+	end)
+	local healthPoint, manaPoint = health.points.TOPLEFT, mana.points.TOPLEFT
+	assert(healthPoint.x == 32 and healthPoint.y == -112, "the health slider is not where the switches leave room")
+	assert(manaPoint.x == 32 and manaPoint.y == -162, "the mana slider is not one step below the health slider")
+	assert(section and section.height == 204, "the section does not hold the sliders")
+	assert(listbox.points.TOPLEFT.y == -214, "the list does not start below the section")
+	assert(listbox.height == 242, "the list does not end at the page bottom")
+	MikSBT.EraseTable(calls)
+end
+
 -- Rule: Profile copy, reset, delete, export and import take the classic paths.
 do
 	ClickEntry("profile")

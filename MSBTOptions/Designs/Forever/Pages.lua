@@ -31,6 +31,14 @@ local MECHANICS_STEP = 24
 local MECHANICS_GROWTH = MECHANICS_TOP + (#MECHANICS - 1) * MECHANICS_STEP + 20 + 12 - 130
 local LANGUAGE_NOTE_TOP = 96
 local LANGUAGE_NOTE_SHIFT = 30
+-- The alert thresholds are sliders under the sound switches; the list below starts under them.
+local THRESHOLDS = { "lowHealthThreshold", "lowManaThreshold" }
+local THRESHOLD_DEFAULT = 35
+local THRESHOLD_LEFT = 32
+local THRESHOLD_TOP = 112
+local THRESHOLD_STEP = 50
+local SLIDER_HEIGHT = 30
+local SOUNDS_SECTION_HEIGHT = THRESHOLD_TOP + (#THRESHOLDS - 1) * THRESHOLD_STEP + SLIDER_HEIGHT + 12
 
 -- Field part and text of the sub-options under each enable switch, as on the classic General tab.
 local SUB_OPTIONS = {
@@ -55,8 +63,10 @@ local config = {}
 local generalSwitches = {}
 local mechanicsSwitches = {}
 local soundSwitches = {}
+local thresholdSliders = {}
 local fontsColorsButtons = {}
 local soundNames = {}
+local refreshingThresholds
 
 local msbtCheckbox
 local speedSlider
@@ -375,8 +385,22 @@ end
 
 
 
+-- The sliders are filled under a guard, so showing the page and putting a profile back write nothing.
+local function PopulateThresholds()
+	local profile = MSBTProfiles.currentProfile
+	refreshingThresholds = true
+	for _, slider in ipairs(thresholdSliders) do
+		local value = profile[slider.option]
+		if type(value) ~= "number" or not (value >= 1 and value <= 99) then value = THRESHOLD_DEFAULT end
+		slider:SetValue(value)
+	end
+	refreshingThresholds = false
+end
+
+
 local function RefreshSounds()
 	PopulateSwitches(soundSwitches)
+	PopulateThresholds()
 	local sounds = MSBTProfiles.savedMedia.sounds
 	EraseTable(soundNames)
 	for name in pairs(sounds) do soundNames[#soundNames + 1] = name end
@@ -436,9 +460,29 @@ local function DisplaySoundLine(listbox, line, item)
 end
 
 
+local function OnThresholdChanged(this, value)
+	if refreshingThresholds then return end
+	MSBTProfiles.SetOption(nil, this.option, math.floor(value + 0.5))
+end
+
+
+local function CreateThresholdSlider(section, option, index)
+	local locale = L.SLIDERS[option]
+	local slider = MSBTControls.CreateSlider(section)
+	slider:Configure(300, locale.label, locale.tooltip)
+	slider:SetPoint("TOPLEFT", section, "TOPLEFT", THRESHOLD_LEFT, -THRESHOLD_TOP - (index - 1) * THRESHOLD_STEP)
+	slider:SetMinMaxValues(1, 99)
+	slider:SetValueStep(1)
+	slider.option = option
+	slider:SetValueChangedHandler(OnThresholdChanged)
+	MSBTWindow.SkinSlider(slider)
+	thresholdSliders[index] = slider
+end
+
+
 local function CreateSounds(page, width, height)
 	soundsPage = page
-	local section = CreateSection(page, 0, 110)
+	local section = CreateSection(page, 0, SOUNDS_SECTION_HEIGHT)
 	local anchor = CreateSwitch(section, soundSwitches, "enableSounds", "soundsDisabled", true)
 	anchor:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -12)
 	for index, switch in ipairs({
@@ -448,6 +492,7 @@ local function CreateSounds(page, width, height)
 		CreateSwitch(section, soundSwitches, switch[1], switch[2], true)
 			:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 20, -6 - (index - 1) * ROW_HEIGHT)
 	end
+	for index, option in ipairs(THRESHOLDS) do CreateThresholdSlider(section, option, index) end
 
 	local locale = L.BUTTONS["addCustomSound"]
 	CreateButton(section, locale.label, locale.tooltip, function(this)
@@ -455,8 +500,8 @@ local function CreateSounds(page, width, height)
 	end):SetPoint("TOPRIGHT", section, "TOPRIGHT", -12, -12)
 
 	soundListbox = MSBTControls.CreateListbox(page)
-	soundListbox:Configure(width, height - 120, SOUND_LINE_HEIGHT)
-	soundListbox:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -120)
+	soundListbox:Configure(width, height - SOUNDS_SECTION_HEIGHT - 10, SOUND_LINE_HEIGHT)
+	soundListbox:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -SOUNDS_SECTION_HEIGHT - 10)
 	soundListbox:SetCreateLineHandler(CreateSoundLine)
 	soundListbox:SetDisplayHandler(DisplaySoundLine)
 	MSBTWindow.Fill(soundListbox, COLORS.panel)

@@ -145,6 +145,7 @@ function Methods:SetValue(value)
 	if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value) end
 end
 function Methods:GetValue() return self.value end
+function Methods:SetValueStep(value) self.step, self.stepSet = value, value end
 function Methods:GetValueStep() return self.step end
 function Methods:SetBackdropColor(...) self.backdropColor = { ... } end
 
