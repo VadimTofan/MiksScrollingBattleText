@@ -449,15 +449,26 @@ ns.ActiveWindfurySpell = ActiveWindfurySpell
 -- one shield of its school you have on, none when there are several
 -- (predicted, not yet seen in client). Only a hit whose frame brought
 -- shield lines alone is a shield's (Mine.lua, Hit): beside a line of
--- another kind either line can be the hit's, and it stays unnamed.
+-- another kind either line can be the hit's, and it stays unnamed. A shield
+-- counts as on where its end was read (0 for never) and is not past, or
+-- where your cast of it on yourself explained a hidden change of your auras
+-- since the last scan (below); a shield of the hit's school whose end could
+-- not be read leaves the hit unnamed. While a change of your auras that
+-- could not be read and may have added an aura waits half a second for an
+-- explanation, and after one that found none until a scan reads all your
+-- buffs, no hit is named (reader.auraChanges, reader.aurasUnsure, below).
 local function ShieldSpell(at, school)
+    if reader.aurasUnsure or #reader.auraChanges > 0 then return nil end
     local shields, found = MikSBT.DAMAGE_SHIELDS or {}
     for _, entry in pairs(reader.auras or {}) do
         local shieldSchool = entry.spell and shields[entry.spell]
-        local on = not entry.expires or entry.expires == 0 or entry.expires > at
-        if shieldSchool and shieldSchool == school and on then
-            if found then return nil end
-            found = entry.spell
+        if shieldSchool and shieldSchool == school then
+            local expires = entry.expires
+            if expires == nil and not entry.learned then return nil end
+            if entry.learned or expires == 0 or expires > at then
+                if found and found ~= entry.spell then return nil end
+                found = entry.spell
+            end
         end
     end
     return found
@@ -566,7 +577,9 @@ function ns.DecideHit(hit, line, restrict)
             == WINDFURY_WEAPON_SPELL_ID then
         result.proc = true
     end
-    if result.shield then
+    -- A shield's miss is reported as Physical whatever shield caused it, so
+    -- only a shield's damage is named after its school's shield.
+    if result.shield and record.event == "damage" then
         result.procSpell = ShieldSpell(hit.at, record.school)
     end
     TagProcCandidate(result, hit.at, record.school, hit.key)
@@ -1643,11 +1656,52 @@ local function Recast()
     local entry = reader.buffSpells and reader.buffSpells[cast.spell]
     if entry then ShowBuff(entry) end
 end
+
+-- A change of your auras that could not be read may have taken a damage
+-- shield off you and put another on, unseen by the cache: shield hits are
+-- named again only after a scan reads all your buffs (a full update, or
+-- the end of the fight), unless within half a second the change is
+-- explained. The combat text's kind can be read, and its aura notices come
+-- in the frame of the change, before or after it: when the notices from
+-- that frame to the end of the half second are of a debuff only, no shield
+-- was put on you. A damage shield you cast on yourself in the moment of the
+-- change, before or after it in that frame, explains it, and is learned
+-- until the next scan; a cast of another moment may be another change's.
+local AURA_PAIR = 0.5
+reader.auraChanges = {}
+local function LearnShield(change, spell)
+    change.explained = true
+    reader.auras = reader.auras or {}
+    reader.auras["cast" .. spell] = { spell = spell, learned = true }
+end
+local function SettleAuraChange(change)
+    for index, waiting in ipairs(reader.auraChanges) do
+        if waiting == change then
+            table.remove(reader.auraChanges, index)
+            if not (change.explained or (change.harmful and not change.helpful)) then reader.aurasUnsure = true end
+            return
+        end
+    end
+end
+local function HiddenAuraChange()
+    local change, cast, notice = { at = Now() }, reader.shieldCast, reader.auraNotice
+    if cast and cast.at == change.at then LearnShield(change, cast.spell) end
+    if notice and notice.at == change.at then change.harmful, change.helpful = notice.harmful, notice.helpful end
+    reader.auraChanges[#reader.auraChanges + 1] = change
+    C_Timer.After(AURA_PAIR, function() SettleAuraChange(change) end)
+end
+
 function ns.OnBuffCast(spell)
-    if not (reader.buffSpells and reader.buffSpells[spell]) then return end
+    local shield = MikSBT.DAMAGE_SHIELDS and MikSBT.DAMAGE_SHIELDS[spell]
+    if not (shield or reader.buffSpells and reader.buffSpells[spell]) then return end
     -- Cast on a friend you target, it is theirs, not yours.
     local exists, assist, self = UnitExists("target"), UnitCanAssist("player", "target"), UnitIsUnit("target", "player")
     if ns.Bool(exists) and exists and ns.Bool(assist) and assist and not (ns.Bool(self) and self) then return end
+    if shield then
+        reader.shieldCast = { spell = spell, at = Now() }
+        for _, change in ipairs(reader.auraChanges) do if change.at == Now() then LearnShield(change, spell) end end
+    end
+    if not (reader.buffSpells and reader.buffSpells[spell]) then return end
     reader.buffCast = { spell = spell, at = Now() }
     Recast()
 end
@@ -1669,32 +1723,50 @@ local function AuraSecret(check, ...)
     return not ns.Bool(secret) or secret
 end
 ns.AuraSecret = AuraSecret
+-- Only a scan that read every buff, its spell too, settles the changes that
+-- could not be read; a debuff is no damage shield.
 local function RebuildAuras()
     reader.auras = {}
     if not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then return end
+    local hidden = false
     for _, filter in ipairs({ "HELPFUL", "HARMFUL" }) do
+        local buffs = filter == "HELPFUL"
         for index = 1, 40 do
-            if AuraSecret("ShouldUnitAuraIndexBeSecret", "player", index, filter) then break end
+            if AuraSecret("ShouldUnitAuraIndexBeSecret", "player", index, filter) then hidden = hidden or buffs break end
             local aura = C_UnitAuras.GetAuraDataByIndex("player", index, filter)
-            if not ns.Public(aura) or aura == nil then break end
+            if not ns.Public(aura) then hidden = hidden or buffs break end
+            if aura == nil then break end
             local id, entry = AuraEntry(aura)
             if id then reader.auras[id] = entry end
+            if not (id and entry.spell) then hidden = hidden or buffs end
         end
     end
+    reader.aurasUnsure = hidden or nil
+    if not hidden then reader.auraChanges = {} end
 end
 local function OnPlayerAura(info)
     if type(info) ~= "table" or not ns.Public(info) then
         reader.unreadAuraAt = Now()
+        HiddenAuraChange()
         Recast()
         return
     end
     local full = info.isFullUpdate
-    if not ns.Bool(full) then return end
+    if not ns.Bool(full) then
+        -- In a fight the full flag is hidden, but which lists came can be
+        -- read: removed or updated auras with no list of added ones added
+        -- none. A payload with no list at all may be a full update.
+        local added, removed, updated = info.addedAuras, info.removedAuraInstanceIDs, info.updatedAuraInstanceIDs
+        local other = not ns.Public(removed) or removed ~= nil or not ns.Public(updated) or updated ~= nil
+        if not ns.Public(added) or added ~= nil or not other then HiddenAuraChange() end
+        return
+    end
     reader.auras = reader.auras or {}
     if full then RebuildAuras() return end
     local router = Router()
     local any = false
     local added, removed = info.addedAuras, info.removedAuraInstanceIDs
+    local hidden = not ns.Public(added)
     if type(added) == "table" and ns.Public(added) then
         for _, aura in ipairs(added) do
             local id, entry = AuraEntry(aura)
@@ -1704,9 +1776,14 @@ local function OnPlayerAura(info)
                 for _ in pairs(reader.auras) do count = count + 1 end
                 if count < MAX_AURAS then reader.auras[id] = entry end
                 if router then router:Aura(true, entry.harmful, entry.name, entry.icon, entry.spell) end
+                -- A buff whose spell is hidden may be a damage shield.
+                if not (entry.spell or entry.harmful) then hidden = true end
+            else
+                hidden = true
             end
         end
     end
+    if hidden then HiddenAuraChange() end
     local updated = info.updatedAuraInstanceIDs
     if type(updated) == "table" and ns.Public(updated) and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
         for _, id in ipairs(updated) do
@@ -1779,7 +1856,16 @@ end
 ns.UpdateWand = UpdateWand
 
 local function OnCombatText(kind)
-    if not ns.Text(kind) or not C_CombatText or not C_CombatText.GetCurrentEventInfo then return end
+    if not ns.Text(kind) then return end
+    -- The kind of an aura gained, for the changes that could not be read:
+    -- those waiting, and one still to come in this frame.
+    local gained = kind == "SPELL_AURA_START" and "helpful" or kind == "SPELL_AURA_START_HARMFUL" and "harmful"
+    if gained then
+        if not (reader.auraNotice and reader.auraNotice.at == Now()) then reader.auraNotice = { at = Now() } end
+        reader.auraNotice[gained] = true
+        for _, change in ipairs(reader.auraChanges) do change[gained] = true end
+    end
+    if not C_CombatText or not C_CombatText.GetCurrentEventInfo then return end
     local router = Router()
     if not router then return end
     if kind == "SPELL_AURA_START" or kind == "SPELL_AURA_START_HARMFUL" or kind == "SPELL_AURA_END"
@@ -2405,6 +2491,8 @@ local function OnEvent(_, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         OnCombat(false)
         ReadShieldBlock()
+        -- Your auras are read again once the fight is over, a frame later.
+        C_Timer.After(0, RebuildAuras)
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
         reader.windfuryCooldownFrame, reader.windfuryNoticeAt = nil, nil
