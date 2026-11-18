@@ -1,3 +1,6 @@
+import argparse
+import os
+import re
 import unittest
 from pathlib import Path
 
@@ -54,6 +57,43 @@ class ParserNotificationsTests(unittest.TestCase):
                 lines.index("Components\\SkillLineIcons.lua") + 1,
                 lines.index("Components\\ParserNotifications.lua"),
             )
+
+    def test_the_skill_line_table_names_the_build_of_its_source(self):
+        # Given
+        from scripts import generate_skill_line_icons as generator
+
+        root = Path(__file__).resolve().parents[1]
+        lines = (root / "Components" / "SkillLineIcons.lua").read_text(encoding="utf-8").splitlines()
+
+        # When
+        start = lines.index("MikSBT.TABLE_BUILDS = MikSBT.TABLE_BUILDS or {}")
+        build = re.search(r'build = "([^"]*)"', lines[start + 1]).group(1)
+        header = re.search(r"build (\d+\.\d+\.\d+\.\d+)[.,]", "\n".join(lines[:start]))
+
+        # Then
+        self.assertEqual(lines[start:start + 2], generator.registration(build))
+        self.assertEqual(lines.count(lines[start]), 1)
+        self.assertRegex(build, generator.BUILD_PATTERN)
+        self.assertEqual(header and header.group(1), build, "the header names another build than the entry")
+        self.assertTrue((root / generator.SCRIPT).is_file())
+        with self.assertRaises(argparse.ArgumentTypeError):
+            generator.build_argument("test")
+
+    @unittest.skipUnless(os.environ.get("MSBT_CSV_DIR"),
+                         "MSBT_CSV_DIR names no folder with the CSV files of the table's build")
+    def test_the_shipped_skill_line_table_is_what_its_generator_writes(self):
+        # Given
+        from scripts import generate_skill_line_icons as generator
+
+        root = Path(__file__).resolve().parents[1]
+        table = (root / "Components" / "SkillLineIcons.lua").read_text(encoding="utf-8")
+        build = re.search(r'TABLE_BUILDS\.\w+ = \{[^}]*build = "([^"]*)"', table).group(1)
+
+        # When
+        written = generator.generate(Path(os.environ["MSBT_CSV_DIR"]), build)
+
+        # Then
+        self.assertEqual(table, written, "regenerate with the CSV files of build " + build)
 
 
 if __name__ == "__main__":
