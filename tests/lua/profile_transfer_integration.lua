@@ -69,12 +69,10 @@ local environment = setmetatable({}, {
 local sourceFile = assert(io.open("MSBTProfiles.lua", "rb"))
 local source = sourceFile:read("*a"):gsub("^\239\187\191", "")
 sourceFile:close()
-local optionsFile = assert(io.open("MSBTOptions/MSBTOptionsTabs.lua", "rb"))
-local optionsSource = optionsFile:read("*a")
-optionsFile:close()
 local exports = {}
-for _, classic in ipairs({ false, true }) do
-	MikSBT.Compatibility.Client.isClassicContent = classic
+for _, forever in ipairs({ false, true }) do
+	MikSBT.Compatibility.Client.isClassicContent = forever
+	MikSBT.Compatibility.Client.isForever = forever
 	frame = nil
 	local chunk = assert(loadstring(source, "@MSBTProfiles.lua"))
 	setfenv(chunk, environment)
@@ -241,18 +239,68 @@ for _, classic in ipairs({ false, true }) do
 	assert(not auraTransfer:Validate(auraPayload))
 	auraPayload.sections.SpamControl.auraTracking["name:"] = nil
 
-	-- Given every event offered by the actual options list on this client.
-	for eventType in optionsSource:gmatch(
-		'EventsTab_AddEvent%([^,]+,%s*"([A-Z_]+)"') do
-		-- When the list resolves settings from the active profile.
-		local eventSettings = profiles.currentProfile.events[eventType]
+	-- Given the real options module on this client.
+	local previousOptions = MSBTOptions
+	MikSBT.translations = {}
+	LoadFile("MSBTOptions/Localization/localization.lua")
+	MSBTOptions.Main = { AddTab = Noop }
+	MSBTOptions.Popups = {}
+	LoadFile("MSBTOptions/MSBTOptionsTabs.lua")
+	MikSBT.translations = translations
 
-		-- Then its rendering/editing controls have a complete settings object.
-		assert(type(eventSettings) == "table",
-			"missing options event defaults: " .. eventType
-				.. " (classic=" .. tostring(classic) .. ")")
-		assert(type(eventSettings.message) == "string",
-			"missing options event message: " .. eventType)
+	-- When each Events category resolves its rows.
+	local eventOptions = MSBTOptions.Tabs.events
+	MSBTOptions = previousOptions
+	local outgoing = {}
+	for _, category in ipairs({
+		"INCOMING_PLAYER_EVENTS", "INCOMING_PET_EVENTS", "OUTGOING_PLAYER_EVENTS",
+		"OUTGOING_PET_EVENTS", "NOTIFICATION_EVENTS",
+	}) do
+		for _, row in ipairs(eventOptions.GetEvents(category)) do
+			-- Then each row has a complete settings object.
+			local settings = eventOptions.GetSettings(row.eventType)
+			assert(type(settings) == "table",
+				"missing options event defaults: " .. row.eventType)
+			assert(type(settings.message) == "string",
+				"missing options event message: " .. row.eventType)
+			if category == "OUTGOING_PLAYER_EVENTS" then
+				outgoing[row.eventType] = row
+			end
+		end
+	end
+	-- Then only Forever offers ranged sound rows, and they default to opt-in.
+	for _, eventType in ipairs({
+		"OUTGOING_BOW_DAMAGE", "OUTGOING_BOW_DAMAGE_CRIT", "OUTGOING_BOW_MISS",
+		"OUTGOING_GUN_DAMAGE", "OUTGOING_GUN_DAMAGE_CRIT", "OUTGOING_GUN_MISS",
+	}) do
+		assert((outgoing[eventType] ~= nil) == forever,
+			"wrong client for Auto Shot option: " .. eventType)
+		assert((defaults.events[eventType] ~= nil) == forever,
+			"wrong client for Auto Shot defaults: " .. eventType)
+		if forever then
+			local settings = eventOptions.GetSettings(eventType)
+			assert(settings.disabled == true and settings.textCategory == "Outgoing",
+				"Auto Shot row does not default to opt-in: " .. eventType)
+			assert(settings.scrollArea == "Outgoing", eventType)
+			assert(not not settings.isCrit == (eventType:match("_CRIT$") ~= nil), eventType)
+		end
+	end
+
+	if forever then
+		-- Given a saved profile from before Auto Shot sound options existed.
+		profiles.SelectProfile("InferredLegacy")
+		local eventType = "OUTGOING_BOW_DAMAGE"
+		assert(eventOptions.GetSettings(eventType).disabled == true)
+
+		-- When the player enables the new row and assigns a sound.
+		eventOptions.SaveOption(eventType, "disabled", false)
+		eventOptions.SaveOption(eventType, "soundFile", 5678901)
+		profiles.SelectProfile("InferredLegacy")
+
+		-- Then the profile keeps the explicit opt-in and its sound.
+		local settings = eventOptions.GetSettings(eventType)
+		assert(settings.disabled == false and settings.soundFile == 5678901)
+		profiles.SelectProfile("Default")
 	end
 
 	-- Given the loaded defaults for a buff ending on either client branch.

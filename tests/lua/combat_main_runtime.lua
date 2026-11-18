@@ -657,6 +657,100 @@ for _, forever in ipairs({ false, true }) do
 	events.OUTGOING_SPELL_DAMAGE.message = "Hit %a"
 	events.INCOMING_DAMAGE.message = "Taken %a"
 
+	do
+		-- Given separate opt-in rows alongside existing Skill Hits settings.
+		local savedHit = events.OUTGOING_SPELL_DAMAGE
+		local savedCrit = events.OUTGOING_SPELL_DAMAGE_CRIT
+		local savedMiss = events.OUTGOING_SPELL_MISS
+		local savedDodge = events.OUTGOING_SPELL_DODGE
+		events.OUTGOING_SPELL_DAMAGE = { message = "Skill %a" }
+		events.OUTGOING_SPELL_DAMAGE_CRIT = { message = "Skill crit %a" }
+		events.OUTGOING_SPELL_MISS = { message = "Skill miss" }
+		events.OUTGOING_SPELL_DODGE = { message = "Skill dodge" }
+		events.OUTGOING_BOW_DAMAGE = { message = "Bow %a", soundFile = "bow",
+			disabled = true }
+		events.OUTGOING_BOW_DAMAGE_CRIT = { message = "Bow crit %a",
+			soundFile = "bow crit", disabled = true }
+		events.OUTGOING_GUN_DAMAGE = { message = "Gun %a", soundFile = "gun" }
+		events.OUTGOING_GUN_MISS = { message = "Gun miss", soundFile = "gun miss" }
+		local inventory, itemAPI = GetInventoryItemID, C_Item
+		local weaponSubclass, itemReads
+		itemReads = 0
+		GetInventoryItemID = function(unit, slot)
+			assert(unit == "player" and slot == (INVSLOT_RANGED or 18))
+			itemReads = itemReads + 1
+			return 1234
+		end
+		C_Item = { GetItemInfoInstant = function(id)
+			assert(id == 1234)
+			return id, nil, nil, nil, nil, 2, weaponSubclass
+		end }
+		local engine = MikSBT.CombatEngine
+		local function Shot(subclass, event, crit, amount, swappedSubclass, missWord)
+			weaponSubclass = subclass
+			local result
+			if forever then
+				Dispatch("PLAYER_SWING", 2.6, Enum.PlayerSwingType.Ranged)
+				weaponSubclass = swappedSubclass or subclass
+				Advance(0.2)
+				result = assert(engine.mine:Hit(engine.TargetKey(), event, 1,
+					now, false, true, amount, crit, "shot"))
+			else
+				result = { who = "you", melee = true, hand = "ranged",
+					weaponFamily = "GUN" }
+			end
+			local before = #displayed
+			engine.liveRouter:Out({ result = result, event = event, crit = crit,
+				school = 1, amount = amount, missWord = missWord or "MISS" })
+			Advance(0.31)
+			assert(#displayed == before + 1, "ranged event did not display")
+			return displayed[#displayed]
+		end
+
+		-- When the bow rows are disabled, the saved skill settings still apply.
+		assert(Shot(2, "damage", false, 42)[2] == "Skill 42")
+		events.OUTGOING_BOW_DAMAGE.disabled = false
+		-- Then a shot uses its firing weapon, even after an equipment swap.
+		local bow = Shot(2, "damage", false, 42, 3)
+		assert(bow[2] == (forever and "Bow 42" or "Skill 42"),
+			"enabled bow route did not use the weapon that fired")
+		assert(bow[1].colorB == 1)
+		assert(bow[1].soundFile == (forever and "bow" or nil))
+		-- A disabled crit row still uses the existing crit settings.
+		assert(Shot(18, "damage", true, 42)[2] == "Skill crit 42")
+		events.OUTGOING_BOW_DAMAGE_CRIT.disabled = false
+		assert(Shot(18, "damage", true, 42)[2]
+			== (forever and "Bow crit 42" or "Skill crit 42"))
+		assert(Shot(3, "damage", false, 42)[2]
+			== (forever and "Gun 42" or "Skill 42"))
+		local miss = Shot(3, "miss", false)
+		assert(miss[2] == (forever and "Gun miss" or "Skill miss"))
+		assert(miss[1].soundFile == (forever and "gun miss" or nil))
+		assert(Shot(19, "damage", false, 42)[2] == "Skill 42",
+			"wand shot did not retain the skill route")
+		assert(Shot(nil, "damage", false, 42)[2] == "Skill 42",
+			"missing weapon metadata did not retain the skill route")
+		assert(Shot(3, "miss", false, nil, nil, "DODGE")[2] == "Skill dodge",
+			"a dodge selected the plain miss row")
+
+		-- Given a native-only damage amount, the same event settings apply.
+		local opaque, secretCheck = {}, issecretvalue
+		issecretvalue = function(value) return value == opaque end
+		local hidden = Shot(3, "damage", false, opaque)
+		issecretvalue = secretCheck
+		assert(hidden[4] == opaque and hidden[1].colorB == 1)
+		assert(hidden[1].soundFile == (forever and "gun" or nil))
+		if not forever then assert(itemReads == 0, "Retail read the ranged slot") end
+
+		GetInventoryItemID, C_Item = inventory, itemAPI
+		events.OUTGOING_SPELL_DAMAGE = savedHit
+		events.OUTGOING_SPELL_DAMAGE_CRIT = savedCrit
+		events.OUTGOING_SPELL_MISS = savedMiss
+		events.OUTGOING_SPELL_DODGE = savedDodge
+		events.OUTGOING_BOW_DAMAGE, events.OUTGOING_BOW_DAMAGE_CRIT = nil, nil
+		events.OUTGOING_GUN_DAMAGE, events.OUTGOING_GUN_MISS = nil, nil
+	end
+
 	-- Given incoming heals have their own styling and damage-school colours are on.
 	profile.damageColoringDisabled = false
 

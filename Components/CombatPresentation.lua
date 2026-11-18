@@ -450,6 +450,33 @@ local function EventKey(direction, record, result)
 	return prefix .. (spell and "SPELL_DAMAGE" or "DAMAGE")
 end
 
+local function RangedEventKey(profile, record, result, key)
+	local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+	local family = result.weaponFamily
+	if not (client and client.isForever) or result.who ~= "you"
+		or not result.melee or result.hand ~= "ranged"
+		or (family ~= "BOW" and family ~= "GUN") then
+		return key
+	end
+
+	local eventKey
+	if key == "OUTGOING_SPELL_DAMAGE" and record.event == "damage" then
+		eventKey = "OUTGOING_" .. family .. "_DAMAGE"
+	elseif key == "OUTGOING_SPELL_MISS" and record.event == "miss" then
+		eventKey = "OUTGOING_" .. family .. "_MISS"
+	else
+		return key
+	end
+
+	local settingsKey = eventKey
+	if record.event == "damage" and record.crit then
+		settingsKey = eventKey .. "_CRIT"
+	end
+	local settings = profile.events[settingsKey]
+	if settings and not settings.disabled then return eventKey end
+	return key
+end
+
 function Presentation:Out(record)
 	local result = record.result
 	if not result or (result.who ~= "you" and result.who ~= "pet") then return end
@@ -459,6 +486,9 @@ function Presentation:Out(record)
 		return
 	end
 	local key = EventKey("OUTGOING", record, result)
+	if result.weaponFamily then
+		key = RangedEventKey(self.config.getProfile(), record, result, key)
+	end
 	local spell = result.spell or result.procSpell
 	if result.melee then spell = result.hand == "ranged" and 5019 or 6603 end
 	local icon = record.icon or (spell and self.config.getSpellTexture(spell))

@@ -376,6 +376,30 @@ obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="Melee Hits", tooltip="Enable outgoing melee hits."}
 obj["OUTGOING_DAMAGE_CRIT"]					= { label="Melee Crits", tooltip="Enable outgoing melee crits."}
 obj["OUTGOING_MISS"]						= { label="Melee Misses", tooltip="Enable outgoing melee misses."}
+obj["OUTGOING_BOW_DAMAGE"] = {
+	label = "Bow/Crossbow Hits",
+	tooltip = "Enable to use separate settings for bow and crossbow Auto Shot hits.",
+}
+obj["OUTGOING_BOW_DAMAGE_CRIT"] = {
+	label = "Bow/Crossbow Crits",
+	tooltip = "Enable to use separate settings for bow and crossbow Auto Shot crits.",
+}
+obj["OUTGOING_BOW_MISS"] = {
+	label = "Bow/Crossbow Misses",
+	tooltip = "Enable to use separate settings for bow and crossbow Auto Shot misses.",
+}
+obj["OUTGOING_GUN_DAMAGE"] = {
+	label = "Gun Hits",
+	tooltip = "Enable to use separate settings for gun Auto Shot hits.",
+}
+obj["OUTGOING_GUN_DAMAGE_CRIT"] = {
+	label = "Gun Crits",
+	tooltip = "Enable to use separate settings for gun Auto Shot crits.",
+}
+obj["OUTGOING_GUN_MISS"] = {
+	label = "Gun Misses",
+	tooltip = "Enable to use separate settings for gun Auto Shot misses.",
+}
 obj["OUTGOING_DODGE"]						= { label="Melee Dodges", tooltip="Enable outgoing melee dodges."}
 obj["OUTGOING_PARRY"]						= { label="Melee Parries", tooltip="Enable outgoing melee parries."}
 obj["OUTGOING_BLOCK"]						= { label="Melee Blocks", tooltip="Enable outgoing melee blocks."}

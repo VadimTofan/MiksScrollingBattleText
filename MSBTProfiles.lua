@@ -2316,6 +2316,21 @@ for _, side in ipairs({ "msbt", "blizzard" }) do
 	end
 end
 
+if Client.isForever then
+	for _, family in ipairs({ "BOW", "GUN" }) do
+		local prefix = "OUTGOING_" .. family
+		masterProfile.events[prefix .. "_DAMAGE"] = {
+			disabled = true, message = "%a", scrollArea = "Outgoing",
+		}
+		masterProfile.events[prefix .. "_DAMAGE_CRIT"] = {
+			disabled = true, message = "%a", scrollArea = "Outgoing", isCrit = true,
+		}
+		masterProfile.events[prefix .. "_MISS"] = {
+			disabled = true, message = MISS .. "!", scrollArea = "Outgoing",
+		}
+	end
+end
+
 for eventType, settings in pairs(masterProfile.events) do
 	local categoryType = eventType:gsub("^PET_", "")
 	if categoryType:match("^OUTGOING_") then

@@ -1461,6 +1461,26 @@ local function OnCast(unit, spell, guid)
     if unit == "player" and ns.OnBuffCast then ns.OnBuffCast(spell) end
 end
 
+local RANGED_SLOT = INVSLOT_RANGED or 18
+-- Enum.ItemWeaponSubclass for bows, guns and crossbows.
+local RANGED_WEAPON_FAMILIES = { [2] = "BOW", [3] = "GUN", [18] = "BOW" }
+
+local function ReadRangedWeaponFamily()
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not (client and client.isForever)
+        or type(GetInventoryItemID) ~= "function"
+        or not C_Item or type(C_Item.GetItemInfoInstant) ~= "function" then
+        return
+    end
+    local read, itemID = pcall(GetInventoryItemID, "player", RANGED_SLOT)
+    if not read or not ns.Number(itemID, 1) then return end
+    local ok, _, _, _, _, _, classID, subclassID =
+        pcall(C_Item.GetItemInfoInstant, itemID)
+    if ok and ns.Number(classID) and classID == 2 and ns.Number(subclassID) then
+        return RANGED_WEAPON_FAMILIES[subclassID]
+    end
+end
+
 local SWING_HANDS
 local function OnSwing(swingType, swingDuration)
     if not SWING_HANDS then
@@ -1491,7 +1511,9 @@ local function OnSwing(swingType, swingDuration)
         key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
     if strike then return end
-    local claimed = ns.mine:Swing(hand, key, Now(), ns.Number(swingDuration) and swingDuration or nil)
+    local weaponFamily = hand == "ranged" and ReadRangedWeaponFamily() or nil
+    local duration = ns.Number(swingDuration) and swingDuration or nil
+    local claimed = ns.mine:Swing(hand, key, Now(), duration, weaponFamily)
     if not claimed then return end
     for _, entry in ipairs(reader.held) do
         if entry.held == claimed then
@@ -1739,7 +1761,6 @@ end
 -- learns it from your first shots (Mine.lua). Read again whenever the
 -- ranged slot changes (PLAYER_EQUIPMENT_CHANGED).
 local SCHOOL_WORDS = { holy = 2, fire = 4, nature = 8, frost = 16, shadow = 32, arcane = 64 }
-local RANGED_SLOT = INVSLOT_RANGED or 18
 function ns.ReadWandSchool()
     if not (C_TooltipInfo and C_TooltipInfo.GetInventoryItem) then return nil end
     local data = C_TooltipInfo.GetInventoryItem("player", RANGED_SLOT)
