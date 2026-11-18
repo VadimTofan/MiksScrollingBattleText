@@ -76,6 +76,7 @@ function Widget:GetText() return self.text end
 function Widget:SetChecked(value) self.checked = value end
 function Widget:GetChecked() return self.checked end
 function Widget:SetValue(value) self.value = value end
+function Widget:SetValueChangedHandler(handler) self.valueChangedHandler = handler end
 function Widget:Configure(_, label) self.label = label end
 function Widget:SetClickHandler(handler) self.clickHandler = handler end
 function Widget:Clear() self.items = {} end
@@ -132,6 +133,19 @@ local manaSound = assert(controls.lowManaSoundCheckbox,
 assert(healthSound.checked and manaSound.checked,
 	"resource sounds must remain enabled on existing profiles")
 
+-- Given an existing profile and the Sounds tab.
+local healthThreshold = assert(controls.lowHealthThresholdSlider)
+local manaThreshold = assert(controls.lowManaThresholdSlider)
+assert(healthThreshold.value == 35 and manaThreshold.value == 35)
+
+-- When the thresholds are changed independently and the tab reopens.
+healthThreshold.valueChangedHandler(healthThreshold, 60)
+manaThreshold.valueChangedHandler(manaThreshold, 20)
+sounds:Show()
+
+-- Then the sliders show the active profile's saved percentages.
+assert(healthThreshold.value == 60 and manaThreshold.value == 20)
+
 -- When each resource sound is independently unchecked and the tab reopens.
 healthSound.clickHandler(healthSound, false)
 assert(MikSBT.Profiles.currentProfile.lowHealthSoundDisabled)
@@ -155,6 +169,7 @@ MikSBT.Profiles.currentProfile = { events = {}, soundsDisabled = false }
 -- When Sounds is reopened and its toggle is changed.
 sounds:Show()
 assert(controls.enableSoundsCheckbox.checked == true)
+assert(healthThreshold.value == 35 and manaThreshold.value == 35)
 assert(healthSound.checked and manaSound.checked,
 	"resource sound toggles did not refresh after a profile change")
 controls.enableSoundsCheckbox.clickHandler(controls.enableSoundsCheckbox, false)
