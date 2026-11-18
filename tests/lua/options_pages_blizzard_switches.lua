@@ -7,7 +7,7 @@ local Footer = env.Footer
 -- The client's values, and the functions of the profiles module as they behave: a switch shows
 -- the client until it is set in the current profile (blizzardSwitches, 1 shown, 0 hidden). The
 -- record is opaque to the window: the marks and the client values, as copies.
-local client = { numbers = true, effectsOwn = false, effectsOthers = true }
+local client = { numbers = true, effectsOwn = false, effectsOthers = true, reputation = true, honor = false }
 local seen = {}
 local function Record(...) seen[#seen + 1] = { ... } end
 local function Marks() return Profiles.currentProfile.blizzardSwitches end
@@ -46,6 +46,8 @@ function Profiles.SetSpellMechanicsText(which, isShown)
 end
 L.CHECKBOXES.spellMechanicsOwn = { label = "Effects on targets", tooltip = "Effects tip" }
 L.CHECKBOXES.spellMechanicsOthers = { label = "Effects on other players' targets", tooltip = "Others tip" }
+L.CHECKBOXES.blizzardReputation = { label = "Reputation Changes", tooltip = "Reputation tip" }
+L.CHECKBOXES.blizzardHonor = { label = "Honorable Kills", tooltip = "Honor tip" }
 L.CHECKBOXES.disableOutgoing.blizzardTooltip = "The numbers over targets"
 
 -- The classic exports and media the pages are built on, as in the pages test.
@@ -70,6 +72,8 @@ end
 local function Numbers() return Checkboxes(L.CHECKBOXES.disableOutgoing.label)[2] end
 local function Own() return Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1] end
 local function Others() return Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)[1] end
+local function Reputation() return Checkboxes(L.CHECKBOXES.blizzardReputation.label)[1] end
+local function Honor() return Checkboxes(L.CHECKBOXES.blizzardHonor.label)[1] end
 local function Toggle(checkbox, isChecked)
 	checkbox.checkFrame:SetChecked(isChecked)
 	Click(checkbox.checkFrame)
@@ -102,6 +106,7 @@ local function Reset()
 	Window.Hide()
 	Profiles.currentProfile.blizzardSwitches = nil
 	client.numbers, client.effectsOwn, client.effectsOthers = true, false, true
+	client.reputation, client.honor = true, false
 	for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
 end
 
@@ -296,6 +301,84 @@ do
 	Toggle(Own(), true)
 	Cancel()
 	assert(Marks() == nil or Marks().effectsOwn == nil, "Cancel did not restore after a Show without OnShow")
+	Reset()
+end
+
+-- Rule: the reputation and honor switches show the client, save through the profiles module and are put back by Cancel.
+do
+	Open()
+	local reputation, honor = Reputation(), Honor()
+	assert(reputation and honor, "a switch is missing")
+	assert(reputation:GetChecked() == true and honor:GetChecked() == false, "the switches do not show the client")
+	assert(reputation.Enable == Others().Enable, "the switch is not skinned")
+
+	-- Then they stand in the Blizzard column, in the two rows below the effect switches.
+	assert(Own().points.TOPLEFT.y == -114 and Others().points.TOPLEFT.y == -138, "the effect switches moved")
+	assert(reputation.points.TOPLEFT.x == 345 and reputation.points.TOPLEFT.y == -162
+		and honor.points.TOPLEFT.x == 345 and honor.points.TOPLEFT.y == -186, "the rows are not below the effects")
+	-- And the first section grew by them, the second closed its rows up, the third gave the room back.
+	local function Section(top)
+		return Find(MSBTOptionsWindowFrame, function(region)
+			local point = region.points and region.points.TOPLEFT
+			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
+		end)
+	end
+	assert(Section(0) and Section(228) and Section(378), "the sections do not follow the new rows")
+	assert(Section(0).height == 218 and Section(228).height == 140 and Section(378).height == 78,
+		"the sections differ from the grown layout")
+	local lastRow = Checkboxes(L.CHECKBOXES.shortenNumbers.label)[1]
+	assert(lastRow.points.TOPLEFT.y == -12 - 4 * 24, "the second section kept its wide rows")
+	local note = Find(MSBTOptionsWindowFrame, function(frame)
+		for _, region in ipairs(frame.regions) do
+			if region.GetText and region:GetText() == L.LANGUAGE_INFO then return true end
+		end
+	end)
+	for _, region in ipairs(note.regions) do
+		if region.GetText and region:GetText() == L.LANGUAGE_INFO then
+			assert(region.points.TOPLEFT.y == -52, "the language note did not follow the third section")
+		end
+	end
+
+	-- When one is clicked, then the profiles module is asked with its name and the new state.
+	Toggle(honor, true)
+	assert(Sets()[1] and Sets()[1][2] == "honor" and Sets()[1][3] == true, "the click did not set the honor switch")
+	Toggle(reputation, false)
+	assert(Sets()[2] and Sets()[2][2] == "reputation" and Sets()[2][3] == false, "the click did not set the reputation switch")
+	assert(#calls == 0, "a click wrote to the profile")
+	assert(Apply().enabled, "a click on a switch did not enable Apply")
+
+	-- When the client has the opposite of what the clicks left and the profile has no mark, then the next
+	-- show has the client's values, however the page showed the switches before.
+	Profiles.currentProfile.blizzardSwitches = nil
+	client.reputation, client.honor = true, false
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(Reputation():GetChecked() == true and Honor():GetChecked() == false, "the page kept the values of its first show")
+
+	-- When the client changed again, then the next show has that too; a missing setting hides its switch.
+	client.reputation, client.honor = false, true
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(Reputation():GetChecked() == false and Honor():GetChecked() == true, "the switches did not take the client's values")
+	client.reputation = nil
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(not Reputation() and Honor().points.TOPLEFT.y == -162, "a missing setting kept its row")
+	client.reputation = true
+	client.effectsOwn = nil
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(not Own() and Reputation().points.TOPLEFT.y == -138 and Honor().points.TOPLEFT.y == -162,
+		"a missing effect switch left its row to the switches below")
+	Reset()
+
+	-- When the window opened, then Cancel gives the record back and the client has its values from then.
+	Open()
+	Toggle(Honor(), true)
+	Toggle(Reputation(), false)
+	Cancel()
+	assert(client.reputation == true and client.honor == false, "Cancel did not put the switches back")
+	assert(Marks() == nil or (Marks().reputation == nil and Marks().honor == nil), "Cancel left a mark")
 	Reset()
 end
 

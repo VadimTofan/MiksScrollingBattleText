@@ -26,11 +26,23 @@ local MECHANICS = {
 }
 local MECHANICS_TOP = 114
 local MECHANICS_STEP = 24
--- The first section grows by the rows below its sub-options; the page has no spare height, so the
--- third section gives the same back and moves the language note up.
-local MECHANICS_GROWTH = MECHANICS_TOP + (#MECHANICS - 1) * MECHANICS_STEP + 20 + 12 - 130
+-- The first section grows by the rows below its sub-options (130 high without them); the page has
+-- no spare height, so the third section gives the same back and moves the language note up.
+local function RowsGrowth(rows) return MECHANICS_TOP + (rows - 1) * MECHANICS_STEP + 20 + 12 - 130 end
 local LANGUAGE_NOTE_TOP = 96
 local LANGUAGE_NOTE_SHIFT = 30
+-- With the reputation and honor switches below the effect switches, the second section closes its
+-- rows up and the third gives the room back, so the language note moves up a little further.
+local CHARACTER_ROWS_HEIGHT = 140
+local CHARACTER_ROW_HEIGHT = 24
+local CHARACTER_NOTE_SHIFT = 44
+-- Switches for the game's reputation and honor text at the character, through the Blizzard switches
+-- of the profiles module: the name there and the locale key of each. They follow the effect switches
+-- in the Blizzard column.
+local CHARACTER_TEXTS = {
+	{ "reputation", "blizzardReputation" },
+	{ "honor", "blizzardHonor" },
+}
 -- The alert thresholds are sliders under the sound switches; the list below starts under them.
 local THRESHOLDS = { "lowHealthThreshold", "lowManaThreshold" }
 local THRESHOLD_DEFAULT = 35
@@ -62,6 +74,7 @@ local FONTS_COLORS = {
 local config = {}
 local generalSwitches = {}
 local mechanicsSwitches = {}
+local characterSwitches = {}
 local soundSwitches = {}
 local thresholdSliders = {}
 local fontsColorsButtons = {}
@@ -188,7 +201,7 @@ end
 
 
 -- The client's own values, read at every show; a switch whose value is nil is hidden and the
--- others move up.
+-- others move up. Returns the number of rows shown.
 local function PopulateMechanics()
 	local own, others = MSBTProfiles.GetSpellMechanicsText()
 	local values = { own = own, others = others }
@@ -201,6 +214,57 @@ local function PopulateMechanics()
 			checkbox:ClearAllPoints()
 			checkbox:SetPoint("TOPLEFT", checkbox:GetParent(), "TOPLEFT", COLUMN, -MECHANICS_TOP - row * MECHANICS_STEP)
 			checkbox:SetChecked(value)
+			checkbox:Show()
+			row = row + 1
+		end
+	end
+	return row
+end
+
+
+-- Only built when the profiles module has the Blizzard switches and the record that puts them back,
+-- the locale has both texts and the client has at least one of the two settings.
+local function HasCharacterSwitches()
+	local profiles = MSBTProfiles
+	if not (profiles.GetBlizzardSwitch and profiles.SetBlizzardSwitch
+		and profiles.TakeBlizzardSwitches and profiles.RestoreBlizzardSwitches) then return false end
+	for _, entry in ipairs(CHARACTER_TEXTS) do
+		if not L.CHECKBOXES[entry[2]] then return false end
+	end
+	return profiles.GetBlizzardSwitch(CHARACTER_TEXTS[1][1]) ~= nil
+		or profiles.GetBlizzardSwitch(CHARACTER_TEXTS[2][1]) ~= nil
+end
+
+
+local function OnClickCharacterSwitch(this, isChecked)
+	MSBTProfiles.SetBlizzardSwitch(this.switch, isChecked)
+	MSBTWindow.RefreshSwitches()
+end
+
+
+local function CreateCharacterSwitch(section, entry)
+	local locale = L.CHECKBOXES[entry[2]]
+	local checkbox = MSBTControls.CreateCheckbox(section)
+	checkbox:Configure(20, locale.label, locale.tooltip)
+	checkbox:SetClickHandler(OnClickCharacterSwitch)
+	checkbox.switch = entry[1]
+	MSBTWindow.SkinCheckbox(checkbox)
+	characterSwitches[#characterSwitches + 1] = checkbox
+end
+
+
+-- The client's own values, read at every show; a switch whose value is nil is hidden and the
+-- other one moves up. The rows start below the ones the effect switches show.
+local function PopulateCharacterSwitches(firstRow)
+	local row = firstRow
+	for _, checkbox in ipairs(characterSwitches) do
+		local isShown = MSBTProfiles.GetBlizzardSwitch(checkbox.switch)
+		if isShown == nil then
+			checkbox:Hide()
+		else
+			checkbox:ClearAllPoints()
+			checkbox:SetPoint("TOPLEFT", checkbox:GetParent(), "TOPLEFT", COLUMN, -MECHANICS_TOP - row * MECHANICS_STEP)
+			checkbox:SetChecked(isShown)
 			checkbox:Show()
 			row = row + 1
 		end
@@ -225,7 +289,8 @@ end
 local function RefreshGeneral()
 	msbtCheckbox:SetChecked(not MSBTProfiles.IsModDisabled())
 	PopulateSwitches(generalSwitches)
-	if #mechanicsSwitches > 0 then PopulateMechanics() end
+	local rows = #mechanicsSwitches > 0 and PopulateMechanics() or 0
+	if #characterSwitches > 0 then PopulateCharacterSwitches(rows) end
 	speedSlider:SetValue(MSBTProfiles.currentProfile.animationSpeed)
 	designDropdown:SetSelectedID(MSBTDesigns.GetSelected())
 	RefreshReloadButton()
@@ -264,7 +329,12 @@ end
 
 
 local function CreateGeneral(page)
-	local extra = HasMechanics() and MECHANICS_GROWTH or 0
+	local hasMechanics, hasCharacter = HasMechanics(), HasCharacterSwitches()
+	local rows = (hasMechanics and #MECHANICS or 0) + (hasCharacter and #CHARACTER_TEXTS or 0)
+	local extra = rows > 0 and RowsGrowth(rows) or 0
+	local isTight = rows > #MECHANICS
+	local rowHeight = isTight and CHARACTER_ROW_HEIGHT or ROW_HEIGHT
+	local middleHeight = isTight and CHARACTER_ROWS_HEIGHT or 150
 	local section = CreateSection(page, 0, 130 + extra)
 	local locale = L.CHECKBOXES["enableMSBT"]
 	msbtCheckbox = MSBTControls.CreateCheckbox(section)
@@ -279,11 +349,14 @@ local function CreateGeneral(page)
 	local blizzard = CreateSwitch(section, generalSwitches, "enableBlizzardDamage", "blizzardDamageEnabled", false, true)
 	blizzard:SetPoint("TOPLEFT", section, "TOPLEFT", COLUMN, -12)
 	CreateSubOptions(section, "blizzard", blizzard)
-	if extra > 0 then
+	if hasMechanics then
 		for _, entry in ipairs(MECHANICS) do CreateMechanicsSwitch(section, entry) end
 	end
+	if hasCharacter then
+		for _, entry in ipairs(CHARACTER_TEXTS) do CreateCharacterSwitch(section, entry) end
+	end
 
-	section = CreateSection(page, 140 + extra, 150)
+	section = CreateSection(page, 140 + extra, middleHeight)
 	local anchor
 	for index, switch in ipairs({
 		{ "enableNames", "hideSkills", true },
@@ -293,7 +366,7 @@ local function CreateGeneral(page)
 		{ "shortenNumbers", "shortenNumbers" },
 	}) do
 		anchor = CreateSwitch(section, generalSwitches, switch[1], switch[2], switch[3])
-		anchor:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -12 - (index - 1) * ROW_HEIGHT)
+		anchor:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -12 - (index - 1) * rowHeight)
 	end
 	locale = L.SLIDERS["animationSpeed"]
 	speedSlider = MSBTControls.CreateSlider(section)
@@ -306,7 +379,7 @@ local function CreateGeneral(page)
 	end)
 	MSBTWindow.SkinSlider(speedSlider)
 
-	section = CreateSection(page, 300 + extra, 156 - extra)
+	section = CreateSection(page, 150 + extra + middleHeight, 156 - extra + 150 - middleHeight)
 	locale = L.DROPDOWNS["optionsDesign"]
 	designDropdown = MSBTControls.CreateDropdown(section)
 	designDropdown:Configure(180, locale.label, locale.tooltip)
@@ -333,7 +406,8 @@ local function CreateGeneral(page)
 	fontString:SetWidth(320)
 
 	fontString = CreateText(section, "GameFontHighlightSmall", COLORS.text, L.LANGUAGE_INFO)
-	fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -(LANGUAGE_NOTE_TOP - (extra > 0 and LANGUAGE_NOTE_SHIFT or 0)))
+	local noteShift = isTight and CHARACTER_NOTE_SHIFT or (extra > 0 and LANGUAGE_NOTE_SHIFT or 0)
+	fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -(LANGUAGE_NOTE_TOP - noteShift))
 	fontString:SetPoint("RIGHT", section, "RIGHT", -12, 0)
 end
 

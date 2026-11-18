@@ -45,6 +45,76 @@ class OptionsPagesSpellMechanicsTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
+    def test_reputation_and_honor_switches_without_the_get_function(self):
+        # Given
+        script_name = "options_pages_text_switches_get.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_reputation_and_honor_switches_without_the_set_function(self):
+        # Given
+        script_name = "options_pages_text_switches_set.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_reputation_and_honor_switches_without_the_take_function(self):
+        # Given
+        script_name = "options_pages_text_switches_take.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_reputation_and_honor_switches_without_the_restore_function(self):
+        # Given
+        script_name = "options_pages_text_switches_restore.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_reputation_and_honor_switches_without_the_texts(self):
+        # Given
+        script_name = "options_pages_text_switches_texts.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_reputation_and_honor_switches_when_the_client_has_neither_setting(self):
+        # Given
+        script_name = "options_pages_text_switches_client.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_reputation_and_honor_switches_beside_missing_effect_switches(self):
+        # Given
+        script_name = "options_pages_text_switches_only.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
