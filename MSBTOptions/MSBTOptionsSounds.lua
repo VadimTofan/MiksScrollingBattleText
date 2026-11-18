@@ -6,6 +6,7 @@ local Popups = MSBTOptions.Popups
 local Media = MikSBT.Media
 local SoundAPI = MikSBT.API.Sounds
 local L = MikSBT.translations
+local thresholdOptions = { "lowHealthThreshold", "lowManaThreshold" }
 
 function module.ShowTab(frame)
 	if not frame.created then
@@ -40,10 +41,28 @@ function module.ShowTab(frame)
 			controls[resource.control] = checkbox
 		end
 
+		local anchor = checkbox
+		for index, option in ipairs(thresholdOptions) do
+			local slider = Controls.CreateSlider(frame)
+			locale = L.SLIDERS[option]
+			slider:Configure(180, locale.label, locale.tooltip)
+			slider:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0,
+				index == 1 and -24 or -20)
+			slider:SetMinMaxValues(1, 99)
+			slider:SetValueStep(1)
+			slider:SetValueChangedHandler(function(_, value)
+				if not frame.refreshingThresholds then
+					MikSBT.Profiles.SetOption(nil, option, math.floor(value + 0.5))
+				end
+			end)
+			controls[option .. "Slider"] = slider
+			anchor = slider
+		end
+
 		local button = Controls.CreateOptionButton(frame)
 		locale = L.BUTTONS.addCustomSound
 		button:Configure(20, locale.label, locale.tooltip)
-		button:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", -15, -20)
+		button:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", -15, -20)
 		button:SetClickHandler(function(this)
 			Popups.DisableControls(controls)
 			module.ShowAddSound(frame, this, function()
@@ -61,6 +80,15 @@ function module.ShowTab(frame)
 	controls.enableSoundsCheckbox:SetChecked(not profile.soundsDisabled)
 	controls.lowHealthSoundCheckbox:SetChecked(not profile.lowHealthSoundDisabled)
 	controls.lowManaSoundCheckbox:SetChecked(not profile.lowManaSoundDisabled)
+	frame.refreshingThresholds = true
+	for _, option in ipairs(thresholdOptions) do
+		local value = profile[option]
+		if type(value) ~= "number" or not (value >= 1 and value <= 99) then
+			value = 35
+		end
+		controls[option .. "Slider"]:SetValue(value)
+	end
+	frame.refreshingThresholds = false
 end
 
 -- Own sounds removed this session: the shared media library keeps them until a reload,

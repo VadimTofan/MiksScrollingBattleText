@@ -2307,6 +2307,8 @@ masterProfile.scrollAreas.OutgoingPet = CreatePetScrollArea(
 
 masterProfile.lowHealthSoundDisabled = false
 masterProfile.lowManaSoundDisabled = false
+masterProfile.lowHealthThreshold = 35
+masterProfile.lowManaThreshold = 35
 
 for _, side in ipairs({ "msbt", "blizzard" }) do
 	for _, category in ipairs({ "Outgoing", "Notifications", "Incoming" }) do

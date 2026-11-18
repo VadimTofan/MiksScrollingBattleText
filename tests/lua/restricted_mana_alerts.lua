@@ -124,10 +124,22 @@ C_StringUtil.TruncateWhenZero = format
 frame.onEvent(frame, resourceEvent, "player")
 assert(warnings == 3, "failed probe prevented later recovery")
 
+-- Given a profile that raises the threshold after the default curve was used.
+MikSBT.Profiles.currentProfile = {
+	[isHealth and "lowHealthThreshold" or "lowManaThreshold"] = 60,
+}
+mana = Secret(0.8)
+frame.onEvent(frame, resourceEvent, "player")
+-- When the resource falls to 50%.
+mana = Secret(0.5)
+frame.onEvent(frame, resourceEvent, "player")
+-- Then the updated native curve emits an alert.
+assert(warnings == 4, "restricted alert ignored the profile threshold")
+
 -- Given a disabled runtime.
 MikSBT.Triggers.Disable()
 -- When a queued callback arrives.
 frame.onEvent(frame, resourceEvent, "player")
 -- Then no additional warning is emitted.
-assert(warnings == 3 and next(frame.events) == nil)
+assert(warnings == 4 and next(frame.events) == nil)
 print("Restricted mana alert tests passed")

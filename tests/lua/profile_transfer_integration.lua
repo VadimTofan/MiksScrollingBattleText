@@ -275,6 +275,8 @@ for _, classic in ipairs({ false, true }) do
 	profiles.SetOption("events.INCOMING_DAMAGE", "soundFile", 5678901)
 	profiles.SetOption(nil, "lowHealthSoundDisabled", true)
 	profiles.SetOption(nil, "lowManaSoundDisabled", false)
+	profiles.SetOption(nil, "lowHealthThreshold", 60)
+	profiles.SetOption(nil, "lowManaThreshold", 20)
 	local exported, errorCode = profiles.ExportProfile("Default")
 
 	-- Then both complete client schemas can be exported.
@@ -352,6 +354,8 @@ assert(profiles.currentProfile.events.PET_OUTGOING_DAMAGE.scrollArea == "Outgoin
 assert(profiles.currentProfile.events.INCOMING_DAMAGE.soundFile == 5678901)
 assert(profiles.currentProfile.lowHealthSoundDisabled == true)
 assert(profiles.currentProfile.lowManaSoundDisabled == false)
+assert(profiles.currentProfile.lowHealthThreshold == 60)
+assert(profiles.currentProfile.lowManaThreshold == 20)
 assert(profiles.currentProfile.inferredWindfuryIcons == nil,
 	"profile transfer restored a retired preference")
 assert(profiles.currentProfile.partialColoringDisabled)

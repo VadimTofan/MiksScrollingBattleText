@@ -723,6 +723,8 @@ for _, forever in ipairs({ false, true }) do
 		for _, crit in ipairs({ false, true }) do
 			for _, case in ipairs({
 				{ result = { who = "you", melee = true }, blue = 1 },
+				{ result = { who = "you", melee = true, hand = "ranged" },
+					blue = 1 },
 				{ result = { who = "you", spell = 123 }, blue = 0 },
 				{ result = { who = "pet", melee = true }, blue = 1 },
 				{ result = { who = "pet", spell = 123 }, blue = 0 },
@@ -755,6 +757,22 @@ for _, forever in ipairs({ false, true }) do
 		profile.stackSimilarHits = false
 		events.OUTGOING_DAMAGE = savedMelee
 
+		-- Given a ranged auto attack without a readable school.
+		-- When its damage reaches the real batcher.
+		Out(42, nil, { who = "you", melee = true, hand = "ranged" })
+		Advance(0.31)
+		-- Then it retains the white auto-attack color.
+		assert(displayed[#displayed][1].colorB == 1,
+			"auto shot without a school became yellow")
+
+		-- Given an elemental wand attack with a readable Frost school.
+		-- When its damage reaches the real batcher.
+		Out(42, 16, { who = "you", melee = true, hand = "ranged" })
+		Advance(0.31)
+		-- Then its school color remains present.
+		assert(displayed[#displayed][2]:find("|cFF0000ff42|r", 1, true),
+			"wand damage lost its school color")
+
 		-- Given a damage amount or school which Lua must not inspect.
 		local opaque = {}
 		local secretCheck, largeNumbers = issecretvalue, BreakUpLargeNumbers
@@ -763,6 +781,8 @@ for _, forever in ipairs({ false, true }) do
 		-- Given hidden swing and physical ability amounts.
 		for _, case in ipairs({
 			{ result = { who = "you", melee = true }, blue = 1 },
+			{ result = { who = "you", melee = true, hand = "ranged" },
+				blue = 1 },
 			{ result = { who = "you", spell = 123 }, blue = 0 },
 		}) do
 			-- When each critical hit reaches native rendering.

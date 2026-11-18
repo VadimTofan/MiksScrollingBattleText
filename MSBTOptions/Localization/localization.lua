@@ -234,6 +234,14 @@ obj["itemName"]			= { label="Item name:", tooltip="The name of the item to add."
 
 
 obj = L.SLIDERS
+obj.lowHealthThreshold = {
+	label = "Low Health Threshold (%)",
+	tooltip = "Show the low health alert when health drops below this percentage.",
+}
+obj.lowManaThreshold = {
+	label = "Low Mana Threshold (%)",
+	tooltip = "Show the low mana alert when mana drops below this percentage.",
+}
 obj["animationSpeed"]		= { label="Animation Speed", tooltip="Sets the master animation speed.\n\nEach scroll area may also be configured to have its own independent speed."}
 obj["normalFontSize"]		= { label="Normal Size", tooltip="Sets the font size for non-crits."}
 obj["normalFontOpacity"]	= { label="Normal Opacity", tooltip="Sets the font opacity for non-crits."}

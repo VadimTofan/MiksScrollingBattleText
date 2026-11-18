@@ -209,4 +209,28 @@ MikSBT.Triggers.Enable()
 assert(#displayed == 8 and #played == 6)
 MikSBT.Triggers.Disable()
 
+-- Given readable resources at 50% and independent profile thresholds.
+profile.lowHealthThreshold = 60
+profile.lowManaThreshold = 20
+health, mana = 0.5, 0.5
+UnitHealthPercent = function() return health end
+UnitPowerPercent = function() return mana end
+MikSBT.Triggers.Enable()
+local frame = frames[#frames]
+
+-- When the initial values are evaluated, then only health warns.
+frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD")
+assert(#displayed == 9 and displayed[9] == "Low Health!")
+
+-- When mana reaches its threshold and then drops below it.
+mana = 0.2
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+assert(#displayed == 9, "mana warned at the threshold")
+mana = 0.19
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then the lower mana threshold produces its own alert.
+assert(#displayed == 10 and displayed[10] == "Low Mana!")
+MikSBT.Triggers.Disable()
+
 print("Low resource alert tests passed")
