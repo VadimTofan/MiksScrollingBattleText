@@ -2459,8 +2459,8 @@ local function SetupBlizzardOptions()
 			if isSubcategory then
 				registered = Settings.RegisterCanvasLayoutSubcategory(category, panel, panel.name)
 			else
+				-- The category keeps the number the game gives it: the function that opens the settings takes a number.
 				registered = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-				registered.ID = panel.name
 				Settings.RegisterAddOnCategory(registered)
 				category = registered
 			end
