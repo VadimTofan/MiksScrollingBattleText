@@ -144,30 +144,19 @@ local deTick = ns.MatchHealing("player", 51, true, true)
 assert(deTick and deTick.spell == 774,
 	"German localized Rejuvenation was rejected! Expected 774, got: " .. tostring(deTick and deTick.spell))
 
--- Scenario 7: Multiple concurrent active HoTs interleave
+-- Given two active HoTs on the same recipient.
 ns.ResetHealing()
-selectedUnit = "player"
 descriptions[774] = "Heals the target for 189 over 12 sec."
-
--- Cast Rejuvenation at t = 60
 ns.NoteHealTarget("player", "Druid", "multi-rejuv", 774, 60)
 ns.NoteHealCast("player", 774, "player", 60, "multi-rejuv")
-
--- Tick 1 at t = 63 belongs to Rejuvenation
-local multi1 = ns.MatchHealing("player", 63, true, true)
-assert(multi1 and multi1.spell == 774, "multi-hot tick 1 failed")
-
--- Cast Regrowth at t = 62 on the same player
 ns.NoteHealTarget("player", "Druid", "multi-regrowth", 8936, 62)
 ns.NoteHealCast("player", 8936, "player", 62, "multi-regrowth")
 
--- Tick 2 at t = 65 (Regrowth is younger and Rejuv ticked at 63, so Regrowth claims it)
-local multi2 = ns.MatchHealing("player", 65, true, true)
-assert(multi2 and multi2.spell == 8936, "multi-hot tick 2 failed, expected Regrowth got: " .. tostring(multi2 and multi2.spell))
+-- When a tick could belong to either spell.
+local overlap = ns.MatchHealing("player", 65, true, true)
 
--- Tick 3 at t = 66 (Regrowth just ticked at 65 so rate-limited; Rejuv last ticked at 63, claims it)
-local multi3 = ns.MatchHealing("player", 66, true, true)
-assert(multi3 and multi3.spell == 774, "multi-hot tick 3 failed, expected Rejuv got: " .. tostring(multi3 and multi3.spell))
+-- Then cast age alone cannot identify the spell.
+assert(overlap == nil, "overlapping HoTs were assigned by cast age")
 
 -- Scenario 8: Spanish localized Rejuvenation description ("s." abbreviation)
 ns.ResetHealing()
@@ -208,4 +197,18 @@ local deTick2 = ns.MatchHealing("player", 77, true, true)
 assert(deTick2 and deTick2.spell == 774,
 	"German Thorns (Dornen) hijacked Rejuvenation! Expected 774, got: " .. tostring(deTick2 and deTick2.spell))
 
-print("All HoT attribution tests passed successfully!")
+-- Given one eligible HoT and two closely spaced confirmed ticks.
+ns.ResetHealing()
+descriptions[774] = "Heals the target for 189 over 12 sec."
+ns.NoteHealTarget("player", "Druid", "rapid", 774, 90)
+ns.NoteHealCast("player", 774, "player", 90, "rapid")
+
+-- When a second tick arrives after 1.5 seconds.
+local first = ns.MatchHealing("player", 93, true, true)
+local second = ns.MatchHealing("player", 94.5, true, true)
+
+-- Then both ticks keep the spell identity.
+assert(first and first.spell == 774)
+assert(second and second.spell == 774, "rapid confirmed tick lost its spell")
+
+print("HoT attribution tests passed")

@@ -95,13 +95,21 @@ local NON_HEALING_PATTERNS = {
 	"absorbiert %d+.*schaden",
 }
 
+-- Lua 5.1 lowercases bytes using the host locale. Fold ASCII only so
+-- accented UTF-8 bytes still match the localized patterns.
+local function LowerASCII(text)
+	return (text:gsub("[A-Z]", function(letter)
+		return string.char(letter:byte() + 32)
+	end))
+end
+
 -- Checks if a spell description speaks of healing, with safe fallback for unidentifiable text.
 local function Heals(spell)
 	if TargetlessHealRecipient("player", spell) then return true end
 	if not (C_Spell and C_Spell.GetSpellDescription) then return true end
 	local ok, text = pcall(C_Spell.GetSpellDescription, spell)
 	if not ok or not ns.Text(text) then return true end
-	local lower = text:lower()
+	local lower = LowerASCII(text)
 
 	-- Strip passive stat phrases before checking for healing terms
 	local clean = lower
@@ -128,7 +136,7 @@ local function ParseDuration(spell)
 	if not (C_Spell and C_Spell.GetSpellDescription) then return nil end
 	local ok, text = pcall(C_Spell.GetSpellDescription, spell)
 	if not ok or not ns.Text(text) then return nil end
-	local lower = text:lower()
+	local lower = LowerASCII(text)
 	for _, pattern in ipairs(DURATION_PATTERNS) do
 		local secs = lower:match(pattern)
 		if secs then return tonumber(secs) end
@@ -212,15 +220,15 @@ function ns.MatchHealing(key, now, tick, confirmed)
 	for _, cast in ipairs(casts) do
 		local since = now - cast.at
 		local maxWindow = tick and (cast.duration and (cast.duration + 2) or HOT_WINDOW) or DIRECT_WINDOW
-		-- Enforce a minimum interval between ticks claimed by the same spell
-		local rateLimited = tick and cast.lastTick and (now - cast.lastTick < 1.8)
 		-- A confirmed direct heal cannot claim ticks unless it has a HoT duration
 		local directExhausted = tick and cast.directUsed and not cast.duration
 		if cast.key == key and since >= 0
 			and since <= maxWindow
-			and not rateLimited
 			and not directExhausted
 			and (tick or not cast.used) then
+			if tick and best and (best.spell ~= cast.spell or best.who ~= cast.who) then
+				return nil
+			end
 			if not age or since < age then
 				best, age, ambiguous = cast, since, false
 			elseif since == age and cast.spell ~= best.spell then
@@ -230,10 +238,7 @@ function ns.MatchHealing(key, now, tick, confirmed)
 	end
 	if not best or ambiguous then return nil end
 	best.used = true
-	if tick then
-		best.ticked = true
-		best.lastTick = now
-	elseif confirmed then
+	if not tick and confirmed then
 		best.directUsed = true
 	end
 	return { who = best.who, spell = best.spell, tick = tick }
