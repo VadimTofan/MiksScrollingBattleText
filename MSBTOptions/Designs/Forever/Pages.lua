@@ -5,6 +5,8 @@ local MSBTControls = MSBTOptions.Controls
 local MSBTPopups = MSBTOptions.Popups
 local MSBTSounds = MSBTOptions.Sounds
 local MSBTGeneral = MSBTOptions.Tabs.general
+-- The developer share of the classic tabs, where they have one.
+local MSBTDeveloper = MSBTOptions.Tabs.developer
 local MSBTProfiles = MikSBT.Profiles
 local L = MikSBT.translations
 
@@ -53,6 +55,9 @@ local THRESHOLD_TOP = 112
 local THRESHOLD_STEP = 50
 local SLIDER_HEIGHT = 30
 local SOUNDS_SECTION_HEIGHT = THRESHOLD_TOP + (#THRESHOLDS - 1) * THRESHOLD_STEP + SLIDER_HEIGHT + 12
+-- The developer page lists the generated tables below the section's title, a line for each text.
+local DEVELOPER_LIST_TOP = 40
+local DEVELOPER_LINE_HEIGHT = 18
 
 -- Field part and text of the sub-options under each enable switch, as on the classic General tab.
 local SUB_OPTIONS = {
@@ -416,6 +421,49 @@ end
 
 
 
+-- The developer page: the client's build with the button for the debug window, and the generated
+-- tables. A table whose source differs from the client stands out and names its script below.
+-- The tables do not change while the game runs, so the page is written once.
+local function CreateDeveloper(page)
+	local locale = L.DEVELOPER
+	local section = CreateSection(page, 0, 50)
+	local fontString = CreateText(section, "GameFontHighlight", COLORS.text,
+		locale.client:format(MSBTDeveloper.GetBuild()))
+	fontString:SetPoint("LEFT", section, "LEFT", 12, 0)
+	local button = CreateButton(section, locale.debugWindow, locale.debugWindowTooltip, MSBTDeveloper.ToggleDebugWindow)
+	button:SetPoint("RIGHT", section, "RIGHT", -12, 0)
+
+	local tables = MSBTDeveloper.GetTables()
+	local height = DEVELOPER_LIST_TOP + 12
+	for _, entry in ipairs(tables) do
+		height = height + (entry.state == "fits" and 1 or 2) * DEVELOPER_LINE_HEIGHT + 6
+	end
+	if #tables == 0 then height = height + DEVELOPER_LINE_HEIGHT end
+	section = CreateSection(page, 60, height)
+	fontString = CreateText(section, "GameFontNormal", COLORS.gold, locale.tables)
+	fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -12)
+	local top = DEVELOPER_LIST_TOP
+	for _, entry in ipairs(tables) do
+		local fits = entry.state == "fits"
+		fontString = CreateText(section, "GameFontHighlight", fits and COLORS.text or COLORS.gold,
+			entry.name .. ": " .. entry.build .. ", " .. locale[entry.state])
+		fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -top)
+		top = top + DEVELOPER_LINE_HEIGHT
+		if not fits then
+			fontString = CreateText(section, "GameFontHighlightSmall", COLORS.hint, locale.regenerate:format(entry.script))
+			fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 26, -top)
+			top = top + DEVELOPER_LINE_HEIGHT
+		end
+		top = top + 6
+	end
+	if #tables == 0 then
+		fontString = CreateText(section, "GameFontHighlightSmall", COLORS.hint, locale.noTables)
+		fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -top)
+	end
+end
+
+
+
 local function EnableFontsColors()
 	for _, button in ipairs(fontsColorsButtons) do button:Enable() end
 end
@@ -694,3 +742,7 @@ MSBTWindow.RegisterPage("general", CreateGeneral, RefreshGeneral)
 MSBTWindow.RegisterPage("fontsColors", CreateFontsColors)
 MSBTWindow.RegisterPage("sounds", CreateSounds, RefreshSounds)
 MSBTWindow.RegisterPage("profile", CreateProfile, RefreshProfile)
+-- The developer page needs that share, and is offered when the share says so.
+if MSBTDeveloper then
+	MSBTWindow.RegisterPage("developer", CreateDeveloper, nil, nil, MSBTDeveloper.IsOffered)
+end

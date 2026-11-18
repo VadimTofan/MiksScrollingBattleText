@@ -100,6 +100,8 @@ obj.noSounds = "No custom sounds yet."
 obj.remove = "Remove"
 obj.removeTooltip = "Remove this sound from your saved sounds. Until the next reload it can still be chosen and played, here and in other addons, and adding it again replaces it in MSBT."
 obj.resetProfile = "Reset Profile"
+obj.developer = "Developer"
+obj.developerHint = "The client's build, the generated tables and the debug window."
 
 L.CUSTOM_FONTS = {
 	add = "Add custom font",

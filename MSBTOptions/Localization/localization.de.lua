@@ -89,6 +89,8 @@ obj.noSounds = "Noch keine eigenen Sounds."
 obj.remove = "Entfernen"
 obj.removeTooltip = "Entfernt diesen Sound aus deinen gespeicherten Sounds. Bis zum nächsten Neuladen bleibt er wählbar und abspielbar, hier und in anderen Addons; erneutes Hinzufügen ersetzt ihn in MSBT."
 obj.resetProfile = "Profil zurücksetzen"
+obj.developer = "Entwickler"
+obj.developerHint = "Der Build des Clients, die erzeugten Tabellen und das Debug-Fenster."
 
 
 

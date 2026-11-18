@@ -103,6 +103,7 @@ local ENTRIES = {
 	{ key = "sounds", tab = "sounds" },
 	{ key = "profile", tab = "profile" },
 	{ key = "changes" },
+	{ key = "developer" },
 }
 
 
@@ -979,6 +980,15 @@ local function OnSearchChanged(this)
 end
 
 
+-- An entry needs a registered page, or the classic tab that lends it label and hint. A page may
+-- say when it is offered; that is asked when the sidebar or the game's settings list is built.
+local function IsOffered(entry)
+	local page = pages[entry.key]
+	if page and page.isOffered then return page.isOffered() end
+	return entry.tab ~= nil or page ~= nil
+end
+
+
 -- The label of an entry, also where no sidebar is built.
 local function EntryLabel(entry)
 	local tabLocale = entry.tab and L.TABS[entry.tab]
@@ -1052,8 +1062,7 @@ local function CreateSidebar()
 				SetTextColor(fontString, COLORS.hint)
 				offset = offset + GROUP_HEIGHT
 			end
-		-- An entry needs a registered page, or the classic tab that lends it label and hint.
-		elseif entry.tab or pages[entry.key] then
+		elseif IsOffered(entry) then
 			CreateEntry(sidebar, entry):SetPoint("TOPLEFT", sidebar, "TOPLEFT", 8, -offset)
 			offset = offset + ENTRY_HEIGHT
 		end
@@ -1430,8 +1439,8 @@ end
 
 
 
-local function RegisterPage(key, create, refresh, arg)
-	pages[key] = { create = create, refresh = refresh, arg = arg }
+local function RegisterPage(key, create, refresh, arg, isOffered)
+	pages[key] = { create = create, refresh = refresh, arg = arg, isOffered = isOffered }
 end
 
 
@@ -1504,7 +1513,7 @@ end
 local function DockPages()
 	local list = {}
 	for _, entry in ipairs(ENTRIES) do
-		if entry.key and (entry.tab or pages[entry.key]) then
+		if entry.key and IsOffered(entry) then
 			list[#list + 1] = { key = entry.key, label = EntryLabel(entry) }
 		end
 	end
