@@ -1619,11 +1619,13 @@ local function EventsTab_OnShow()
 
 	local areaNames = {}
 	for key, settings in pairs(MSBTAnimations.scrollAreas or {}) do
-		areaNames[key] = settings.name
+		if not ScrollAreasTab_IsBuiltIn(key) then
+			areaNames[key] = settings.name
+		end
 	end
 	for _, key in ipairs(SortKeysByValue(areaNames)) do
 		local category = SCROLL_AREA_CATEGORY_PREFIX .. key
-		dropdown:AddItem(L.EVENT_SCROLL_AREA_LABEL:format(areaNames[key]), category)
+		dropdown:AddItem(areaNames[key], category)
 	end
 
 	local areaKey = EventsTab_ScrollArea(selected)
