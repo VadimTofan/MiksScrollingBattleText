@@ -8,7 +8,7 @@ end
 local Log = dofile("Components/CombatLogFilter.lua")
 local Engine = dofile("Components/CombatEngine.lua")
 local ns = MikSBT.CombatEngine
-local now, timers, records = 0, {}, {}
+local now, timers, records, alerts = 0, {}, {}, {}
 local target, focus, mouseover, names, visible, pet = nil, nil, nil, {}, {}, false
 local opaque = setmetatable({}, { __mode = "k" })
 local function Amount()
@@ -40,7 +40,12 @@ UnitIsUnit = function(a, b)
     a, b = Unit(a), Unit(b)
     return a ~= nil and b ~= nil and a == b
 end
-UnitName = function(unit) return names[Unit(unit)] end
+-- A unit's name is a text, or a table of the two names the client gives for it.
+UnitName = function(unit)
+    local name = names[Unit(unit)]
+    if type(name) == "table" then return name[1], name[2] end
+    return name
+end
 UnitGUID = function(unit) return unit == "player" and "Player-Test" end
 UnitIsPlayer = function(unit) return unit == "player" end
 UnitIsDead = function() return false end
@@ -75,7 +80,8 @@ local engine = Engine:New({ log = log,
     getSaved = function() return nil end, setSaved = function() end,
     notify = function() end, presentation = {
         Out = function(_, record) records[#records + 1] = record end,
-        In = function() end, Alert = function() end, Aura = function() end,
+        In = function() end, Alert = function(_, record) alerts[#alerts + 1] = record end,
+        Aura = function() end,
         Healer = function() end, Resource = function() end,
         ComboPoints = function() end,
     } })
@@ -96,14 +102,14 @@ local function At(time)
 end
 local function Line(kind)
     local event = ({ swing = "SWING_DAMAGE", spell = "SPELL_DAMAGE",
-        tick = "SPELL_PERIODIC_DAMAGE" })[kind]
+        tick = "SPELL_PERIODIC_DAMAGE", interrupt = "SPELL_INTERRUPT" })[kind]
     local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[event]
     Event("COMBAT_LOG_MESSAGE", "opaque native text", rgb.r, rgb.g, rgb.b,
         Enum.CombatLogMessageOrder.Newest)
 end
 local function Start()
     if engine.active then engine:Stop() end
-    now, timers, records = now + 10, {}, {}
+    now, timers, records, alerts = now + 10, {}, {}, {}
     target, focus, mouseover, pet = "nameplate1", nil, nil, false
     visible = { nameplate1 = true, nameplate2 = true }
     names = { nameplate1 = "Creature A", nameplate2 = "Creature B" }
@@ -296,6 +302,144 @@ Replay("same-name unplated focus keeps the recipient ambiguous", function()
     local cast = ns.mine.casts[172][1]
     assert(cast.targetUncertain and cast.key == nil,
         "same-name unplated focus trusted the selected creature")
+end)
+
+-- Forever gives a player a surname: UnitName's second value there, joined to the name by the
+-- client's separator in what the game sends. Elsewhere the second value is a realm.
+local function WithSurnames(callback)
+    local client = MikSBT.Compatibility.Client
+    local constants, forever = Constants, client.isForever
+    Constants = { CharacterNameSeparatorConsts = { CHARACTERNAME_SURNAME_SEPARATOR = " " } }
+    local ok, failure = pcall(callback)
+    Constants, client.isForever = constants, forever
+    assert(ok, failure)
+end
+
+Replay("a cast sent at a player's name and surname finds the player", function()
+    WithSurnames(function()
+        -- Given a selected player the client names with a surname.
+        local start = Start()
+        names.nameplate1 = { "Anna", "Berg" }
+        local key = ns.TargetKey()
+
+        -- When a cast is sent at the two names as the game joins them.
+        Event("UNIT_SPELLCAST_SENT", "player", "Anna Berg", "cast-surname", 172)
+        At(start + 0.1)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-surname", 172)
+
+        -- Then the cast belongs to that player.
+        local cast = ns.mine.casts[172][1]
+        assert(cast.key == key and not cast.targetUncertain,
+            "a name with its surname did not find the player")
+    end)
+end)
+
+Replay("an interrupt whose interrupter is readable names the enemy with its surname", function()
+    WithSurnames(function()
+        -- Given a selected player with a surname and a cast of yours.
+        local start = Start()
+        names.nameplate1 = { "Anna", "Berg" }
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-kick", 172)
+
+        -- When that player's cast is interrupted by you.
+        At(start + 0.1)
+        Event("UNIT_SPELLCAST_INTERRUPTED", "target", "cast-enemy", 999, "Player-Test")
+
+        -- Then the alert names the player as the game writes the name.
+        assert(#alerts == 1 and alerts[1].kind == "interrupt" and alerts[1].sub == "Anna Berg",
+            "the interrupt named " .. tostring(alerts[1] and alerts[1].sub))
+    end)
+end)
+
+Replay("an interrupt settled by its combat log line names the enemy with its surname", function()
+    WithSurnames(function()
+        -- Given a selected player with a surname, and an interrupter the client hides.
+        local start = Start()
+        names.nameplate1 = { "Anna", "Berg" }
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-kick", 172)
+        At(start + 0.1)
+        Event("UNIT_SPELLCAST_INTERRUPTED", "target", "cast-enemy", 999, nil)
+        assert(#alerts == 0, "the interrupt did not wait for its line")
+
+        -- When your combat log line of the interrupt comes.
+        Line("interrupt")
+        At(start + 1)
+
+        -- Then the alert carries the name held for that line, with the surname.
+        assert(#alerts == 1 and alerts[1].kind == "interrupt" and alerts[1].sub == "Anna Berg",
+            "the held interrupt named " .. tostring(alerts[1] and alerts[1].sub))
+    end)
+end)
+
+Replay("elsewhere the second name is a realm and is not written after the name", function()
+    WithSurnames(function()
+        -- Given another client, where UnitName gives the realm, and a selected player from one.
+        MikSBT.Compatibility.Client.isForever = false
+        local start = Start()
+        names.nameplate1 = { "Anna", "Realm" }
+        local key = ns.TargetKey()
+
+        -- When a cast is sent at name and realm, and you interrupt that player.
+        Event("UNIT_SPELLCAST_SENT", "player", "Anna-Realm", "cast-realm", 172)
+        At(start + 0.1)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-realm", 172)
+        Event("UNIT_SPELLCAST_INTERRUPTED", "target", "cast-enemy", 999, "Player-Test")
+
+        -- Then the cast finds the player as before, and the alert shows the name alone.
+        local cast = ns.mine.casts[172][1]
+        assert(cast.key == key and not cast.targetUncertain, "a name with its realm did not find the player")
+        assert(#alerts == 1 and alerts[1].sub == "Anna",
+            "the interrupt named " .. tostring(alerts[1] and alerts[1].sub))
+    end)
+end)
+
+Replay("without the client's separator a name stands alone", function()
+    -- Given Forever without the constant for the separator, and a selected player with a surname.
+    local start = Start()
+    names.nameplate1 = { "Anna", "Berg" }
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-kick", 172)
+
+    -- When you interrupt that player.
+    At(start + 0.1)
+    Event("UNIT_SPELLCAST_INTERRUPTED", "target", "cast-enemy", 999, "Player-Test")
+
+    -- Then the alert shows the name alone.
+    assert(#alerts == 1 and alerts[1].sub == "Anna",
+        "without a separator the interrupt named " .. tostring(alerts[1] and alerts[1].sub))
+end)
+
+Replay("a surname the client hides is left off the name", function()
+    WithSurnames(function()
+        -- Given a selected player whose surname the client hides.
+        local start = Start()
+        names.nameplate1 = { "Anna", Amount() }
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-kick", 172)
+
+        -- When you interrupt that player.
+        At(start + 0.1)
+        Event("UNIT_SPELLCAST_INTERRUPTED", "target", "cast-enemy", 999, "Player-Test")
+
+        -- Then the alert shows the name alone.
+        assert(#alerts == 1 and alerts[1].sub == "Anna",
+            "with a hidden surname the interrupt carried a " .. type(alerts[1] and alerts[1].sub))
+    end)
+end)
+
+Replay("a name the client hides is not shown", function()
+    WithSurnames(function()
+        -- Given a selected player whose name the client hides.
+        local start = Start()
+        names.nameplate1 = { Amount(), "Berg" }
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-kick", 172)
+
+        -- When you interrupt that player.
+        At(start + 0.1)
+        Event("UNIT_SPELLCAST_INTERRUPTED", "target", "cast-enemy", 999, "Player-Test")
+
+        -- Then the alert comes without a name.
+        assert(#alerts == 1 and alerts[1].sub == nil,
+            "with a hidden name the interrupt carried a " .. type(alerts[1] and alerts[1].sub))
+    end)
 end)
 
 Replay("a same-creature plate return rekeys hits already waiting for a line", function()
