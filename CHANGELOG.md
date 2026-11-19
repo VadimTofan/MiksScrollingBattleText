@@ -1,5 +1,18 @@
 # Changelog
 
+## v12.055
+
+- In Events, select a custom scroll area to see its assigned events and
+  tracked auras. Moving an entry updates the list immediately.
+- Set separate thresholds for low-health and low-mana alerts.
+- Auto Shot damage now displays in white. Off-hand swings keep their
+  attribution, and pet casts no longer interrupt queued player strikes.
+- Healing-over-time ticks retain their spell attribution across unrelated
+  casts. When several active spells could explain a tick, its spell name
+  is left blank.
+- Fixed named-aura editing, refreshed the saved profile list when opened,
+  and improved debug tooltip readability.
+
 ## v12.054
 
 - Improved player killing-blow classification using a recent victim's recorded
