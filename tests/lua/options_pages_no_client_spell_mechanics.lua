@@ -1,7 +1,7 @@
 -- Describe: the General page of the new options window when the client has neither text setting.
 local env = dofile("tests/lua/options_window_env.lua")
 local Profiles, L, Window = env.Profiles, env.L, env.Window
-local Find, FindAll, ClickEntry = env.Find, env.FindAll, env.ClickEntry
+local Find, ClickEntry = env.Find, env.ClickEntry
 
 -- The profiles module and the texts exist, but the client has neither setting.
 function Profiles.GetSpellMechanicsText() return nil, nil end
@@ -35,8 +35,8 @@ do
 			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
 		end)
 	end
-	local extra = FindAll(MSBTOptionsWindowFrame, function(region) return region.which end)
-	assert(#extra == 0, "a switch appeared without a client setting")
+	local onTarget = assert(env.Menu(L.WINDOW.blizzardOnTarget), "the dropdown for the text over targets is missing")
+	assert(#onTarget == 1 and onTarget[1].text == L.WINDOW.blizzardNumbers, "an entry appeared without a client setting")
 	assert(Section(0).height == 130 and Section(140).height == 150 and Section(300).height == 156,
 		"the layout changed")
 	local note = Find(MSBTOptionsWindowFrame, function(frame)

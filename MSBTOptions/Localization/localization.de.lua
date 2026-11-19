@@ -91,6 +91,12 @@ obj.removeTooltip = "Entfernt diesen Sound aus deinen gespeicherten Sounds. Bis 
 obj.resetProfile = "Profil zurücksetzen"
 obj.developer = "Entwickler"
 obj.developerHint = "Der Build des Clients, die erzeugten Tabellen und das Debug-Fenster."
+obj.blizzardOnMe = "Text über mir"
+obj.blizzardOnTarget = "Text auf Ziel"
+obj.blizzardIncomingTooltip = "Blizzards Text für das, was andere dir antun: Schaden, Heilung, Fehlschläge."
+obj.blizzardNotificationsTooltip = "Alles andere, was Blizzards Text an deiner Spielfigur zeigt, etwa Auren, Kampfbeginn und Zugewinne."
+obj.blizzardNumbers = "Zahlen"
+obj.blizzardNumbersTooltip = "Blizzards Schadens- und Heilungszahlen über deinen Zielen."
 
 
 

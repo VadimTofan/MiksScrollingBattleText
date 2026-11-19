@@ -76,6 +76,15 @@ local function Toggle(checkbox, isChecked)
 	checkbox.checkFrame:SetChecked(isChecked)
 	Click(checkbox.checkFrame)
 end
+-- An entry of the two Blizzard dropdowns by its label, and a click on it where it does not stand as wanted.
+local ON_ME, ON_TARGET = L.WINDOW.blizzardOnMe, L.WINDOW.blizzardOnTarget
+local function MenuEntry(label)
+	return env.MenuEntry(ON_ME, label) or env.MenuEntry(ON_TARGET, label)
+end
+local function Tick(label, isTicked)
+	local entry = MenuEntry(label)
+	if entry:IsSelected() ~= isTicked then entry:Pick() end
+end
 
 -- Rule: the sidebar shows the rebuilt entries as pages, not as classic tabs.
 do
@@ -100,9 +109,6 @@ do
 		{ "disableOutgoing", 1, "msbtOutgoingDisabled", true, true },
 		{ "disableNotifications", 1, "msbtNotificationsDisabled", true, true },
 		{ "disableIncoming", 1, "msbtIncomingDisabled", true, true },
-		{ "disableOutgoing", 2, "blizzardOutgoingDisabled", true, true },
-		{ "disableNotifications", 2, "blizzardNotificationsDisabled", true, true },
-		{ "disableIncoming", 2, "blizzardIncomingDisabled", true, true },
 		{ "enableNames", 1, "hideSkills", false },
 		{ "enableIcons", 1, "skillIconsDisabled", false },
 		{ "stickyCrits", 1, "stickyCritsDisabled", false },
@@ -138,26 +144,105 @@ do
 	Profiles.currentProfile.hideSkills = nil
 end
 
--- Rule: the Blizzard part shows the client's text-over-target switches and saves through the profiles module.
+-- Rule: the Blizzard part offers its text in two dropdowns under its switch, as the game's combat options do.
 do
 	ClickEntry("general")
-	local own = Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)
-	local others = Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)
-	assert(#own == 1 and #others == 1, "the two switches were not built once")
+	local onMe, meDropdown = env.Menu(ON_ME)
+	local onTarget, targetDropdown = env.Menu(ON_TARGET)
+	assert(onMe and onTarget, "the two dropdowns were not built")
+	-- Then the Blizzard column has no sub-option checkboxes any more; MSBT's own remain.
+	for _, key in ipairs({ "disableOutgoing", "disableNotifications", "disableIncoming" }) do
+		assert(#Checkboxes(L.CHECKBOXES[key].label) == 1, "the Blizzard column kept the checkbox " .. key)
+	end
+	-- And each dropdown lists what this tree offers: the text at the character, and the text over targets.
+	local function Labels(entries)
+		local labels = {}
+		for _, entry in ipairs(entries) do labels[#labels + 1] = entry.text end
+		return table.concat(labels, "|")
+	end
+	assert(Labels(onMe) == L.WINDOW.incoming .. "|" .. L.WINDOW.notifications,
+		"the text at the character differs: " .. Labels(onMe))
+	assert(Labels(onTarget) == L.WINDOW.blizzardNumbers .. "|" .. L.CHECKBOXES.spellMechanicsOwn.label .. "|"
+		.. L.CHECKBOXES.spellMechanicsOthers.label, "the text over targets differs: " .. Labels(onTarget))
+	-- And they stand under the Blizzard switch, indented like sub-options, one below the other.
+	local blizzard = Checkboxes(L.CHECKBOXES.enableBlizzardDamage.label)[1]
+	local first, second = meDropdown.points.TOPLEFT, targetDropdown.points.TOPLEFT
+	assert(first.relative == blizzard and first.relativePoint == "BOTTOMLEFT" and first.x == 20 and first.y == -8,
+		"the first dropdown is not under the Blizzard switch")
+	assert(second.relative == blizzard and second.relativePoint == "BOTTOMLEFT" and second.x == 20 and second.y == -42,
+		"the second dropdown is not under the first")
+	assert(meDropdown.width == 240 and targetDropdown.width == 240, "the dropdowns have another width")
+	-- And they are the game's own dropdowns, in the section of the Blizzard switch.
+	assert(meDropdown.template == "WowStyle2DropdownTemplate" and targetDropdown.template == "WowStyle2DropdownTemplate"
+		and meDropdown.parent == blizzard.parent and targetDropdown.parent == blizzard.parent,
+		"the dropdowns are not the game's own in the section of the Blizzard switch")
+	-- The game's menu stands at the screen's scale: it is made as wide as the dropdown looks at the window's scale.
+	local _, _, width = env.Menu(ON_ME)
+	assert(width == 240, "the menu is not as wide as its dropdown: " .. tostring(width))
+	MSBTOptionsWindowFrame:SetScale(1.25)
+	_, _, width = env.Menu(ON_ME)
+	MSBTOptionsWindowFrame:SetScale(1)
+	assert(width == 300, "the menu does not follow the window's scale: " .. tostring(width))
 
-	-- Then each is checked as the client says, with no write to the profile.
-	assert(own[1]:GetChecked() == false and others[1]:GetChecked() == true, "the switches differ from the client")
+	-- Then the sections keep their heights and gaps whatever the dropdowns list, and the language note its place.
+	local function Section(top)
+		return Find(MSBTOptionsWindowFrame, function(region)
+			local point = region.points and region.points.TOPLEFT
+			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
+		end)
+	end
+	assert(Section(0) and Section(140) and Section(300) and Section(0).height == 130
+		and Section(140).height == 150 and Section(300).height == 156, "the sections changed with the dropdowns")
+	assert(NoteTop() == -96, "the language note moved")
+end
 
-	-- And they look like the other switches.
-	assert(own[1].Enable == Checkboxes(L.CHECKBOXES.enableNames.label)[1].Enable, "the switch is not skinned")
+-- Rule: an entry for a "...Disabled" field of the profile is ticked while its text shows, and saves like the classic checkbox.
+do
+	for _, case in ipairs({
+		{ L.WINDOW.incoming, "blizzardIncomingDisabled", L.WINDOW.blizzardIncomingTooltip },
+		{ L.WINDOW.notifications, "blizzardNotificationsDisabled", L.WINDOW.blizzardNotificationsTooltip },
+		{ L.WINDOW.blizzardNumbers, "blizzardOutgoingDisabled", L.WINDOW.blizzardNumbersTooltip },
+	}) do
+		local label, field = case[1], case[2]
+		-- Given the profile has not switched the text off, then the entry is ticked.
+		assert(Profiles.currentProfile[field] == nil and MenuEntry(label):IsSelected() == true,
+			label .. " is not ticked while its text shows")
+		-- When it is clicked, then the field is saved as disabled and the Blizzard text is reapplied. The click
+		-- answers nothing, so the game leaves the menu open and draws the ticks anew.
+		MikSBT.EraseTable(calls)
+		assert(MenuEntry(label):Pick() == nil, label .. " answers the click")
+		assert(calls[1][1] == "SetOption" and calls[1][2] == nil and calls[1][3] == field and calls[1][4] == true
+			and calls[1][5] == nil, "wrong save for " .. field)
+		assert(calls[2] ~= nil and calls[2][1] == "ApplyContextOptions", "no context reapply for " .. field)
+		assert(MenuEntry(label):IsSelected() == false, label .. " stayed ticked")
+		-- When it is clicked again, then the text is back on.
+		MenuEntry(label):Pick()
+		assert(Profiles.currentProfile[field] == false and MenuEntry(label):IsSelected() == true,
+			label .. " was not ticked again")
+		-- And it tells what it stands for.
+		local title, text = env.MenuTooltip(MenuEntry(label))
+		assert(title == label and text == case[3] and text ~= nil, label .. " has another tooltip")
+		MenuEntry(label):Pick()
+	end
+	MikSBT.EraseTable(calls)
+end
+
+-- Rule: the entries for the client's text over targets show the client's values and save through the profiles module.
+do
+	local ownLabel, othersLabel = L.CHECKBOXES.spellMechanicsOwn.label, L.CHECKBOXES.spellMechanicsOthers.label
+	-- Then each is ticked as the client says, and has the text of its classic checkbox.
+	assert(MenuEntry(ownLabel):IsSelected() == false and MenuEntry(othersLabel):IsSelected() == true,
+		"the entries differ from the client")
+	local title, text = env.MenuTooltip(MenuEntry(ownLabel))
+	assert(title == ownLabel and text == L.CHECKBOXES.spellMechanicsOwn.tooltip, "the entry has another tooltip")
 
 	-- When one is clicked, then the profiles module is asked with the part and the new state.
 	MikSBT.EraseTable(calls)
 	local profileBefore = {}
 	for key, value in pairs(Profiles.currentProfile) do profileBefore[key] = value end
-	Toggle(own[1], true)
+	assert(MenuEntry(ownLabel):Pick() == nil, "the entry answers the click")
 	assert(Last()[1] == "SetSpellMechanicsText" and Last()[2] == "own" and Last()[3] == true, "own was not set")
-	Toggle(others[1], false)
+	MenuEntry(othersLabel):Pick()
 	assert(Last()[2] == "others" and Last()[3] == false, "others was not set")
 	assert(#calls == 0, "a click wrote to the profile")
 	for key, value in pairs(Profiles.currentProfile) do
@@ -167,38 +252,16 @@ do
 		assert(Profiles.currentProfile[key] ~= nil, "a click removed the profile field " .. key)
 	end
 
-	-- When the client value changed elsewhere, then the next show has it.
-	mechanics.own, mechanics.others = true, false
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(own[1]:GetChecked() == true and others[1]:GetChecked() == false, "the page did not take the client's values")
+	-- When the client value changed elsewhere, then the entries have it the next time the menu opens.
+	mechanics.own, mechanics.others = false, true
+	assert(MenuEntry(ownLabel):IsSelected() == false and MenuEntry(othersLabel):IsSelected() == true,
+		"the entries did not take the client's values")
 
-	-- When a client lacks one setting, then its switch is hidden and the other one moves up.
+	-- When a client lacks one setting, then its entry is left out and the others stay.
 	mechanics.own = nil
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(#Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label) == 0, "a nil value kept its switch")
-	assert(others[1].points.TOPLEFT.y == own[1].points.TOPLEFT.y, "the remaining switch did not move up")
+	assert(not MenuEntry(ownLabel) and MenuEntry(othersLabel) and #env.Menu(ON_TARGET) == 2, "a nil value kept its entry")
 	mechanics.own = false
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(#Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label) == 1, "the switch did not return")
-
-	-- Then the section grew by the two rows, and the sections below keep their gaps within the page.
-	local function Section(top)
-		return Find(MSBTOptionsWindowFrame, function(region)
-			local point = region.points and region.points.TOPLEFT
-			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
-		end)
-	end
-	assert(Section(0) and Section(180) and Section(340) and Section(0).height == 170
-		and Section(180).height == 150 and Section(340).height == 116, "the sections do not follow the new rows")
-	assert(own[1].points.TOPLEFT.y == -114 and others[1].points.TOPLEFT.y == -138, "the rows are not below the sub-options")
-	-- At the left edge of the Blizzard column, like its own switch, not indented as a sub-option.
-	local blizzard = Checkboxes(L.CHECKBOXES.enableBlizzardDamage.label)[1]
-	assert(own[1].points.TOPLEFT.x == blizzard.points.TOPLEFT.x, "the switches are indented")
-	-- The language note moved up with the third section.
-	assert(NoteTop() == -66, "the language note did not move with the section")
+	assert(MenuEntry(ownLabel) and #env.Menu(ON_TARGET) == 3, "the entry did not return")
 end
 
 -- Rule: Cancel and Undo all put the client's text settings back to their values from when the window opened.
@@ -221,7 +284,7 @@ do
 
 	-- When only one changed, then Cancel writes only that one back.
 	Open(false, true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
 	MikSBT.EraseTable(shown)
 	Cancel()
 	assert(#Sets() == 1 and Sets()[1][2] == "own" and Sets()[1][3] == false, "Cancel did not put back only the changed one")
@@ -229,8 +292,8 @@ do
 
 	-- When both changed, then both go back.
 	Open(false, true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)[1], false)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
+	Tick(L.CHECKBOXES.spellMechanicsOthers.label, false)
 	MikSBT.EraseTable(shown)
 	Cancel()
 	assert(#Sets() == 2 and mechanics.own == false and mechanics.others == true, "Cancel did not put both back")
@@ -242,7 +305,7 @@ do
 
 	-- When a client lacks a setting, then Cancel does not write it.
 	Open(nil, true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)[1], false)
+	Tick(L.CHECKBOXES.spellMechanicsOthers.label, false)
 	MikSBT.EraseTable(shown)
 	Cancel()
 	assert(#Sets() == 1 and Sets()[1][2] == "others" and mechanics.own == nil, "Cancel wrote a setting the client lacks")
@@ -255,7 +318,7 @@ do
 
 	-- When the window was put away for a moment and shown again, then Cancel goes back to the opening.
 	Open(false, true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
 	Window.Hide(true)
 	Window.Show()
 	MikSBT.EraseTable(shown)
@@ -264,7 +327,7 @@ do
 
 	-- When Apply was clicked (it needs a profile change to be enabled), then Cancel goes back to that state.
 	Open(false, true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
 	Profiles.SetOption(nil, "animationSpeed", 60)
 	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)))
 	MikSBT.EraseTable(shown)
@@ -274,7 +337,7 @@ do
 
 	-- When Undo all is clicked, then the client's settings are left alone: only Cancel covers them.
 	Open(false, true)
-	Toggle(Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1], true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
 	Profiles.SetOption(nil, "animationSpeed", 50)
 	Click(Footer())
 	MikSBT.EraseTable(shown)

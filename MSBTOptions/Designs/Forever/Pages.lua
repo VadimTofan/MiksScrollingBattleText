@@ -20,33 +20,32 @@ local COLUMN = 345
 local ROW_HEIGHT = 26
 local SOUND_LINE_HEIGHT = 30
 local DEFAULT_PROFILE_NAME = "Default"
--- Switches for the game's own text over a target (they show the client until set, then the profile's
--- value, which MSBT forces): the part of the field names in the profiles module and the locale key of each.
-local MECHANICS = {
-	{ "own", "spellMechanicsOwn" },
-	{ "others", "spellMechanicsOthers" },
+-- Blizzard's own text is chosen from two dropdowns under its enable switch, as in the game's combat
+-- options: what its text at the character shows, and what stands over targets. An entry is ticked
+-- while its text shows. It names its text in the window's table (text, tooltip) or by the key of a
+-- classic checkbox (locale), and what it reads and writes: a "...Disabled" field of the profile
+-- (option), a Blizzard switch of the profiles module (switch), or one of the client's two texts for
+-- spell effects (mechanics). The numbers over targets are the profile's field, or the switch where
+-- the profiles module has it.
+local BLIZZARD_MENUS = {
+	{ text = "blizzardOnMe", entries = {
+		{ text = "incoming", tooltip = "blizzardIncomingTooltip", option = "blizzardIncomingDisabled" },
+		{ text = "notifications", tooltip = "blizzardNotificationsTooltip", option = "blizzardNotificationsDisabled" },
+		{ locale = "blizzardReputation", switch = "reputation" },
+		{ locale = "blizzardHonor", switch = "honor" },
+	} },
+	{ text = "blizzardOnTarget", entries = {
+		{ text = "blizzardNumbers", tooltip = "blizzardNumbersTooltip", option = "blizzardOutgoingDisabled", switch = "numbers" },
+		{ locale = "spellMechanicsOwn", mechanics = "own" },
+		{ locale = "spellMechanicsOthers", mechanics = "others" },
+	} },
 }
-local MECHANICS_TOP = 114
-local MECHANICS_STEP = 24
--- The first section grows by the rows below its sub-options (130 high without them); the page has
--- no spare height, so the third section gives the same back and moves the language note up.
-local function RowsGrowth(rows) return MECHANICS_TOP + (rows - 1) * MECHANICS_STEP + 20 + 12 - 130 end
+local BLIZZARD_MENU_WIDTH = 240
+local BLIZZARD_MENU_TOP = 8
+local BLIZZARD_MENU_STEP = 34
 local LANGUAGE_NOTE_TOP = 96
-local LANGUAGE_NOTE_SHIFT = 30
--- With the reputation and honor switches below the effect switches, the second section closes its
--- rows up and the third gives the room back, so the language note moves up a little further.
-local CHARACTER_ROWS_HEIGHT = 140
-local CHARACTER_ROW_HEIGHT = 24
-local CHARACTER_NOTE_SHIFT = 44
 -- The reset button stands in the second section, under the slider that ends 60 below its top.
 local RESET_TOP = 74
--- Switches for the game's reputation and honor text at the character, through the Blizzard switches
--- of the profiles module: the name there and the locale key of each. They follow the effect switches
--- in the Blizzard column.
-local CHARACTER_TEXTS = {
-	{ "reputation", "blizzardReputation" },
-	{ "honor", "blizzardHonor" },
-}
 -- The alert thresholds are sliders under the sound switches; the list below starts under them.
 local THRESHOLDS = { "lowHealthThreshold", "lowManaThreshold" }
 local THRESHOLD_DEFAULT = 35
@@ -59,7 +58,7 @@ local SOUNDS_SECTION_HEIGHT = THRESHOLD_TOP + (#THRESHOLDS - 1) * THRESHOLD_STEP
 local DEVELOPER_LIST_TOP = 40
 local DEVELOPER_LINE_HEIGHT = 18
 
--- Field part and text of the sub-options under each enable switch, as on the classic General tab.
+-- Field part and text of the sub-options under MSBT's enable switch, as on the classic General tab.
 local SUB_OPTIONS = {
 	{ "Outgoing", "disableOutgoing" },
 	{ "Notifications", "disableNotifications" },
@@ -80,8 +79,6 @@ local FONTS_COLORS = {
 -- Popups copy what they need, so one table serves every click, as on the classic tabs.
 local config = {}
 local generalSwitches = {}
-local mechanicsSwitches = {}
-local characterSwitches = {}
 local soundSwitches = {}
 local thresholdSliders = {}
 local fontsColorsButtons = {}
@@ -140,22 +137,16 @@ end
 
 -- inverted saves the opposite for the "...Disabled" fields; context reapplies the Blizzard text.
 local function OnClickSwitch(this, isChecked)
-	-- The numbers over targets stand for the client's setting; the profiles module marks and writes it.
-	if this.numbers then
-		MSBTProfiles.SetBlizzardSwitch("numbers", not isChecked)
-		MSBTWindow.RefreshSwitches()
-		return
-	end
 	if this.inverted then isChecked = not isChecked end
 	MSBTProfiles.SetOption(nil, this.option, isChecked)
 	if this.context then MSBTProfiles.ApplyContextOptions() end
 end
 
 
-local function CreateSwitch(parent, switches, localeKey, option, inverted, context, tooltip)
+local function CreateSwitch(parent, switches, localeKey, option, inverted, context)
 	local locale = L.CHECKBOXES[localeKey]
 	local checkbox = MSBTControls.CreateCheckbox(parent)
-	checkbox:Configure(20, locale.label, tooltip or locale.tooltip)
+	checkbox:Configure(20, locale.label, locale.tooltip)
 	checkbox:SetClickHandler(OnClickSwitch)
 	checkbox.option, checkbox.inverted, checkbox.context = option, inverted, context
 	MSBTWindow.SkinCheckbox(checkbox)
@@ -167,115 +158,99 @@ end
 local function PopulateSwitches(switches)
 	local profile = MSBTProfiles.currentProfile
 	for _, checkbox in ipairs(switches) do
-		if checkbox.numbers then
-			checkbox:SetChecked(MSBTProfiles.GetBlizzardSwitch("numbers") == false)
-		else
-			local value = profile[checkbox.option]
-			if checkbox.inverted then value = not value end
-			checkbox:SetChecked(value)
-		end
+		local value = profile[checkbox.option]
+		if checkbox.inverted then value = not value end
+		checkbox:SetChecked(value)
 	end
 end
 
 
--- Only built when the profiles module and the locale have them and the client has at least one of
--- the two settings, so a client without them keeps the page as it was.
-local function HasMechanics()
-	if not (MSBTProfiles.GetSpellMechanicsText and MSBTProfiles.SetSpellMechanicsText) then return false end
-	for _, entry in ipairs(MECHANICS) do
-		if not L.CHECKBOXES[entry[2]] then return false end
-	end
-	local own, others = MSBTProfiles.GetSpellMechanicsText()
-	return own ~= nil or others ~= nil
+-- The numbers over targets stand for the client's setting where the profiles module has the switch
+-- for them and the locale the text that only that switch brings; else for the profile's field.
+local function UsesSwitch(entry)
+	if not entry.option then return true end
+	return entry.switch and MSBTProfiles.GetBlizzardSwitch and MSBTProfiles.SetBlizzardSwitch
+		and L.CHECKBOXES.disableOutgoing.blizzardTooltip and true or false
 end
 
 
-local function OnClickMechanics(this, isChecked)
-	MSBTProfiles.SetSpellMechanicsText(this.which, isChecked)
-	MSBTWindow.RefreshSwitches()
-end
-
-
-local function CreateMechanicsSwitch(section, entry)
-	local locale = L.CHECKBOXES[entry[2]]
-	local checkbox = MSBTControls.CreateCheckbox(section)
-	checkbox:Configure(20, locale.label, locale.tooltip)
-	checkbox:SetClickHandler(OnClickMechanics)
-	checkbox.which = entry[1]
-	MSBTWindow.SkinCheckbox(checkbox)
-	mechanicsSwitches[#mechanicsSwitches + 1] = checkbox
-end
-
-
--- The client's own values, read at every show; a switch whose value is nil is hidden and the
--- others move up. Returns the number of rows shown.
-local function PopulateMechanics()
-	local own, others = MSBTProfiles.GetSpellMechanicsText()
-	local values = { own = own, others = others }
-	local row = 0
-	for _, checkbox in ipairs(mechanicsSwitches) do
-		local value = values[checkbox.which]
-		if value == nil then
-			checkbox:Hide()
-		else
-			checkbox:ClearAllPoints()
-			checkbox:SetPoint("TOPLEFT", checkbox:GetParent(), "TOPLEFT", COLUMN, -MECHANICS_TOP - row * MECHANICS_STEP)
-			checkbox:SetChecked(value)
-			checkbox:Show()
-			row = row + 1
-		end
-	end
-	return row
-end
-
-
--- Only built when the profiles module has the Blizzard switches and the record that puts them back,
--- the locale has both texts and the client has at least one of the two settings.
-local function HasCharacterSwitches()
+-- Whether an entry's text shows. nil where the profiles module, the locale or the client lacks the
+-- setting; such an entry is left out of its dropdown.
+local function ReadEntry(entry)
 	local profiles = MSBTProfiles
-	if not (profiles.GetBlizzardSwitch and profiles.SetBlizzardSwitch
-		and profiles.TakeBlizzardSwitches and profiles.RestoreBlizzardSwitches) then return false end
-	for _, entry in ipairs(CHARACTER_TEXTS) do
-		if not L.CHECKBOXES[entry[2]] then return false end
+	if entry.option then
+		if UsesSwitch(entry) then return profiles.GetBlizzardSwitch(entry.switch) ~= false end
+		return not profiles.currentProfile[entry.option]
 	end
-	return profiles.GetBlizzardSwitch(CHARACTER_TEXTS[1][1]) ~= nil
-		or profiles.GetBlizzardSwitch(CHARACTER_TEXTS[2][1]) ~= nil
+	if not L.CHECKBOXES[entry.locale] then return nil end
+	if entry.mechanics then
+		if not (profiles.GetSpellMechanicsText and profiles.SetSpellMechanicsText) then return nil end
+		local own, others = profiles.GetSpellMechanicsText()
+		if entry.mechanics == "own" then return own end
+		return others
+	end
+	-- A Blizzard switch also needs the record that Cancel puts back.
+	if not (profiles.GetBlizzardSwitch and profiles.SetBlizzardSwitch
+		and profiles.TakeBlizzardSwitches and profiles.RestoreBlizzardSwitches) then return nil end
+	return (profiles.GetBlizzardSwitch(entry.switch))
 end
 
 
-local function OnClickCharacterSwitch(this, isChecked)
-	MSBTProfiles.SetBlizzardSwitch(this.switch, isChecked)
+-- The profile's field saves the opposite and reapplies the Blizzard text, like the classic checkbox;
+-- the client's settings are marked and written by the profiles module.
+local function OnPickEntry(entry)
+	local isShown = not ReadEntry(entry)
+	if not UsesSwitch(entry) then
+		MSBTProfiles.SetOption(nil, entry.option, not isShown)
+		MSBTProfiles.ApplyContextOptions()
+		return
+	end
+	if entry.mechanics then
+		MSBTProfiles.SetSpellMechanicsText(entry.mechanics, isShown)
+	else
+		MSBTProfiles.SetBlizzardSwitch(entry.switch, isShown)
+	end
 	MSBTWindow.RefreshSwitches()
 end
 
 
-local function CreateCharacterSwitch(section, entry)
-	local locale = L.CHECKBOXES[entry[2]]
-	local checkbox = MSBTControls.CreateCheckbox(section)
-	checkbox:Configure(20, locale.label, locale.tooltip)
-	checkbox:SetClickHandler(OnClickCharacterSwitch)
-	checkbox.switch = entry[1]
-	MSBTWindow.SkinCheckbox(checkbox)
-	characterSwitches[#characterSwitches + 1] = checkbox
+local function EntryTexts(entry)
+	if entry.text then return L.WINDOW[entry.text], L.WINDOW[entry.tooltip] end
+	local locale = L.CHECKBOXES[entry.locale]
+	return locale.label, locale.tooltip
 end
 
 
--- The client's own values, read at every show; a switch whose value is nil is hidden and the
--- other one moves up. The rows start below the ones the effect switches show.
-local function PopulateCharacterSwitches(firstRow)
-	local row = firstRow
-	for _, checkbox in ipairs(characterSwitches) do
-		local isShown = MSBTProfiles.GetBlizzardSwitch(checkbox.switch)
-		if isShown == nil then
-			checkbox:Hide()
-		else
-			checkbox:ClearAllPoints()
-			checkbox:SetPoint("TOPLEFT", checkbox:GetParent(), "TOPLEFT", COLUMN, -MECHANICS_TOP - row * MECHANICS_STEP)
-			checkbox:SetChecked(isShown)
-			checkbox:Show()
-			row = row + 1
+local function ShowEntryTooltip(tooltip, description)
+	local label, text = EntryTexts(description:GetData())
+	GameTooltip_SetTitle(tooltip, label)
+	if text then GameTooltip_AddNormalLine(tooltip, text, true) end
+end
+
+
+-- The game's menu asks for its entries each time it opens, so every entry shows the value of that
+-- moment, and a click, which answers nothing, leaves the menu open. The menu stands at the screen's
+-- scale, not the window's, and is made as wide as the dropdown looks.
+local function ListEntries(dropdown, root)
+	root:SetMinimumWidth(dropdown:GetWidth() * dropdown:GetEffectiveScale() / UIParent:GetEffectiveScale())
+	for _, entry in ipairs(dropdown.entries) do
+		if ReadEntry(entry) ~= nil then
+			root:CreateCheckbox((EntryTexts(entry)), ReadEntry, OnPickEntry, entry):SetTooltip(ShowEntryTooltip)
 		end
 	end
+end
+
+
+-- The game's own dropdown with its menu. A client without that menu system gets no dropdown; its
+-- classic design has every one of these settings as a checkbox.
+local function CreateBlizzardMenu(section, menu)
+	if type(WowStyle2DropdownMixin) ~= "table" then return nil end
+	local dropdown = CreateFrame("DropdownButton", nil, section, "WowStyle2DropdownTemplate")
+	dropdown:SetWidth(BLIZZARD_MENU_WIDTH)
+	dropdown:OverrideText(L.WINDOW[menu.text])
+	dropdown.entries = menu.entries
+	dropdown:SetupMenu(ListEntries)
+	return dropdown
 end
 
 
@@ -296,8 +271,6 @@ end
 local function RefreshGeneral()
 	msbtCheckbox:SetChecked(not MSBTProfiles.IsModDisabled())
 	PopulateSwitches(generalSwitches)
-	local rows = #mechanicsSwitches > 0 and PopulateMechanics() or 0
-	if #characterSwitches > 0 then PopulateCharacterSwitches(rows) end
 	speedSlider:SetValue(MSBTProfiles.currentProfile.animationSpeed)
 	designDropdown:SetSelectedID(MSBTDesigns.GetSelected())
 	RefreshReloadButton()
@@ -321,30 +294,8 @@ local function OnClickReloadDesign()
 end
 
 
-local function CreateSubOptions(section, side, enable)
-	for index, option in ipairs(SUB_OPTIONS) do
-		-- Blizzard's outgoing switch stands for the client's numbers over targets where the profiles
-		-- module has the functions for it, and then says so in its tooltip. The tooltip text is what only
-		-- the numbers switch brings; without it the switch stays on its profile option.
-		local numbers = side == "blizzard" and option[2] == "disableOutgoing"
-			and MSBTProfiles.GetBlizzardSwitch and MSBTProfiles.SetBlizzardSwitch
-			and L.CHECKBOXES[option[2]].blizzardTooltip and true or nil
-		local checkbox = CreateSwitch(section, generalSwitches, option[2], side .. option[1] .. "Disabled", false, true,
-			numbers and L.CHECKBOXES[option[2]].blizzardTooltip)
-		checkbox.numbers = numbers
-		checkbox:SetPoint("TOPLEFT", enable, "BOTTOMLEFT", 20, -6 - (index - 1) * ROW_HEIGHT)
-	end
-end
-
-
 local function CreateGeneral(page)
-	local hasMechanics, hasCharacter = HasMechanics(), HasCharacterSwitches()
-	local rows = (hasMechanics and #MECHANICS or 0) + (hasCharacter and #CHARACTER_TEXTS or 0)
-	local extra = rows > 0 and RowsGrowth(rows) or 0
-	local isTight = rows > #MECHANICS
-	local rowHeight = isTight and CHARACTER_ROW_HEIGHT or ROW_HEIGHT
-	local middleHeight = isTight and CHARACTER_ROWS_HEIGHT or 150
-	local section = CreateSection(page, 0, 130 + extra)
+	local section = CreateSection(page, 0, 130)
 	local locale = L.CHECKBOXES["enableMSBT"]
 	msbtCheckbox = MSBTControls.CreateCheckbox(section)
 	msbtCheckbox:Configure(20, locale.label, locale.tooltip)
@@ -354,18 +305,20 @@ local function CreateGeneral(page)
 		RefreshGeneral()
 	end)
 	MSBTWindow.SkinCheckbox(msbtCheckbox)
-	CreateSubOptions(section, "msbt", msbtCheckbox)
+	for index, option in ipairs(SUB_OPTIONS) do
+		local checkbox = CreateSwitch(section, generalSwitches, option[2], "msbt" .. option[1] .. "Disabled", false, true)
+		checkbox:SetPoint("TOPLEFT", msbtCheckbox, "BOTTOMLEFT", 20, -6 - (index - 1) * ROW_HEIGHT)
+	end
 	local blizzard = CreateSwitch(section, generalSwitches, "enableBlizzardDamage", "blizzardDamageEnabled", false, true)
 	blizzard:SetPoint("TOPLEFT", section, "TOPLEFT", COLUMN, -12)
-	CreateSubOptions(section, "blizzard", blizzard)
-	if hasMechanics then
-		for _, entry in ipairs(MECHANICS) do CreateMechanicsSwitch(section, entry) end
-	end
-	if hasCharacter then
-		for _, entry in ipairs(CHARACTER_TEXTS) do CreateCharacterSwitch(section, entry) end
+	for index, menu in ipairs(BLIZZARD_MENUS) do
+		local dropdown = CreateBlizzardMenu(section, menu)
+		if dropdown then
+			dropdown:SetPoint("TOPLEFT", blizzard, "BOTTOMLEFT", 20, -BLIZZARD_MENU_TOP - (index - 1) * BLIZZARD_MENU_STEP)
+		end
 	end
 
-	section = CreateSection(page, 140 + extra, middleHeight)
+	section = CreateSection(page, 140, 150)
 	local anchor
 	for index, switch in ipairs({
 		{ "enableNames", "hideSkills", true },
@@ -375,7 +328,7 @@ local function CreateGeneral(page)
 		{ "shortenNumbers", "shortenNumbers" },
 	}) do
 		anchor = CreateSwitch(section, generalSwitches, switch[1], switch[2], switch[3])
-		anchor:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -12 - (index - 1) * rowHeight)
+		anchor:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -12 - (index - 1) * ROW_HEIGHT)
 	end
 	locale = L.SLIDERS["animationSpeed"]
 	speedSlider = MSBTControls.CreateSlider(section)
@@ -387,8 +340,8 @@ local function CreateGeneral(page)
 		MSBTProfiles.SetOption(nil, "animationSpeed", value)
 	end)
 	MSBTWindow.SkinSlider(speedSlider)
-	-- Below the slider, where the column is free with every number of rows above. The third section
-	-- is too low with all of them to hold the button's hint above the language note.
+	-- Below the slider, where the column is free; the third section holds the design choice and the
+	-- language note.
 	locale = L.BUTTONS["resetBlizzardSCT"]
 	local button = CreateButton(section, locale.label, locale.tooltip, OnClickResetBlizzardSCT)
 	button:SetPoint("TOPLEFT", section, "TOPLEFT", COLUMN, -RESET_TOP)
@@ -396,7 +349,7 @@ local function CreateGeneral(page)
 	fontString:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -6)
 	fontString:SetWidth(320)
 
-	section = CreateSection(page, 150 + extra + middleHeight, 156 - extra + 150 - middleHeight)
+	section = CreateSection(page, 300, 156)
 	locale = L.DROPDOWNS["optionsDesign"]
 	designDropdown = MSBTControls.CreateDropdown(section)
 	designDropdown:Configure(180, locale.label, locale.tooltip)
@@ -416,8 +369,7 @@ local function CreateGeneral(page)
 	reloadDesignButton:Hide()
 
 	fontString = CreateText(section, "GameFontHighlightSmall", COLORS.text, L.LANGUAGE_INFO)
-	local noteShift = isTight and CHARACTER_NOTE_SHIFT or (extra > 0 and LANGUAGE_NOTE_SHIFT or 0)
-	fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -(LANGUAGE_NOTE_TOP - noteShift))
+	fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -LANGUAGE_NOTE_TOP)
 	fontString:SetPoint("RIGHT", section, "RIGHT", -12, 0)
 end
 

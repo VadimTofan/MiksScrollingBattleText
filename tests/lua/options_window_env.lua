@@ -148,9 +148,42 @@ function Methods:GetValue() return self.value end
 function Methods:SetValueStep(value) self.step, self.stepSet = value, value end
 function Methods:GetValueStep() return self.step end
 function Methods:SetBackdropColor(...) self.backdropColor = { ... } end
+function Methods:GetEffectiveScale()
+	local scale, region = 1, self
+	while region do
+		scale, region = scale * region.scale, region.parent
+	end
+	return scale
+end
+-- The game's dropdown with a menu, as far as the pages use it: the button keeps its text and the
+-- function that lists its entries, which the game runs when the button is set up and whenever the
+-- menu opens. The list it makes: each entry tells whether it is ticked, takes a click and answers
+-- what the page answers, and keeps its tooltip. A script without the game's menu system clears the mixin.
+local function ListMenu(dropdown)
+	local root = { entries = {} }
+	function root:SetMinimumWidth(width) self.minimumWidth = width end
+	function root:CreateCheckbox(label, isSelected, onSelect, data)
+		local entry = { text = label }
+		function entry:IsSelected() return isSelected(data) end
+		function entry:Pick() return onSelect(data) end
+		function entry:SetTooltip(initializer) self.tooltip = initializer end
+		function entry:GetData() return data end
+		self.entries[#self.entries + 1] = entry
+		return entry
+	end
+	dropdown.menuGenerator(dropdown, root)
+	return root
+end
+function Methods:SetupMenu(generator)
+	self.menuGenerator = generator
+	ListMenu(self)
+end
+function Methods:OverrideText(text) self.text = text end
+WowStyle2DropdownMixin = {}
 
 function CreateFrame(kind, name, parent, template)
 	local frame = NewRegion(kind, parent, name)
+	frame.template = template
 	if template and template:find("Scroll%a+ButtonTemplate") then
 		frame:SetNormalTexture()
 		frame:SetPushedTexture()
@@ -309,6 +342,31 @@ function env.ClickEntry(key)
 end
 function env.IsInWindow(frame)
 	return frame:GetParent() and frame:GetParent():GetParent() == MSBTOptionsWindowFrame
+end
+-- The entries of the game's dropdown with that text, as its menu lists them when it is opened, the
+-- dropdown itself and the menu's width.
+function env.Menu(text)
+	local dropdown = env.Find(MSBTOptionsWindowFrame, function(region)
+		return region.kind == "DropdownButton" and region.shown and region:GetText() == text
+	end)
+	if not dropdown then return nil end
+	local root = ListMenu(dropdown)
+	return root.entries, dropdown, root.minimumWidth
+end
+function env.MenuEntry(text, label)
+	for _, entry in ipairs(env.Menu(text) or {}) do
+		if entry.text == label then return entry end
+	end
+end
+-- What an entry's tooltip writes: its title and its text.
+function env.MenuTooltip(entry)
+	local written = {}
+	local setTitle, addLine = GameTooltip_SetTitle, GameTooltip_AddNormalLine
+	GameTooltip_SetTitle = function(_, text) written.title = text end
+	GameTooltip_AddNormalLine = function(_, text) written.text = text end
+	entry.tooltip({}, entry)
+	GameTooltip_SetTitle, GameTooltip_AddNormalLine = setTitle, addLine
+	return written.title, written.text
 end
 function env.Count() return snapshots:Count(snapshots:GetLoginSnapshot()) end
 function env.Footer()

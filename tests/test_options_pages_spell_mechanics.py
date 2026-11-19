@@ -126,6 +126,16 @@ class OptionsPagesSpellMechanicsTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
+    def test_general_page_builds_without_the_games_menu_system(self):
+        # Given
+        script_name = "options_pages_without_menus.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

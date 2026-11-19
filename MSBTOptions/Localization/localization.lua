@@ -102,6 +102,12 @@ obj.removeTooltip = "Remove this sound from your saved sounds. Until the next re
 obj.resetProfile = "Reset Profile"
 obj.developer = "Developer"
 obj.developerHint = "The client's build, the generated tables and the debug window."
+obj.blizzardOnMe = "Text above me"
+obj.blizzardOnTarget = "Text on target"
+obj.blizzardIncomingTooltip = "Blizzard's text for what others do to you: damage, healing, misses."
+obj.blizzardNotificationsTooltip = "Everything else Blizzard's text shows at your character, such as auras, combat state and gains."
+obj.blizzardNumbers = "Numbers"
+obj.blizzardNumbersTooltip = "Blizzard's damage and healing numbers over your targets."
 
 L.CUSTOM_FONTS = {
 	add = "Add custom font",

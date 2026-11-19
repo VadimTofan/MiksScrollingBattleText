@@ -1,7 +1,7 @@
--- Describe: the General page of the new options window builds the reputation and honor switches only when it can.
+-- Describe: the General page of the new options window lists the reputation and honor entries only when it can.
 -- A script sets TEXT_SWITCH_SCENARIO first: "get", "set", "take" or "restore" takes one function of the
 -- profiles module away, "texts" the locale texts and "client" the client's settings; "only" gives the
--- page the switches without the effect switches.
+-- page the two entries without the effect entries.
 local scenario = assert(TEXT_SWITCH_SCENARIO, "no scenario")
 local env = dofile("tests/lua/options_window_env.lua")
 local Profiles, L, Window = env.Profiles, env.L, env.Window
@@ -47,42 +47,43 @@ for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSp
 dofile("MSBTOptions/MSBTOptionsSounds.lua")
 dofile("MSBTOptions/Designs/Forever/Pages.lua")
 
--- Rule: the switches are built only with all four functions, both texts and a client setting, and then
--- stand in the Blizzard column below the effect switches' rows; without them the page is as it was.
+-- Rule: the two entries are listed only with all four functions, both texts and a client setting, and then
+-- close the dropdown for the text at the character; either way the page keeps its layout.
 do
 	local built, err = pcall(function()
 		Window.Show()
 		ClickEntry("general")
 	end)
 	assert(built, "the page could not be built: " .. tostring(err))
-	local function Switch(label)
-		return Find(MSBTOptionsWindowFrame, function(region)
-			return region.checkFrame and region.fontString:GetText() == label and region.shown
-		end)
+	local function Labels(text)
+		local labels = {}
+		for _, entry in ipairs(assert(env.Menu(text), "a dropdown is missing")) do labels[#labels + 1] = entry.text end
+		return table.concat(labels, "|")
 	end
-	local reputation, honor = Switch("Reputation Changes"), Switch("Honorable Kills")
-	-- Hidden or not, no switch is built where it cannot work.
-	local switches = FindAll(MSBTOptionsWindowFrame, function(region) return region.switch end)
-	assert(#switches == (scenario == "only" and 2 or 0), "the number of built switches differs")
-	local own = Switch("Effects on targets")
+	local onMe, onTarget = Labels(L.WINDOW.blizzardOnMe), Labels(L.WINDOW.blizzardOnTarget)
+	local profile = L.WINDOW.incoming .. "|" .. L.WINDOW.notifications
 	if scenario == "only" then
-		-- The two rows are the first of the Blizzard column, below the sub-options.
-		assert(reputation and honor, "a switch is missing")
-		assert(reputation.points.TOPLEFT.x == 345 and reputation.points.TOPLEFT.y == -114
-			and honor.points.TOPLEFT.y == -138, "the switches are not below the sub-options")
-		assert(not own, "an effect switch was built without its functions")
+		assert(onMe == profile .. "|Reputation Changes|Honorable Kills", "an entry is missing: " .. onMe)
+		assert(onTarget == L.WINDOW.blizzardNumbers, "an effect entry was listed without its functions: " .. onTarget)
 	else
-		assert(not reputation and not honor, "a switch appeared without what it needs")
-		assert(own and own.points.TOPLEFT.x == 345 and own.points.TOPLEFT.y == -114, "the effect switch moved")
+		assert(onMe == profile, "an entry appeared without what it needs: " .. onMe)
+		assert(onTarget == L.WINDOW.blizzardNumbers .. "|Effects on targets|Effects on other players' targets",
+			"the effect entries differ: " .. onTarget)
 	end
+	-- No checkbox of the page stands for any of them.
+	local checkboxes = FindAll(MSBTOptionsWindowFrame, function(region)
+		local text = region.checkFrame and region.fontString:GetText()
+		return text == "Reputation Changes" or text == "Honorable Kills" or text == "Effects on targets"
+	end)
+	assert(#checkboxes == 0, "a checkbox was built for an entry of the dropdowns")
 	local function Section(top)
 		return Find(MSBTOptionsWindowFrame, function(region)
 			local point = region.points and region.points.TOPLEFT
 			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
 		end)
 	end
-	assert(Section(0).height == 170 and Section(180).height == 150 and Section(340).height == 116,
-		"the layout differs from that with two rows")
+	assert(Section(0).height == 130 and Section(140).height == 150 and Section(300).height == 156,
+		"the layout changed with the entries")
 	local note = Find(MSBTOptionsWindowFrame, function(frame)
 		for _, region in ipairs(frame.regions) do
 			if region.GetText and region:GetText() == L.LANGUAGE_INFO then return true end
@@ -90,7 +91,7 @@ do
 	end)
 	for _, region in ipairs(note.regions) do
 		if region.GetText and region:GetText() == L.LANGUAGE_INFO then
-			assert(region.points.TOPLEFT.y == -66, "the language note is not where the grown section puts it")
+			assert(region.points.TOPLEFT.y == -96, "the language note moved")
 		end
 	end
 end

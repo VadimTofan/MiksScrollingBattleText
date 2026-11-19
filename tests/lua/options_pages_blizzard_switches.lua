@@ -69,14 +69,25 @@ local function Checkboxes(label)
 		return region.checkFrame and region.fontString:GetText() == label and region.shown
 	end)
 end
-local function Numbers() return Checkboxes(L.CHECKBOXES.disableOutgoing.label)[2] end
-local function Own() return Checkboxes(L.CHECKBOXES.spellMechanicsOwn.label)[1] end
-local function Others() return Checkboxes(L.CHECKBOXES.spellMechanicsOthers.label)[1] end
-local function Reputation() return Checkboxes(L.CHECKBOXES.blizzardReputation.label)[1] end
-local function Honor() return Checkboxes(L.CHECKBOXES.blizzardHonor.label)[1] end
-local function Toggle(checkbox, isChecked)
-	checkbox.checkFrame:SetChecked(isChecked)
-	Click(checkbox.checkFrame)
+-- The entries of the two dropdowns by a short name: an entry as the menu lists it when opened, the
+-- labels of a dropdown in their order, and a click on an entry where its text does not stand as wanted.
+local ON_ME, ON_TARGET = L.WINDOW.blizzardOnMe, L.WINDOW.blizzardOnTarget
+local LABELS = {
+	numbers = L.WINDOW.blizzardNumbers, own = L.CHECKBOXES.spellMechanicsOwn.label,
+	others = L.CHECKBOXES.spellMechanicsOthers.label, reputation = L.CHECKBOXES.blizzardReputation.label,
+	honor = L.CHECKBOXES.blizzardHonor.label,
+}
+local function Entry(name)
+	return env.MenuEntry(ON_ME, LABELS[name]) or env.MenuEntry(ON_TARGET, LABELS[name])
+end
+local function Labels(text)
+	local labels = {}
+	for _, entry in ipairs(env.Menu(text)) do labels[#labels + 1] = entry.text end
+	return table.concat(labels, "|")
+end
+local function Set(name, isShown)
+	local entry = Entry(name)
+	if entry:IsSelected() ~= isShown then entry:Pick() end
 end
 local function Cancel() Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.cancel))) end
 local function Apply() return Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)) end
@@ -110,33 +121,33 @@ local function Reset()
 	for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
 end
 
--- Rule: Blizzard's outgoing switch shows the client's numbers and saves through the profiles module.
+-- Rule: the entry for the numbers over targets shows the client and saves through the profiles module.
 do
 	Window.Show()
 	ClickEntry("general")
-	local numbers = Numbers()
-	assert(numbers, "the switch is missing")
-	-- Then it shows the client (numbers shown means the box is not checked) with the tooltip of the numbers.
-	assert(numbers:GetChecked() == false, "the switch does not show the client")
-	assert(numbers.checkFrame.tooltip == L.CHECKBOXES.disableOutgoing.blizzardTooltip, "the tooltip is not the numbers' one")
-	assert(Checkboxes(L.CHECKBOXES.disableOutgoing.label)[1].checkFrame.tooltip == L.CHECKBOXES.disableOutgoing.tooltip,
-		"MSBT's own switch lost its tooltip")
+	assert(Entry("numbers"), "the entry is missing")
+	-- Then it shows the client, ticked while the numbers show, and tells what it stands for.
+	assert(Entry("numbers"):IsSelected() == true, "the entry does not show the client")
+	local title, text = env.MenuTooltip(Entry("numbers"))
+	assert(title == L.WINDOW.blizzardNumbers and text == L.WINDOW.blizzardNumbersTooltip, "the entry has another tooltip")
+	-- And Blizzard's column has no checkbox for them; MSBT's own switch keeps its tooltip.
+	local outgoing = Checkboxes(L.CHECKBOXES.disableOutgoing.label)
+	assert(#outgoing == 1 and outgoing[1].checkFrame.tooltip == L.CHECKBOXES.disableOutgoing.tooltip,
+		"MSBT's own switch differs")
 
-	-- When the client changed meanwhile, then the next show has it.
+	-- When the client changed meanwhile, then the menu has it the next time it opens.
 	client.numbers = false
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(numbers:GetChecked() == true, "the switch did not take the client's value")
+	assert(Entry("numbers"):IsSelected() == false, "the entry did not take the client's value")
 
 	-- When it is clicked, then the profiles module is asked and the page writes nothing itself.
 	MikSBT.EraseTable(seen)
 	MikSBT.EraseTable(calls)
-	Toggle(numbers, false)
+	Entry("numbers"):Pick()
 	assert(Sets()[1] and Sets()[1][2] == "numbers" and Sets()[1][3] == true,
 		"the click did not ask the profiles module to show the numbers")
 	assert(#calls == 0, "the page wrote a profile field itself")
 	assert(Profiles.currentProfile.blizzardOutgoingDisabled == nil, "the old profile field was written")
-	Toggle(numbers, true)
+	Entry("numbers"):Pick()
 	assert(Sets()[2] and Sets()[2][3] == false, "the click did not hide the numbers")
 	Reset()
 end
@@ -145,7 +156,7 @@ end
 do
 	Window.Show()
 	local before = env.Count()
-	Toggle(Own(), true)
+	Set("own", true)
 	assert(Marks().effectsOwn == 1, "the click set no mark")
 	assert(env.Count() == before and #snapshots:Diff(snapshots:GetLoginSnapshot()) == before,
 		"a mark reached the changes list")
@@ -168,8 +179,8 @@ do
 	Window.Show()
 	assert(seen[1] and seen[1][1] == "TakeBlizzardSwitches", "no record was taken at the opening")
 	ClickEntry("general")
-	Toggle(Others(), false)
-	Toggle(Numbers(), false)
+	Set("others", false)
+	Set("numbers", false)
 	Profiles.SetOption(nil, "animationSpeed", 60)
 	MikSBT.EraseTable(seen)
 	Cancel()
@@ -190,11 +201,11 @@ do
 
 	-- When Apply moved the base, then Cancel goes back to that state.
 	Open()
-	Toggle(Others(), false)
+	Set("others", false)
 	assert(Apply().enabled, "Apply stays disabled after a switch click")
 	Click(Apply())
 	assert(not Apply().enabled, "Apply stays enabled after it was applied")
-	Toggle(Numbers(), false)
+	Set("numbers", false)
 	Cancel()
 	assert(Marks().effectsOthers == 0 and Marks().numbers == nil and client.numbers == true,
 		"Cancel went back past Apply")
@@ -205,18 +216,20 @@ end
 do
 	Open()
 	assert(not Apply().enabled, "Apply is enabled at the opening")
-	Toggle(Numbers(), false)
+	Entry("numbers"):Pick()
 	assert(Apply().enabled, "a click on the numbers did not enable Apply")
 	-- Clicking it back leaves a mark, which is a difference from the opening.
-	Toggle(Numbers(), true)
-	assert(Apply().enabled, "the mark of a clicked switch was not counted as a difference")
+	Entry("numbers"):Pick()
+	assert(Entry("numbers"):IsSelected() == true and Apply().enabled,
+		"the mark of a clicked switch was not counted as a difference")
 	Click(Apply())
 	assert(not Apply().enabled, "Apply stays enabled after it was applied")
-	Toggle(Own(), true)
+	Set("own", true)
 	assert(Apply().enabled, "a click on an effect did not enable Apply")
-	-- A switch set to the state it already had in the record is no difference.
+	-- A switch clicked back to the state it had in the record is no difference.
 	Click(Apply())
-	Toggle(Own(), true)
+	Entry("own"):Pick()
+	Entry("own"):Pick()
 	assert(not Apply().enabled, "Apply is enabled with the record as it was")
 	-- A profile change still does it.
 	Reset()
@@ -231,7 +244,7 @@ end
 do
 	-- Hidden by Escape, which hides the frame itself.
 	Open()
-	Toggle(Own(), true)
+	Set("own", true)
 	-- Without the hook of the popups, which would clear the record as well.
 	local hooked = MSBTOptions.Popups.UseDesignPopups
 	MSBTOptions.Popups.UseDesignPopups = Noop
@@ -239,49 +252,49 @@ do
 	MSBTOptions.Popups.UseDesignPopups = hooked
 	Window.Show()
 	ClickEntry("general")
-	Toggle(Own(), false)
+	Set("own", false)
 	Cancel()
 	assert(Marks() and Marks().effectsOwn == 1, "after Escape the old record was used")
 	Reset()
 
 	-- Hidden by the window's own Hide.
 	Open()
-	Toggle(Own(), true)
+	Set("own", true)
 	Window.Hide()
 	Window.Show()
 	ClickEntry("general")
-	Toggle(Own(), false)
+	Set("own", false)
 	Cancel()
 	assert(Marks() and Marks().effectsOwn == 1, "after Hide the old record was used")
 	Reset()
 
 	-- Put away for a moment, then another design takes its popups.
 	Open()
-	Toggle(Own(), true)
+	Set("own", true)
 	Window.Hide(true)
 	MSBTOptions.Popups.UseDesignPopups("classic")
 	Window.Show()
 	ClickEntry("general")
-	Toggle(Own(), false)
+	Set("own", false)
 	Cancel()
 	assert(Marks() and Marks().effectsOwn == 1, "after another design opened the old record was used")
 	Reset()
 
 	-- Put away for a moment, then a Hide while it was hidden.
 	Open()
-	Toggle(Own(), true)
+	Set("own", true)
 	Window.Hide(true)
 	Window.Hide()
 	Window.Show()
 	ClickEntry("general")
-	Toggle(Own(), false)
+	Set("own", false)
 	Cancel()
 	assert(Marks() and Marks().effectsOwn == 1, "after a Hide while hidden the old record was used")
 	Reset()
 
 	-- Put away for a moment only: the record stays.
 	Open()
-	Toggle(Own(), true)
+	Set("own", true)
 	Window.Hide(true)
 	Window.Show()
 	ClickEntry("general")
@@ -298,36 +311,39 @@ do
 	MSBTOptionsWindowFrame.scripts.OnShow = onShow
 	assert(seen[1] and seen[1][1] == "TakeBlizzardSwitches", "Show took no record")
 	ClickEntry("general")
-	Toggle(Own(), true)
+	Set("own", true)
 	Cancel()
 	assert(Marks() == nil or Marks().effectsOwn == nil, "Cancel did not restore after a Show without OnShow")
 	Reset()
 end
 
--- Rule: the reputation and honor switches show the client, save through the profiles module and are put back by Cancel.
+-- Rule: the reputation and honor entries show the client, save through the profiles module and are put back by Cancel.
 do
 	Open()
-	local reputation, honor = Reputation(), Honor()
-	assert(reputation and honor, "a switch is missing")
-	assert(reputation:GetChecked() == true and honor:GetChecked() == false, "the switches do not show the client")
-	assert(reputation.Enable == Others().Enable, "the switch is not skinned")
+	assert(Entry("reputation") and Entry("honor"), "an entry is missing")
+	assert(Entry("reputation"):IsSelected() == true and Entry("honor"):IsSelected() == false,
+		"the entries do not show the client")
+	local title, text = env.MenuTooltip(Entry("reputation"))
+	assert(title == L.CHECKBOXES.blizzardReputation.label and text == L.CHECKBOXES.blizzardReputation.tooltip,
+		"the entry does not have the text of its classic checkbox")
 
-	-- Then they stand in the Blizzard column, in the two rows below the effect switches.
-	assert(Own().points.TOPLEFT.y == -114 and Others().points.TOPLEFT.y == -138, "the effect switches moved")
-	assert(reputation.points.TOPLEFT.x == 345 and reputation.points.TOPLEFT.y == -162
-		and honor.points.TOPLEFT.x == 345 and honor.points.TOPLEFT.y == -186, "the rows are not below the effects")
-	-- And the first section grew by them, the second closed its rows up, the third gave the room back.
+	-- Then they close the text at the character, after the profile's two; the effects follow the numbers.
+	assert(Labels(ON_ME) == L.WINDOW.incoming .. "|" .. L.WINDOW.notifications .. "|" .. LABELS.reputation .. "|"
+		.. LABELS.honor, "the text at the character differs: " .. Labels(ON_ME))
+	assert(Labels(ON_TARGET) == LABELS.numbers .. "|" .. LABELS.own .. "|" .. LABELS.others,
+		"the text over targets differs: " .. Labels(ON_TARGET))
+	-- And with all seven entries the sections keep their heights, the rows of the second their distance.
 	local function Section(top)
 		return Find(MSBTOptionsWindowFrame, function(region)
 			local point = region.points and region.points.TOPLEFT
 			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
 		end)
 	end
-	assert(Section(0) and Section(228) and Section(378), "the sections do not follow the new rows")
-	assert(Section(0).height == 218 and Section(228).height == 140 and Section(378).height == 78,
-		"the sections differ from the grown layout")
+	assert(Section(0) and Section(140) and Section(300), "the sections moved with the entries")
+	assert(Section(0).height == 130 and Section(140).height == 150 and Section(300).height == 156,
+		"the sections changed with the entries")
 	local lastRow = Checkboxes(L.CHECKBOXES.shortenNumbers.label)[1]
-	assert(lastRow.points.TOPLEFT.y == -12 - 4 * 24, "the second section kept its wide rows")
+	assert(lastRow.points.TOPLEFT.y == -12 - 4 * 26, "the second section closed its rows up")
 	local note = Find(MSBTOptionsWindowFrame, function(frame)
 		for _, region in ipairs(frame.regions) do
 			if region.GetText and region:GetText() == L.LANGUAGE_INFO then return true end
@@ -335,57 +351,50 @@ do
 	end)
 	for _, region in ipairs(note.regions) do
 		if region.GetText and region:GetText() == L.LANGUAGE_INFO then
-			assert(region.points.TOPLEFT.y == -52, "the language note did not follow the third section")
+			assert(region.points.TOPLEFT.y == -96, "the language note moved")
 		end
 	end
 	-- And the reset button stands with its hint under the slider of the second section, so the
-	-- third holds no text but the note, which may take two lines there.
+	-- third holds no text but the note.
 	local reset = Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.resetBlizzardSCT.label))
 	local top = -reset.points.TOPLEFT.y
-	assert(reset.parent == Section(228) and reset.points.TOPLEFT.x == 345, "the reset button left the second section")
+	assert(reset.parent == Section(140) and reset.points.TOPLEFT.x == 345, "the reset button left the second section")
 	assert(top >= 30 + 30, "the reset button is not below the slider")
-	assert(top + reset.height + 6 + 2 * 12 <= Section(228).height, "the hint of the reset button leaves the section")
-	for _, region in ipairs(Section(378).regions) do
+	assert(top + reset.height + 6 + 2 * 12 <= Section(140).height, "the hint of the reset button leaves the section")
+	for _, region in ipairs(Section(300).regions) do
 		assert(region.kind ~= "FontString" or region:GetText() == L.LANGUAGE_INFO, "a text shares the third section with the note")
 	end
 
 	-- When one is clicked, then the profiles module is asked with its name and the new state.
-	Toggle(honor, true)
+	Set("honor", true)
 	assert(Sets()[1] and Sets()[1][2] == "honor" and Sets()[1][3] == true, "the click did not set the honor switch")
-	Toggle(reputation, false)
+	Set("reputation", false)
 	assert(Sets()[2] and Sets()[2][2] == "reputation" and Sets()[2][3] == false, "the click did not set the reputation switch")
 	assert(#calls == 0, "a click wrote to the profile")
 	assert(Apply().enabled, "a click on a switch did not enable Apply")
 
-	-- When the client has the opposite of what the clicks left and the profile has no mark, then the next
-	-- show has the client's values, however the page showed the switches before.
+	-- When the client has the opposite of what the clicks left and the profile has no mark, then the menu
+	-- has the client's values the next time it opens.
 	Profiles.currentProfile.blizzardSwitches = nil
 	client.reputation, client.honor = true, false
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(Reputation():GetChecked() == true and Honor():GetChecked() == false, "the page kept the values of its first show")
+	assert(Entry("reputation"):IsSelected() == true and Entry("honor"):IsSelected() == false,
+		"the entries kept the values of an earlier opening")
 
-	-- When the client changed again, then the next show has that too; a missing setting hides its switch.
+	-- When the client changed again, then the menu has that too; a missing setting leaves its entry out.
 	client.reputation, client.honor = false, true
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(Reputation():GetChecked() == false and Honor():GetChecked() == true, "the switches did not take the client's values")
+	assert(Entry("reputation"):IsSelected() == false and Entry("honor"):IsSelected() == true,
+		"the entries did not take the client's values")
 	client.reputation = nil
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(not Reputation() and Honor().points.TOPLEFT.y == -162, "a missing setting kept its row")
+	assert(not Entry("reputation") and Entry("honor") and #env.Menu(ON_ME) == 3, "a missing setting kept its entry")
 	client.reputation = true
 	client.effectsOwn = nil
-	ClickEntry("sounds")
-	ClickEntry("general")
-	assert(not Own() and Reputation().points.TOPLEFT.y == -138 and Honor().points.TOPLEFT.y == -162,
-		"a missing effect switch left its row to the switches below")
+	assert(not Entry("own") and Entry("others") and #env.Menu(ON_TARGET) == 2, "a missing effect setting kept its entry")
 	Reset()
 
 	-- When the window opened, then Cancel gives the record back and the client has its values from then.
 	Open()
-	Toggle(Honor(), true)
-	Toggle(Reputation(), false)
+	Set("honor", true)
+	Set("reputation", false)
 	Cancel()
 	assert(client.reputation == true and client.honor == false, "Cancel did not put the switches back")
 	assert(Marks() == nil or (Marks().reputation == nil and Marks().honor == nil), "Cancel left a mark")

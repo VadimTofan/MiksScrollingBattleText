@@ -1,7 +1,7 @@
 -- Describe: the General page of the new options window without the client text switches.
 local env = dofile("tests/lua/options_window_env.lua")
 local Profiles, L, Window = env.Profiles, env.L, env.Window
-local Find, FindAll, ClickEntry = env.Find, env.FindAll, env.ClickEntry
+local Find, ClickEntry = env.Find, env.ClickEntry
 
 -- The texts exist, but the profiles module has no functions for the client setting.
 L.CHECKBOXES.spellMechanicsOwn = { label = "Effects on targets", tooltip = "Effects tip" }
@@ -39,11 +39,8 @@ do
 			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
 		end)
 	end
-	local switches = FindAll(MSBTOptionsWindowFrame, function(region)
-		local text = region.checkFrame and region.fontString:GetText()
-		return text == L.CHECKBOXES.spellMechanicsOwn.label or text == L.CHECKBOXES.spellMechanicsOthers.label
-	end)
-	assert(#switches == 0, "a switch appeared without its functions")
+	local onTarget = assert(env.Menu(L.WINDOW.blizzardOnTarget), "the dropdown for the text over targets is missing")
+	assert(#onTarget == 1 and onTarget[1].text == L.WINDOW.blizzardNumbers, "an entry appeared without its functions")
 	assert(Section(0).height == 130 and Section(140).height == 150 and Section(300).height == 156,
 		"the layout changed")
 	local note = Find(MSBTOptionsWindowFrame, function(frame)

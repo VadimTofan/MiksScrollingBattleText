@@ -1,8 +1,8 @@
--- Describe: Blizzard's Disable outgoing on the General page where the profiles module has the Blizzard
+-- Describe: the numbers over targets on the General page where the profiles module has the Blizzard
 -- switch functions but the locale has no text for the numbers switch.
 local env = dofile("tests/lua/options_window_env.lua")
 local calls, Profiles, L, Window = env.calls, env.Profiles, env.L, env.Window
-local FindAll, Click, ClickEntry = env.FindAll, env.Click, env.ClickEntry
+local ClickEntry = env.ClickEntry
 
 -- The functions of the profiles module that offer the Blizzard switches, as the effect and text switches use them.
 local function Fail() error("the page used a Blizzard switch for the outgoing option") end
@@ -29,23 +29,20 @@ for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSp
 dofile("MSBTOptions/MSBTOptionsSounds.lua")
 dofile("MSBTOptions/Designs/Forever/Pages.lua")
 
--- Rule: without the numbers tooltip the outgoing switch stays on the profile option.
+-- Rule: without the numbers text the entry for the numbers stays on the profile option.
 do
 	Window.Show()
 	ClickEntry("general")
-	local outgoing = FindAll(MSBTOptionsWindowFrame, function(region)
-		return region.checkFrame and region.fontString:GetText() == L.CHECKBOXES.disableOutgoing.label and region.shown
-	end)[2]
-	assert(outgoing, "the switch is missing")
-	-- Then it shows the profile option with MSBT's own tooltip.
-	assert(outgoing:GetChecked() == true, "the switch does not show the profile option")
-	assert(outgoing.checkFrame.tooltip == L.CHECKBOXES.disableOutgoing.tooltip, "the tooltip is not the option's one")
+	local function Numbers() return env.MenuEntry(L.WINDOW.blizzardOnTarget, L.WINDOW.blizzardNumbers) end
+	assert(Numbers(), "the entry is missing")
+	-- Then it shows the profile option: not ticked while the option switches the numbers off.
+	assert(Numbers():IsSelected() == false, "the entry does not show the profile option")
 
 	-- When it is clicked, then the profile option is saved and the Blizzard switch is left alone.
 	MikSBT.EraseTable(calls)
-	outgoing.checkFrame:SetChecked(false)
-	Click(outgoing.checkFrame)
+	Numbers():Pick()
 	assert(Profiles.currentProfile.blizzardOutgoingDisabled == false, "the click did not save the profile option")
 	assert(calls[1] and calls[1][1] == "SetOption" and calls[1][3] == "blizzardOutgoingDisabled" and calls[1][4] == false,
 		"the click did not go through the profile option")
+	assert(Numbers():IsSelected() == true, "the entry is not ticked while the numbers show")
 end
