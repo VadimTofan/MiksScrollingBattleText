@@ -61,6 +61,13 @@ local function Tells(text)
 		end
 	end)
 end
+-- The color a shown text is written in, and a color of the design, as one string each.
+local function Shade(color) return ("%.3f %.3f %.3f"):format(color[1], color[2], color[3]) end
+local function ColorOf(text)
+	for _, region in ipairs(Tells(text).regions) do
+		if region.shown and region.GetText and region:GetText() == text then return Shade(region.textColor) end
+	end
+end
 
 -- Rule: where the classic tabs have the developer share, it has every function the page calls.
 do
@@ -128,5 +135,14 @@ do
 	assert(list.height == 40 + 12 + (2 * 18 + 6) + (18 + 6), "the section does not fit its lines: " .. list.height)
 	Click(Find(MSBTOptionsWindowFrame, Labelled(texts.debugWindow)))
 	assert(toggled == 1, "the button did not toggle the debug window")
+end
+
+-- Rule: a differing table is written in orange, apart from the list's title and from a table that fits.
+do
+	local orange = Shade(Window.COLORS.orange)
+	assert(ColorOf("HealSpells: 1.60.1.70888, " .. texts.clientNewer) == orange, "a differing table is not written in orange")
+	assert(ColorOf(texts.tables) ~= orange, "the list's title has the color of a differing table")
+	assert(ColorOf("SkillLineIcons: 1.60.1.70959, " .. texts.fits) == Shade(Window.COLORS.text),
+		"a fitting table is not written in the text color")
 end
 print("developer page OK", scenario)

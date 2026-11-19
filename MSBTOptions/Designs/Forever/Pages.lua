@@ -424,7 +424,8 @@ end
 
 
 -- The developer page: the client's build with the button for the debug window, and the generated
--- tables. A table whose source differs from the client stands out and names its script below.
+-- tables. A table whose source differs from the client stands out in orange, apart from the gold of
+-- the titles, and names its script below.
 -- The tables do not change while the game runs, so the page is written once.
 local function CreateDeveloper(page)
 	local locale = L.DEVELOPER
@@ -447,7 +448,7 @@ local function CreateDeveloper(page)
 	local top = DEVELOPER_LIST_TOP
 	for _, entry in ipairs(tables) do
 		local fits = entry.state == "fits"
-		fontString = CreateText(section, "GameFontHighlight", fits and COLORS.text or COLORS.gold,
+		fontString = CreateText(section, "GameFontHighlight", fits and COLORS.text or COLORS.orange,
 			entry.name .. ": " .. entry.build .. ", " .. locale[entry.state])
 		fontString:SetPoint("TOPLEFT", section, "TOPLEFT", 12, -top)
 		top = top + DEVELOPER_LINE_HEIGHT
