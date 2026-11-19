@@ -167,6 +167,23 @@ for _, language in ipairs({ "deDE", "enUS" }) do
 		Expect(Incoming(10.25, false), REGROWTH, "Regrowth with an enemy selected, sent at " .. label)
 	end
 
+	-- Given a client where a unit has a surname: UnitName gives it as the second name, and the name
+	-- a cast is sent at joins the two with the client's separator.
+	local unitName = UnitName
+	Constants = { CharacterNameSeparatorConsts = { CHARACTERNAME_SURNAME_SEPARATOR = " " } }
+	UnitName = function(unit)
+		if unit == "player" then return "Druid", "Green" end
+		return unitName(unit)
+	end
+	for _, selected in ipairs({ "enemy", false }) do
+		ns.ResetHealing(); target = selected or nil
+		Cast(REGROWTH, selected and "target1" or nil, 10, "Druid Green")
+		-- Then its heal on you is yours.
+		Expect(Incoming(10.25, false), REGROWTH,
+			"Regrowth sent at your name and surname with " .. (selected or "nothing") .. " selected")
+	end
+	UnitName, Constants = unitName, nil
+
 	-- Given a heal sent at a friend while an enemy or nothing is selected.
 	for _, selected in ipairs({ "enemy", false }) do
 		ns.ResetHealing(); target = selected or nil

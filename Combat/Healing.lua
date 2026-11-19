@@ -168,6 +168,21 @@ local function ParseDuration(spell)
 	end
 end
 
+-- Whether a cast sent at this name went to the unit. UnitName gives a unit's
+-- second name apart: its realm, which the sent name carries after "-", or,
+-- where units have surnames (Forever), its surname after the client's own
+-- separator.
+local function IsNamed(target, token)
+	local ok, name, second = pcall(UnitName, token)
+	if not ok or not ns.Text(name) then return false end
+	if target == name then return true end
+	if not ns.Text(second) then return false end
+	local separators = Constants and Constants.CharacterNameSeparatorConsts
+	local surname = separators and separators.CHARACTERNAME_SURNAME_SEPARATOR
+	return target == name .. "-" .. second
+		or (ns.Text(surname) and target == name .. surname .. second) or false
+end
+
 function ns.NoteHealTarget(unit, target, guid, spell, now)
 	if (unit ~= "player" and unit ~= "pet")
 		or not ns.Text(guid) or not ns.Number(spell, 1) then return end
@@ -180,9 +195,7 @@ function ns.NoteHealTarget(unit, target, guid, spell, now)
 	else
 		if not ns.Text(target) or type(UnitName) ~= "function" then return end
 		for _, token in ipairs({ "player", "pet" }) do
-			local ok, name, realm = pcall(UnitName, token)
-			if ok and ns.Text(name) and (target == name
-				or (ns.Text(realm) and target == name .. "-" .. realm)) then
+			if IsNamed(target, token) then
 				if recipient then return end
 				recipient = token
 			end
@@ -190,9 +203,7 @@ function ns.NoteHealTarget(unit, target, guid, spell, now)
 		if not recipient then
 			-- A name that is not yours, your pet's or your target's is a
 			-- friend the cast went to, so it does not land on you.
-			local ok, name, realm = pcall(UnitName, "target")
-			if ok and ns.Text(name) and (target == name
-				or (ns.Text(realm) and target == name .. "-" .. realm)) then return end
+			if IsNamed(target, "target") then return end
 			recipient = false
 		end
 	end
