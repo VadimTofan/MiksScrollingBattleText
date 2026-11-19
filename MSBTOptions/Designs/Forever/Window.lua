@@ -1446,11 +1446,13 @@ end
 
 
 local function Show()
-	-- Put away from the game's settings window, the options come back there.
+	-- Put away from the game's settings window, the options come back there, a frame later. The
+	-- positioning window asks from its OnHide, and the game runs the settings window's own OnShow
+	-- only after such a script: that OnShow would put the window back on its first page.
 	if reopenSettings then
 		local reopen = reopenSettings
 		reopenSettings = nil
-		reopen()
+		C_Timer.After(0, reopen)
 		return
 	end
 	if not frame then CreateWindow() end

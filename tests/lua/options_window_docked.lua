@@ -23,11 +23,28 @@ SettingsPanel:SetScript("OnHide", function()
 	if panel then panel:Hide() end
 end)
 function HideUIPanel(frame) frame:Hide() end
+-- A timer runs when the test lets a frame pass.
+local timers = {}
+C_Timer = { After = function(_, callback) timers[#timers + 1] = callback end }
+local function NextFrame()
+	local due = timers
+	timers = {}
+	for _, callback in ipairs(due) do callback() end
+end
+-- The game runs the settings window's own OnShow only after a script that hides a frame has
+-- returned, and that OnShow puts the window on its first page. So a page it is opened at from
+-- inside such a script does not stay: the window ends on a page of the game.
+local hiding = 0
+local function InHideScript(run)
+	hiding = hiding + 1
+	run()
+	hiding = hiding - 1
+end
 local function Open(key)
-	local panel = panels[key]
+	local panel = hiding == 0 and panels[key] or nil
 	if currentPanel and currentPanel ~= panel then currentPanel:Hide() end
 	currentPanel = panel
-	panel:Show()
+	if panel then panel:Show() end
 	SettingsPanel:Show()
 end
 
@@ -348,8 +365,15 @@ do
 		"putting away left the settings window open")
 	assert(Popups.design == "forever", "putting away ended the session")
 
-	-- When the options are requested again.
-	Designs.Show()
+	-- When the options are requested again from a script that hides a frame, as the positioning
+	-- window does when it closes.
+	InHideScript(Designs.Show)
+
+	-- Then nothing opens inside that script, where the settings window would not keep the page.
+	assert(not SettingsPanel:IsShown() and not Frame():IsShown(), "the options came back inside the hiding script")
+
+	-- When a frame has passed.
+	NextFrame()
 
 	-- Then the settings window opens at the same page, not the standalone window.
 	assert(SettingsPanel:IsShown() and Frame():GetParent() == panels.scrollAreas and Window.IsDocked()
@@ -364,6 +388,7 @@ do
 	Open("sounds")
 	Designs.Hide()
 	Designs.Show()
+	NextFrame()
 	CloseSettings()
 
 	-- When they are requested again.
