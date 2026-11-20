@@ -9,6 +9,9 @@ local EMPTY = {}
 -- The marks of the Blizzard text switches live in each profile but stay out of the snapshots:
 -- they are not listed, counted, reverted or restored here, as they follow the client.
 local MARKS = "blizzardSwitches"
+-- The note that a profile's ranged events were made is written when the profile is selected. It is
+-- no setting, so it is not listed or counted; a restore still takes it back with the rest.
+local MIGRATED = "rangedEventsMigrated"
 
 function ProfileSnapshots:New(options)
 	local snapshots = setmetatable({}, self)
@@ -76,7 +79,7 @@ local found, limit, master
 
 -- Profiles sit at depth 2; inside one, a missing raw value is the master value at that path.
 local function CompareValues(entries, path, depth, key, old, new, default)
-	if depth == 3 and key == MARKS then return end
+	if depth == 3 and (key == MARKS or key == MIGRATED) then return end
 	path[depth] = key
 	local oldIsTable, newIsTable = type(old) == "table", type(new) == "table"
 	-- A profile on one side only is one entry, so a revert copies or removes it whole.

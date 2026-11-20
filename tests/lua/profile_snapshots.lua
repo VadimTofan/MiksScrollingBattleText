@@ -306,4 +306,51 @@ do
 	profiles.DeleteProfile("Visited")
 end
 
+-- Rule: the note that a profile's ranged events were made is neither listed nor counted, and a
+-- restore takes it back with the rest.
+do
+	-- Given a Forever client, where selecting a profile makes its ranged events and notes that, and
+	-- two profiles as they were saved before those events came, one with a spell event of its own.
+	MikSBT.Compatibility.Client.isForever = true
+	profiles = LoadProfiles()
+	saved = profiles.savedVariables
+	snapshots = profiles.GetProfileSnapshots()
+	profiles.CopyProfile("Default", "Plain")
+	profiles.CopyProfile("Default", "Custom")
+	rawset(saved.profiles.Plain, "rangedEventsMigrated", nil)
+	rawset(saved.profiles.Custom, "rangedEventsMigrated", nil)
+	rawset(saved.profiles.Custom, "events", { OUTGOING_SPELL_DAMAGE = { message = "mine %a" } })
+	EnterWorld(true, false)
+	local login = snapshots:GetLoginSnapshot()
+	assert(snapshots:Count(login) == 0, "the login state differs from its own snapshot")
+
+	-- When the plain one is selected.
+	profiles.SelectProfile("Plain")
+	assert(rawget(saved.profiles.Plain, "rangedEventsMigrated") == true, "selecting the profile left no note")
+
+	-- Then only the selection is a change.
+	local entries = snapshots:Diff(login)
+	assert(#entries == 1 and entries[1].key == "currentProfileName",
+		"the note counts as a change: " .. #entries .. " entries")
+	assert(snapshots:Count(login) == 1, "the note is counted")
+
+	-- When the one with its own spell event is selected, then the events made for it are listed,
+	-- as they are settings, and the note is not.
+	profiles.SelectProfile("Custom")
+	local listed = {}
+	for _, entry in ipairs(snapshots:Diff(login)) do listed[entry.key] = true end
+	assert(listed["profiles.Custom.events.OUTGOING_RANGED_DAMAGE.message"], "a made event is not listed")
+	assert(not listed["profiles.Custom.rangedEventsMigrated"] and not listed["profiles.Plain.rangedEventsMigrated"],
+		"a note is listed")
+
+	-- When the login state is restored, then the notes go with the events that were made.
+	snapshots:Restore(login)
+	assert(rawget(saved.profiles.Plain, "rangedEventsMigrated") == nil, "a restore kept the note")
+	assert(rawget(saved.profiles.Custom, "rangedEventsMigrated") == nil
+		and rawget(saved.profiles.Custom.events, "OUTGOING_RANGED_DAMAGE") == nil,
+		"a restore kept what the selection made")
+	assert(snapshots:Count(login) == 0, "the restored state differs from the login snapshot")
+	MikSBT.Compatibility.Client.isForever = nil
+end
+
 print("Profile snapshot tests passed")
