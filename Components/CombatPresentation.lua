@@ -532,23 +532,23 @@ function Presentation:In(record)
 end
 
 function Presentation:Aura(gained, harmful, name, icon, spellID)
-	local rules = self.config.getProfile().auraTracking
-	if rules and not MikSBT.Configuration.AuraTracking:ShouldShow(
-		rules, spellID, name) then return end
+	local profile = self.config.getProfile()
+	local rules = profile.auraTracking
+	local tracking = rules and MikSBT.Configuration.AuraTracking
+	if rules and not tracking:ShouldShow(rules, spellID, name) then return end
 	local key = "NOTIFICATION_" .. (harmful and "DEBUFF" or "BUFF")
 		.. (gained and "" or "_FADE")
-	local settings = self:Settings(key)
+	local id = rules and tracking:FindID(rules, spellID, name)
+	local settings = id and tracking:GetSettings(profile, id, key)
+		or profile.events[key]
 	if not settings then return end
-	if rules then
-		local tracking = MikSBT.Configuration.AuraTracking
-		local id = tracking:FindID(rules, spellID, name)
-		if id and rules[id] ~= nil then
-			settings = tracking:GetSettings(self.config.getProfile(), id, key)
-		end
+	if settings.disabled then
+		if harmful or not id then return end
+		-- A tracked buff inherits the general style, including the fade message.
+		settings = setmetatable({ disabled = false }, { __index = settings })
 	end
 	if RestrictedValue:IsRestricted(name) then
-		local visibility = rules and MikSBT.Configuration.AuraTracking
-			:SecretVisibility(rules, name)
+		local visibility = rules and tracking:SecretVisibility(rules, name)
 		if visibility then
 			-- Native visibility cannot selectively suppress sound playback.
 			settings = setmetatable({
