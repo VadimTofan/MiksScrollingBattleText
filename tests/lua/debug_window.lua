@@ -1643,7 +1643,7 @@ do
 		assert(#popupsShown == 1 and Popup().which == "MSBT_DEBUG_RECORD_START" and dialog, "a click did not show the question")
 		assert(dialog.button1 == "Start" and dialog.button2 == "Cancel" and dialog.timeout == 0 and dialog.whileDead
 			and dialog.hideOnEscape and dialog.preferredIndex == 3, "the question is not set up as asked")
-		for _, part in ipairs({ "combat log", "switched on", "switched off", "SavedVariables", "WoWCombatLog", "reload",
+		for _, part in ipairs({ "combat log", "If the combat log is off", "turns it on until the recording stops", "SavedVariables", "WoWCombatLog", "reload",
 			"3 recordings", "oldest" }) do
 			assert(dialog.text:find(part, 1, true), "the question does not say " .. part)
 		end
@@ -1894,6 +1894,20 @@ do
 		saved.optionsDesign = nil
 		Slash()
 		assert(Window() == window and button.label == "Record", "the classic window came back with the state of before")
+	end
+
+	-- Given a combat log the player started before recording.
+	do
+		combatLogOn = true
+		local callsBefore = #combatLogCalls
+
+		-- When a recording starts and stops.
+		Begin()
+		Click(button)
+
+		-- Then the existing combat log keeps running.
+		assert(combatLogOn, "stopping the recording turned off an existing combat log")
+		assert(#combatLogCalls == callsBefore, "recording changed an existing combat log")
 	end
 
 	saved.debugRecordings = nil

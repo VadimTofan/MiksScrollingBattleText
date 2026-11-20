@@ -736,17 +736,18 @@ local function StartRecording()
 	local current = { rows = {}, times = {}, tests = {}, seen = {}, startedAt = Precise(), date = date("%m/%d/%Y"),
 		second = time(), combatLog = "unavailable" }
 	recording = current
-	local isLogging = type(LoggingCombat) == "function"
-	if isLogging then current.combatLog = LoggingCombat() and "already on" or "switched on" end
+	if type(LoggingCombat) == "function" then
+		current.startedCombatLog = not LoggingCombat()
+		current.combatLog = current.startedCombatLog and "switched on" or "already on"
+	end
 	Log("record", "started", "combat log " .. current.combatLog)
 	local hearing = Recorder()
 	for _, event in ipairs({ "CHAT_LOGGING_CHANGED", "PLAYER_LOGOUT" }) do
 		if not pcall(hearing.RegisterEvent, hearing, event) then Log("record", "event unavailable", event) end
 	end
 	hearing:SetScript("OnUpdate", AlignClock)
-	-- The game logs the fight only while the combat log is on, and the stop switches it off. It writes the file
-	-- in blocks: the last one can come minutes after the stop, since neither the stop nor a reload writes it.
-	if isLogging then LoggingCombat(true) end
+	-- The game writes the log in blocks. The last block can arrive minutes after stopping.
+	if current.startedCombatLog then LoggingCombat(true) end
 	if C_ChatInfo and C_ChatInfo.IsLoggingCombat then
 		Log("record", "combat log state", C_ChatInfo.IsLoggingCombat())
 	end
@@ -769,8 +770,8 @@ local function ShowStartPopup()
 			-- The client wraps the text only between words, and a word wider than the dialog cuts the rest
 			-- off, so the places of the files are named in short words.
 			text = "Record the log together with the game's combat log?\n\nThe ticked tests start anew, and tests"
-				.. " ticked while it records are recorded from their start. The combat log is switched on now and"
-				.. " switched off when the recording stops.\n\nThe game writes the recording to disk only when the"
+				.. " ticked while it records are recorded from their start. If the combat log is off, this"
+				.. " turns it on until the recording stops.\n\nThe game writes the recording to disk only when the"
 				.. " interface reloads or on logout: into the saved variables of MikScrollingBattleText, in the folders"
 				.. " WTF, your account, SavedVariables. The combat log goes to the folder Logs, into a WoWCombatLog file."
 				.. " A reload is offered when the recording stops. At most "
@@ -812,16 +813,17 @@ local function ShowSavePopup(entry)
 end
 
 
--- Ends the recording that runs, whichever way it ends: the tests stop, the combat log is switched off, and
--- the recording is saved with the settings. Anything but a logout then offers the reload that makes the
--- game write the settings to disk.
+-- Stop the tests and save the recording. Restore combat logging if the recorder
+-- enabled it. Offer to reload so the game writes the recording to disk.
 function StopRecording(reason)
 	local current = recording
 	if not current or current.isEnding then return end
 	current.isEnding = true
 	for _, key in ipairs(current.tests) do StopTest(key) end
 	if shownWindow then UpdateTests(shownWindow) end
-	if type(LoggingCombat) == "function" then LoggingCombat(false) end
+	if current.startedCombatLog and type(LoggingCombat) == "function" then
+		LoggingCombat(false)
+	end
 	Log("record", "stopped", reason, #current.rows + 1)
 	recorder:UnregisterAllEvents()
 	recorder:SetScript("OnUpdate", nil)
