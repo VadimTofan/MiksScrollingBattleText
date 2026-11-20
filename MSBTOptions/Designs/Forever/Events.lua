@@ -28,7 +28,8 @@ local COLUMN_EVENT = 26
 local COLUMN_PREVIEW = 136
 local COLUMN_AREA = 256
 local COLUMN_SOUND = 364
-local SOUND_ICON = "Interface\\Addons\\MikScrollingBattleText\\MSBTOptions\\Designs\\Forever\\Artwork\\FlatSound"
+local HEADER_INSET = 8
+local SOUND_ICON ="Interface\\Addons\\MikScrollingBattleText\\MSBTOptions\\Designs\\Forever\\Artwork\\FlatSound"
 local SOUND_ICON_SIZE = 16
 local SEARCH_CATEGORIES = { "INCOMING_PLAYER_EVENTS", "INCOMING_PET_EVENTS", "OUTGOING_PLAYER_EVENTS",
 	"OUTGOING_PET_EVENTS", "NOTIFICATION_EVENTS", "LOOT_EVENTS" }
@@ -253,6 +254,22 @@ local function CreateRow(this)
 	soundIcon:SetPoint("LEFT", row, "LEFT", COLUMN_SOUND, 0)
 	soundIcon:SetVertexColor(COLORS.gold[1], COLORS.gold[2], COLORS.gold[3])
 	row.soundIcon = soundIcon
+
+	-- A group header stands on a bar over the whole row, with a line on its upper edge and its
+	-- text in white, as the groups of the sidebar.
+	row.headerBar = MSBTWindow.Fill(row, COLORS.bar)
+	local edge = row:CreateTexture(nil, "BORDER")
+	edge:SetColorTexture(COLORS.border[1], COLORS.border[2], COLORS.border[3])
+	edge:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+	edge:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+	edge:SetHeight(1)
+	row.headerEdge = edge
+	local header = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	header:SetJustifyH("LEFT")
+	header:SetWordWrap(false)
+	header:SetWidth(tableWidth - 2 * HEADER_INSET)
+	header:SetPoint("LEFT", row, "LEFT", HEADER_INSET, 0)
+	row.headerFontString = header
 	return row
 end
 
@@ -263,12 +280,12 @@ local function DisplayRow(this, row, item)
 	row:EnableMouse(not isHeader)
 	row.enableCheckbox:SetShown(not isHeader)
 	row.removeButton:SetShown(type(item) == "string")
-	-- A header has the whole row for its text.
-	row.nameFontString:SetWidth(isHeader and tableWidth - COLUMN_EVENT or COLUMN_PREVIEW - COLUMN_EVENT - 4)
+	row.headerBar:SetShown(isHeader)
+	row.headerEdge:SetShown(isHeader)
+	row.headerFontString:SetText(isHeader and item.header or "")
 	if isHeader then
 		row.tooltip, row.eventType, row.auraID = nil, nil, nil
-		row.nameFontString:SetText(item.header)
-		SetColor(row.nameFontString, COLORS.gold)
+		row.nameFontString:SetText("")
 		row.previewFontString:SetText("")
 		row.areaFontString:SetText("")
 		row.soundIcon:Hide()
@@ -296,7 +313,6 @@ local function DisplayRow(this, row, item)
 		row.tooltip = tooltip
 		row.soundIcon:SetShown(hasSound)
 	end
-	SetColor(row.nameFontString, COLORS.text)
 	row.previewFontString:SetText(Render(settings, eventType, auraID and auraEvent.codes or item.codes))
 	SetEventColor(row.previewFontString, settings)
 	-- A deleted scroll area leaves its key in the events that used it.

@@ -816,6 +816,19 @@ do
 	listbox:SetOffset(0)
 	local headerRow = Rows()[1]
 	assert(headerRow.mouseEnabled == false and not headerRow.enableCheckbox.shown, "a header row can be clicked")
+	-- And the header stands on a bar over the row, its text at the row's left edge.
+	assert(headerRow.headerBar.shown and headerRow.headerEdge.shown, "a header row has no bar")
+	assert(headerRow.headerFontString:GetText() == "Melee" and headerRow.headerFontString.point[4] == 8,
+		"the header's text does not stand on the bar's left edge")
+	assert((headerRow.nameFontString:GetText() or "") == "", "the header's text also stands in the event column")
+	-- And an event row has no bar, also the row that held a header before.
+	local eventRow = Rows()[2]
+	assert(not eventRow.headerBar.shown and not eventRow.headerEdge.shown
+		and (eventRow.headerFontString:GetText() or "") == "", "an event row carries a header's bar")
+	listbox:SetOffset(1)
+	assert(not headerRow.headerBar.shown and not headerRow.headerEdge.shown
+		and (headerRow.headerFontString:GetText() or "") == "", "a row kept the bar of the header it held before")
+	listbox:SetOffset(0)
 	ClickEntry("pet")
 	assert(Headers() == "Incoming \194\183 Melee,Incoming \194\183 Spells,Incoming \194\183 Healing,"
 		.. "Outgoing \194\183 Melee,Outgoing \194\183 Spells,Outgoing \194\183 Healing,Outgoing \194\183 Other",
