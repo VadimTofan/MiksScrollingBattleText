@@ -35,7 +35,7 @@ function GetBuildInfo()
 end
 
 -- Given no debug window
-dofile("Diagnostics/DeveloperTab.lua")
+dofile("Developer/DeveloperTab.lua")
 assert(not registered, "The Developer tab requires the debug window")
 
 -- Given the local debug window and build metadata
@@ -46,7 +46,7 @@ MikSBT.TABLE_BUILDS = {
 }
 
 -- When the local tab is loaded and opened
-dofile("Diagnostics/DeveloperTab.lua")
+dofile("Developer/DeveloperTab.lua")
 assert(registered == "Developer")
 shown()
 click()

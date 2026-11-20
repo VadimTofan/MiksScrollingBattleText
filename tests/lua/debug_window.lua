@@ -236,7 +236,7 @@ MSBTOptions.Designs.Register("listed", {})
 MSBTOptions.Designs.Register("wide", {})
 local framesBefore = #frames
 local SelectBefore = MSBTOptions.Designs.Select
-dofile("Diagnostics/DebugWindow.lua")
+dofile("Developer/DebugWindow.lua")
 local Debug = MSBTOptions.Debug
 
 local function Slash() SlashCmdList.MSBTDEBUG("") end
@@ -1918,7 +1918,7 @@ end
 -- Rule: the listed tests come from one file, on the pages game and addon.
 do
 	-- Given the tests file.
-	dofile("Diagnostics/DebugTests.lua")
+	dofile("Developer/DebugTests.lua")
 	local byKey, pageKeys = {}, {}
 	for _, page in ipairs(Debug.pages) do
 		assert(type(page.key) == "string" and type(page.label) == "string" and type(page.tests) == "table",
@@ -2818,7 +2818,7 @@ do
 	end
 	local windowsBefore, skinsBefore, watchedBefore = Windows(), Skins(), Hooked("Select")
 	MSBTOptions.Designs = nil
-	dofile("Diagnostics/DebugWindow.lua")
+	dofile("Developer/DebugWindow.lua")
 	MSBTOptions.Debug.pages = { { key = "alone", label = "Alone", tests = {
 		{ key = "echo", label = "Echo", run = function(t) t:Log("heard") end },
 	} } }

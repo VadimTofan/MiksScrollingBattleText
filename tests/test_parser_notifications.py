@@ -31,7 +31,7 @@ class ParserNotificationsTests(unittest.TestCase):
 
     def test_skill_gains_take_their_skill_line_icon(self):
         # Given
-        from scripts import generate_skill_line_icons as generator
+        from Developer import generate_skill_line_icons as generator
 
         root = Path(__file__).resolve().parents[1]
         main = (root / "MSBTMain.lua").read_text(encoding="utf-8-sig")
@@ -60,7 +60,7 @@ class ParserNotificationsTests(unittest.TestCase):
 
     def test_the_skill_line_table_names_the_build_of_its_source(self):
         # Given
-        from scripts import generate_skill_line_icons as generator
+        from Developer import generate_skill_line_icons as generator
 
         root = Path(__file__).resolve().parents[1]
         lines = (root / "Components" / "SkillLineIcons.lua").read_text(encoding="utf-8").splitlines()
@@ -72,7 +72,7 @@ class ParserNotificationsTests(unittest.TestCase):
         # Then
         self.assertNotIn("TABLE_BUILDS", table)
         self.assertNotIn("TABLE_BUILDS", generator.render({}, build))
-        sidecar = (root / "Diagnostics" / "SkillLineIconsBuild.lua").read_text(encoding="utf-8")
+        sidecar = (root / "Developer" / "SkillLineIconsBuild.lua").read_text(encoding="utf-8")
         self.assertEqual(sidecar, generator.render_build_metadata(build))
         self.assertRegex(build, generator.BUILD_PATTERN)
         self.assertTrue((root / generator.SCRIPT).is_file())
@@ -83,7 +83,7 @@ class ParserNotificationsTests(unittest.TestCase):
                          "MSBT_CSV_DIR names no folder with the CSV files of the table's build")
     def test_the_shipped_skill_line_table_is_what_its_generator_writes(self):
         # Given
-        from scripts import generate_skill_line_icons as generator
+        from Developer import generate_skill_line_icons as generator
 
         root = Path(__file__).resolve().parents[1]
         table = (root / "Components" / "SkillLineIcons.lua").read_text(encoding="utf-8")

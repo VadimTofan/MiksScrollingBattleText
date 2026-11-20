@@ -18,9 +18,9 @@ class DeveloperTabTests(unittest.TestCase):
 
         # Then
         self.assertNotIn("DeveloperTab", options)
-        self.assertIn("  - Diagnostics", exclusions.splitlines())
+        self.assertIn("  - Developer", exclusions.splitlines())
         for manifest in manifests:
-            self.assertNotIn("Diagnostics", manifest.read_text(encoding="utf-8-sig"))
+            self.assertNotIn("Developer/", manifest.read_text(encoding="utf-8-sig").replace("\\", "/"))
 
     def test_tab_waits_for_the_debug_window_and_lists_the_generated_tables(self):
         # Given

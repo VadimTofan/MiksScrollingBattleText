@@ -26,10 +26,10 @@ class ResourceCaptureTests(unittest.TestCase):
             files = manifest.read_text(encoding="utf-8-sig").replace("\\", "/")
 
             # Then
-            self.assertNotIn("Diagnostics/ResourceCapture.lua", files)
+            self.assertNotIn("Developer/ResourceCapture.lua", files)
 
         # Given / When
         exclusions = (ROOT / ".pkgmeta").read_text(encoding="utf-8")
 
         # Then
-        self.assertIn("  - Diagnostics\n", exclusions)
+        self.assertIn("  - Developer\n", exclusions)
