@@ -361,6 +361,11 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     if record.event == "damage" then
         record.victimKey, record.victim = key, CaptureVictim(unit, key)
     end
+    -- A partly blocked hit on this unit. How much it blocked is not told, so
+    -- its trailer names no amount.
+    if record.event == "damage" and ns.Text(flag) and flag == "BLOCK_REDUCED" then
+        record.blocked = true
+    end
     local hit = { record = record, key = key, at = now, unit = unit,
         petOn = PetAttacking(token) }
     reader.pendingHits[hit] = true

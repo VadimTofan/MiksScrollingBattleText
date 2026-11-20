@@ -143,7 +143,7 @@ assert(rendered[2][4] == 1 and rendered[2][5] == 0 and rendered[2][6] == 0,
 
 -- Describe: a partly blocked hit on you shows the amount blocked.
 do
-	local shown, hidden, pending = {}, {}, {}
+	local shown, hidden, pending, dealt = {}, {}, {}, {}
 	local function Trailer(record)
 		if not record.blocked then return nil end
 		return record.blockedAmount
@@ -161,6 +161,8 @@ do
 		end,
 		display = function(_, message) shown[#shown + 1] = message end,
 		displayRestricted = function(...) hidden[#hidden + 1] = { ... } end,
+		batcher = { DisplayRestricted = function(_, ...) dealt[#dealt + 1] = { ... } end },
+		getSpellTexture = function() return "icon" end,
 	})
 	local function Flush()
 		for _, callback in ipairs(pending) do callback() end
@@ -192,4 +194,17 @@ do
 	Flush()
 	-- Then the total is not guessed.
 	assert(shown[2] == "-20 <blocked>", "a partly unknown total was guessed")
+
+	-- Given hits of yours with hidden amounts, the first partly blocked.
+	-- When they are drawn.
+	for _, blocked in ipairs({ true, false }) do
+		blocking:Out({ event = "damage", amount = secret, school = 1,
+			blocked = blocked or nil,
+			result = { who = "you", melee = true, hand = "main" } })
+	end
+	-- Then the trailer goes on with the blocked one, without an amount.
+	assert(dealt[1][2] == secret and dealt[1][12] == " <blocked>",
+		"a partly blocked hit of yours lost its trailer")
+	assert(dealt[2][2] == secret and dealt[2][12] == nil,
+		"an unblocked hit of yours got a trailer")
 end

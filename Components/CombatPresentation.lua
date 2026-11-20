@@ -509,7 +509,9 @@ function Presentation:Out(record)
 			self.config.batcher:DisplayRestricted(
 				spell, record.amount, record.crit, icon, isSpell,
 				result.who == "pet", result.tick, key, school, candidateSpell,
-				inferenceGroup)
+				inferenceGroup,
+				self.config.formatBlockedTrailer
+					and self.config.formatBlockedTrailer(record))
 		else
 			self.config.batcher:Queue(
 				spell, record.amount, record.crit, icon, isSpell,

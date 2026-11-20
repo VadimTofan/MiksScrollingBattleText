@@ -29,8 +29,8 @@ local batcher = OutgoingBatcher:New({
 		displayed = { settings, message, texture }
 		outputs[#outputs + 1] = displayed
 	end,
-	displayRestricted = function(settings, amount, texture, message)
-		displayed = { settings, amount, texture, message }
+	displayRestricted = function(settings, amount, texture, message, suffix)
+		displayed = { settings, amount, texture, message, suffix }
 		outputs[#outputs + 1] = displayed
 	end,
 	after = function(_, callback)
@@ -157,6 +157,14 @@ assert(#outputs == beforeCount + 1
 	and displayed[1] == profile.events.OUTGOING_SPELL_DAMAGE_CRIT
 	and displayed[2] == "secret",
 	"restricted skill crit was suppressed when skill hits were disabled")
+
+-- When a restricted hit comes with a trailer of its own.
+batcher:DisplayRestricted(1234, "secret", true, nil, true, false, false, "OUTGOING_SPELL_DAMAGE",
+	nil, nil, nil, " <blocked>")
+
+-- Then the trailer reaches the display with the amount.
+assert(displayed[2] == "secret" and displayed[5] == " <blocked>",
+	"a restricted hit lost its trailer")
 
 -- Describe: settled inferred icons cannot decorate another candidate batch.
 -- Given a plain candidate and a separately validated inferred candidate.
