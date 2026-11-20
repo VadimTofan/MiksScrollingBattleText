@@ -436,20 +436,6 @@ L.RESET_BLIZZARD_INFO = "Blizzards Text für direkten, regelmäßigen und Beglei
     "wiederherstellen. Dies aktiviert Blizzards Schadenstext und " ..
     "deaktiviert MSBT. Beide Optionen lassen sich unter Allgemein ändern."
 L.MSG_BLIZZARD_TEXT_RESTORED = "Blizzards Kampftext wurde wiederhergestellt."
-L.DEVELOPER = {
-	client = "Client-Build: %s",
-	tables = "Erzeugte Tabellen",
-	noTables = "Keine erzeugte Tabelle hat sich angemeldet.",
-	fits = "passt",
-	clientNewer = "Client ist neuer",
-	clientOlder = "Client ist älter",
-	otherVersion = "andere Version",
-	otherClient = "anderer Client",
-	regenerate = "Neu erzeugen mit %s",
-	debugWindow = "Debug-Fenster",
-	debugWindowTooltip = "Das Debug-Fenster öffnen, oder schließen, wenn es offen ist.",
-}
-L.TABS.developer = { label = "Entwickler", tooltip = "Client-Build, erzeugte Tabellen und das Debug-Fenster anzeigen." }
 
 L.TABS.profile.label = "Profile"
 L.TABS.profile.tooltip = "Profile verwalten und wechseln."
