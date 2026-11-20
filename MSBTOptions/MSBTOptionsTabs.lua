@@ -1093,6 +1093,12 @@ local function EventsTab_SetupEvents()
 	EventsTab_AddEvent(category, "OUTGOING_DAMAGE", c.DAMAGE_DONE .. c.ATTACKED_NAME)
 	EventsTab_AddEvent(category, "OUTGOING_DAMAGE_CRIT", c.DAMAGE_DONE .. c.ATTACKED_NAME)
 	EventsTab_AddEvent(category, "OUTGOING_MISS", c.ATTACKED_NAME)
+	if IsForever then
+		local damage = c.DAMAGE_DONE .. c.ATTACKED_NAME
+		EventsTab_AddEvent(category, "OUTGOING_RANGED_DAMAGE", damage)
+		EventsTab_AddEvent(category, "OUTGOING_RANGED_DAMAGE_CRIT", damage)
+		EventsTab_AddEvent(category, "OUTGOING_RANGED_MISS", c.ATTACKED_NAME)
+	end
 	EventsTab_AddEvent(category, "OUTGOING_DODGE", c.ATTACKED_NAME)
 	EventsTab_AddEvent(category, "OUTGOING_PARRY", c.ATTACKED_NAME)
 	EventsTab_AddEvent(category, "OUTGOING_BLOCK", c.ATTACKED_NAME)

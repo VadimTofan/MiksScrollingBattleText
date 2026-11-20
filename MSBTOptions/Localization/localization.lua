@@ -376,6 +376,18 @@ obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="Melee Hits", tooltip="Enable outgoing melee hits."}
 obj["OUTGOING_DAMAGE_CRIT"]					= { label="Melee Crits", tooltip="Enable outgoing melee crits."}
 obj["OUTGOING_MISS"]						= { label="Melee Misses", tooltip="Enable outgoing melee misses."}
+obj["OUTGOING_RANGED_DAMAGE"] = {
+	label = "Ranged Hits",
+	tooltip = "Enable outgoing ranged auto-attack hits, including wand shots.",
+}
+obj["OUTGOING_RANGED_DAMAGE_CRIT"] = {
+	label = "Ranged Crits",
+	tooltip = "Enable outgoing ranged auto-attack crits, including wand shots.",
+}
+obj["OUTGOING_RANGED_MISS"] = {
+	label = "Ranged Misses",
+	tooltip = "Enable outgoing ranged auto-attack misses, including wand shots.",
+}
 obj["OUTGOING_DODGE"]						= { label="Melee Dodges", tooltip="Enable outgoing melee dodges."}
 obj["OUTGOING_PARRY"]						= { label="Melee Parries", tooltip="Enable outgoing melee parries."}
 obj["OUTGOING_BLOCK"]						= { label="Melee Blocks", tooltip="Enable outgoing melee blocks."}

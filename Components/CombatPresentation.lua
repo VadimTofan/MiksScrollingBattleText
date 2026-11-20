@@ -450,6 +450,18 @@ local function EventKey(direction, record, result)
 	return prefix .. (spell and "SPELL_DAMAGE" or "DAMAGE")
 end
 
+local function RangedEventKey(record, key)
+	local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+	if not (client and client.isForever) then return key end
+
+	if key == "OUTGOING_SPELL_DAMAGE" and record.event == "damage" then
+		return "OUTGOING_RANGED_DAMAGE"
+	elseif key == "OUTGOING_SPELL_MISS" and record.event == "miss" then
+		return "OUTGOING_RANGED_MISS"
+	end
+	return key
+end
+
 function Presentation:Out(record)
 	local result = record.result
 	if not result or (result.who ~= "you" and result.who ~= "pet") then return end
@@ -459,6 +471,9 @@ function Presentation:Out(record)
 		return
 	end
 	local key = EventKey("OUTGOING", record, result)
+	if result.melee and result.hand == "ranged" then
+		key = RangedEventKey(record, key)
+	end
 	local spell = result.spell or result.procSpell
 	if result.melee then spell = result.hand == "ranged" and 5019 or 6603 end
 	local icon = record.icon or (spell and self.config.getSpellTexture(spell))
