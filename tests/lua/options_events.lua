@@ -175,9 +175,12 @@ local function CopyTable(source)
 	return copy
 end
 
+-- A wrapper names the client; a Forever client has the ranged events.
+local isForever = EVENTS_CLIENT == "forever"
+
 MikSBT = {
 	VERSION_STRING = "v12.052",
-	Compatibility = { Client = { hasModernAPI = true } },
+	Compatibility = { Client = { hasModernAPI = true, isForever = isForever } },
 	translations = { DEFAULT_FONT_NAME = "Default" },
 	Configuration = {},
 	API = { Sounds = { NormalizeFile = function(_, file) return file ~= "" and file or nil end } },
@@ -391,18 +394,34 @@ local function VisibleRow(eventType)
 end
 local expected = {}
 
--- Rule: each sidebar entry lists its events in the classic tab's order.
+-- Rule: each sidebar entry lists its events in the classic tab's order, with the ranged results,
+-- which the classic tab lists between the melee results, behind the melee results.
 do
-	-- Given the order in which the classic tab adds its events.
-	local category
+	-- Given the order in which the classic tab adds its events; the ranged ones only on Forever.
+	local category, foreverOnly
+	local ranged = {}
 	for line in io.lines("MSBTOptions/MSBTOptionsTabs.lua") do
 		category = line:match('category = "([%u_]+)"') or category
+		if line:match("^%s*if IsForever then%s*$") then
+			foreverOnly = true
+		elseif line:match("^%s*end%s*$") then
+			foreverOnly = false
+		end
 		local eventType = line:match('EventsTab_AddEvent%(category, "([%u_]+)"')
-		if eventType and L[category][eventType] then
+		if eventType and L[category][eventType] and (isForever or not foreverOnly) then
 			expected[category] = expected[category] or {}
-			table.insert(expected[category], eventType)
+			if eventType:find("_RANGED_") then
+				ranged[#ranged + 1] = eventType
+			else
+				table.insert(expected[category], eventType)
+			end
 		end
 	end
+	assert(#ranged == (isForever and 3 or 0), "the classic tab adds " .. #ranged .. " ranged events")
+	local outgoing = expected.OUTGOING_PLAYER_EVENTS
+	local firstSpell = 1
+	while not outgoing[firstSpell]:find("SPELL") do firstSpell = firstSpell + 1 end
+	for offset, eventType in ipairs(ranged) do table.insert(outgoing, firstSpell + offset - 1, eventType) end
 	local pet = {}
 	for _, name in ipairs({ "INCOMING_PET_EVENTS", "OUTGOING_PET_EVENTS" }) do
 		for _, eventType in ipairs(expected[name]) do pet[#pet + 1] = eventType end
@@ -772,7 +791,7 @@ do
 	assert(lootPanel.shown and Items()[1] == "NOTIFICATION_LOOT", "clearing the search did not return to Loot Alerts")
 end
 
--- Rule: group headers stand where the group changes and are neither selectable nor toggled.
+-- Rule: each group has one header, which is neither selectable nor toggled.
 do
 	-- Given the Outgoing and Pet pages.
 	local function Headers()
@@ -789,8 +808,9 @@ do
 	end
 	ClickEntry("outgoing")
 
-	-- Then the headers follow the groups of the classic order.
-	assert(Headers() == "Melee,Spells,Healing,Other", "Outgoing headers are " .. Headers())
+	-- Then the headers follow the groups of the classic order, the ranged group after the melee one.
+	assert(Headers() == (isForever and "Melee,Ranged,Spells,Healing,Other" or "Melee,Spells,Healing,Other"),
+		"Outgoing headers are " .. Headers())
 	assert(listbox:GetItem(1).header and listbox:GetSelectedItem().eventType == "OUTGOING_DAMAGE",
 		"the page does not start with a header and select the first event")
 	listbox:SetOffset(0)
@@ -946,6 +966,12 @@ do
 	-- And a group with mixed prefixes or none stays as it is.
 	assert(Shown("OUTGOING_SPELL_MISS") == "Spell: " .. Label("OUTGOING_SPELL_MISS"), "a mixed group was shortened")
 	assert(Shown("OUTGOING_HEAL") == Label("OUTGOING_HEAL"), "a name without a prefix changed")
+	-- And the ranged group, whose rows stand between the melee ones in the list, has its own prefix.
+	if isForever then
+		assert(Shown("OUTGOING_RANGED_DAMAGE") == Label("OUTGOING_RANGED_DAMAGE"),
+			"the ranged prefix stayed: " .. Shown("OUTGOING_RANGED_DAMAGE"))
+		assert(Shown("OUTGOING_DODGE") == Label("OUTGOING_DODGE"), "the melee rows after the ranged ones kept the prefix")
+	end
 
 	-- And the detail panel keeps the full name.
 	ClickRow("OUTGOING_DAMAGE")

@@ -80,6 +80,8 @@ local inherited = {}
 local headers = {}
 -- Event names shown without the prefix their group repeats, by event.
 local shortNames = {}
+-- The groups a category has listed so far, while its rows are added.
+local listedGroups = {}
 -- A selected aura is shown through this one table, as aura rows carry only their ID.
 local auraEvent = { codes = L.EVENT_CODES.SKILL_LONG }
 local shownArg
@@ -160,27 +162,31 @@ local MELEE_RESULTS = {
 	BLOCK = true, DEFLECT = true, ABSORB = true, IMMUNE = true, EVADE = true,
 }
 
--- Groups follow the classic order of player and pet events: melee results, spells, healing,
--- then the rest. Notifications and loot have no groups.
+-- Groups follow the classic order of player and pet events: melee results, ranged results,
+-- spells, healing, then the rest. Notifications and loot have no groups.
 local function GroupOf(eventType)
 	if eventType:find("^NOTIFICATION") then return end
 	if eventType:find("HEAL") or eventType:find("HOT") then return "headerHealing" end
 	if eventType:find("SPELL") then return "headerSpells" end
 	local result = eventType:gsub("^PET_", ""):gsub("^[A-Z]+_", "", 1)
+	if result:find("^RANGED_") then return "headerRanged" end
 	return MELEE_RESULTS[result] and "headerMelee" or "headerOther"
 end
 
 
 -- Inside a group whose event names all begin with the same "Prefix: ", the rows leave it out.
+-- A group's events need not follow each other in the list.
 local function ShortenNames(events, first, group)
 	local prefix = events[first].label:match("^.-: ")
 	if not prefix then return end
-	local last = first
-	while events[last + 1] and GroupOf(events[last + 1].eventType) == group do last = last + 1 end
-	for index = first, last do
-		if events[index].label:sub(1, #prefix) ~= prefix then return end
+	for index = first, #events do
+		local event = events[index]
+		if GroupOf(event.eventType) == group and event.label:sub(1, #prefix) ~= prefix then return end
 	end
-	for index = first, last do shortNames[events[index]] = events[index].label:sub(#prefix + 1) end
+	for index = first, #events do
+		local event = events[index]
+		if GroupOf(event.eventType) == group then shortNames[event] = event.label:sub(#prefix + 1) end
+	end
 end
 
 
@@ -505,17 +511,24 @@ end
 
 
 
+-- A group's rows stand together under one header, in the classic order, and the groups come in
+-- the order of their first row. The classic tab lists the ranged results between the melee
+-- results; here they follow the melee group.
 local function AddCategory(category, named)
-	local group
 	local events = Events.GetEvents(category)
+	EraseTable(listedGroups)
 	for index, event in ipairs(events) do
-		local eventGroup = GroupOf(event.eventType)
-		if eventGroup and eventGroup ~= group then
-			listbox:AddItem(Header(category, eventGroup, named))
-			ShortenNames(events, index, eventGroup)
+		local group = GroupOf(event.eventType)
+		if not group then
+			listbox:AddItem(event)
+		elseif not listedGroups[group] then
+			listedGroups[group] = true
+			listbox:AddItem(Header(category, group, named))
+			ShortenNames(events, index, group)
+			for later = index, #events do
+				if GroupOf(events[later].eventType) == group then listbox:AddItem(events[later]) end
+			end
 		end
-		group = eventGroup
-		listbox:AddItem(event)
 	end
 end
 

@@ -15,6 +15,16 @@ class OptionsEventsTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
+    def test_events_page_groups_the_ranged_events_on_forever(self):
+        # Given
+        script_name = "options_events_forever.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
