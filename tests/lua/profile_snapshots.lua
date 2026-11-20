@@ -280,4 +280,30 @@ do
 	assert(#snapshots:Diff(login) == 0)
 end
 
+-- Rule: a restored profile that was selected before can be selected again.
+do
+	-- Given a profile as an earlier version saved it, without the value a selection adds, that is
+	-- selected after the login and left again.
+	saved = profiles.savedVariables
+	profiles.CopyProfile("Default", "Visited")
+	rawset(saved.profiles.Visited, "blizzardDamageEnabled", nil)
+	saved.profiles.Visited.normalFontSize = 30
+	EnterWorld(true, false)
+	local login = snapshots:GetLoginSnapshot()
+	profiles.SelectProfile("Visited")
+	profiles.SelectProfile("Default")
+
+	-- When the login state is restored and the profile is selected again.
+	snapshots:Restore(login)
+	local selected, message = pcall(profiles.SelectProfile, "Visited")
+
+	-- Then it is the running profile, with its own value and its defaults.
+	assert(selected, "selecting a restored profile failed: " .. tostring(message))
+	assert(MSBTProfiles_SavedVarsPerChar.currentProfileName == "Visited"
+		and profiles.currentProfile.normalFontSize == 30 and profiles.currentProfile.events.INCOMING_DAMAGE.message,
+		"the restored profile is not the running one with its defaults")
+	profiles.SelectProfile("Default")
+	profiles.DeleteProfile("Visited")
+end
+
 print("Profile snapshot tests passed")

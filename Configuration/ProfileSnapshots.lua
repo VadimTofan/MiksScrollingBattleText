@@ -55,6 +55,9 @@ function ProfileSnapshots:Restore(snapshot)
 		local marks = profile and rawget(profile, MARKS)
 		if profile then
 			EraseTable(profile)
+			-- As after loading: a profile that was selected earlier would otherwise still look for its
+			-- defaults where they are gone once another profile is selected.
+			setmetatable(profile, nil)
 		else
 			profile = {}
 			profiles[name] = profile
