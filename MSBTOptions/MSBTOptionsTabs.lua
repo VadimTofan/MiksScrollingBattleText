@@ -1094,12 +1094,9 @@ local function EventsTab_SetupEvents()
 	EventsTab_AddEvent(category, "OUTGOING_MISS", c.ATTACKED_NAME)
 	if IsForever then
 		local damage = c.DAMAGE_DONE .. c.ATTACKED_NAME
-		EventsTab_AddEvent(category, "OUTGOING_BOW_DAMAGE", damage)
-		EventsTab_AddEvent(category, "OUTGOING_BOW_DAMAGE_CRIT", damage)
-		EventsTab_AddEvent(category, "OUTGOING_BOW_MISS", c.ATTACKED_NAME)
-		EventsTab_AddEvent(category, "OUTGOING_GUN_DAMAGE", damage)
-		EventsTab_AddEvent(category, "OUTGOING_GUN_DAMAGE_CRIT", damage)
-		EventsTab_AddEvent(category, "OUTGOING_GUN_MISS", c.ATTACKED_NAME)
+		EventsTab_AddEvent(category, "OUTGOING_AUTO_SHOT_DAMAGE", damage)
+		EventsTab_AddEvent(category, "OUTGOING_AUTO_SHOT_DAMAGE_CRIT", damage)
+		EventsTab_AddEvent(category, "OUTGOING_AUTO_SHOT_MISS", c.ATTACKED_NAME)
 	end
 	EventsTab_AddEvent(category, "OUTGOING_DODGE", c.ATTACKED_NAME)
 	EventsTab_AddEvent(category, "OUTGOING_PARRY", c.ATTACKED_NAME)

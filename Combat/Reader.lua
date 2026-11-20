@@ -1463,9 +1463,9 @@ end
 
 local RANGED_SLOT = INVSLOT_RANGED or 18
 -- Enum.ItemWeaponSubclass for bows, guns and crossbows.
-local RANGED_WEAPON_FAMILIES = { [2] = "BOW", [3] = "GUN", [18] = "BOW" }
+local AUTO_SHOT_WEAPONS = { [2] = true, [3] = true, [18] = true }
 
-local function ReadRangedWeaponFamily()
+local function IsAutoShotWeapon()
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     if not (client and client.isForever)
         or type(GetInventoryItemID) ~= "function"
@@ -1477,7 +1477,7 @@ local function ReadRangedWeaponFamily()
     local ok, _, _, _, _, _, classID, subclassID =
         pcall(C_Item.GetItemInfoInstant, itemID)
     if ok and ns.Number(classID) and classID == 2 and ns.Number(subclassID) then
-        return RANGED_WEAPON_FAMILIES[subclassID]
+        return AUTO_SHOT_WEAPONS[subclassID]
     end
 end
 
@@ -1511,13 +1511,16 @@ local function OnSwing(swingType, swingDuration)
         key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
     if strike then return end
-    local weaponFamily = hand == "ranged" and ReadRangedWeaponFamily() or nil
+    local autoShot = hand == "ranged" and IsAutoShotWeapon() or nil
     local duration = ns.Number(swingDuration) and swingDuration or nil
-    local claimed = ns.mine:Swing(hand, key, Now(), duration, weaponFamily)
+    local claimed = ns.mine:Swing(hand, key, Now(), duration, autoShot)
     if not claimed then return end
     for _, entry in ipairs(reader.held) do
         if entry.held == claimed then
-            entry.record.result = { who = "you", melee = true, hand = hand, missed = entry.record.event == "miss" }
+            entry.record.result = {
+                who = "you", melee = true, hand = hand, autoShot = autoShot,
+                missed = entry.record.event == "miss",
+            }
             if entry.record.accounting then
                 entry.record.accounting.receipt = claimed.accountingReceipt
             end

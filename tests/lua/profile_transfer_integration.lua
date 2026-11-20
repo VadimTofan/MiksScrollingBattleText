@@ -270,8 +270,8 @@ for _, forever in ipairs({ false, true }) do
 	end
 	-- Then only Forever offers ranged sound rows, and they default to opt-in.
 	for _, eventType in ipairs({
-		"OUTGOING_BOW_DAMAGE", "OUTGOING_BOW_DAMAGE_CRIT", "OUTGOING_BOW_MISS",
-		"OUTGOING_GUN_DAMAGE", "OUTGOING_GUN_DAMAGE_CRIT", "OUTGOING_GUN_MISS",
+		"OUTGOING_AUTO_SHOT_DAMAGE", "OUTGOING_AUTO_SHOT_DAMAGE_CRIT",
+		"OUTGOING_AUTO_SHOT_MISS",
 	}) do
 		assert((outgoing[eventType] ~= nil) == forever,
 			"wrong client for Auto Shot option: " .. eventType)
@@ -285,11 +285,18 @@ for _, forever in ipairs({ false, true }) do
 			assert(not not settings.isCrit == (eventType:match("_CRIT$") ~= nil), eventType)
 		end
 	end
+	for _, family in ipairs({ "BOW", "GUN" }) do
+		for _, outcome in ipairs({ "DAMAGE", "DAMAGE_CRIT", "MISS" }) do
+			local eventType = "OUTGOING_" .. family .. "_" .. outcome
+			assert(not outgoing[eventType] and not defaults.events[eventType],
+				"weapon-specific Auto Shot option remains: " .. eventType)
+		end
+	end
 
 	if forever then
 		-- Given a saved profile from before Auto Shot sound options existed.
 		profiles.SelectProfile("InferredLegacy")
-		local eventType = "OUTGOING_BOW_DAMAGE"
+		local eventType = "OUTGOING_AUTO_SHOT_DAMAGE"
 		assert(eventOptions.GetSettings(eventType).disabled == true)
 
 		-- When the player enables the new row and assigns a sound.

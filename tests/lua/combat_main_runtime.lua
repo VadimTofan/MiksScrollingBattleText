@@ -658,7 +658,7 @@ for _, forever in ipairs({ false, true }) do
 	events.INCOMING_DAMAGE.message = "Taken %a"
 
 	do
-		-- Given separate opt-in rows alongside existing Skill Hits settings.
+		-- Given shared Auto Shot rows alongside existing Skill settings.
 		local savedHit = events.OUTGOING_SPELL_DAMAGE
 		local savedCrit = events.OUTGOING_SPELL_DAMAGE_CRIT
 		local savedMiss = events.OUTGOING_SPELL_MISS
@@ -667,12 +667,13 @@ for _, forever in ipairs({ false, true }) do
 		events.OUTGOING_SPELL_DAMAGE_CRIT = { message = "Skill crit %a" }
 		events.OUTGOING_SPELL_MISS = { message = "Skill miss" }
 		events.OUTGOING_SPELL_DODGE = { message = "Skill dodge" }
-		events.OUTGOING_BOW_DAMAGE = { message = "Bow %a", soundFile = "bow",
+		events.OUTGOING_AUTO_SHOT_DAMAGE = { message = "Auto Shot %a",
+			soundFile = "shot",
 			disabled = true }
-		events.OUTGOING_BOW_DAMAGE_CRIT = { message = "Bow crit %a",
-			soundFile = "bow crit", disabled = true }
-		events.OUTGOING_GUN_DAMAGE = { message = "Gun %a", soundFile = "gun" }
-		events.OUTGOING_GUN_MISS = { message = "Gun miss", soundFile = "gun miss" }
+		events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT = { message = "Auto Shot crit %a",
+			soundFile = "shot crit", disabled = true }
+		events.OUTGOING_AUTO_SHOT_MISS = { message = "Auto Shot miss",
+			soundFile = "shot miss" }
 		local inventory, itemAPI = GetInventoryItemID, C_Item
 		local weaponSubclass, itemReads
 		itemReads = 0
@@ -697,7 +698,7 @@ for _, forever in ipairs({ false, true }) do
 					now, false, true, amount, crit, "shot"))
 			else
 				result = { who = "you", melee = true, hand = "ranged",
-					weaponFamily = "GUN" }
+					autoShot = true }
 			end
 			local before = #displayed
 			engine.liveRouter:Out({ result = result, event = event, crit = crit,
@@ -707,26 +708,28 @@ for _, forever in ipairs({ false, true }) do
 			return displayed[#displayed]
 		end
 
-		-- When the bow rows are disabled, the saved skill settings still apply.
+		-- When the hit row is disabled, the saved Skill settings still apply.
 		assert(Shot(2, "damage", false, 42)[2] == "Skill 42")
-		events.OUTGOING_BOW_DAMAGE.disabled = false
-		-- Then a shot uses its firing weapon, even after an equipment swap.
-		local bow = Shot(2, "damage", false, 42, 3)
-		assert(bow[2] == (forever and "Bow 42" or "Skill 42"),
-			"enabled bow route did not use the weapon that fired")
-		assert(bow[1].colorB == 1)
-		assert(bow[1].soundFile == (forever and "bow" or nil))
+
+		-- When the hit row is enabled, every Auto Shot weapon uses it.
+		events.OUTGOING_AUTO_SHOT_DAMAGE.disabled = false
+		for _, subclass in ipairs({ 2, 3, 18 }) do
+			-- Then the hit keeps its settings even if a wand is equipped in flight.
+			local hit = Shot(subclass, "damage", false, 42, 19)
+			assert(hit[2] == (forever and "Auto Shot 42" or "Skill 42"),
+				"enabled Auto Shot hit row did not apply")
+			assert(hit[1].colorB == 1)
+			assert(hit[1].soundFile == (forever and "shot" or nil))
+		end
 		-- A disabled crit row still uses the existing crit settings.
 		assert(Shot(18, "damage", true, 42)[2] == "Skill crit 42")
-		events.OUTGOING_BOW_DAMAGE_CRIT.disabled = false
+		events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT.disabled = false
 		assert(Shot(18, "damage", true, 42)[2]
-			== (forever and "Bow crit 42" or "Skill crit 42"))
-		assert(Shot(3, "damage", false, 42)[2]
-			== (forever and "Gun 42" or "Skill 42"))
+			== (forever and "Auto Shot crit 42" or "Skill crit 42"))
 		local miss = Shot(3, "miss", false)
-		assert(miss[2] == (forever and "Gun miss" or "Skill miss"))
-		assert(miss[1].soundFile == (forever and "gun miss" or nil))
-		assert(Shot(19, "damage", false, 42)[2] == "Skill 42",
+		assert(miss[2] == (forever and "Auto Shot miss" or "Skill miss"))
+		assert(miss[1].soundFile == (forever and "shot miss" or nil))
+		assert(Shot(19, "damage", false, 42, 2)[2] == "Skill 42",
 			"wand shot did not retain the skill route")
 		assert(Shot(nil, "damage", false, 42)[2] == "Skill 42",
 			"missing weapon metadata did not retain the skill route")
@@ -739,7 +742,7 @@ for _, forever in ipairs({ false, true }) do
 		local hidden = Shot(3, "damage", false, opaque)
 		issecretvalue = secretCheck
 		assert(hidden[4] == opaque and hidden[1].colorB == 1)
-		assert(hidden[1].soundFile == (forever and "gun" or nil))
+		assert(hidden[1].soundFile == (forever and "shot" or nil))
 		if not forever then assert(itemReads == 0, "Retail read the ranged slot") end
 
 		GetInventoryItemID, C_Item = inventory, itemAPI
@@ -747,8 +750,9 @@ for _, forever in ipairs({ false, true }) do
 		events.OUTGOING_SPELL_DAMAGE_CRIT = savedCrit
 		events.OUTGOING_SPELL_MISS = savedMiss
 		events.OUTGOING_SPELL_DODGE = savedDodge
-		events.OUTGOING_BOW_DAMAGE, events.OUTGOING_BOW_DAMAGE_CRIT = nil, nil
-		events.OUTGOING_GUN_DAMAGE, events.OUTGOING_GUN_MISS = nil, nil
+		events.OUTGOING_AUTO_SHOT_DAMAGE = nil
+		events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT = nil
+		events.OUTGOING_AUTO_SHOT_MISS = nil
 	end
 
 	-- Given incoming heals have their own styling and damage-school colours are on.

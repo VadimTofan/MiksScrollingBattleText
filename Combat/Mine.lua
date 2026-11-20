@@ -618,7 +618,7 @@ end
 
 -- One of your swings (hand: "main", "off" or "ranged"). Returns a held hit
 -- it claims, if one came just before it.
-function Mine:Swing(hand, key, now, duration, weaponFamily)
+function Mine:Swing(hand, key, now, duration, autoShot)
     self:Tidy(now)
     -- 0.6.2: another weapon (or a big change of attack speed) may swing with
     -- another delay to its hit: what was learned is dropped.
@@ -643,7 +643,7 @@ function Mine:Swing(hand, key, now, duration, weaponFamily)
     end
     if key then
         self.swings[#self.swings + 1] = {
-            hand = hand, key = key, at = now, weaponFamily = weaponFamily,
+            hand = hand, key = key, at = now, autoShot = autoShot,
         }
     end
 end
@@ -1495,7 +1495,7 @@ local function Yours(self, key, kind, school, now)
                 end
                 return Result("you", nil, false, {
                     melee = true, hand = swing.hand,
-                    missed = kind == "miss", weaponFamily = swing.weaponFamily,
+                    missed = kind == "miss", autoShot = swing.autoShot,
                 })
             end
         end

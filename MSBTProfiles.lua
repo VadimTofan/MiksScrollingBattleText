@@ -2317,18 +2317,15 @@ for _, side in ipairs({ "msbt", "blizzard" }) do
 end
 
 if Client.isForever then
-	for _, family in ipairs({ "BOW", "GUN" }) do
-		local prefix = "OUTGOING_" .. family
-		masterProfile.events[prefix .. "_DAMAGE"] = {
-			disabled = true, message = "%a", scrollArea = "Outgoing",
-		}
-		masterProfile.events[prefix .. "_DAMAGE_CRIT"] = {
-			disabled = true, message = "%a", scrollArea = "Outgoing", isCrit = true,
-		}
-		masterProfile.events[prefix .. "_MISS"] = {
-			disabled = true, message = MISS .. "!", scrollArea = "Outgoing",
-		}
-	end
+	masterProfile.events.OUTGOING_AUTO_SHOT_DAMAGE = {
+		disabled = true, message = "%a", scrollArea = "Outgoing",
+	}
+	masterProfile.events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT = {
+		disabled = true, message = "%a", scrollArea = "Outgoing", isCrit = true,
+	}
+	masterProfile.events.OUTGOING_AUTO_SHOT_MISS = {
+		disabled = true, message = MISS .. "!", scrollArea = "Outgoing",
+	}
 end
 
 for eventType, settings in pairs(masterProfile.events) do

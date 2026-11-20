@@ -252,29 +252,17 @@ obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="Melee: Treffer", tooltip="Aktiviert ausgehende Melee-Treffer."}
 obj["OUTGOING_DAMAGE_CRIT"]					= { label="Melee: Krit", tooltip="Aktiviert ausgehende Melee-Krits."}
 obj["OUTGOING_MISS"]						= { label="Melee: Fehlschlag", tooltip="Aktiviert ausgehende Melee-Fehlschläge."}
-obj["OUTGOING_BOW_DAMAGE"] = {
-	label = "Bogen/Armbrust: Treffer",
-	tooltip = "Aktivieren für eigene Einstellungen bei Treffern mit Bogen oder Armbrust per Auto-Schuss.",
+obj["OUTGOING_AUTO_SHOT_DAMAGE"] = {
+	label = "Auto-Schuss: Treffer",
+	tooltip = "Aktivieren für eigene Einstellungen bei Treffern mit Auto-Schuss.",
 }
-obj["OUTGOING_BOW_DAMAGE_CRIT"] = {
-	label = "Bogen/Armbrust: Krit",
-	tooltip = "Aktivieren für eigene Einstellungen bei kritischen Treffern mit Bogen oder Armbrust per Auto-Schuss.",
+obj["OUTGOING_AUTO_SHOT_DAMAGE_CRIT"] = {
+	label = "Auto-Schuss: Krit",
+	tooltip = "Aktivieren für eigene Einstellungen bei kritischen Treffern mit Auto-Schuss.",
 }
-obj["OUTGOING_BOW_MISS"] = {
-	label = "Bogen/Armbrust: Fehlschlag",
-	tooltip = "Aktivieren für eigene Einstellungen, wenn ein Auto-Schuss mit Bogen oder Armbrust verfehlt.",
-}
-obj["OUTGOING_GUN_DAMAGE"] = {
-	label = "Gewehr: Treffer",
-	tooltip = "Aktivieren für eigene Einstellungen bei Treffern mit dem Gewehr per Auto-Schuss.",
-}
-obj["OUTGOING_GUN_DAMAGE_CRIT"] = {
-	label = "Gewehr: Krit",
-	tooltip = "Aktivieren für eigene Einstellungen bei kritischen Treffern mit dem Gewehr per Auto-Schuss.",
-}
-obj["OUTGOING_GUN_MISS"] = {
-	label = "Gewehr: Fehlschlag",
-	tooltip = "Aktivieren für eigene Einstellungen, wenn ein Auto-Schuss mit dem Gewehr verfehlt.",
+obj["OUTGOING_AUTO_SHOT_MISS"] = {
+	label = "Auto-Schuss: Fehlschlag",
+	tooltip = "Aktivieren für eigene Einstellungen, wenn ein Auto-Schuss verfehlt.",
 }
 obj["OUTGOING_DODGE"]						= { label="Melee: Ausweichen", tooltip="Aktiviert ausgehendes Melee-Ausweichen."}
 obj["OUTGOING_PARRY"]						= { label="Melee: Parieren", tooltip="Aktiviert ausgehendess Melee-Parieren."}
