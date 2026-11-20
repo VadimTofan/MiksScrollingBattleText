@@ -112,6 +112,26 @@ for _, forever in ipairs({ false, true }) do
 	assert(profiles.currentProfile.inferredWindfuryIcons == nil,
 		"existing profile inherited a retired preference")
 	profiles.SelectProfile("Default")
+
+	if forever then
+		-- Given only Blizzard is showing resource gains.
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", true)
+		CombatTextTypeInfo = {
+			ENERGIZE = { show = 1, cvar = "floatingCombatTextEnergyGains_v2" },
+		}
+
+		-- When the player enables MSBT Resource Gains from the Events settings.
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", false)
+
+		-- Then the native renderer is suppressed immediately.
+		assert(CombatTextTypeInfo.ENERGIZE.show == nil,
+			"the resource switch left the native renderer active")
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", true)
+		assert(CombatTextTypeInfo.ENERGIZE.show == 1)
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", false)
+		CombatTextTypeInfo = nil
+	end
+
 	assert(defaults.lowHealthSoundDisabled == false,
 		"low-health sounds are not enabled by default")
 	assert(defaults.lowManaSoundDisabled == false,
