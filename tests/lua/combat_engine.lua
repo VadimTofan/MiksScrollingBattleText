@@ -697,6 +697,32 @@ for _, example in ipairs({
 		"a swing's own report lost its line over its school")
 end
 
+-- Describe: a partly blocked hit of yours is marked, without an amount.
+for _, example in ipairs({
+	{ flag = "BLOCK_REDUCED", amount = 326, blocked = true },
+	{ flag = "", amount = 327 },
+	{ flag = "CRITICAL", amount = 328 },
+	{ flag = "BLOCK_REDUCED", amount = 0, line = "swingMiss", event = "miss" },
+}) do
+	-- Given a native swing and its melee line.
+	Advance(4)
+	Event("PLAYER_SWING", 3.8, 0)
+	Event("COMBAT_LOG_MESSAGE", nil, example.line or "swing", 0, 0, 1)
+
+	-- When its report carries the flag of a partly blocked hit, none, another, or the flag
+	-- with no damage at all.
+	Advance(0.585)
+	Event("UNIT_COMBAT", "target", "WOUND", example.flag, example.amount, 1)
+	Advance(0.5)
+
+	-- Then only the partly blocked hit is marked, and no amount blocked is named.
+	local hit = outgoing[#outgoing]
+	assert(hit.event == (example.event or "damage") and hit.result.who == "you"
+		and hit.blocked == example.blocked and hit.blockedAmount == nil,
+		("a %s of yours with the flag '%s' came out with blocked = %s"):format(
+			hit.event, example.flag, tostring(hit.blocked)))
+end
+
 -- Given the later capture: proc confirmations trail the swing by 0.099 s.
 Advance(4)
 Event("PLAYER_ENTERING_WORLD")
