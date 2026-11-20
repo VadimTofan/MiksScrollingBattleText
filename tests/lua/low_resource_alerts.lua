@@ -233,4 +233,32 @@ frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
 assert(#displayed == 10 and displayed[10] == "Low Mana!")
 MikSBT.Triggers.Disable()
 
+-- Given the core translations loaded for a Russian client.
+MikSBT.COMMAND = "/msbt"
+MikSBT.translations = {}
+GetLocale = function() return "ruRU" end
+for _, path in ipairs({ "Localization/localization.lua", "Localization/localization.ru.lua" }) do
+	local file = assert(io.open(path, "rb"))
+	local source = file:read("*a"):gsub("^\239\187\191", "")
+	file:close()
+	assert(loadstring(source, "@" .. path))()
+end
+dofile("MSBTTriggers.lua")
+MikSBT.Triggers.Enable()
+frame = frames[#frames]
+local before = #displayed
+
+-- When both player resources cross their thresholds.
+ShowLowHealth()
+mana = 1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+mana = 0.1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then the display service receives each localized warning.
+assert(#displayed == before + 2)
+assert(displayed[before + 1] == "Малый запас здоровья!", "health alert ignored ruRU")
+assert(displayed[before + 2] == "Малый запас маны!", "mana alert ignored ruRU")
+MikSBT.Triggers.Disable()
+
 print("Low resource alert tests passed")
