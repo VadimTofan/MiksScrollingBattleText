@@ -443,12 +443,13 @@ assert(reset.bodyFontString.text == L.RESET_BLIZZARD_INFO)
 -- Given a custom area added after the Events tab was first opened.
 local profile = MikSBT.Profiles.currentProfile
 MikSBT.Profiles.masterProfile = {
-	scrollAreas = { Notification = {}, Outgoing = {}, Incoming = {} },
+	scrollAreas = { Notification = {}, Outgoing = {}, Incoming = {}, Static = {} },
 }
 MikSBT.Animations.scrollAreas = {
 	Incoming = { name = "Incoming" },
 	Notification = { name = "Notification" },
 	Outgoing = { name = "Outgoing" },
+	Static = { name = "Static" },
 	Custom1 = { name = "Hunter" },
 }
 profile.events.OUTGOING_DAMAGE = {
@@ -457,6 +458,10 @@ profile.events.OUTGOING_DAMAGE = {
 profile.events.OUTGOING_SPELL_DAMAGE = {
 	message = "Skill %a", scrollArea = "Outgoing",
 }
+profile.events.NOTIFICATION_LOOT = { message = "%e", scrollArea = "Static" }
+profile.events.NOTIFICATION_MONEY = { message = "%e", scrollArea = "Static" }
+profile.events.NOTIFICATION_CURRENCY = { message = "%e", scrollArea = "Notification" }
+profile.events.NOTIFICATION_ABILITY_READY = { message = "%s", scrollArea = "Static" }
 profile.auraTracking["1459"] = true
 profile.auraSettings = { ["1459"] = { scrollArea = "Custom1" } }
 MikSBT.Profiles.SetOption = function(path, field, value)
@@ -473,13 +478,28 @@ events.scripts.OnShow()
 local dropdown = controls.eventCategoryDropdown
 local names = {}
 for _, label in ipairs(dropdown.items) do names[label] = true end
-assert(#dropdown.items == #MikSBT.translations.EVENT_CATEGORIES + 1,
-	"one custom area should add exactly one dropdown entry")
+assert(#dropdown.items == #MikSBT.translations.EVENT_CATEGORIES + 2,
+	"Static and one custom area should add exactly two dropdown entries")
 assert(names.Hunter and names["Outgoing Player"])
+assert(names.Static, "Static was missing from the Events picker")
 local function SelectCategory(id)
 	dropdown:SetSelectedID(id)
 	dropdown:change(id)
 end
+
+-- When Static is selected, then it shows only the rows routed there.
+SelectCategory("scrollArea:Static")
+local staticRows = {}
+for _, line in ipairs(list.lines) do staticRows[line.eventType] = line end
+assert(#list.lines == 3 and staticRows.NOTIFICATION_LOOT
+	and staticRows.NOTIFICATION_MONEY and staticRows.NOTIFICATION_ABILITY_READY)
+assert(not staticRows.NOTIFICATION_CURRENCY and not staticRows.OUTGOING_DAMAGE)
+
+-- When the loot event is disabled there, then its shared setting is updated.
+staticRows.NOTIFICATION_LOOT.enableCheckbox:click(false)
+assert(profile.events.NOTIFICATION_LOOT.disabled == true)
+assert(not profile.events.NOTIFICATION_MONEY.disabled)
+
 SelectCategory("scrollArea:Custom1")
 
 -- Then the view shows exactly the event and aura assigned to Hunter.

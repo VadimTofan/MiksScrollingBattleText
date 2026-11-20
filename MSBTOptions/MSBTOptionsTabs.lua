@@ -1212,14 +1212,18 @@ end
 local function EventsTab_EventsInArea(areaKey)
 	local events = {}
 	local profileEvents = MSBTProfiles.currentProfile.events
-	for _, category in ipairs(EVENT_CATEGORY_MAP) do
-		for _, row in ipairs(orderedEvents[category]) do
+	local function AddRows(rows)
+		for _, row in ipairs(rows) do
 			local settings = profileEvents[row.eventType]
-			if EventsTab_EventArea(settings) == areaKey then
+			if settings and EventsTab_EventArea(settings) == areaKey then
 				events[#events + 1] = row
 			end
 		end
 	end
+	for _, category in ipairs(EVENT_CATEGORY_MAP) do
+		AddRows(orderedEvents[category])
+	end
+	AddRows(orderedEvents.LOOT_EVENTS)
 	return events
 end
 
@@ -1626,7 +1630,7 @@ local function EventsTab_OnShow()
 
 	local areaNames = {}
 	for key, settings in pairs(MSBTAnimations.scrollAreas or {}) do
-		if not ScrollAreasTab_IsBuiltIn(key) then
+		if key == "Static" or not ScrollAreasTab_IsBuiltIn(key) then
 			areaNames[key] = settings.name
 		end
 	end
