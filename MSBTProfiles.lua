@@ -2316,16 +2316,12 @@ for _, side in ipairs({ "msbt", "blizzard" }) do
 	end
 end
 
+local RANGED_OUTCOMES = { "DAMAGE", "DAMAGE_CRIT", "MISS" }
 if Client.isForever then
-	masterProfile.events.OUTGOING_AUTO_SHOT_DAMAGE = {
-		disabled = true, message = "%a", scrollArea = "Outgoing",
-	}
-	masterProfile.events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT = {
-		disabled = true, message = "%a", scrollArea = "Outgoing", isCrit = true,
-	}
-	masterProfile.events.OUTGOING_AUTO_SHOT_MISS = {
-		disabled = true, message = MISS .. "!", scrollArea = "Outgoing",
-	}
+	for _, outcome in ipairs(RANGED_OUTCOMES) do
+		masterProfile.events["OUTGOING_RANGED_" .. outcome] =
+			CopyTable(masterProfile.events["OUTGOING_SPELL_" .. outcome])
+	end
 end
 
 for eventType, settings in pairs(masterProfile.events) do
@@ -2783,6 +2779,27 @@ local function MigrateCombatTextOptions(profile)
 	end
 end
 
+local function MigrateRangedEvents(profile)
+	if not Client.isForever or rawget(profile, "rangedEventsMigrated") then return end
+
+	local events = rawget(profile, "events")
+	if type(events) == "table" then
+		for _, outcome in ipairs(RANGED_OUTCOMES) do
+			local key = "OUTGOING_RANGED_" .. outcome
+			if rawget(events, key) == nil then
+				local previous = rawget(events, "OUTGOING_AUTO_SHOT_" .. outcome)
+				if type(previous) ~= "table" or rawget(previous, "disabled") ~= false then
+					previous = rawget(events, "OUTGOING_SPELL_" .. outcome)
+				end
+				if type(previous) == "table" then
+					events[key] = CopyTable(previous)
+				end
+			end
+		end
+	end
+	profile.rangedEventsMigrated = true
+end
+
 local function SelectProfile(profileName)
 
 	if (savedVariables.profiles[profileName]) then
@@ -2791,6 +2808,7 @@ local function SelectProfile(profileName)
 
 		currentProfile = savedVariables.profiles[profileName]
 		MigrateCombatTextOptions(currentProfile)
+		MigrateRangedEvents(currentProfile)
 		module.currentProfile = currentProfile
 
 		EraseTable(differentialMap)

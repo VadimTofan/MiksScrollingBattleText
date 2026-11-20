@@ -376,17 +376,17 @@ obj = L.OUTGOING_PLAYER_EVENTS
 obj["OUTGOING_DAMAGE"]						= { label="Melee Hits", tooltip="Enable outgoing melee hits."}
 obj["OUTGOING_DAMAGE_CRIT"]					= { label="Melee Crits", tooltip="Enable outgoing melee crits."}
 obj["OUTGOING_MISS"]						= { label="Melee Misses", tooltip="Enable outgoing melee misses."}
-obj["OUTGOING_AUTO_SHOT_DAMAGE"] = {
-	label = "Auto Shot Hits",
-	tooltip = "Enable to use separate settings for Auto Shot hits.",
+obj["OUTGOING_RANGED_DAMAGE"] = {
+	label = "Ranged Hits",
+	tooltip = "Enable outgoing ranged auto-attack hits, including wand shots.",
 }
-obj["OUTGOING_AUTO_SHOT_DAMAGE_CRIT"] = {
-	label = "Auto Shot Crits",
-	tooltip = "Enable to use separate settings for Auto Shot crits.",
+obj["OUTGOING_RANGED_DAMAGE_CRIT"] = {
+	label = "Ranged Crits",
+	tooltip = "Enable outgoing ranged auto-attack crits, including wand shots.",
 }
-obj["OUTGOING_AUTO_SHOT_MISS"] = {
-	label = "Auto Shot Misses",
-	tooltip = "Enable to use separate settings for Auto Shot misses.",
+obj["OUTGOING_RANGED_MISS"] = {
+	label = "Ranged Misses",
+	tooltip = "Enable outgoing ranged auto-attack misses, including wand shots.",
 }
 obj["OUTGOING_DODGE"]						= { label="Melee Dodges", tooltip="Enable outgoing melee dodges."}
 obj["OUTGOING_PARRY"]						= { label="Melee Parries", tooltip="Enable outgoing melee parries."}

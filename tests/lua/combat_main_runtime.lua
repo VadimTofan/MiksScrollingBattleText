@@ -658,7 +658,7 @@ for _, forever in ipairs({ false, true }) do
 	events.INCOMING_DAMAGE.message = "Taken %a"
 
 	do
-		-- Given shared Auto Shot rows alongside existing Skill settings.
+		-- Given independent settings for melee, ranged swings, and skills.
 		local savedHit = events.OUTGOING_SPELL_DAMAGE
 		local savedCrit = events.OUTGOING_SPELL_DAMAGE_CRIT
 		local savedMiss = events.OUTGOING_SPELL_MISS
@@ -667,92 +667,70 @@ for _, forever in ipairs({ false, true }) do
 		events.OUTGOING_SPELL_DAMAGE_CRIT = { message = "Skill crit %a" }
 		events.OUTGOING_SPELL_MISS = { message = "Skill miss" }
 		events.OUTGOING_SPELL_DODGE = { message = "Skill dodge" }
-		events.OUTGOING_AUTO_SHOT_DAMAGE = { message = "Auto Shot %a",
-			soundFile = "shot",
-			disabled = true }
-		events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT = { message = "Auto Shot crit %a",
-			soundFile = "shot crit", disabled = true }
-		events.OUTGOING_AUTO_SHOT_MISS = { message = "Auto Shot miss",
-			soundFile = "shot miss" }
-		local inventory, itemAPI = GetInventoryItemID, C_Item
-		local weaponSubclass, itemReads
-		itemReads = 0
-		GetInventoryItemID = function(unit, slot)
-			assert(unit == "player" and slot == (INVSLOT_RANGED or 18))
-			itemReads = itemReads + 1
-			return 1234
-		end
-		C_Item = { GetItemInfoInstant = function(id)
-			assert(id == 1234)
-			return id, nil, nil, nil, nil, 2, weaponSubclass
-		end }
+		events.OUTGOING_RANGED_DAMAGE = { message = "Ranged %a", soundFile = "hit" }
+		events.OUTGOING_RANGED_DAMAGE_CRIT = { message = "Ranged crit %a",
+			soundFile = "crit" }
+		events.OUTGOING_RANGED_MISS = { message = "Ranged miss", soundFile = "miss" }
+
 		local engine = MikSBT.CombatEngine
-		local function Shot(subclass, event, crit, amount, swappedSubclass, missWord)
-			weaponSubclass = subclass
-			local result
+		local function Shot(event, crit, amount, school, missWord)
+			local result = { who = "you", melee = true, hand = "ranged" }
 			if forever then
 				Dispatch("PLAYER_SWING", 2.6, Enum.PlayerSwingType.Ranged)
-				weaponSubclass = swappedSubclass or subclass
 				Advance(0.2)
-				result = assert(engine.mine:Hit(engine.TargetKey(), event, 1,
+				engine.mine.wandSchool = school
+				result = assert(engine.mine:Hit(engine.TargetKey(), event, school,
 					now, false, true, amount, crit, "shot"))
-			else
-				result = { who = "you", melee = true, hand = "ranged",
-					autoShot = true }
+				engine.mine.wandSchool = nil
 			end
 			local before = #displayed
 			engine.liveRouter:Out({ result = result, event = event, crit = crit,
-				school = 1, amount = amount, missWord = missWord or "MISS" })
+				school = school, amount = amount, missWord = missWord or "MISS" })
 			Advance(0.31)
-			assert(#displayed == before + 1, "ranged event did not display")
-			return displayed[#displayed]
+			if #displayed > before then return displayed[#displayed] end
 		end
 
-		-- When the hit row is disabled, the saved Skill settings still apply.
-		assert(Shot(2, "damage", false, 42)[2] == "Skill 42")
+		-- When physical and wand swings land, they use the same ranged row.
+		local hit = assert(Shot("damage", false, 42, 1))
+		assert(hit[2] == (forever and "Ranged 42" or "Skill 42"),
+			"ranged hit did not select its own row")
+		assert(hit[1].colorB == 1)
+		assert(hit[1].soundFile == (forever and "hit" or nil))
+		local wand = assert(Shot("damage", false, 42, 16))
+		assert(wand[1].soundFile == (forever and "hit" or nil))
+		assert(Shot("damage", true, 42, 1)[2]
+			== (forever and "Ranged crit 42" or "Skill crit 42"))
+		assert(Shot("miss", false, nil, 1)[2]
+			== (forever and "Ranged miss" or "Skill miss"))
+		assert(Shot("miss", false, nil, 1, "DODGE")[2] == "Skill dodge")
 
-		-- When the hit row is enabled, every Auto Shot weapon uses it.
-		events.OUTGOING_AUTO_SHOT_DAMAGE.disabled = false
-		for _, subclass in ipairs({ 2, 3, 18 }) do
-			-- Then the hit keeps its settings even if a wand is equipped in flight.
-			local hit = Shot(subclass, "damage", false, 42, 19)
-			assert(hit[2] == (forever and "Auto Shot 42" or "Skill 42"),
-				"enabled Auto Shot hit row did not apply")
-			assert(hit[1].colorB == 1)
-			assert(hit[1].soundFile == (forever and "shot" or nil))
+		if forever then
+			-- Then disabling one outcome hides it without falling back.
+			events.OUTGOING_RANGED_DAMAGE_CRIT.disabled = true
+			assert(not Shot("damage", true, 42, 1), "disabled ranged crit was shown")
+			assert(Shot("damage", false, 42, 1))
+			events.OUTGOING_RANGED_DAMAGE.disabled = true
+			assert(not Shot("damage", false, 42, 1), "disabled ranged hit was shown")
+			events.OUTGOING_RANGED_MISS.disabled = true
+			assert(not Shot("miss", false, nil, 1), "disabled ranged miss was shown")
+			events.OUTGOING_RANGED_DAMAGE.disabled = false
 		end
-		-- A disabled crit row still uses the existing crit settings.
-		assert(Shot(18, "damage", true, 42)[2] == "Skill crit 42")
-		events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT.disabled = false
-		assert(Shot(18, "damage", true, 42)[2]
-			== (forever and "Auto Shot crit 42" or "Skill crit 42"))
-		local miss = Shot(3, "miss", false)
-		assert(miss[2] == (forever and "Auto Shot miss" or "Skill miss"))
-		assert(miss[1].soundFile == (forever and "shot miss" or nil))
-		assert(Shot(19, "damage", false, 42, 2)[2] == "Skill 42",
-			"wand shot did not retain the skill route")
-		assert(Shot(nil, "damage", false, 42)[2] == "Skill 42",
-			"missing weapon metadata did not retain the skill route")
-		assert(Shot(3, "miss", false, nil, nil, "DODGE")[2] == "Skill dodge",
-			"a dodge selected the plain miss row")
 
-		-- Given a native-only damage amount, the same event settings apply.
+		-- Given a native-only damage amount, the same ranged settings apply.
 		local opaque, secretCheck = {}, issecretvalue
 		issecretvalue = function(value) return value == opaque end
-		local hidden = Shot(3, "damage", false, opaque)
+		local hidden = Shot("damage", false, opaque, 1)
 		issecretvalue = secretCheck
 		assert(hidden[4] == opaque and hidden[1].colorB == 1)
-		assert(hidden[1].soundFile == (forever and "shot" or nil))
-		if not forever then assert(itemReads == 0, "Retail read the ranged slot") end
+		assert(hidden[1].soundFile == (forever and "hit" or nil))
 
-		GetInventoryItemID, C_Item = inventory, itemAPI
 		events.OUTGOING_SPELL_DAMAGE = savedHit
 		events.OUTGOING_SPELL_DAMAGE_CRIT = savedCrit
 		events.OUTGOING_SPELL_MISS = savedMiss
 		events.OUTGOING_SPELL_DODGE = savedDodge
-		events.OUTGOING_AUTO_SHOT_DAMAGE = nil
-		events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT = nil
-		events.OUTGOING_AUTO_SHOT_MISS = nil
+		events.OUTGOING_RANGED_DAMAGE = { message = savedHit.message }
+		events.OUTGOING_RANGED_DAMAGE_CRIT = { message = savedHit.message }
+		events.OUTGOING_RANGED_MISS = nil
 	end
 
 	-- Given incoming heals have their own styling and damage-school colours are on.

@@ -11,6 +11,13 @@ LoadFile("Libs/LibSerialize.lua")
 LoadFile("Libs/LibDeflate.lua")
 
 local function Noop() end
+local function CopyTable(source)
+	local copy = {}
+	for key, value in pairs(source) do
+		copy[key] = type(value) == "table" and CopyTable(value) or value
+	end
+	return copy
+end
 local frame
 function CreateFrame()
 	local created = setmetatable({ scripts = {} }, {
@@ -43,6 +50,7 @@ MikSBT = {
 	} },
 	GetSkillName = function(id) return "Spell " .. tostring(id) end,
 	Print = Noop,
+	CopyTable = CopyTable,
 	EraseTable = function(value) for key in pairs(value) do value[key] = nil end end,
 	SplitString = function(value, pattern, target)
 		for part in value:gmatch("[^.]+") do target[#target + 1] = part end
@@ -268,45 +276,51 @@ for _, forever in ipairs({ false, true }) do
 			end
 		end
 	end
-	-- Then only Forever offers ranged sound rows, and they default to opt-in.
-	for _, eventType in ipairs({
-		"OUTGOING_AUTO_SHOT_DAMAGE", "OUTGOING_AUTO_SHOT_DAMAGE_CRIT",
-		"OUTGOING_AUTO_SHOT_MISS",
-	}) do
+	-- Then only Forever offers ranged swing settings, enabled by default.
+	for _, suffix in ipairs({ "DAMAGE", "DAMAGE_CRIT", "MISS" }) do
+		local eventType = "OUTGOING_RANGED_" .. suffix
 		assert((outgoing[eventType] ~= nil) == forever,
-			"wrong client for Auto Shot option: " .. eventType)
-		assert((defaults.events[eventType] ~= nil) == forever,
-			"wrong client for Auto Shot defaults: " .. eventType)
+			"wrong client for ranged swing option: " .. eventType)
+		assert((defaults.events[eventType] ~= nil) == forever, eventType)
+		assert(not outgoing["OUTGOING_AUTO_SHOT_" .. suffix])
 		if forever then
 			local settings = eventOptions.GetSettings(eventType)
-			assert(settings.disabled == true and settings.textCategory == "Outgoing",
-				"Auto Shot row does not default to opt-in: " .. eventType)
+			assert(not settings.disabled and settings.textCategory == "Outgoing", eventType)
 			assert(settings.scrollArea == "Outgoing", eventType)
-			assert(not not settings.isCrit == (eventType:match("_CRIT$") ~= nil), eventType)
-		end
-	end
-	for _, family in ipairs({ "BOW", "GUN" }) do
-		for _, outcome in ipairs({ "DAMAGE", "DAMAGE_CRIT", "MISS" }) do
-			local eventType = "OUTGOING_" .. family .. "_" .. outcome
-			assert(not outgoing[eventType] and not defaults.events[eventType],
-				"weapon-specific Auto Shot option remains: " .. eventType)
+			assert(not not settings.isCrit == (suffix == "DAMAGE_CRIT"), eventType)
 		end
 	end
 
 	if forever then
-		-- Given a saved profile from before Auto Shot sound options existed.
-		profiles.SelectProfile("InferredLegacy")
-		local eventType = "OUTGOING_AUTO_SHOT_DAMAGE"
-		assert(eventOptions.GetSettings(eventType).disabled == true)
+		-- Given saved Skill settings and an explicitly enabled Auto Shot preview.
+		profiles.savedVariables.profiles.LegacyRanged = {
+			creationVersion = "12.054.0",
+			events = {
+				OUTGOING_SPELL_DAMAGE = { soundFile = 5678901 },
+				OUTGOING_SPELL_MISS = { disabled = true },
+				OUTGOING_AUTO_SHOT_DAMAGE_CRIT = { disabled = false, soundFile = 5678902 },
+			},
+		}
 
-		-- When the player enables the new row and assigns a sound.
-		eventOptions.SaveOption(eventType, "disabled", false)
-		eventOptions.SaveOption(eventType, "soundFile", 5678901)
-		profiles.SelectProfile("InferredLegacy")
+		-- When the saved profile is selected and upgraded.
+		profiles.SelectProfile("LegacyRanged")
 
-		-- Then the profile keeps the explicit opt-in and its sound.
-		local settings = eventOptions.GetSettings(eventType)
-		assert(settings.disabled == false and settings.soundFile == 5678901)
+		-- Then ranged outcomes retain their previously effective settings.
+		local hit = "OUTGOING_RANGED_DAMAGE"
+		assert(eventOptions.GetSettings(hit).soundFile == 5678901)
+		assert(eventOptions.GetSettings("OUTGOING_RANGED_DAMAGE_CRIT").soundFile == 5678902)
+		assert(eventOptions.GetSettings("OUTGOING_RANGED_MISS").disabled)
+		eventOptions.SaveOption(hit, "disabled", true)
+		eventOptions.SaveOption(hit, "soundFile", 5678903)
+		profiles.SelectProfile("LegacyRanged")
+		assert(eventOptions.GetSettings(hit).disabled)
+		assert(eventOptions.GetSettings(hit).soundFile == 5678903)
+		assert(eventOptions.GetSettings("OUTGOING_SPELL_DAMAGE").soundFile == 5678901)
+		local exported = assert(profiles.ExportProfile("LegacyRanged"))
+		local payload = assert(legacyTransfer:Decode(exported))
+		assert(payload.sections.Events[hit].soundFile == 5678903)
+		assert(payload.sections.Events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT == nil)
+		assert(payload.sections.General.rangedEventsMigrated == nil)
 		profiles.SelectProfile("Default")
 	end
 
