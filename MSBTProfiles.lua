@@ -2309,6 +2309,13 @@ masterProfile.lowHealthSoundDisabled = false
 masterProfile.lowManaSoundDisabled = false
 masterProfile.lowHealthThreshold = 35
 masterProfile.lowManaThreshold = 35
+masterProfile.events.NOTIFICATION_ABILITY_READY = {
+	disabled = true,
+	message = "%s " .. L.MSG_READY_NOW .. "!",
+	scrollArea = "Static",
+	fontSize = 22,
+	soundFile = "MSBT Cooldown",
+}
 
 for _, side in ipairs({ "msbt", "blizzard" }) do
 	for _, category in ipairs({ "Outgoing", "Notifications", "Incoming" }) do

@@ -260,6 +260,7 @@ for _, forever in ipairs({ false, true }) do
 	local eventOptions = MSBTOptions.Tabs.events
 	MSBTOptions = previousOptions
 	local outgoing = {}
+	local abilityReady
 	for _, category in ipairs({
 		"INCOMING_PLAYER_EVENTS", "INCOMING_PET_EVENTS", "OUTGOING_PLAYER_EVENTS",
 		"OUTGOING_PET_EVENTS", "NOTIFICATION_EVENTS",
@@ -274,8 +275,15 @@ for _, forever in ipairs({ false, true }) do
 			if category == "OUTGOING_PLAYER_EVENTS" then
 				outgoing[row.eventType] = row
 			end
+			if category == "NOTIFICATION_EVENTS"
+				and row.eventType == "NOTIFICATION_ABILITY_READY" then
+				abilityReady = settings
+			end
 		end
 	end
+	assert(abilityReady and abilityReady.disabled
+		and abilityReady.soundFile == "MSBT Cooldown",
+		"Ability Ready should be opt-in with the original cooldown sound")
 	-- Then only Forever offers ranged swing settings, enabled by default.
 	for _, suffix in ipairs({ "DAMAGE", "DAMAGE_CRIT", "MISS" }) do
 		local eventType = "OUTGOING_RANGED_" .. suffix
