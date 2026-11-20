@@ -1348,9 +1348,12 @@ end
 -- MISS_SETTLE, a hit up to LATE_LINE for its line), and those speak for
 -- themselves; so does a hit left unnamed because it might be another cast's
 -- (one of yours or your pet's in its moment). A miss left unnamed for that
--- reason marks no cast, so any spell's miss line of yours within LAND_FRAME
--- of the cast speaks for it (SpellMissLine). A spell whose missile flies
--- puts its aura there later and is left to its hit (the rule as a whole is
+-- reason marks no cast, and neither does a hit that is spent on no cast at
+-- all (in a party, others strike the same enemy in the cast's moment and
+-- change its auras: a Swipe was shown as landed with its three hit lines in
+-- its frame), so any spell's hit or miss line of yours within LAND_FRAME of
+-- the cast speaks for it (SpellLine). A spell whose missile flies puts its
+-- aura there later and is left to its hit (the rule as a whole is
 -- predicted, not yet seen in client).
 local LAND_FRAME, LAND_SETTLE = 0.05, 0.2
 -- An aura the payload lets you read is not the cast's when it shows as
@@ -1382,9 +1385,10 @@ local function Evidence(list, lookup)
     end
     return false
 end
-local function SpellMissLine(at)
+local function SpellLine(at)
     for _, line in ipairs(reader.logLines or {}) do
-        if line.source == "mine" and LineClass(line) == "miss" and LineRestrict(line) == "direct"
+        local class = LineClass(line)
+        if line.source == "mine" and (class == "damage" or class == "miss") and LineRestrict(line) == "direct"
             and math.abs(line.at - at) <= LAND_FRAME then return line end
     end
 end
@@ -1410,7 +1414,7 @@ local function WatchLanding(spell, cast, now)
     reader.landing = watch
     C_Timer.After(LAND_SETTLE, function()
         if not watch.aura or cast.directUsed or cast.ambiguous then return end
-        if SpellMissLine(watch.at) then return end
+        if SpellLine(watch.at) then return end
         local router = Router()
         if router then router:Landed(spell) end
     end)

@@ -505,6 +505,28 @@ do
     -- Then the aura is not looked up, and the refresh counts as hidden ones do.
     assert(not looked, "a secret aura of the target was looked up")
     assert(shown == 4, "a refresh hidden by the client was not shown")
+    -- Given a strike whose line of yours comes in its frame while no hit on
+    -- the target is spent on it (in a party, others strike the same enemy in
+    -- that moment), and an aura event on the target in that frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_AURA", "target", hidden)
+    -- When the wait is over.
+    Advance(0.016) Advance(0.05) Advance(0.2)
+    -- Then the line speaks for the cast: it struck, so the aura is not its mark.
+    assert(#landed == 4, "a strike with a line of its own and no hit spent on it was shown as landed")
+    -- Given a debuff with a swing's hit line and a tick's line of yours in its
+    -- frame, and an aura event in it.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+    Event("COMBAT_LOG_MESSAGE", nil, "tick", 0, 0, 1)
+    Event("UNIT_AURA", "target", hidden)
+    -- When the wait is over.
+    Advance(0.016) Advance(0.05) Advance(0.2)
+    -- Then neither line is taken for a hit of the debuff's own.
+    assert(#landed == 5, "a swing's hit line or a tick's line hid a landing")
     issecretvalue, C_Spell.IsSpellHarmful = plainSecretCheck, harmful
 end
 
