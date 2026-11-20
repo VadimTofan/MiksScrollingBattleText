@@ -238,20 +238,21 @@ frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
 assert(#displayed == 10 and displayed[10] == "Low Mana!")
 MikSBT.Triggers.Disable()
 
--- Given a living player with full mana and an enabled alert.
+-- Given a living player with full health and mana and enabled alerts.
 now = 50
 health, mana = 1, 1
 MikSBT.Triggers.Enable()
 frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
 local textBefore, soundBefore = #displayed, #played
 
--- When death empties the mana bar.
-dead, mana = true, 0
+-- When death empties both resource bars.
+dead, health, mana = true, 0, 0
+frame.scripts.OnEvent(frame, "UNIT_HEALTH", "player")
 frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
 
--- Then neither the warning nor its sound is emitted.
+-- Then neither warning emits text or sound.
 assert(#displayed == textBefore and #played == soundBefore,
-	"death triggered the low mana alert")
+	"death triggered a low resource alert")
 
 -- When the player releases spirit and enters the world as a ghost.
 dead, ghost = false, true
@@ -259,13 +260,35 @@ frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD")
 
 -- Then the alert stays silent until the player is alive again.
 assert(#displayed == textBefore and #played == soundBefore,
-	"a ghost triggered the low mana alert")
-ghost, mana = false, 1
+	"a ghost triggered a low resource alert")
+ghost, health, mana = false, 1, 1
+frame.scripts.OnEvent(frame, "UNIT_HEALTH", "player")
 frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
-mana = 0.1
+health, mana = 0.1, 0.1
+frame.scripts.OnEvent(frame, "UNIT_HEALTH", "player")
 frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
-assert(#displayed == textBefore + 1 and displayed[#displayed] == "Low Mana!")
-assert(#played == soundBefore + 1 and played[#played]:match("LowMana%.ogg$"))
+assert(#displayed == textBefore + 2 and displayed[textBefore + 1] == "Low Health!"
+	and displayed[textBefore + 2] == "Low Mana!")
+assert(#played == soundBefore + 2 and played[soundBefore + 1]:match("LowHealth%.ogg$")
+	and played[soundBefore + 2]:match("LowMana%.ogg$"))
+
+-- Given an armed mana alert, check life after sampling the resource.
+mana = 1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+local readMana = UnitPowerPercent
+UnitPowerPercent = function()
+	dead = true
+	return 0
+end
+
+-- When the mana update reveals the player died during the check.
+now = 60
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then neither text nor sound is emitted.
+assert(#displayed == textBefore + 2 and #played == soundBefore + 2,
+	"the alert used the life state from before the mana check")
+dead, UnitPowerPercent = false, readMana
 MikSBT.Triggers.Disable()
 
 -- Given the core translations loaded for a Russian client.
