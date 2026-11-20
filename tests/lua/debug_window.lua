@@ -94,6 +94,7 @@ local function NewFrame(kind, parent)
 	end
 	function frame:ClearAllPoints() self.point, self.points, self.anchors = nil, nil, 0 end
 	function frame:SetSize(width, height) self.width, self.height = width, height end
+	function frame:SetJustifyH(justify) self.justifyH = justify end
 	function frame:GetCenter() return self.centerX, self.centerY end
 	-- Like the client, which draws a value it hides when one is handed over; here as a mark.
 	function frame:SetFormattedText(format, ...)
@@ -114,6 +115,7 @@ local function NewFrame(kind, parent)
 		self.text = string.format(format, unpack(values, 1, count))
 	end
 	function frame:Configure(_, label, tooltip) self.label, self.tooltip = label, tooltip end
+	function frame:SetLabel(label) self.label = label end
 	function frame:SetClickHandler(handler) self.clickHandler = handler end
 	function frame:SetChecked(isChecked) self.checked = isChecked and true or false end
 	function frame:GetChecked() return self.checked == true end
@@ -984,8 +986,14 @@ do
 	local selectAt, runAt = window.selectButton.point, window.runButton.point
 	assert(selectAt[1] == "TOPLEFT" and selectAt[2] == panel and selectAt[3] == "BOTTOMLEFT" and selectAt[5] == runAt[5],
 		"the row of buttons of the log does not stand under its panel as Run and Stop do")
-	assert(window.clearButton.point[2] == window.selectButton and window.countFontString.point[2] == window.clearButton,
-		"Clear and the count do not follow Select all")
+	assert(window.clearButton.point[2] == window.selectButton and window.recordButton.point[2] == window.clearButton
+		and window.countFontString.points.LEFT[2] == window.recordButton, "Clear, the record button and the count do not follow Select all")
+	-- And the count ends at the right edge of the log, level with the middle of the buttons, so that a count too
+	-- long for its room goes on to a second line inside the window instead of out of it.
+	local countEnd = window.countFontString.points.RIGHT
+	assert(countEnd and countEnd[2] == panel and countEnd[3] == "BOTTOMRIGHT" and countEnd[4] == 0
+		and countEnd[5] == selectAt[5] - window.recordButton:GetHeight() / 2 and window.countFontString.justifyH == "LEFT",
+		"the count does not end at the right edge of the log, level with the buttons")
 
 	-- And the log is as tall as the content of the left column: the window's 560 less its top and its bottom.
 	assert(560 + drop + top[5] - bottom[5] == 376, "the log is " .. 560 + drop + top[5] - bottom[5] .. " tall, not 376")
@@ -1557,6 +1565,356 @@ do
 	assert(Window() == window, "the classic window did not come back after the design with four pages")
 end
 
+-- Rules: a recording keeps the log together with the game's combat log, with the combat log's clock.
+do
+	-- The clocks of the stub: the wall clock in seconds with fractions, which time() cuts to whole seconds,
+	-- and the precise clock of the game beside it, a fixed gap behind. 1700000000 is 22:13:20 on
+	-- 11/14/2023 as the stubbed date writes it, in UTC.
+	local CLOCK_GAP = 1699999500
+	local wallClock = 1700000000.25
+	local combatLogOn, combatLogCalls = false, {}
+	local popupsShown, reloads = {}, 0
+	function time() return math.floor(wallClock) end
+	function GetTimePreciseSec() return wallClock - CLOCK_GAP end
+	function date(format, at) return os.date("!" .. format, math.floor(at or wallClock)) end
+	-- Like the client: without a value the call says whether the combat log is on, with one it sets that.
+	function LoggingCombat(...)
+		if select("#", ...) == 0 then return combatLogOn end
+		combatLogOn = (...) and true or false
+		combatLogCalls[#combatLogCalls + 1] = combatLogOn
+		return combatLogOn
+	end
+	C_ChatInfo = { IsLoggingCombat = function() return combatLogOn, false end }
+	StaticPopupDialogs = {}
+	function StaticPopup_Show(which, text) popupsShown[#popupsShown + 1] = { which = which, text = text } end
+	function ReloadUI() reloads = reloads + 1 end
+	function UnitGUID() return "Player-1-0A1B2C3D" end
+	function GetBuildInfo() return "1.60.1", "70888", "Nov 1 2026", 160001 end
+
+	-- Whether a frame hears the event, and how many frames have a script for each frame.
+	local function Hears(event)
+		for _, frame in ipairs(frames) do
+			if frame.events[event] then return true end
+		end
+		return false
+	end
+	local function Updating()
+		local count = 0
+		for _, frame in ipairs(frames) do
+			if frame.scripts.OnUpdate then count = count + 1 end
+		end
+		return count
+	end
+	-- One frame passes.
+	local function Update()
+		for _, frame in ipairs(frames) do
+			if frame.scripts.OnUpdate then frame.scripts.OnUpdate(frame, 0.016) end
+		end
+	end
+	local function Popup() return popupsShown[#popupsShown] end
+	local function Find(list, pattern, from)
+		for index = from or 1, #list do
+			if list[index]:find(pattern) then return index, list[index] end
+		end
+	end
+	-- The button is clicked and the question for the start is accepted.
+	local function Begin()
+		Click(window.recordButton)
+		local popup = Popup()
+		assert(popup and popup.which == "MSBT_DEBUG_RECORD_START", "the button did not ask before the start")
+		StaticPopupDialogs[popup.which].OnAccept()
+	end
+	local button = window.recordButton
+
+	-- Rule: the window has a button for the recording right of Clear, with the count right of it; a click asks
+	-- first, and nothing starts before the question is accepted or when it is cancelled.
+	do
+		assert(Window() == window and not Listening() and Updating() == 0, "the classic window is not open and quiet")
+		assert(button and button.label == "Record", "the window has no button labelled Record")
+		assert(button.point[1] == "LEFT" and button.point[2] == window.clearButton, "the record button does not stand right of Clear")
+		assert(window.countFontString.points.LEFT[2] == button, "the count does not stand right of the record button")
+		assert(saved.debugRecordings == nil, "a recording is kept before there was one")
+
+		-- When the button is clicked.
+		Click(button)
+
+		-- Then the question comes, set up as the game's dialogs are, and says what happens and where it goes.
+		local dialog = StaticPopupDialogs.MSBT_DEBUG_RECORD_START
+		assert(#popupsShown == 1 and Popup().which == "MSBT_DEBUG_RECORD_START" and dialog, "a click did not show the question")
+		assert(dialog.button1 == "Start" and dialog.button2 == "Cancel" and dialog.timeout == 0 and dialog.whileDead
+			and dialog.hideOnEscape and dialog.preferredIndex == 3, "the question is not set up as asked")
+		for _, part in ipairs({ "combat log", "If the combat log is off", "turns it on until the recording stops", "SavedVariables", "WoWCombatLog", "reload",
+			"3 recordings", "oldest" }) do
+			assert(dialog.text:find(part, 1, true), "the question does not say " .. part)
+		end
+		-- The client wraps a dialog's text only between words, and a word wider than the dialog cuts the rest off.
+		for word in dialog.text:gmatch("%S+") do
+			assert(#word <= 24, "the question has the word " .. word .. ", longer than 24 letters")
+		end
+
+		-- And nothing started, and nothing does when it is cancelled.
+		assert(#combatLogCalls == 0 and not combatLogOn and button.label == "Record" and not Listening()
+			and Updating() == 0 and not Hears("PLAYER_LOGOUT"), "something started before the question was accepted")
+		if dialog.OnCancel then dialog.OnCancel() end
+		assert(#combatLogCalls == 0 and not combatLogOn and button.label == "Record" and not Listening()
+			and Updating() == 0 and not Hears("PLAYER_LOGOUT"), "something started when the question was cancelled")
+
+		-- When asked again, then the dialog is the one defined before.
+		Click(button)
+		assert(#popupsShown == 2 and StaticPopupDialogs.MSBT_DEBUG_RECORD_START == dialog, "the dialog was defined a second time")
+	end
+
+	-- A listed and a pasted test run, a row is written before the recording, and the recording starts at
+	-- a quarter past the second.
+	Tick(window, "echo", true)
+	Click(window.pageButtons.custom)
+	window.customEditbox:SetText('t:On("SOME_EVENT", function(value) t:Log("pasted", value) end)')
+	Click(window.runButton)
+	Click(window.pageButtons.first)
+	Fire("SOME_EVENT", "before")
+
+	-- Rule: Accept switches the combat log on, starts the running tests anew behind the record row, and shows
+	-- the state in the open window at once.
+	do
+		StaticPopupDialogs.MSBT_DEBUG_RECORD_START.OnAccept()
+
+		assert(#combatLogCalls == 1 and combatLogCalls[1] == true and combatLogOn, "Accept did not switch the combat log on")
+		assert(button.label == "Stop recording", "the button reads " .. tostring(button.label) .. " while it records")
+		assert(window.countFontString:GetText():find("^|cffff4040Recording: %d+ rows|r %- log: "), "the count has no marker: "
+			.. window.countFontString:GetText())
+		assert(Hears("CHAT_LOGGING_CHANGED") and Hears("PLAYER_LOGOUT") and Updating() == 1, "the recorder does not listen")
+		local all = AllLines(window)
+		local started = assert(Find(all, "record started combat log switched on$"), "no row says the recording started")
+		-- And the marker counts the rows of the recording, those since its start, while the log counts its own.
+		local recorded, logged = window.countFontString:GetText():match("^|cffff4040Recording: (%d+) rows|r %- log: (%d+) rows")
+		assert(tonumber(recorded) == tonumber(logged) - started + 1, "the marker counts " .. tostring(recorded)
+			.. " rows of the recording, not the " .. tostring(tonumber(logged) - started + 1) .. " since its start")
+		assert(Find(all, "record combat log state true false$", started), "no row says what the game reports of the combat log")
+		assert((Find(all, "echo stopped$", started)) and (Find(all, "echo started Echo$", started)),
+			"the running listed test did not start anew behind the record row")
+		assert(Find(all, "custom started custom test$", started), "the pasted test did not start anew behind the record row")
+	end
+
+	-- Rule: rows written after the start are kept with the clock of the combat log: the moment of a row on
+	-- the precise clock is placed once time() has stepped.
+	do
+		-- When a row is written before the step, the clock steps in the next frame at a whole second, and a row follows.
+		wallClock = 1700000000.75
+		Fire("SOME_EVENT", 7, "x")
+		Update()
+		assert(Updating() == 1, "the clock was aligned before time() stepped")
+		wallClock = 1700000001
+		Update()
+		assert(Updating() == 0, "the clock was not aligned after time() stepped, or the frame still runs")
+		wallClock = 1700000002.5
+		Fire("SOME_EVENT", 8, "y")
+		wallClock = 1700000003
+		Update()
+		assert(Updating() == 0, "a frame runs after the clock is aligned")
+	end
+
+	-- Rule: Stop ends the tests, switches the combat log off, and saves the recording with the settings, and the
+	-- game is asked for a reload.
+	do
+		Click(button)
+
+		assert(not window.testCheckboxes.echo:GetChecked() and not Hears("SOME_EVENT"), "Stop left a test running or ticked")
+		assert(#combatLogCalls == 2 and combatLogCalls[2] == false and not combatLogOn, "Stop did not switch the combat log off")
+		assert(button.label == "Record" and not window.countFontString:GetText():find("Recording", 1, true),
+			"the window still shows the recording after Stop")
+		assert(not Hears("CHAT_LOGGING_CHANGED") and not Hears("PLAYER_LOGOUT") and Updating() == 0, "the recorder listens after Stop")
+		local list = assert(saved.debugRecordings, "no recording was saved")
+		assert(#list == 1, #list .. " recordings were saved")
+		local entry = list[1]
+		assert(entry.date == "11/14/2023" and entry.started == "22:13:20.250" and entry.stopped == "22:13:23.000",
+			"the recording says " .. tostring(entry.date) .. " " .. tostring(entry.started) .. " to " .. tostring(entry.stopped))
+		assert(entry.clock == "exact" and entry.reason == "stopped" and entry.truncated == nil, "the recording says "
+			.. tostring(entry.clock) .. ", " .. tostring(entry.reason))
+		assert(entry.build == "1.60.1 70888" and entry.player == "Player-1-0A1B2C3D" and entry.combatLog == "switched on",
+			"the recording says " .. tostring(entry.build) .. ", " .. tostring(entry.player) .. ", " .. tostring(entry.combatLog))
+		assert(table.concat(entry.tests, ",") == "echo,custom", "the tests are " .. table.concat(entry.tests, ","))
+		for index, row in ipairs(entry.rows) do
+			assert(row:find("^%d%d:%d%d:%d%d%.%d%d%d %d+%.%d%d%d "), "the row " .. index .. " has no time of day: " .. row)
+		end
+		assert(not Find(entry.rows, "heard before"), "a row from before the start was kept")
+		local _, seven = Find(entry.rows, "echo heard 7 x$")
+		assert(seven and seven:find("^22:13:20%.750 "), "the row before the step reads " .. tostring(seven))
+		local _, eight = Find(entry.rows, "echo heard 8 y$")
+		assert(eight and eight:find("^22:13:22%.500 "), "the row after the step reads " .. tostring(eight))
+		assert(Find(entry.rows, "pasted 7$") and Find(entry.rows, "custom stopped$"), "the pasted test is missing from the rows")
+		assert(entry.rows[#entry.rows]:find("record stopped stopped " .. #entry.rows .. "$"), "the last row reads "
+			.. entry.rows[#entry.rows])
+
+		-- And the question for the reload names the rows and the times, and Later does not reload.
+		local popup = Popup()
+		local dialog = StaticPopupDialogs.MSBT_DEBUG_RECORD_SAVE
+		assert(#popupsShown == 3 and popup.which == "MSBT_DEBUG_RECORD_SAVE" and dialog, "Stop showed no question for the reload")
+		assert(popup.text:find(#entry.rows .. " rows", 1, true) and popup.text:find(entry.started, 1, true)
+			and popup.text:find(entry.stopped, 1, true) and popup.text:find("reloads or on logout", 1, true),
+			"the question for the reload reads " .. popup.text)
+		for word in popup.text:gmatch("%S+") do
+			assert(#word <= 24, "the question for the reload has the word " .. word .. ", longer than 24 letters")
+		end
+		assert(dialog.button1 == "Reload now" and dialog.button2 == "Later" and dialog.timeout == 0 and dialog.whileDead
+			and dialog.hideOnEscape and dialog.preferredIndex == 3, "the question for the reload is not set up as asked")
+		dialog.OnCancel()
+		assert(reloads == 0, "Later reloaded the interface")
+		local lines = Lines(window)
+		assert(lines[#lines]:find("record kept until the next reload or logout$"), "Later wrote " .. lines[#lines])
+		dialog.OnAccept()
+		assert(reloads == 1, "Reload now did not reload the interface")
+	end
+
+	-- Rule: a recording that stops before time() has stepped places its rows by the whole second and says so; without
+	-- the precise clock the moments come from the clock the log has.
+	do
+		wallClock = 1700000010.25
+		Begin()
+		Click(button)
+		local entry = saved.debugRecordings[2]
+		assert(entry and entry.clock == "approximate" and entry.started == "22:13:30.000", "a recording stopped before the step says "
+			.. tostring(entry and entry.clock) .. " " .. tostring(entry and entry.started))
+
+		local precise = GetTimePreciseSec
+		GetTimePreciseSec = nil
+		Begin()
+		Click(button)
+		entry = saved.debugRecordings[3]
+		assert(entry and entry.started == "22:13:30.000" and entry.rows[1]:find("^22:13:30%.000 "), "without the precise clock the recording says "
+			.. tostring(entry and entry.started))
+		GetTimePreciseSec = precise
+	end
+
+	-- Rule: the row that brings the recording to its limit ends it, as Stop does, with the reason and a row that say so.
+	do
+		saved.debugRecordings = nil
+		Begin()
+		Click(window.pageButtons.custom)
+		window.customEditbox:SetText('for index = 1, 30000 do t:Log("x", index) if not t.isActive then break end end')
+		Click(window.runButton)
+		Click(window.pageButtons.first)
+
+		local entry = saved.debugRecordings and saved.debugRecordings[1]
+		assert(entry, "the recording did not end at its limit")
+		assert(entry.reason == "limit" and entry.truncated == true, "the recording says " .. tostring(entry.reason) .. ", "
+			.. tostring(entry.truncated))
+		assert(entry.rows[10000]:find("custom x 9997$"), "the row at the limit reads " .. entry.rows[10000])
+		assert(entry.rows[10001]:find("record limit reached 10000$"), "the row after the limit reads " .. entry.rows[10001])
+		assert(entry.rows[#entry.rows]:find("record stopped limit "), "the last row reads " .. entry.rows[#entry.rows])
+		assert(button.label == "Record" and not combatLogOn and Popup().which == "MSBT_DEBUG_RECORD_SAVE", "the end at the limit did not stop the recording")
+		Click(window.clearButton)
+	end
+
+	-- Rule: three recordings are kept, and the oldest goes first.
+	do
+		saved.debugRecordings = nil
+		local function Take(tag)
+			Begin()
+			Tick(window, "echo", true)
+			Fire("SOME_EVENT", tag, "x")
+			Click(button)
+		end
+		Take("tagA")
+		Take("tagB")
+		Take("tagC")
+		assert(#saved.debugRecordings == 3, #saved.debugRecordings .. " recordings are kept after three")
+		Take("tagD")
+
+		local list = saved.debugRecordings
+		assert(#list == 3, #list .. " recordings are kept after four")
+		assert(Find(list[1].rows, "echo heard tagB x$") and Find(list[2].rows, "echo heard tagC x$") and Find(list[3].rows, "echo heard tagD x$")
+			and not Find(list[1].rows, "tagA"), "the recordings kept are not the newest three, oldest first")
+		assert(Find(AllLines(window), "record dropped the oldest recording "), "no row says that a recording was dropped")
+		Click(window.clearButton)
+	end
+
+	-- Rule: a logout ends the recording and saves it, and asks for nothing.
+	do
+		saved.debugRecordings = nil
+		Begin()
+		Tick(window, "echo", true)
+		local popups = #popupsShown
+
+		Fire("PLAYER_LOGOUT")
+
+		local entry = saved.debugRecordings and saved.debugRecordings[1]
+		assert(entry and entry.reason == "logout" and Find(entry.rows, "record stopped logout "), "a logout did not save the recording")
+		assert(#popupsShown == popups, "a logout asked for a reload")
+		assert(not combatLogOn and button.label == "Record" and not Listening() and not Hears("PLAYER_LOGOUT") and Updating() == 0,
+			"a logout left the recording running")
+	end
+
+	-- Rule: while the recording runs it hears changes of the logging and writes a row for each; after the stop
+	-- it hears nothing.
+	do
+		Begin()
+		Fire("CHAT_LOGGING_CHANGED", "combat", true)
+		local lines = AllLines(window)
+		assert(lines[#lines]:find("record logging changed combat true$"), "a change of the logging wrote " .. lines[#lines])
+		Click(button)
+		local entry = saved.debugRecordings[#saved.debugRecordings]
+		assert(Find(entry.rows, "record logging changed combat true$"), "the recording lacks the change of the logging")
+		local count = #AllLines(window)
+
+		Fire("CHAT_LOGGING_CHANGED", "combat", false)
+
+		assert(#AllLines(window) == count and not Hears("CHAT_LOGGING_CHANGED"), "the recorder heard a change after the stop")
+		Click(window.clearButton)
+	end
+
+	-- Rule: where the client has no call for the combat log the recording works and says so.
+	do
+		local logging, info = LoggingCombat, C_ChatInfo
+		LoggingCombat, C_ChatInfo = nil, nil
+		local calls = #combatLogCalls
+
+		Begin()
+		assert(Find(AllLines(window), "record started combat log unavailable$"), "a recording without the combat log call did not say so")
+		Click(button)
+
+		local entry = saved.debugRecordings[#saved.debugRecordings]
+		assert(entry.combatLog == "unavailable" and Find(entry.rows, "record started combat log unavailable$"),
+			"the recording says " .. tostring(entry.combatLog))
+		assert(#combatLogCalls == calls and button.label == "Record", "a recording without the combat log call failed")
+		LoggingCombat, C_ChatInfo = logging, info
+		Click(window.clearButton)
+	end
+
+	-- Rule: a window of another design that opens while the recording runs shows it, and stops it from there.
+	do
+		Begin()
+		saved.optionsDesign = "other"
+		Slash()
+		local other = Window()
+		assert(other and other ~= window and other.recordButton.label == "Stop recording", "the other design's window does not show the recording")
+		assert(other.countFontString:GetText():find("Recording", 1, true), "the other design's count has no marker")
+
+		Click(other.recordButton)
+		assert(other.recordButton.label == "Record" and not combatLogOn, "the other design's window did not stop the recording")
+		saved.optionsDesign = nil
+		Slash()
+		assert(Window() == window and button.label == "Record", "the classic window came back with the state of before")
+	end
+
+	-- Given a combat log the player started before recording.
+	do
+		combatLogOn = true
+		local callsBefore = #combatLogCalls
+
+		-- When a recording starts and stops.
+		Begin()
+		Click(button)
+
+		-- Then the existing combat log keeps running.
+		assert(combatLogOn, "stopping the recording turned off an existing combat log")
+		assert(#combatLogCalls == callsBefore, "recording changed an existing combat log")
+	end
+
+	saved.debugRecordings = nil
+	time, date, GetTimePreciseSec, LoggingCombat, C_ChatInfo = nil, nil, nil, nil, nil
+	StaticPopupDialogs, StaticPopup_Show, ReloadUI, UnitGUID, GetBuildInfo = nil, nil, nil, nil, nil
+end
+
 -- Rule: the listed tests come from one file, on the pages game and addon.
 do
 	-- Given the tests file.
@@ -1587,6 +1945,10 @@ do
 	assert(#Debug.pages == 2 and Debug.pages[1].key == "game" and Debug.pages[2].key == "addon",
 		"the listed pages are not game and addon")
 	assert(byKey.sources and Debug.pages[1].tests[1] == byKey.sources, "the test of the sources is not listed first on the page game")
+	-- And the tests that set a limit themselves say that a recording lifts it.
+	for _, key in ipairs({ "sources", "display", "trace" }) do
+		assert(not byKey[key] or byKey[key].tooltip:find("recording", 1, true), "the tooltip of the test " .. key .. " does not say that a recording lifts its limit")
+	end
 
 	-- When a design is chosen whose window is built with the listed tests.
 	Slash()
@@ -1614,6 +1976,73 @@ function Display.service:DisplayEvent(settings, message, texture, mute, formatAr
 end
 Display.Show = function(...) return Display.service:DisplayEvent(...) end
 MikSBT.Display = { Service = Display.service }
+
+-- A recording as the game runs it, around a body: the clocks and the dialogs the recorder asks of the
+-- client are stubbed, the recording is started with its button and, when the body is done, stopped with
+-- it. Gives the recording as it was saved.
+local function Recording(body)
+	local names = { "time", "date", "GetTimePreciseSec", "StaticPopupDialogs", "StaticPopup_Show", "UnitGUID", "GetBuildInfo" }
+	local before = {}
+	for _, name in ipairs(names) do before[name] = _G[name] end
+	function time() return 1700000000 end
+	function date(format, at) return os.date("!" .. format, math.floor(at or 1700000000)) end
+	function GetTimePreciseSec() return 500 end
+	StaticPopupDialogs = {}
+	function StaticPopup_Show() end
+	function UnitGUID() return "Player-1-0A1B2C3D" end
+	function GetBuildInfo() return "1.60.1", "70888", "Nov 1 2026", 160001 end
+	saved.debugRecordings = nil
+	Click(window.recordButton)
+	StaticPopupDialogs.MSBT_DEBUG_RECORD_START.OnAccept()
+	assert(window.recordButton.label == "Stop recording", "the recording did not start")
+	body()
+	assert(window.recordButton.label == "Stop recording", "the recording ended before its body was done")
+	Click(window.recordButton)
+	local entry = saved.debugRecordings[#saved.debugRecordings]
+	saved.debugRecordings = nil
+	for _, name in ipairs(names) do _G[name] = before[name] end
+	return entry
+end
+-- How many of the lines hold the text.
+local function Count(lines, text)
+	local count = 0
+	for _, line in ipairs(lines) do
+		if line:find(text, 1, true) then count = count + 1 end
+	end
+	return count
+end
+
+-- Rule: t:Limit gives the limit a test sets itself, and while a recording runs at least the recording's own
+-- limit, which is 10000 rows.
+do
+	-- Given a pasted test that asks for a limit and is stopped after it asked.
+	local function Asked(limit)
+		Click(window.pageButtons.custom)
+		window.customEditbox:SetText("limitAsked = t:Limit(" .. limit .. ")")
+		Click(window.runButton)
+		Click(window.stopButton)
+		Click(window.pageButtons.game)
+		local asked = limitAsked
+		limitAsked = nil
+		return asked
+	end
+
+	-- When no recording runs, then a test gets the limit it asked for.
+	local small, large = Asked(300), Asked(20000)
+	assert(small == 300, "t:Limit(300) gave " .. tostring(small) .. " while no recording runs, not 300")
+	assert(large == 20000, "t:Limit(20000) gave " .. tostring(large) .. " while no recording runs, not 20000")
+
+	-- When a recording runs, then a smaller limit is lifted to the recording's and a larger one stays.
+	Recording(function()
+		small, large = Asked(300), Asked(20000)
+		assert(small == 10000, "t:Limit(300) gave " .. tostring(small) .. " while a recording runs, not 10000")
+		assert(large == 20000, "t:Limit(20000) gave " .. tostring(large) .. " while a recording runs, not 20000")
+	end)
+
+	-- When the recording has stopped, then a new run has its own limit again.
+	small = Asked(300)
+	assert(small == 300, "t:Limit(300) gave " .. tostring(small) .. " after the recording stopped, not 300")
+end
 
 -- Rule: the test of the sources records the client's build, each resource gain with the fields of its
 -- payload, the first twenty combat log messages and the player's casts, and ends itself after 30 seconds.
@@ -1678,6 +2107,21 @@ do
 	assert(not Listening() and not window.testCheckboxes.sources:GetChecked(), "the test of the sources did not end after 30 seconds")
 	assert(lines[#lines - 1] == "1.000 sources END gains 2 log messages 25" and lines[#lines] == "1.000 sources stopped",
 		"the test of the sources ended with " .. lines[#lines - 1] .. " | " .. lines[#lines])
+
+	-- When a recording runs, then the test goes on past 30 seconds, up to the recording's limit taken as seconds.
+	do
+		Click(window.clearButton)
+		Tick(window, "sources", true)
+		local recorded = Recording(function()
+			RunTimers(30)
+			assert(window.testCheckboxes.sources:GetChecked(), "the test of the sources ended after 30 seconds while a recording runs")
+			RunTimers(9999)
+			assert(window.testCheckboxes.sources:GetChecked(), "the test of the sources ended before 10000 seconds while a recording runs")
+			RunTimers(10000)
+			assert(not window.testCheckboxes.sources:GetChecked(), "the test of the sources did not end after 10000 seconds while a recording runs")
+		end)
+		assert(recorded.rows[#recorded.rows - 2]:find(" sources END gains 0 log messages 0$"), "the recording lacks the end of the test of the sources")
+	end
 
 	-- When the client has no call for the build and the call for the payload of a gain fails, and in
 	-- another run lacks that call.
@@ -1915,6 +2359,21 @@ do
 		"the test of the display ended with " .. lines[304])
 	assert(not window.testCheckboxes.display:GetChecked(), "the test of the display kept its tick after its limit")
 
+	-- When a recording runs, then the test logs past 300 lines, says no limit and does not end itself.
+	do
+		Click(window.clearButton)
+		local recorded = Recording(function()
+			Tick(window, "display", true)
+			for index = 1, 350 do Display.Show(changed, "line " .. index) end
+			assert(window.testCheckboxes.display:GetChecked(), "the test of the display ended itself while a recording runs")
+			local all = AllLines(window)
+			assert(Count(all, " display LINE ") == 350, Count(all, " display LINE ") .. " of 350 lines were logged while a recording runs")
+			assert(Count(all, "limit of") == 0, "the test of the display said a limit while a recording runs")
+		end)
+		assert(Count(recorded.rows, " display LINE ") == 350 and Count(recorded.rows, " display END lines seen 350") == 1,
+			"the recording lacks the 350 lines of the display")
+	end
+
 	-- When the addon has no display service, then the test says so.
 	MikSBT.Display = nil
 	Click(window.clearButton)
@@ -2136,6 +2595,21 @@ do
 		"the limit is said as " .. lines[303])
 	assert(lines[304] == "0.000 trace END stages seen 305 logged 300", "the test of the trace ended with " .. lines[304])
 	assert(Row(11) == "305 BATCH - 305 305 " and Row(12):find("^292 BATCH "), "the drawing did not go on after the limit: " .. Row(11) .. "|" .. Row(12))
+
+	-- When a recording runs, then the stages are logged past 300 and no limit is said.
+	do
+		Click(window.clearButton)
+		local recorded = Recording(function()
+			Tick(window, "trace", true)
+			for index = 1, 350 do Batcher:Queue(index, index) end
+			local all = AllLines(window)
+			assert(Count(all, " trace BATCH ") == 350, Count(all, " trace BATCH ") .. " of 350 stages were logged while a recording runs")
+			assert(Count(all, "limit of") == 0, "the test of the trace said a limit while a recording runs")
+			Tick(window, "trace", false)
+		end)
+		assert(Count(recorded.rows, " trace BATCH ") == 350 and Count(recorded.rows, " trace END stages seen 350 logged 350") == 1,
+			"the recording lacks the 350 stages of the trace")
+	end
 
 	-- When the time of the tracked swing is hidden, then it counts as none.
 	reader.swingTimes = { { at = 499.8 } }
