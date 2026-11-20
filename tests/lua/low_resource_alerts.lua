@@ -4,6 +4,7 @@ local profile, area = {}, {}
 local disabled = false
 local mana, powerType = 1, 0
 local health = 1
+local dead, ghost = false, false
 local now = 0
 GetTime = function() return now end
 local secret = newproxy(true)
@@ -14,6 +15,10 @@ canaccessvalue = function(value) return not rawequal(value, secret) end
 Enum = { PowerType = { Mana = 0 } }
 UnitClass = function() return "Mage", "MAGE" end
 UnitPowerType = function() return powerType end
+UnitIsDeadOrGhost = function(unit)
+	assert(unit == "player")
+	return dead or ghost
+end
 UnitPowerPercent = function(unit, power)
 	assert(unit == "player" and power == 0)
 	return mana
@@ -231,6 +236,36 @@ frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
 
 -- Then the lower mana threshold produces its own alert.
 assert(#displayed == 10 and displayed[10] == "Low Mana!")
+MikSBT.Triggers.Disable()
+
+-- Given a living player with full mana and an enabled alert.
+now = 50
+health, mana = 1, 1
+MikSBT.Triggers.Enable()
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+local textBefore, soundBefore = #displayed, #played
+
+-- When death empties the mana bar.
+dead, mana = true, 0
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then neither the warning nor its sound is emitted.
+assert(#displayed == textBefore and #played == soundBefore,
+	"death triggered the low mana alert")
+
+-- When the player releases spirit and enters the world as a ghost.
+dead, ghost = false, true
+frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD")
+
+-- Then the alert stays silent until the player is alive again.
+assert(#displayed == textBefore and #played == soundBefore,
+	"a ghost triggered the low mana alert")
+ghost, mana = false, 1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+mana = 0.1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+assert(#displayed == textBefore + 1 and displayed[#displayed] == "Low Mana!")
+assert(#played == soundBefore + 1 and played[#played]:match("LowMana%.ogg$"))
 MikSBT.Triggers.Disable()
 
 -- Given the core translations loaded for a Russian client.

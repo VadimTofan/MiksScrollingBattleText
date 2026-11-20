@@ -494,6 +494,9 @@ local function CheckLowMana()
 	if not alertsEnabled or type(UnitPowerPercent) ~= "function" then
 		return
 	end
+	if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then
+		return
+	end
 	if UnitPowerType("player") ~= Enum.PowerType.Mana then
 		manaAlerted = false
 		return
