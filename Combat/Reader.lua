@@ -190,6 +190,7 @@ end
 -- yours came with it.
 local LinesRunning, DecideGroup
 local WeaponProcTrigger
+local SettleSharedName
 local function TagProcCandidate(result, at, school, key)
     if result.ambiguous or not result.proc or result.spell
         or result.drain then return end
@@ -518,6 +519,7 @@ function ns.DecideHit(hit, line, restrict)
     if not router then return end
     local record = hit.record
     local kind = record.event == "miss" and "miss" or record.event
+    if line == true then SettleSharedName(hit, kind, restrict) end
     local swingChecks = ns.mine and ns.mine.accountingEnabled
         and (kind == "damage" or kind == "miss")
         and ns.mine:AccountingSwingChecks(hit.key, hit.at) or nil
@@ -661,6 +663,9 @@ end
 local NonPeriodicPair
 
 local function DecideReports(group, at, settled)
+    -- The units this moment's reports landed on (SettleSharedName).
+    local landed = {}
+    for _, hit in ipairs(group) do landed[hit.key], hit.landed = true, landed end
     local frameLines, kinded = {}, false
     for _, line in ipairs(reader.logLines or {}) do
         local gap = line.at - at
@@ -1268,7 +1273,8 @@ end
 
 local function NamedRecipient(target)
     if type(UnitName) ~= "function" then return nil, true end
-    local key, uncertain
+    local key, uncertain, unkeyed
+    local candidates = {}
     local tokens = { "target", "focus", "mouseover" }
     for token in pairs(reader.plates) do tokens[#tokens + 1] = token end
     for _, token in ipairs(tokens) do
@@ -1279,24 +1285,52 @@ local function NamedRecipient(target)
             local candidate = RecipientKey(token)
             if candidate then
                 if key and key ~= candidate then uncertain = true end
-                key = candidate
+                key, candidates[candidate] = candidate, true
             else
-                uncertain = true
+                uncertain, unkeyed = true, true
             end
         end
     end
-    if uncertain then return nil, true end
+    -- Several units with keys carry the name: a report of the cast's own
+    -- frame may still show which one took it (SettleSharedName).
+    if uncertain then return nil, true, not unkeyed and candidates or nil end
     return key, key == nil
+end
+
+-- A cast sent to a name several units in view carry has no recipient
+-- (NamedRecipient). A report of yours that a cast could have made (its line
+-- not a tick's, swing's or shot's), on one of those units in the cast's own
+-- frame, with no report of that moment on another of them, shows which one
+-- took it (Mine:Settle; predicted, not yet seen in client).
+SettleSharedName = function(hit, kind, restrict)
+    local landed = hit.landed
+    if not landed or (kind ~= "damage" and kind ~= "miss")
+        or (restrict ~= nil and restrict ~= "direct") then return end
+    for _, casts in pairs(ns.mine.casts) do
+        for _, cast in ipairs(casts) do
+            local candidates = cast.candidates
+            if candidates and candidates[hit.key]
+                and math.abs(cast.at - hit.at) <= SWING_FRAME then
+                local alone = true
+                for key in pairs(candidates) do
+                    if key ~= hit.key and landed[key] then alone = false end
+                end
+                if alone then
+                    ns.mine:Settle(cast, hit.key, kind, hit.record.school, hit.at)
+                end
+            end
+        end
+    end
 end
 
 local function NoteCastTarget(unit, target, guid, spell, now)
     if (unit ~= "player" and unit ~= "pet")
         or not ns.Number(spell, 1) then return end
-    local key, uncertain
+    local key, uncertain, candidates
     if not ns.Public(target) then
         uncertain = true
     elseif ns.Text(target) then
-        key, uncertain = NamedRecipient(target)
+        key, uncertain, candidates = NamedRecipient(target)
     elseif target == nil or target == "" then
         -- Older clients omit the recipient name. Keep the start snapshot;
         -- selecting another target before success must not move the cast.
@@ -1313,7 +1347,8 @@ local function NoteCastTarget(unit, target, guid, spell, now)
     end
     targets[#targets + 1] = { unit = unit, spell = spell, at = now,
         guid = ns.Text(guid) and guid or nil, key = key,
-        uncertain = uncertain == true or not ns.Text(guid) }
+        uncertain = uncertain == true or not ns.Text(guid),
+        candidates = candidates }
     while #targets > MAX_CAST_TARGETS do table.remove(targets, 1) end
 end
 
@@ -1334,7 +1369,12 @@ local function CastTarget(unit, spell, guid, now, consume)
     if found then
         local entry = reader.castTargets[found]
         if consume then table.remove(reader.castTargets, found) end
-        if entry.uncertain or count > 1 then return nil, true, true end
+        if entry.uncertain or count > 1 then
+            -- A shared name's units pass on only when the cast's GUID pairs
+            -- it with this send.
+            return nil, true, true,
+                ns.Text(guid) and entry.guid == guid and entry.candidates or nil
+        end
         return entry.key, false, true
     end
     local recent = reader.lastCastTarget
@@ -1430,7 +1470,8 @@ local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
     WindfuryNotice(unit, spell, guid, now)
-    local key, uncertain, observed = CastTarget(unit, spell, guid, now, true)
+    local key, uncertain, observed, candidates =
+        CastTarget(unit, spell, guid, now, true)
     if not observed and unit == "player" then
         key = ns.TargetKey()
     elseif not observed and unit == "pet" then
@@ -1456,6 +1497,11 @@ local function OnCast(unit, spell, guid)
             spell = spell, guid = ns.Text(guid) and guid or nil,
             uncertain = not certain, conflict = conflict == true })
     end
+    -- A cast sent to a name several units carry keeps their keys on its
+    -- record, for its own report to settle (SettleSharedName).
+    local recorded = candidates and ns.mine.casts[spell]
+    recorded = recorded and recorded[#recorded]
+    if recorded and recorded.at == now then recorded.candidates = candidates end
     -- Your pet's casts and your own with no target to hit (Life Tap) are
     -- written too (0.3.16).
     lastCast = { at = now, spell = spell, unit = unit }

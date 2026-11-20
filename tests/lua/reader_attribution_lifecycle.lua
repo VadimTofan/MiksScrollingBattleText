@@ -642,5 +642,251 @@ Replay("fully confirmed mixed damage keeps both numbers without guessed roles", 
         "opaque mixed reports received guessed identities")
 end)
 
+-- A cast sent to a name two creatures in view carry, nameplate1 the target.
+local function SharedNameCast(spell, guid)
+    names.nameplate1, names.nameplate2 = "Creature", "Creature"
+    Event("UNIT_SPELLCAST_SENT", "player", "Creature", guid, spell)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", guid, spell)
+end
+-- A report on unit with a line of yours of its kind in the same frame.
+local function OwnReport(unit, kind, school)
+    local amount = Amount()
+    Line(kind or "spell")
+    Event("UNIT_COMBAT", unit, "WOUND", "", amount, school or 1)
+    return amount
+end
+-- A line of yours for an event Line does not cover.
+local function EventLine(event)
+    local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[event]
+    Event("COMBAT_LOG_MESSAGE", "opaque native text", rgb.r, rgb.g, rgb.b,
+        Enum.CombatLogMessageOrder.Newest)
+end
+local function Unplaced(spell)
+    local cast = ns.mine.casts[spell][1]
+    return cast.targetUncertain and cast.key == nil
+end
+
+Replay("a strike's own report settles a name two creatures share", function()
+    -- Given Rake sent to a name the target and another creature carry.
+    local start = Start()
+    SharedNameCast(1822, "cast-shared")
+
+    -- When its hit lands on the target in the cast's own frame.
+    local hit = OwnReport("target")
+    At(start + 3)
+    local tick = OwnReport("target", "tick")
+    At(start + 3.3)
+
+    -- Then the hit and the bleed's later tick are both named after Rake.
+    assert(Result(hit).who == "you" and Result(hit).spell == 1822,
+        "the strike's own report did not settle its recipient")
+    assert(Result(tick).spell == 1822 and Result(tick).tick,
+        "the settled bleed's tick was not named")
+end)
+
+Replay("a mouseover strike is settled on the creature its report lands on", function()
+    -- Given Rake sent by mouseover to the second creature of a shared name.
+    local start = Start()
+    mouseover = "nameplate2"
+    SharedNameCast(1822, "cast-mouseover")
+
+    -- When its hit and later tick land on that creature.
+    local hit = OwnReport("nameplate2")
+    At(start + 3)
+    local tick = OwnReport("nameplate2", "tick")
+    At(start + 3.3)
+
+    -- Then Rake follows that creature, not the selected one.
+    local key = ns.mine.casts[1822][1].key
+    assert(key and key ~= ns.TargetKey(),
+        "the strike was not settled on the creature its report landed on")
+    assert(Result(hit).spell == 1822 and Result(tick).spell == 1822,
+        "the mouseover strike's hit or tick was not named")
+end)
+
+Replay("a strike's own miss settles a name two creatures share", function()
+    -- Given Claw sent to a name two creatures in view carry.
+    local start = Start()
+    SharedNameCast(3029, "cast-dodged")
+
+    -- When the target dodges it in the cast's own frame.
+    EventLine("SPELL_MISSED")
+    Event("UNIT_COMBAT", "target", "DODGE", "", nil, 1)
+    At(start + 1)
+
+    -- Then the miss is named after the strike.
+    local result
+    for _, record in ipairs(records) do
+        if record.event == "miss" then result = record.result end
+    end
+    assert(result and result.missed and result.spell == 3029,
+        "the strike's own miss did not settle its recipient")
+end)
+
+Replay("reports on both creatures of a shared name keep the strike unplaced", function()
+    -- Given Claw sent to a name two creatures in view carry.
+    local start = Start()
+    SharedNameCast(3029, "cast-both")
+
+    -- When reports of yours land on both creatures in the cast's frame.
+    local first, second = OwnReport("target"), OwnReport("nameplate2")
+    At(start + 1)
+
+    -- Then neither report chooses the strike's recipient.
+    assert(Unplaced(3029), "one of two reported creatures was chosen")
+    assert(Result(first).spell == nil and Result(second).spell == nil,
+        "a report was named after a strike without a recipient")
+end)
+
+Replay("an unplated same-name focus keeps a reported strike unplaced", function()
+    -- Given the target and an unplated focus that carry one name.
+    local start = Start()
+    focus = "focus-creature"
+    visible[focus], names[focus] = true, names.nameplate1
+
+    -- When Claw's report lands on the target in its own frame.
+    Event("UNIT_SPELLCAST_SENT", "player", names.nameplate1, "cast-focus", 3029)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-focus", 3029)
+    local hit = OwnReport("target")
+    At(start + 1)
+
+    -- Then the focus, which no report can show, may still have taken it.
+    assert(Unplaced(3029) and Result(hit).spell == nil,
+        "a report ruled out an unplated creature of the same name")
+end)
+
+Replay("a hidden recipient name is not settled by a report", function()
+    -- Given Claw whose recipient name cannot be read.
+    local start = Start()
+    names.nameplate1, names.nameplate2 = "Creature", "Creature"
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "cast-hidden", 3029)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-hidden", 3029)
+
+    -- When its report lands on the target in its own frame.
+    local hit = OwnReport("target")
+    At(start + 1)
+
+    -- Then nothing names the unit it was sent to.
+    assert(Unplaced(3029) and Result(hit).spell == nil,
+        "a hidden recipient name was settled")
+end)
+
+Replay("a cast paired without its GUID is not settled by a report", function()
+    -- Given Claw sent to a shared name with no readable cast GUID.
+    local start = Start()
+    SharedNameCast(3029, nil)
+
+    -- When its report lands on the target in its own frame.
+    local hit = OwnReport("target")
+    At(start + 1)
+
+    -- Then the cast is not known to be the one sent to that name.
+    assert(Unplaced(3029) and Result(hit).spell == nil,
+        "a cast paired without its GUID was settled")
+end)
+
+Replay("a report after the cast's frame does not settle a shared name", function()
+    -- Given Claw sent to a name two creatures in view carry.
+    local start = Start()
+    SharedNameCast(3029, "cast-late")
+
+    -- When a report of yours lands on the target only after its frame.
+    At(start + 0.05)
+    local hit = OwnReport("target")
+    At(start + 1)
+
+    -- Then that report does not choose the strike's recipient.
+    assert(Unplaced(3029) and Result(hit).spell == nil,
+        "a report outside the cast's frame settled its recipient")
+end)
+
+Replay("a report without your line does not settle a shared name", function()
+    -- Given Claw sent to a name two creatures in view carry.
+    local start = Start()
+    SharedNameCast(3029, "cast-unlined")
+
+    -- When a report lands on the target with no line of yours.
+    local hit = Amount()
+    Event("UNIT_COMBAT", "target", "WOUND", "", hit, 1)
+    At(start + 1)
+
+    -- Then a report that is not yours chooses nothing.
+    assert(Unplaced(3029) and Result(hit).who == "unknown",
+        "another's report settled the strike's recipient")
+end)
+
+Replay("a tick in the cast's frame does not settle a shared name", function()
+    -- Given Rend on the target, then a second creature of its name.
+    local start = Start()
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 772)
+
+    -- When Claw's frame at the shared name holds only Rend's tick.
+    At(start + 3)
+    SharedNameCast(3029, "cast-tick")
+    local tick = OwnReport("target", "tick")
+    At(start + 3.3)
+
+    -- Then the tick keeps its own spell and the strike stays unplaced.
+    assert(Result(tick).spell == 772, "Rend's tick lost its spell")
+    assert(Unplaced(3029), "a tick settled a strike's recipient")
+end)
+
+Replay("a heal in the cast's frame does not settle a shared name", function()
+    -- Given Claw sent to a name two creatures in view carry.
+    local start = Start()
+    SharedNameCast(3029, "cast-heal")
+
+    -- When the only report of its frame is a heal on the target.
+    EventLine("SPELL_HEAL")
+    Event("UNIT_COMBAT", "target", "HEAL", "", Amount(), 8)
+    At(start + 1)
+
+    -- Then a heal does not show where a strike landed.
+    assert(Unplaced(3029), "a heal settled a strike's recipient")
+end)
+
+Replay("a report its spell cannot make does not settle a shared name", function()
+    -- Given Claw, a physical strike, sent to a shared name.
+    local start = Start()
+    SharedNameCast(3029, "cast-school")
+
+    -- When the only report of its frame is a Fire hit on the target.
+    OwnReport("target", "spell", 4)
+    At(start + 1)
+
+    -- Then that report is not taken for the strike's.
+    assert(Unplaced(3029), "a report of another school settled a strike")
+end)
+
+Replay("a flying spell is not settled by a report in its cast's frame", function()
+    -- Given Fireball, whose missile flies, sent to a shared name.
+    local start = Start()
+    SharedNameCast(133, "cast-fireball")
+
+    -- When a Fire report of yours lands on the target in its cast's frame.
+    local hit = OwnReport("target", "spell", 4)
+    At(start + 1)
+
+    -- Then that report is not taken for the missile's.
+    assert(Unplaced(133) and Result(hit).spell == nil,
+        "a flying spell was settled by a report in its cast's frame")
+end)
+
+Replay("a report on a creature of another name does not settle a shared name", function()
+    -- Given a third creature in view whose name differs.
+    local start = Start()
+    visible.nameplate3, names.nameplate3 = true, "Other"
+    Event("NAME_PLATE_UNIT_ADDED", "nameplate3")
+    SharedNameCast(3029, "cast-other")
+
+    -- When the only report of the cast's frame lands on that creature.
+    local hit = OwnReport("nameplate3")
+    At(start + 1)
+
+    -- Then a creature the name did not match is never chosen.
+    assert(Unplaced(3029) and Result(hit).spell == nil,
+        "a creature of another name was taken for the recipient")
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Reader attribution lifecycle tests passed")
