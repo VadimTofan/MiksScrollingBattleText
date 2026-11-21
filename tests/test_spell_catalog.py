@@ -27,7 +27,8 @@ class SpellCatalogTests(unittest.TestCase):
                 files.index("Combat\\SpellCatalog.lua"),
                 files.index("Combat\\Spells.lua"),
             )
-            for class_name in ("Paladin", "Shaman"):
+            classes = ("Druid", "Hunter", "Paladin", "Rogue", "Shaman", "Warrior")
+            for class_name in classes:
                 rules = files.index(f"Combat\\Classes\\{class_name}.lua")
                 self.assertLess(files.index("Combat\\Context.lua"), rules)
                 self.assertLess(rules, files.index("Combat\\Reader.lua"))

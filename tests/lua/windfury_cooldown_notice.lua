@@ -4,6 +4,9 @@ MikSBT = {
 }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+for _, class in ipairs({ "Druid", "Hunter", "Rogue", "Warrior" }) do
+    dofile("Combat/Classes/" .. class .. ".lua")
+end
 dofile("Combat/Classes/Paladin.lua")
 dofile("Combat/Classes/Shaman.lua")
 dofile("Combat/Helpers.lua")
@@ -348,8 +351,62 @@ for _, missing in ipairs({ "cooldown", "line", "class" }) do
 end
 playerClass = "SHAMAN"
 
+for _, row in ipairs({
+    { "DRUID", 5221, 1822 }, -- Shred and Rake, whose application can also bleed.
+    { "HUNTER", 1495, 2643 }, -- Mongoose Bite and Multi-Shot.
+    { "ROGUE", 1752, 1310707 }, -- Sinister Strike and dual-hand Mutilate.
+    { "WARRIOR", 12294, 1680 }, -- Mortal Strike and dual-hand Whirlwind.
+}) do
+    -- Given the matching class and a direct combat line from a known strike.
+    playerClass = row[1]
+    now = now + 0.01
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-class-strike-" .. playerClass, row[2])
+    Line("SPELL_DAMAGE")
+
+    -- When the Totem cooldown update arrives in the same frame.
+    Cooldown(10610)
+    EndFrame()
+
+    -- Then the class rule corroborates exactly one Totem alert.
+    before = before + 1
+    assert(#displayed == before, playerClass .. " strike did not corroborate Totem")
+    assert(displayed[#displayed].message == "Spell 10610")
+
+    -- Given a cast outside this class's verified pool of triggers.
+    now = now + 0.01
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-other-strike-" .. playerClass, row[3])
+
+    -- When the line and cooldown match that frame.
+    Line("SPELL_DAMAGE")
+    Cooldown(10610)
+    EndFrame()
+
+    -- Then it stays silent without evidence of an eligible strike.
+    assert(#displayed == before, playerClass .. " used unverified Totem evidence")
+end
+playerClass = "SHAMAN"
+
+for _, class in ipairs({ "MAGE", "PRIEST", "WARLOCK" }) do
+    -- Given a class without melee ability rules and an observed player swing.
+    playerClass = class
+    for _, hand in ipairs({ 0, 1, 2 }) do
+        now = now + 0.01
+        Event("PLAYER_SWING", 2.5, hand)
+
+        -- When a direct player line and a Totem cooldown share the frame.
+        Line("SPELL_DAMAGE")
+        Cooldown(10610)
+        EndFrame()
+
+        -- Then only a main-hand melee swing corroborates the Totem alert.
+        if hand == 0 then before = before + 1 end
+        assert(#displayed == before, class .. " Totem alert did not match its swing hand")
+    end
+end
+playerClass = "SHAMAN"
+
 -- Given a melee frame whose extra attack is avoided.
-now = 47326.8
+now = 47326.99
 
 -- When a direct miss line corroborates its Windfury update.
 Event("PLAYER_SWING", 2.5, 0)

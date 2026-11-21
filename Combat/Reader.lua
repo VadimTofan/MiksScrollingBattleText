@@ -1385,7 +1385,11 @@ local function WindfuryNotice(spell, now)
     end
 end
 
-local function ClassWindfuryTotemTriggerAt(at)
+local function WindfuryTotemTriggerAt(at)
+    for _, swing in ipairs(reader.swingTimes) do
+        if swing.hand == "main" and not swing.strike
+            and math.abs(swing.at - at) <= SWING_FRAME then return true end
+    end
     local rules = ns.PlayerClassRules()
     local triggers = rules and rules.windfuryTotemTriggers
     if not triggers then return false end
@@ -1428,7 +1432,7 @@ local function WindfuryCooldown(spell)
             and spell ~= WINDFURY_TOTEM_ATTACK_SPELL_ID) then return end
     local at = Now()
     local triggerAt = spell == WINDFURY_TOTEM_ATTACK_SPELL_ID
-        and ClassWindfuryTotemTriggerAt or WindfuryTriggerAt
+        and WindfuryTotemTriggerAt or WindfuryTriggerAt
     local pending = reader.windfuryCooldownFrames[spell]
     if pending and math.abs(pending.at - at) <= SWING_FRAME then return end
     pending = { at = at }
@@ -1539,8 +1543,8 @@ local function OnSwing(swingType, swingDuration)
     if hand == "main" and queuedStrike and math.abs(queuedStrike.at - Now()) <= SWING_FRAME then
         strike, queuedStrike = true, nil
     end
-    times[#times + 1] = { at = Now(), ranged = hand == "ranged", strike = strike,
-        key = key, victim = CaptureVictim("target", key) }
+    times[#times + 1] = { at = Now(), hand = hand, ranged = hand == "ranged",
+        strike = strike, key = key, victim = CaptureVictim("target", key) }
     while times[1] and (Now() - times[1].at > 3 or #times > 16) do table.remove(times, 1) end
     if strike then return end
     local claimed = ns.mine:Swing(hand, key, Now(), ns.Number(swingDuration) and swingDuration or nil)
