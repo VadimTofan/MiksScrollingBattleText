@@ -24,7 +24,11 @@ CreateFrame = function()
 		assert(not unsupported[event], "registered unsupported event " .. event)
 		self.events[event] = true
 	end
-	function frame:RegisterUnitEvent(event) self:RegisterEvent(event) end
+	function frame:RegisterUnitEvent(event, ...)
+		self.units = self.units or {}
+		self.units[event] = { ... }
+		self:RegisterEvent(event)
+	end
 	function frame:SetScript(_, callback) self.callback = callback end
 	function frame:UnregisterAllEvents() self.events = {} end
 	frames[#frames + 1] = frame
@@ -130,6 +134,212 @@ local record = outgoing[#outgoing]
 assert(record and record.result.who == "you" and record.result.spell == 101)
 assert(record.amount == 100 and record.crit)
 
+do
+    local landed = {}
+    engine.config.presentation.Landed = function(_, spell) landed[#landed + 1] = spell end
+    -- Given a harmful spell that leaves an aura on the target and reports
+    -- nothing else. The aura's event comes in the cast's frame with its
+    -- payload hidden, as in a fight.
+    assert(frame.units.UNIT_AURA[1] == "player" and frame.units.UNIT_AURA[2] == "target",
+        "the target's auras are not heard")
+    local missLine = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring.SPELL_MISSED
+    local hiddenAuras, hiddenHarm, hiddenRecipient = {}, {}, {}
+    local plainSecretCheck = issecretvalue
+    issecretvalue = function(value)
+        return value == hiddenAuras or value == hiddenHarm or value == hiddenRecipient
+    end
+    C_Spell.IsSpellHarmful = function(id)
+        if id == 506 then return hiddenHarm end
+        return true
+    end
+    local function Settle() Advance(0.016) Advance(0.05) Advance(0.2) end
+    local function Lands(unit, spell, info)
+        Advance(4)
+        Event("UNIT_SPELLCAST_SUCCEEDED", unit, nil, spell)
+        if info then Event("UNIT_AURA", "target", info) end
+        Settle()
+        return #landed
+    end
+    local describe = C_Spell.GetSpellDescription
+    C_Spell.GetSpellDescription = function(id) return id ~= 505 and describe(id) or "" end
+    -- When the wait for a hit or a miss of its own is over.
+    -- Then the spell is shown as landed: one with no description read, one
+    -- whose aura was only refreshed, one whose aura came just before its cast.
+    assert(Lands("player", 505, { isFullUpdate = false, addedAuras = hiddenAuras }) == 1,
+        "landed debuff was not shown")
+    assert(landed[1] == 505, "another spell was shown as landed")
+    assert(Lands("player", 503, { isFullUpdate = false, updatedAuraInstanceIDs = { 7 } }) == 2,
+        "refreshed debuff was not shown")
+    Advance(4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Settle()
+    assert(#landed == 3, "an aura just before its cast was not counted")
+
+    -- Given casts that left nothing of their own on the target: no aura event,
+    -- one that only took an aura away, a full update, a spell that does not
+    -- harm, a spell whose harm the client hides, and a cast of the pet's.
+    -- When the wait is over.
+    -- Then none of them is shown as landed.
+    assert(Lands("player", 503) == 3, "a cast without an aura was shown as landed")
+    assert(Lands("player", 503, { isFullUpdate = false, addedAuras = {}, removedAuraInstanceIDs = { 7 } }) == 3,
+        "a faded aura counted as landed")
+    assert(Lands("player", 503, { isFullUpdate = true }) == 3, "a full update counted as landed")
+    C_Spell.IsSpellHarmful = function(id)
+        if id == 506 then return hiddenHarm end
+        return id ~= 504
+    end
+    assert(Lands("player", 504, { isFullUpdate = false, addedAuras = hiddenAuras }) == 3,
+        "a harmless spell was shown as landed")
+    assert(Lands("player", 506, { isFullUpdate = false, addedAuras = hiddenAuras }) == 3,
+        "a spell with hidden harm was shown as landed")
+    petExists = true
+    assert(Lands("pet", 503, { isFullUpdate = false, addedAuras = hiddenAuras }) == 3,
+        "a pet's cast was shown as landed")
+    petExists = false
+
+    -- Given a spell that is resisted and a spell that hits, each with an aura
+    -- event in its frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 8)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    -- Then the miss and the hit speak for themselves.
+    assert(#landed == 3, "a spell with a result of its own was shown as landed")
+    -- Given a spell of yours and the same spell of your pet's in one frame,
+    -- with an aura event in it: their hit is shown without a name.
+    petExists = true
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "pet", nil, 101)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    petExists = false
+    assert(not outgoing[#outgoing].result.spell, "the hit of two casts was named")
+    -- Then the hit, though unnamed, speaks for your cast.
+    assert(#landed == 3, "a spell with an unnamed hit of its own was shown as landed")
+    -- Given two spells of yours in one frame, one of them resisted, with an
+    -- aura event in it: the miss is shown without a name.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 8)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    assert(outgoing[#outgoing].result.missed and not outgoing[#outgoing].result.spell,
+        "the miss of one of two casts was named")
+    -- Then the miss, though unnamed, speaks for the debuff.
+    assert(#landed == 3, "a spell with an unnamed miss of its own was shown as landed")
+
+    -- Given an aura event on the target, then another target and a cast on it
+    -- in the same frame.
+    Advance(4)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Settle()
+    -- Then the earlier target's aura does not count for the cast.
+    assert(#landed == 3, "an aura of the earlier target counted as landed")
+    -- Given a cast, then another target and an aura event on that one.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the new target's aura does not count for the earlier cast.
+    assert(#landed == 3, "an aura of the new target counted for a cast on the earlier one")
+    -- Given another target, then a cast on it and its aura in the same frame.
+    Advance(4)
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the spell is shown as landed on the new target.
+    assert(#landed == 4, "a debuff landing on a new target was not shown")
+    -- Given a cast and its aura, then another target before the wait is over.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Event("PLAYER_TARGET_CHANGED")
+    Settle()
+    -- Then the landing already seen is still shown.
+    assert(#landed == 5, "a landing seen before the switch was not shown")
+    -- Given a cast sent to the target, then another target before it
+    -- succeeds and an aura event on that one in its frame.
+    local unitName, selected = UnitName, "Creature A"
+    UnitName = function(unit) if unit == "target" then return selected end end
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", "Creature A", "sent-before-switch", 503)
+    selected = "Creature B"
+    Event("PLAYER_TARGET_CHANGED")
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-before-switch", 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the new target's aura does not count for a cast sent to the earlier one.
+    assert(#landed == 5, "an aura of the new target counted for a cast sent to the earlier one")
+    -- Given a cast sent to the target selected now and its aura in its frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", "Creature B", "sent-to-target", 503)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-to-target", 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    UnitName = unitName
+    -- Then the spell is shown as landed.
+    assert(#landed == 6, "a debuff sent to the selected target was not shown")
+    -- Given a cast whose recipient the client hides and an aura in its frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SENT", "player", hiddenRecipient, "sent-hidden", 503)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "sent-hidden", 503)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    Settle()
+    -- Then the spell is not shown as landed: the target is not shown to be
+    -- its recipient.
+    assert(#landed == 6, "the target's aura counted for a cast with a hidden recipient")
+
+    -- Given a spell of yours resisted a moment before a debuff, then a swing
+    -- of yours parried and an aura event in the debuff's frame.
+    local before = #landed
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    engine:HandleEvent("COMBAT_LOG_MESSAGE", "opaque message", missLine.r, missLine.g, missLine.b, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 4)
+    Settle()
+    Advance(0.5)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("COMBAT_LOG_MESSAGE", nil, "swingMiss", 0, 0, 1)
+    Event("UNIT_AURA", "target", { isFullUpdate = false, addedAuras = hiddenAuras })
+    -- When the wait is over.
+    Settle()
+    -- Then neither miss is taken for the debuff's own.
+    assert(#landed == before + 1, "an earlier miss or a swing's miss hid a landing")
+    -- Given the combat log filter not set up, and a debuff landing.
+    before = #landed
+    local currentFilter = Blizzard_CombatLog_Filters.currentFilter
+    Blizzard_CombatLog_Filters.currentFilter = nil
+    -- When the wait is over.
+    local shown = Lands("player", 503, { isFullUpdate = false, addedAuras = hiddenAuras })
+    Blizzard_CombatLog_Filters.currentFilter = currentFilter
+    -- Then the landing waits for the filter, as outgoing hits do.
+    assert(shown == before, "a landing was shown before the combat log filter was ready")
+    issecretvalue = plainSecretCheck
+    C_Spell.GetSpellDescription = describe
+    C_Spell.IsSpellHarmful = nil
+end
+
 -- Chaos Bolt's tooltip says Chaos; its damage uses 124, not always 127.
 for _, example in ipairs({ { spell = 401, school = 106 },
     { spell = 402, school = 127 },
@@ -208,6 +418,117 @@ Advance(0.13)
 -- Then the buffered final hit still retains Eye Beam's identity.
 assert(#outgoing == previous + 1, "final channel hit disappeared")
 assert(outgoing[#outgoing].result.spell == 403)
+
+-- Describe: an aura event on the target counts for a debuff's landing only
+-- when the target is shown to be the cast's recipient and what the event
+-- lets you read does not speak against the cast.
+do
+    local landed = {}
+    engine.config.presentation.Landed = function(_, spell) landed[#landed + 1] = spell end
+    local hiddenAuras, hiddenRecipient = {}, {}
+    local plainSecretCheck, harmful = issecretvalue, C_Spell.IsSpellHarmful
+    issecretvalue = function(value) return value == hiddenAuras or value == hiddenRecipient end
+    C_Spell.IsSpellHarmful = function() return true end
+    local hidden = { isFullUpdate = false, addedAuras = hiddenAuras }
+    local function Lands(info, recipient, guid)
+        Advance(4)
+        if guid then Event("UNIT_SPELLCAST_SENT", "player", recipient, guid, 503) end
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", guid, 503)
+        Event("UNIT_AURA", "target", info)
+        Advance(0.016) Advance(0.05) Advance(0.2)
+        return #landed
+    end
+
+    -- Given a cast sent to the focus, a unit other than the target and
+    -- without a nameplate, and an aura event on the target in its frame.
+    local unitName, unitExists = UnitName, UnitExists
+    UnitName = function(unit)
+        if unit == "target" then return "Target B" end
+        if unit == "focus" then return "Focus A" end
+    end
+    UnitExists = function(unit) return unit == "focus" or unitExists(unit) end
+    -- When the wait is over.
+    local shown = Lands(hidden, "Focus A", "sent-to-focus")
+    UnitName, UnitExists = unitName, unitExists
+    -- Then the target's aura does not count for the focus's cast.
+    assert(shown == 0, "the target's aura counted for a cast on the focus")
+    -- Given yourself as the target, a cast whose recipient the client hides
+    -- and an aura event on the target, you, in its frame.
+    targetIsPlayer = true
+    Event("PLAYER_TARGET_CHANGED")
+    -- When the wait is over.
+    shown = Lands(hidden, hiddenRecipient, "sent-hidden-self")
+    targetIsPlayer = false
+    Event("PLAYER_TARGET_CHANGED")
+    -- Then your own aura does not count for the cast either.
+    assert(shown == 0, "an aura of yours counted for a cast with a hidden recipient")
+
+    -- Given auras the payload shows as not the cast's: a buff a party member
+    -- put on the target, a debuff of another's, a buff of yours, and a
+    -- refreshed aura the client lets you look up, a party member's buff.
+    local function Aura(isHarmful, sourceUnit)
+        return { auraInstanceID = 999, spellId = 1126, isHarmful = isHarmful, sourceUnit = sourceUnit }
+    end
+    local unitAuras, refreshed = C_UnitAuras, Aura(false, "party1")
+    C_UnitAuras = { GetAuraDataByAuraInstanceID = function(unit, id)
+        if unit == "target" and id == 999 then return refreshed end
+    end }
+    -- When the wait is over.
+    -- Then none of them is shown as landed.
+    assert(Lands({ isFullUpdate = false, addedAuras = { { auraInstanceID = 999,
+        spellId = 1126, isHarmful = false, sourceUnit = "party1" } } }) == 0,
+        "a party member's buff counted as landed")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(true, "party1") } }) == 0,
+        "another's debuff counted as landed")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(false, "player") } }) == 0,
+        "a buff of yours counted as landed")
+    assert(Lands({ isFullUpdate = false, updatedAuraInstanceIDs = { 999 } }) == 0,
+        "a party member's refreshed buff counted as landed")
+    -- Given a debuff of yours beside a party member's buff, a debuff of your
+    -- pet's, and an aura the payload hides beside a party member's buff.
+    -- When the wait is over.
+    -- Then each is shown as landed.
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(false, "party1"), Aura(true, "player") } }) == 1,
+        "a debuff of yours beside another's buff was not shown")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(true, "pet") } }) == 2,
+        "a debuff of your pet's was not shown")
+    assert(Lands({ isFullUpdate = false, addedAuras = { Aura(false, "party1"), hiddenAuras } }) == 3,
+        "a hidden aura beside another's buff was not shown")
+    -- Given the client saying the target's auras are secret, and a refreshed
+    -- aura in the cast's frame.
+    local secrets, looked = C_Secrets, false
+    C_Secrets = { ShouldAurasBeSecret = function() return true end }
+    C_UnitAuras.GetAuraDataByAuraInstanceID = function() looked = true return refreshed end
+    -- When the wait is over.
+    shown = Lands({ isFullUpdate = false, updatedAuraInstanceIDs = { 999 } })
+    C_UnitAuras, C_Secrets = unitAuras, secrets
+    -- Then the aura is not looked up, and the refresh counts as hidden ones do.
+    assert(not looked, "a secret aura of the target was looked up")
+    assert(shown == 4, "a refresh hidden by the client was not shown")
+    -- Given a strike whose line of yours comes in its frame while no hit on
+    -- the target is spent on it (in a party, others strike the same enemy in
+    -- that moment), and an aura event on the target in that frame.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+    Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+    Event("UNIT_AURA", "target", hidden)
+    -- When the wait is over.
+    Advance(0.016) Advance(0.05) Advance(0.2)
+    -- Then the line speaks for the cast: it struck, so the aura is not its mark.
+    assert(#landed == 4, "a strike with a line of its own and no hit spent on it was shown as landed")
+    -- Given a debuff with a swing's hit line and a tick's line of yours in its
+    -- frame, and an aura event in it.
+    Advance(4)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 503)
+    Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+    Event("COMBAT_LOG_MESSAGE", nil, "tick", 0, 0, 1)
+    Event("UNIT_AURA", "target", hidden)
+    -- When the wait is over.
+    Advance(0.016) Advance(0.05) Advance(0.2)
+    -- Then neither line is taken for a hit of the debuff's own.
+    assert(#landed == 5, "a swing's hit line or a tick's line hid a landing")
+    issecretvalue, C_Spell.IsSpellHarmful = plainSecretCheck, harmful
+end
 
 -- Given incoming damage and healing.
 -- When the game reports them on the player and pet.

@@ -1350,6 +1350,92 @@ local function CastTarget(unit, spell, guid, now, consume)
     end
 end
 
+-- A harmful cast of yours that leaves an aura on your target and takes no
+-- hit or miss of its own has landed, and its name is shown (nothing had
+-- shown whether a Faerie Fire arrived; it reports nothing when it lands).
+-- The target's auras are secret in a fight (GetAuraDataByIndex is refused,
+-- addedAuras is a secret table), but their event still came in the frame of
+-- the cast, three times of three; a recast came with a plain payload and no
+-- added aura. So the moment counts: an aura added or refreshed on the
+-- target within LAND_FRAME of the cast is taken to be its doing, unless
+-- what the payload lets you read speaks against it (Contradicts) or the
+-- target is not shown to be the cast's recipient (WatchLanding). A resisted
+-- cast takes its miss and a strike its hit within LAND_SETTLE (a miss waits
+-- MISS_SETTLE, a hit up to LATE_LINE for its line), and those speak for
+-- themselves; so does a hit left unnamed because it might be another cast's
+-- (one of yours or your pet's in its moment). A miss left unnamed for that
+-- reason marks no cast, and neither does a hit that is spent on no cast at
+-- all (in a party, others strike the same enemy in the cast's moment and
+-- change its auras: a Swipe was shown as landed with its three hit lines in
+-- its frame), so any spell's hit or miss line of yours within LAND_FRAME of
+-- the cast speaks for it (SpellLine). A spell whose missile flies puts its
+-- aura there later and is left to its hit (the rule as a whole is
+-- predicted, not yet seen in client).
+local LAND_FRAME, LAND_SETTLE = 0.05, 0.2
+-- An aura the payload lets you read is not the cast's when it shows as
+-- helpful or as put there by another than you or your pet (a party
+-- member's buff on the target in the moment of the cast); one it hides may
+-- be. Its spell is not asked: a cast can leave an aura of another spell
+-- (Pounce its bleed, Charge its stun).
+local function Contradicts(aura)
+    if type(aura) ~= "table" or not ns.Public(aura) then return false end
+    local harmful, source = aura.isHarmful, aura.sourceUnit
+    if ns.Bool(harmful) and not harmful then return true end
+    return ns.Text(source) and source ~= "player" and source ~= "pet"
+end
+-- A refreshed aura comes as its id; it is looked up as yours are, unless
+-- the client says it is secret.
+local function TargetAura(id)
+    if not (ns.Number(id) and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID)
+        or ns.AuraSecret("ShouldUnitAuraInstanceBeSecret", "target", id) then return end
+    return C_UnitAuras.GetAuraDataByAuraInstanceID("target", id)
+end
+-- Whether a list of the payload, hidden or read, holds an aura that may be
+-- the cast's.
+local function Evidence(list, lookup)
+    if not ns.Public(list) then return true end
+    if type(list) ~= "table" then return false end
+    for _, entry in ipairs(list) do
+        if lookup then entry = lookup(entry) end
+        if not Contradicts(entry) then return true end
+    end
+    return false
+end
+local function SpellLine(at)
+    for _, line in ipairs(reader.logLines or {}) do
+        local class = LineClass(line)
+        if line.source == "mine" and (class == "damage" or class == "miss") and LineRestrict(line) == "direct"
+            and math.abs(line.at - at) <= LAND_FRAME then return line end
+    end
+end
+local function OnTargetAura(info)
+    if ns.Public(info) then
+        if type(info) ~= "table" then return end
+        if not (Evidence(info.addedAuras) or Evidence(info.updatedAuraInstanceIDs, TargetAura)) then return end
+    end
+    local now = Now()
+    reader.targetAuraAt = now
+    local watch = reader.landing
+    if watch and now - watch.at <= LAND_FRAME then watch.aura = true end
+end
+local function WatchLanding(spell, cast, now)
+    -- Only a cast shown to be at the target selected now is watched. One
+    -- whose recipient is another unit (the target changed while it was
+    -- cast, or it went to the focus) puts its aura there; one whose
+    -- recipient is uncertain (hidden, or a name another unit shares) has no
+    -- key and may have put it there too.
+    if cast.targetUncertain or cast.key ~= ns.TargetKey() then return end
+    local auraAt = reader.targetAuraAt
+    local watch = { at = now, aura = auraAt ~= nil and now - auraAt <= LAND_FRAME }
+    reader.landing = watch
+    C_Timer.After(LAND_SETTLE, function()
+        if not watch.aura or cast.directUsed or cast.ambiguous then return end
+        if SpellLine(watch.at) then return end
+        local router = Router()
+        if router then router:Landed(spell) end
+    end)
+end
+
 local lastCast
 local queuedStrike
 local WINDFURY_ATTACK_SPELL_ID = 439440
@@ -1450,7 +1536,10 @@ local function OnCast(unit, spell, guid)
     if TracksOutcomes() then
         reader.lastCastTarget.observed = observed == true
     end
-    ns.mine:Cast(unit, spell, key, now, uncertain)
+    -- A harmful cast of the player's is watched for its landing.
+    local harmful = C_Spell and C_Spell.IsSpellHarmful and C_Spell.IsSpellHarmful(spell)
+    local cast = ns.mine:Cast(unit, spell, key, now, uncertain)
+    if unit == "player" and cast and ns.Bool(harmful) and harmful then WatchLanding(spell, cast, now) end
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     if ns.windfuryInference and unit == "player" then
         local certain = observed == true and uncertain ~= true
@@ -2350,6 +2439,9 @@ local function OnEvent(_, event, ...)
             reader.departedTargetKey, reader.departedTargetAt = nil, nil
         end
         reader.epoch = reader.epoch + 1
+        -- An aura's moment and a cast watched for its landing belong to the
+        -- target they came on, not to the one selected now.
+        reader.targetAuraAt, reader.landing = nil, nil
         FindTargetPlate()
         ns.TargetKey()
     elseif event == "NAME_PLATE_UNIT_ADDED" then
@@ -2402,6 +2494,8 @@ local function OnEvent(_, event, ...)
         local unit, info = ...
         if unit == "player" then
             OnPlayerAura(info)
+        elseif unit == "target" then
+            OnTargetAura(info)
         end
     elseif event == "COMBAT_TEXT_UPDATE" then
         OnCombatText(...)
@@ -2469,7 +2563,7 @@ function ns.StartReader()
         end
     end
     if ns.EventAvailable("UNIT_AURA") then
-        frame:RegisterUnitEvent("UNIT_AURA", "player")
+        frame:RegisterUnitEvent("UNIT_AURA", "player", "target")
     end
     local presentation = MikSBT.Components.CombatPresentation
     reader.comboTotals = type(UnitPower) == "function"
