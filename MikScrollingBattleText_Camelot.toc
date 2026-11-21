@@ -32,6 +32,7 @@ Services\EventRouter.lua
 Components\IncomingCombat.lua
 Components\OutgoingBatcher.lua
 Combat\Context.lua
+Combat\Classes\Shaman.lua
 Combat\Helpers.lua
 Combat\SpellCatalog.lua
 Combat\Mine.lua

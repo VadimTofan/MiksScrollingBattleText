@@ -4,6 +4,7 @@ MikSBT = {
 }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+dofile("Combat/Classes/Shaman.lua")
 dofile("Combat/Helpers.lua")
 dofile("Combat/SpellCatalog.lua")
 dofile("Combat/Mine.lua")
@@ -36,6 +37,11 @@ UnitExists = function(unit) return unit == "target" end
 UnitIsUnit = function(a, b) return a == b end
 UnitGUID = function(unit) return unit == "target" and "Creature-test" end
 UnitName = function() return "Training target" end
+local playerClass = "SHAMAN"
+UnitClass = function(unit)
+    assert(unit == "player", "class filtering checked a unit other than player")
+    return "Localized class", playerClass
+end
 GetLocale = function() return "enUS" end
 C_Spell = {
     GetSpellName = function(spell) return "Spell " .. spell end,
@@ -263,7 +269,7 @@ EndFrame()
 assert(#displayed == before, "unready source filter corroborated Windfury")
 sources[4] = nil
 
--- Given the Shaman catalog knows Stormstrike and the range API is unavailable.
+-- Given the player is a Shaman and the range API is unavailable.
 local hasRange = C_Spell.SpellHasRange
 C_Spell.SpellHasRange = nil
 now = 47326.6
@@ -274,14 +280,29 @@ Line("SPELL_DAMAGE")
 Cooldown(439440)
 EndFrame()
 
--- Then the catalog supplies the melee fact needed to corroborate Windfury.
-assert(#displayed == before + 1, "catalogued Stormstrike did not corroborate Windfury")
+-- Then the Shaman rule supplies the melee reach needed to corroborate Windfury.
+assert(#displayed == before + 1, "Shaman's Stormstrike did not corroborate Windfury")
+
+-- Given the same spell signal while the current player is another class.
+playerClass = "MAGE"
+before = #displayed
+now = 47326.65
+
+-- When the cast and Windfury update coincide with a direct line.
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-other-class", 17364)
+Line("SPELL_DAMAGE")
+Cooldown(439440)
+EndFrame()
+
+-- Then the Shaman rule cannot supply missing melee reach to another class.
+assert(#displayed == before, "another class inherited Shaman's Windfury rule")
+playerClass = "SHAMAN"
 
 -- Given a physical cast whose reach is absent from the catalog and API.
 before = #displayed
 now = 47326.7
 local unknown = ns.SpellFacts(999999)
-assert(unknown.direct and unknown.school == 1 and unknown.reach == nil)
+assert(unknown.direct and unknown.school == 1)
 
 -- When that cast, a direct line, and the Windfury update coincide.
 Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-unknown-reach", 999999)

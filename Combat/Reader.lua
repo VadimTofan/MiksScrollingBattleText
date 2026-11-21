@@ -1387,11 +1387,14 @@ local function WindfuryTriggerAt(at)
             return true
         end
     end
+    local rules = ns.PlayerClassRules()
+    local spellReach = rules and rules.spellReach
     for spell, casts in pairs(ns.mine.casts) do
         local facts = ns.SpellFacts(spell)
+        local knownReach = spellReach and spellReach[spell]
         if facts and facts.direct == true and facts.school == ns.SCHOOL_PHYSICAL
             and facts.helpful ~= true and not facts.weaponProc
-            and (facts.reach or ns.SpellReach(spell)) == "melee" then
+            and (knownReach or ns.SpellReach(spell)) == "melee" then
             for _, cast in ipairs(casts) do
                 if cast.caster == "you"
                     and math.abs(cast.at - at) <= SWING_FRAME then return true end

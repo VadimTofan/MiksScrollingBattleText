@@ -27,6 +27,9 @@ class SpellCatalogTests(unittest.TestCase):
                 files.index("Combat\\SpellCatalog.lua"),
                 files.index("Combat\\Spells.lua"),
             )
+            shaman_rules = files.index("Combat\\Classes\\Shaman.lua")
+            self.assertLess(files.index("Combat\\Context.lua"), shaman_rules)
+            self.assertLess(shaman_rules, files.index("Combat\\Reader.lua"))
         license_text = (
             root / "Combat/LICENSE-NameplateSCTReforged"
         ).read_text(encoding="utf-8")

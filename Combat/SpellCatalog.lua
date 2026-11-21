@@ -187,7 +187,7 @@ do
 	hits(NATURE, { 421, 930, 2860, 10605 }) -- Chain Lightning
 	hits(NATURE, { 8042, 8044, 8045, 8046, 10412, 10413, 10414 }) -- Earth Shock
 	hits(FROST, { 8056, 8058, 10472, 10473 }) -- Frost Shock
-	addSpell({ school = PHYSICAL, reach = "melee" }, { 17364 }) -- Stormstrike
+	hits(PHYSICAL, { 17364 }) -- Stormstrike
 	hits(FIRE, { 408490 }) -- Lava Burst
 	hits(FIRE, { 1238299, 1238300, 1326047 }) -- Lava Burst, Forever's ranks
 
@@ -379,7 +379,6 @@ function engine.CatalogSpellFacts(spellID)
         travels = spell.travels == true,
         area = spell.area == true,
         shot = spell.shot == true,
-        reach = direct and direct.reach or nil,
         nextSwing = spell.nextSwing == true,
         window = spell.window or (spell.shot and 2.5 or 3),
         learnsSchool = spell.learns == true,
