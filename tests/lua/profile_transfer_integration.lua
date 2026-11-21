@@ -30,7 +30,18 @@ end
 RAID_CLASS_COLORS = {}
 Enum = { ItemQuality = { Poor = 0 } }
 SlashCmdList = {}
-SetCVar = Noop
+-- The client has every text setting on.
+local cvars = {}
+for _, name in ipairs({
+	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
+	"floatingCombatTextCombatLogPeriodicSpells_v2", "floatingCombatTextPetMeleeDamage_v2",
+	"floatingCombatTextPetSpellDamage_v2", "floatingCombatTextCombatHealing_v2",
+	"floatingCombatTextSpellMechanics_v2", "floatingCombatTextSpellMechanicsOther_v2",
+	"floatingCombatTextRepChanges_v2", "floatingCombatTextHonorGains_v2",
+}) do cvars[name] = "1" end
+GetCVar = function(name) return cvars[name] end
+GetCVarBool = function(name) return cvars[name] == "1" end
+SetCVar = function(name, value) cvars[name] = tostring(value) end
 InterfaceOptions_AddCategory = Noop
 IsInGroup = function() return false end
 IsInRaid = function() return false end
@@ -78,6 +89,9 @@ local sourceFile = assert(io.open("MSBTProfiles.lua", "rb"))
 local source = sourceFile:read("*a"):gsub("^\239\187\191", "")
 sourceFile:close()
 local exports = {}
+local installedSwitches
+-- Given the player has the damage number over targets turned off in the game's menu.
+cvars.floatingCombatTextCombatDamage_v2 = "0"
 for _, forever in ipairs({ false, true }) do
 	MikSBT.Compatibility.Client.isClassicContent = forever
 	MikSBT.Compatibility.Client.isForever = forever
@@ -87,6 +101,26 @@ for _, forever in ipairs({ false, true }) do
 	chunk()
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
+
+	local switches = rawget(profiles.savedVariables.profiles.Default, "blizzardSwitches")
+	if not installedSwitches then
+		-- Given a new installation.
+		-- When its default profile is made.
+		-- Then it has the table of switches, with none set, so it is not migrated.
+		assert(switches and switches.version == 2 and switches.numbers == nil,
+			"a new installation's profile was migrated")
+		assert(select(2, profiles.GetBlizzardSwitch("numbers")) == false,
+			"a new installation's profile was migrated")
+		-- Then the client's number stays as the player has it.
+		assert(cvars.floatingCombatTextCombatDamage_v2 == "0", "a new installation wrote the numbers")
+		cvars.floatingCombatTextCombatDamage_v2 = "1"
+		installedSwitches = switches
+	else
+		-- Given the saved variables of that installation.
+		-- When the addon loads again.
+		-- Then the default profile keeps its table of switches.
+		assert(switches == installedSwitches, "a later load started the default profile's switches anew")
+	end
 
 	-- Given the loaded loot diagnostic and its command entry point.
 	local lootCommands = {}
@@ -495,6 +529,9 @@ assert(profiles.currentProfile.blizzardDamageEnabled == false)
 assert(rawget(profiles.currentProfile, "enableBlizzardV2CombatText") == nil)
 assert(rawget(profiles.currentProfile, "disableOutgoingInGroup") == nil)
 assert(profiles.currentProfile.normalFontSize == 24)
+-- Then the numbers over targets stay hidden as MSBT kept them, now as a set switch.
+local isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+assert(isShown == false and isSet == true, "an old profile does not keep the numbers MSBT wrote")
 
 -- Given the migrated profile has Blizzard damage disabled.
 -- When the existing Blizzard reset action runs.
@@ -503,11 +540,20 @@ profiles.ResetOfficialBlizzardCombatText()
 -- Then its result agrees with the two General checkboxes.
 assert(profiles.currentProfile.blizzardDamageEnabled == true)
 assert(profiles.IsModDisabled() == true)
+-- Then the numbers go back to the client's setting.
+isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+assert(isSet == false, "the reset left the numbers set")
+assert(isShown == true, "the numbers remained off after the reset")
 
 -- Describe: enabling MSBT clears Blizzard damage without resetting it on reload.
 -- Given MSBT is off and Blizzard damage is on after the reset action.
 local combatTextWrites = {}
-SetCVar = function(key, value) combatTextWrites[key] = value end
+SetCVar = function(key, value)
+	combatTextWrites[key] = value
+	cvars[key] = tostring(value)
+end
+-- Given the client's text feed was turned off since, as in the game's menu.
+cvars.enableFloatingCombatText = "0"
 
 -- When MSBT is enabled through its real profile action.
 profiles.SetOptionUserDisabled(false)
@@ -522,10 +568,13 @@ for _, key in ipairs({
 	"floatingCombatTextCombatLogPeriodicSpells_v2",
 	"floatingCombatTextPetMeleeDamage_v2", "floatingCombatTextPetSpellDamage_v2",
 }) do
-	assert(combatTextWrites[key] == 0, key .. " remained enabled")
+	assert(cvars[key] == "0", key .. " remained enabled")
 end
 assert(combatTextWrites.enableFloatingCombatText == 1,
 	"enabling MSBT disabled the aura notice feed")
+-- Then the numbers are set off in the profile.
+isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+assert(isShown == false and isSet == true, "enabling MSBT did not set the numbers off")
 
 -- Given the user explicitly enables Blizzard damage afterward.
 profiles.SetOption(nil, "blizzardDamageEnabled", true)
@@ -537,6 +586,125 @@ frame.scripts.OnEvent(frame, "VARIABLES_LOADED")
 -- Then loading settings preserves the explicit selection.
 assert(profiles.currentProfile.blizzardDamageEnabled == true,
 	"loading settings reset an explicit Blizzard damage selection")
+
+-- Describe: the switch for the numbers over targets belongs to each profile.
+-- Given the selected profile with the numbers hidden.
+local selectedName = MSBTProfiles_SavedVarsPerChar.currentProfileName
+-- When it is copied and the copy is selected.
+profiles.CopyProfile(selectedName, "Copied")
+profiles.SelectProfile("Copied")
+-- Then the copy keeps the mark in a table of its own.
+local copied = rawget(profiles.savedVariables.profiles.Copied, "blizzardSwitches")
+assert(copied ~= rawget(profiles.savedVariables.profiles[selectedName], "blizzardSwitches"),
+	"the copy shares the switches of its source")
+assert(copied.numbers == 0, "the copy lost the switches")
+isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+assert(isShown == false and isSet == true, "the copy lost the numbers switch")
+
+-- Given the client shows the numbers again, changed elsewhere.
+for key in pairs(cvars) do cvars[key] = "1" end
+-- When a profile without set switches is selected.
+profiles.SelectProfile("Portable")
+-- Then the client's settings stay as they are and show.
+assert(cvars.floatingCombatTextCombatDamage_v2 == "1", "a profile without set switches wrote them")
+isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+assert(isShown == true and isSet == false, "a profile without set switches does not mirror the client")
+-- When the copy is selected again.
+profiles.SelectProfile("Copied")
+-- Then its switch is forced again.
+assert(cvars.floatingCombatTextCombatDamage_v2 == "0", "selecting a profile does not force its switches")
+
+-- Given the copy is exported.
+local transfer = MikSBT.Configuration.ProfileTransfer:New({
+	masterProfile = profiles.masterProfile,
+	version = "12.029.0", client = 120100, locale = "enUS",
+})
+local switchExport = assert(profiles.ExportProfile("Copied"))
+assert(transfer:Decode(switchExport).sections.General.blizzardSwitches.numbers == 0,
+	"the export lost the switches")
+-- When it is imported.
+assert(profiles.ImportProfile(switchExport, "Copied import"))
+-- Then the switch comes back as it was, without a migration.
+local imported = rawget(profiles.currentProfile, "blizzardSwitches")
+assert(imported.version == 2 and imported.numbers == 0, "an import of a new export changed the switches")
+
+-- Given exports of an older version, made from profiles without the switches.
+for _, outgoingDisabled in ipairs({ true, false }) do
+	local oldExport = assert(transfer:Export("Old", {
+		blizzardDamageEnabled = true, blizzardOutgoingDisabled = outgoingDisabled,
+	}))
+	assert(transfer:Decode(oldExport).sections.General.blizzardSwitches == nil)
+	-- When one is imported.
+	local oldName = "Old " .. tostring(outgoingDisabled)
+	assert(profiles.ImportProfile(oldExport, oldName))
+	-- Then it is migrated: the numbers as MSBT wrote them, and no other switch set.
+	isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+	assert(isSet == true and isShown == not outgoingDisabled, "an import of an old export was not migrated")
+	for switch in pairs(rawget(profiles.currentProfile, "blizzardSwitches")) do
+		assert(switch == "version" or switch == "numbers", "an import of an old export set a switch: " .. switch)
+	end
+	-- When the player shows the numbers and the profile is selected again.
+	profiles.SetBlizzardSwitch("numbers", true)
+	profiles.SelectProfile(oldName)
+	-- Then the migration does not run twice.
+	assert(profiles.GetBlizzardSwitch("numbers") == true, "a profile was migrated twice")
+end
+
+-- Given the selected profile with set switches.
+profiles.SelectProfile("Copied import")
+assert(select(2, profiles.GetBlizzardSwitch("numbers")) == true)
+-- When it is reset to the defaults.
+profiles.ResetProfile("Copied import")
+-- Then it starts with no switch set, as a new profile.
+for switch in pairs(rawget(profiles.currentProfile, "blizzardSwitches")) do
+	assert(switch == "version", "a reset profile was migrated: " .. switch)
+end
+assert(select(2, profiles.GetBlizzardSwitch("numbers")) == false, "a reset profile was migrated: numbers")
+
+-- Given MSBT was enabled, which hid every number over targets.
+profiles.SetOptionUserDisabled(false)
+for _, key in ipairs({
+	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
+	"floatingCombatTextCombatLogPeriodicSpells_v2", "floatingCombatTextPetMeleeDamage_v2",
+	"floatingCombatTextPetSpellDamage_v2", "floatingCombatTextCombatHealing_v2",
+}) do
+	assert(cvars[key] == "0", key .. " remained enabled")
+end
+-- When the Blizzard reset action runs.
+profiles.ResetOfficialBlizzardCombatText()
+-- Then every number setting is shown again, healing included, and left to the client.
+for _, key in ipairs({
+	"floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
+	"floatingCombatTextCombatLogPeriodicSpells_v2", "floatingCombatTextPetMeleeDamage_v2",
+	"floatingCombatTextPetSpellDamage_v2", "floatingCombatTextCombatHealing_v2",
+}) do
+	assert(cvars[key] == "1", key .. " remained off after the reset")
+end
+assert(select(2, profiles.GetBlizzardSwitch("numbers")) == false, "the reset left the numbers set")
+-- When MSBT's own checkbox action turns MSBT off.
+profiles.SetOptionUserDisabled(true)
+-- Then the numbers stay shown and not set, as only enabling MSBT hides them.
+isShown, isSet = profiles.GetBlizzardSwitch("numbers")
+assert(isShown == true and isSet == false, "disabling MSBT switched the numbers")
+-- Given the player sets the numbers shown.
+profiles.SetBlizzardSwitch("numbers", true)
+-- When the Blizzard reset action runs again.
+profiles.ResetOfficialBlizzardCombatText()
+-- Then the mark is taken away all the same.
+assert(select(2, profiles.GetBlizzardSwitch("numbers")) == false, "the reset left the shown numbers set")
+
+-- Given an edited export whose switches hold other values than 1 or 0.
+local craftedExport = assert(transfer:Export("Crafted", {
+	blizzardSwitches = { version = 2, numbers = 5, bogus = 2 },
+}))
+for key in pairs(cvars) do cvars[key] = "1" end
+-- When it is imported.
+assert(profiles.ImportProfile(craftedExport, "Crafted"))
+-- Then MSBT writes no such value and the numbers count as not set.
+for key, value in pairs(cvars) do
+	assert(value == "1", "an edited import wrote " .. key .. "=" .. value)
+end
+assert(select(2, profiles.GetBlizzardSwitch("numbers")) == false, "an edited import set the numbers")
 
 -- Given a character in combat.
 inCombat = true

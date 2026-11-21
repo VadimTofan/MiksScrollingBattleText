@@ -52,6 +52,7 @@ local LIST_TYPES = {
 	qualityExclusions = "boolean", itemsAllowed = "boolean",
 	itemExclusions = "boolean", cooldownExclusions = "boolean",
 	ignoreCooldownThreshold = "boolean",
+	blizzardSwitches = "number",
 }
 local OPTIONAL_TYPES = {
 	soundsDisabled = "boolean", stickyCritsDisabled = "boolean",

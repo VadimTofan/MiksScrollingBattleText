@@ -3,7 +3,7 @@ local file = assert(io.open("MSBTProfiles.lua", "r"))
 local source = file:read("*a")
 file:close()
 local body = assert(source:match(
-    "(local blizzardCategoryState.-)local function SetAddonEnabled"))
+    "(local BLIZZARD_SWITCH_SETTINGS.-)local function SetAddonEnabled"))
 local build = assert(loadstring(body ..
     "\nreturn SetBlizzardCombatTextV2Enabled"))
 local writes, hooks = {}, {}
@@ -24,7 +24,7 @@ local env = {
     CombatText = frame, CombatTextTypeInfo = types,
     SetCVar = function(name, value) writes[name] = value end,
     hooksecurefunc = function(_, _, callback) hooks[#hooks + 1] = callback end,
-    pairs = pairs, ipairs = ipairs, type = type,
+    pairs = pairs, ipairs = ipairs, type = type, tostring = tostring,
 }
 setfenv(build, env)
 local apply = build()
@@ -78,7 +78,8 @@ apply(true, false, profile)
 assert(writes.enableFloatingCombatText == 1 and shown)
 assert(types.DAMAGE.show == nil and types.HEAL.show == nil)
 assert(types.SPELL_AURA_START.show == 1)
-assert(writes.floatingCombatTextCombatDamage_v2 == 1)
+-- Then the numbers over targets, unset in this profile, are left as the client has them.
+assert(writes.floatingCombatTextCombatDamage_v2 == nil, "the categories wrote the numbers")
 
 -- Given a Blizzard refresh while incoming message types are hidden.
 -- When visibility is refreshed and incoming text is re-enabled.
@@ -95,10 +96,11 @@ profile.blizzardNotificationsDisabled = true
 profile.blizzardOutgoingDisabled = true
 -- When the settings apply.
 apply(true, false, profile)
--- Then incoming text returns while notifications and outgoing damage stop.
+-- Then incoming text returns while notifications stop.
 assert(types.DAMAGE.show == 1 and types.HEAL.show == 1)
 assert(types.SPELL_AURA_START.show == nil and types.ENTERING_COMBAT.show == nil)
-assert(writes.floatingCombatTextCombatDamage_v2 == 0)
+-- Then the old outgoing option no longer writes the numbers; their switch does.
+assert(writes.floatingCombatTextCombatDamage_v2 == nil, "the old outgoing option wrote the numbers")
 assert(writes.enableFloatingCombatText == 1)
 
 -- Given Blizzard refreshes its per-message visibility from game settings.
@@ -118,7 +120,8 @@ assert(types.SPELL_AURA_START.show == 1 and types.SPELL_ACTIVE.show == nil)
 apply(false, true, profile)
 -- Then the frame is hidden and MSBT's event source remains enabled.
 assert(not shown and writes.enableFloatingCombatText == 1)
-assert(writes.floatingCombatTextCombatDamage_v2 == 0)
+-- Then the master leaves the numbers over targets alone.
+assert(writes.floatingCombatTextCombatDamage_v2 == nil, "the master wrote the numbers")
 
 -- Given combat lockdown.
 env.InCombatLockdown = function() return true end

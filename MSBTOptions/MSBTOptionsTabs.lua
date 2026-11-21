@@ -145,6 +145,12 @@ GeneralTab_Populate = function()
 				not not currentProfile[side .. category .. "Disabled"])
 		end
 	end
+	-- Blizzard's "Disable outgoing" stands for the client's numbers over targets: it shows the
+	-- profile's value once set there, else the client's, which may have changed elsewhere. Without
+	-- the switch it keeps the profile's option.
+	if MSBTProfiles.GetBlizzardSwitch then
+		controls.blizzardOutgoingCheckbox:SetChecked(MSBTProfiles.GetBlizzardSwitch("numbers") == false)
+	end
 	controls.animationSpeedSlider:SetValue(currentProfile.animationSpeed)
 	if controls.optionsDesignDropdown then
 		controls.optionsDesignDropdown:SetSelectedID(MSBTDesigns.GetSelected())
@@ -333,9 +339,15 @@ local function GeneralTab_Create()
 			local key = side .. category.name .. "Disabled"
 			local control = MSBTControls.CreateCheckbox(tabFrame)
 			local locale = L.CHECKBOXES[category.locale]
-			control:Configure(24, locale.label, locale.tooltip)
+			-- Blizzard's outgoing box stands for the client's numbers over targets.
+			local isNumbers = key == "blizzardOutgoingDisabled"
+			control:Configure(24, locale.label, isNumbers and locale.blizzardTooltip or locale.tooltip)
 			control:SetPoint("TOPLEFT", anchor, "TOPLEFT", 15, -30 - (index - 1) * 24)
 			control:SetClickHandler(function(_, checked)
+				if isNumbers then
+					MSBTProfiles.SetBlizzardSwitch("numbers", not checked)
+					return
+				end
 				MSBTProfiles.SetOption(nil, key, checked)
 				MSBTProfiles.ApplyContextOptions()
 			end)
