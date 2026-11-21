@@ -44,7 +44,7 @@ C_Spell = {
         if spell == 21949 then
             return "Wounds the target causing them to bleed for 210 damage over 7 sec."
         end
-        if spell == 17364 or spell == 2643 then
+        if spell == 17364 or spell == 2643 or spell == 999999 then
             return "Deals 100 Physical damage."
         end
         return "Grants extra attacks."
@@ -263,18 +263,33 @@ EndFrame()
 assert(#displayed == before, "unready source filter corroborated Windfury")
 sources[4] = nil
 
--- Given a weapon ability whose range API is unavailable.
+-- Given the Shaman catalog knows Stormstrike and the range API is unavailable.
 local hasRange = C_Spell.SpellHasRange
 C_Spell.SpellHasRange = nil
 now = 47326.6
 
 -- When its physical cast, direct line, and cooldown update coincide.
-Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-unknown-reach", 17364)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-catalogued-melee", 17364)
 Line("SPELL_DAMAGE")
 Cooldown(439440)
 EndFrame()
 
--- Then unknown reach does not establish a melee ability.
+-- Then the catalog supplies the melee fact needed to corroborate Windfury.
+assert(#displayed == before + 1, "catalogued Stormstrike did not corroborate Windfury")
+
+-- Given a physical cast whose reach is absent from the catalog and API.
+before = #displayed
+now = 47326.7
+local unknown = ns.SpellFacts(999999)
+assert(unknown.direct and unknown.school == 1 and unknown.reach == nil)
+
+-- When that cast, a direct line, and the Windfury update coincide.
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-unknown-reach", 999999)
+Line("SPELL_DAMAGE")
+Cooldown(439440)
+EndFrame()
+
+-- Then physical damage alone does not establish melee reach.
 assert(#displayed == before, "unknown ability reach corroborated Windfury")
 C_Spell.SpellHasRange = hasRange
 

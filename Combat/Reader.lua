@@ -1391,7 +1391,7 @@ local function WindfuryTriggerAt(at)
         local facts = ns.SpellFacts(spell)
         if facts and facts.direct == true and facts.school == ns.SCHOOL_PHYSICAL
             and facts.helpful ~= true and not facts.weaponProc
-            and ns.SpellReach(spell) == "melee" then
+            and (facts.reach or ns.SpellReach(spell)) == "melee" then
             for _, cast in ipairs(casts) do
                 if cast.caster == "you"
                     and math.abs(cast.at - at) <= SWING_FRAME then return true end
