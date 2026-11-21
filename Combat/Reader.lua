@@ -9,7 +9,7 @@ local C_Timer = ns.Timer
 local reader = {
     epoch = 0, plateGeneration = 0, plates = {}, held = {},
     lastGlow = {}, lastCC = {}, swingTimes = {}, castTargets = {},
-    windfuryNotices = {},
+    windfuryCasts = {},
     pendingHits = setmetatable({}, { __mode = "k" }),
 }
 ns.reader = reader
@@ -1348,23 +1348,20 @@ end
 local lastCast
 local queuedStrike
 local WINDFURY_ATTACK_SPELL_ID = 439440
-local MAX_WINDFURY_NOTICES = 16
+local MAX_WINDFURY_CASTS = 16
 
-local function WindfuryNotice(unit, spell, guid, now)
-    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
-    if not (client and client.isForever) or unit ~= "player"
-        or spell ~= WINDFURY_ATTACK_SPELL_ID then return end
-
-    -- Windfury activity is separate from any particular damage amount.
-    -- Keep duplicate casts bounded; coalesce multiple attacks in one frame.
-    local recent = reader.windfuryNotices
-    if ns.Text(guid) then
-        for _, seen in ipairs(recent) do
-            if seen == guid then return end
-        end
-        recent[#recent + 1] = guid
-        if #recent > MAX_WINDFURY_NOTICES then table.remove(recent, 1) end
+local function FirstWindfuryCast(guid)
+    if not ns.Text(guid) then return true end
+    local recent = reader.windfuryCasts
+    for _, seen in ipairs(recent) do
+        if seen == guid then return false end
     end
+    recent[#recent + 1] = guid
+    if #recent > MAX_WINDFURY_CASTS then table.remove(recent, 1) end
+    return true
+end
+
+local function WindfuryNotice(spell, now)
     if reader.windfuryNoticeAt
         and now <= reader.windfuryNoticeAt + SWING_FRAME then return end
     reader.windfuryNoticeAt = now
@@ -1419,7 +1416,7 @@ local function WindfuryCooldown(spell)
         for _, line in ipairs(reader.logLines) do
             if line.source == "mine" and math.abs(line.at - at) <= SWING_FRAME
                 and (line.kind == "spell" or line.kind == "spellMiss") then
-                WindfuryNotice("player", spell, nil, at)
+                WindfuryNotice(spell, at)
                 return
             end
         end
@@ -1429,7 +1426,19 @@ end
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
-    WindfuryNotice(unit, spell, guid, now)
+    if unit == "player" and spell == WINDFURY_ATTACK_SPELL_ID then
+        local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+        if client and client.isForever then
+            if FirstWindfuryCast(guid) then
+                -- Let the proc corroborate the burst without reserving a normal hit.
+                if ns.windfuryInference then
+                    ns.windfuryInference:Signal(now, spell)
+                end
+                WindfuryNotice(spell, now)
+            end
+            if ns.windfuryInference then return end
+        end
+    end
     local key, uncertain, observed = CastTarget(unit, spell, guid, now, true)
     if not observed and unit == "player" then
         key = ns.TargetKey()
@@ -2410,7 +2419,7 @@ local function OnEvent(_, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
         reader.windfuryCooldownFrame, reader.windfuryNoticeAt = nil, nil
-        reader.windfuryNotices = {}
+        reader.windfuryCasts = {}
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil
         reader.pendingHits = setmetatable({}, { __mode = "k" })
