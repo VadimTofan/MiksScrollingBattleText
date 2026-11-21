@@ -416,6 +416,7 @@ obj["OUTGOING_HEAL"]						= { label="Heals", tooltip="Enable outgoing heals."}
 obj["OUTGOING_HEAL_CRIT"]					= { label="Crit Heals", tooltip="Enable outgoing crit heals."}
 obj["OUTGOING_HOT"]							= { label="Heals Over Time", tooltip="Enable outgoing heals over time."}
 obj["OUTGOING_HOT_CRIT"]					= { label="Crit Heals Over Time", tooltip="Enable outgoing crit heals over time."}
+obj["OUTGOING_EFFECT"]						= { label="Effects on Target", tooltip="Enable what your spells do to your target, such as snared, bleed or banished."}
 obj["OUTGOING_DISPEL"]						= { label="Dispels", tooltip="Enable outgoing dispels."}
 
 obj = L.OUTGOING_PET_EVENTS

@@ -292,6 +292,7 @@ obj["OUTGOING_HEAL"]						= { label="Heilung", tooltip="Aktiviert ausgehende Hei
 obj["OUTGOING_HEAL_CRIT"]					= { label="Heilung: Krit", tooltip="Aktiviert ausgehende, kritische Heilungen."}
 obj["OUTGOING_HOT"]							= { label="HoT", tooltip="Aktiviert ausgehende Heilungen über Zeit."}
 obj["OUTGOING_HOT_CRIT"]					= { label="HoT: Krit", tooltip="Aktiviert ausgehende, kritische Heilungen über Zeit."}
+obj["OUTGOING_EFFECT"]						= { label="Effekte auf dem Ziel", tooltip="Aktiviert die Anzeige, was deine Zauber an deinem Ziel bewirken, etwa Verlangsamt, Blutung oder Verbannt."}
 obj["OUTGOING_DISPEL"]						= { label="Dispel", tooltip="Aktiviert ausgehende Entzauberungen."}
 
 obj = L.OUTGOING_PET_EVENTS

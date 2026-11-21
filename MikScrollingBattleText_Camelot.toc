@@ -36,6 +36,8 @@ Combat\Helpers.lua
 Combat\SpellCatalog.lua
 Combat\Mine.lua
 Combat\Spells.lua
+Combat\SpellMechanics.lua
+Combat\Effects.lua
 Combat\Healing.lua
 Combat\WindfuryInference.lua
 Combat\Reader.lua

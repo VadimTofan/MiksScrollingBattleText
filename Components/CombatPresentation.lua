@@ -616,5 +616,11 @@ function Presentation:Healer(name)
 	end
 end
 
+-- What a spell of yours did to your target, in the game's word for it
+-- (Combat/Effects.lua).
+function Presentation:Effect(word, spell)
+	self:Emit("OUTGOING_EFFECT", { name = word, spell = spell })
+end
+
 MikSBT.Components.CombatPresentation = Presentation
 return Presentation
