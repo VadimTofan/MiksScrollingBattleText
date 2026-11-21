@@ -35,7 +35,7 @@ class DebugWindowTests(unittest.TestCase):
         exclusions = (ROOT / ".pkgmeta").read_text(encoding="utf-8")
 
         # Then
-        self.assertIn("  - Diagnostics\n", exclusions)
+        self.assertIn("  - Developer\n", exclusions)
 
 
 if __name__ == "__main__":

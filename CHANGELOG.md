@@ -1,5 +1,21 @@
 # Changelog
 
+## v12.056
+
+- On Forever, Auto Shot and wand attacks use the ranged Events settings. Set
+  sounds for ranged hits, critical hits, and misses separately.
+- Set a sound for the Ability Ready notification to hear when a spell comes off
+  cooldown.
+- Select Static in Events to manage entries routed there, including loot,
+  money, and currency.
+- Explicitly tracked buffs such as Stealth can still show expiration alerts
+  when general buff fade alerts are disabled. Track Stealth by name to cover
+  its spell IDs.
+- On Forever, prevent Blizzard's resource-gain popup error while MSBT handles
+  resource gains, and improve combat attribution for player names with surnames.
+- Fixed opening MSBT from Blizzard Settings, localized low-health and low-mana
+  alerts, and added the German text for broken crowd control.
+
 ## v12.055
 
 - In Events, select a custom scroll area to see its assigned events and

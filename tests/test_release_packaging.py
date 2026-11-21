@@ -16,7 +16,7 @@ ARTWORK_NAMES = {
     "FontSettingsIcon", "FontSettingsIconDisable", "FontSettingsIconHighlight",
 }
 DEVELOPMENT_DIRECTORIES = {
-    "tests", "scripts", "dist", "docs", "skills", "Diagnostics",
+    "tests", "scripts", "dist", "docs", "skills", "Developer",
     "__pycache__",
 }
 
@@ -140,7 +140,7 @@ class ReleasePackagingTests(unittest.TestCase):
         self.assertIn(f"package-as: {ADDON_NAME}", pkgmeta)
         self.assertIn("manual-changelog:", pkgmeta)
         for excluded in (
-            "tests", "scripts", ".github", ".vscode", ".agents", ".codex",
+            "tests", "scripts", "Developer", ".github", ".vscode", ".agents", ".codex",
             ".release", "dist", "README.md", "CHANGELOG.md",
             "Research.md", "Combat/Trace.lua",
             "MSBTOptions/Artwork/TriggerSettingsIcon*",
@@ -186,7 +186,8 @@ class ReleasePackagingTests(unittest.TestCase):
         # Given
         for unwanted in (
             "README.md", "CHANGELOG.md", "API.html", "API.md", "Research.md",
-            "tests/test.lua", "scripts/build.py", ".pkgmeta", ".git/config",
+            "tests/test.lua", "scripts/build.py", "Developer/DebugWindow.lua",
+            ".pkgmeta", ".git/config",
             ".github/workflows/release.yml", ".vscode/settings.json",
             "Main.lua.bak", "Unused.lua", "Sounds/personal.ogg",
             "Fonts/.DS_Store", "Fonts/Thumbs.db", "Fonts/font.ttf.bak",

@@ -86,6 +86,12 @@ MikSBT.Profiles = {savedVariables = {}}
 dofile("MSBTOptions/MSBTOptionsDesigns.lua")
 dofile("MSBTOptions/MSBTOptionsMain.lua")
 local options = MSBTOptions.Main
+local openers = {}
+local dock = options.DockMainFrame
+options.DockMainFrame = function(panel, reopen, ...)
+	openers[panel] = reopen
+	return dock(panel, reopen, ...)
+end
 local designs = MSBTOptions.Designs
 -- What the setup tells the registry about the design Settings shows.
 local settingsCalls = {}
@@ -172,6 +178,14 @@ Settings.OpenToCategory(2)
 assert(main:GetParent() == panels[2] and scrollAreas:IsShown(),
 	"Scroll Areas did not dock when its category opened")
 assert(not general:IsShown(), "previous tab stayed visible")
+
+-- When the opener of the main panel runs from there.
+openers[panels[1]]()
+
+-- Then the addon's own category opens, by its number.
+assert(currentPanel == panels[1],
+	"the opener of the main panel did not open the addon's own category by its number")
+Settings.OpenToCategory(2)
 
 -- When the other design is chosen there and the options are requested.
 designs.Select("other")

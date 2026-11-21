@@ -2310,6 +2310,13 @@ masterProfile.lowHealthSoundDisabled = false
 masterProfile.lowManaSoundDisabled = false
 masterProfile.lowHealthThreshold = 35
 masterProfile.lowManaThreshold = 35
+masterProfile.events.NOTIFICATION_ABILITY_READY = {
+	disabled = true,
+	message = "%s " .. L.MSG_READY_NOW .. "!",
+	scrollArea = "Static",
+	fontSize = 22,
+	soundFile = "MSBT Cooldown",
+}
 
 for _, side in ipairs({ "msbt", "blizzard" }) do
 	for _, category in ipairs({ "Outgoing", "Notifications", "Incoming" }) do
@@ -2436,6 +2443,11 @@ local function SetOption(optionPath, optionName, optionValue, optionDefault)
 			currentTable[optionName] = nil
 			RemoveEmptyDifferentials(currentProfile)
 		end
+	end
+
+	if Client.isForever and optionPath == "events.NOTIFICATION_RESOURCE_GAIN"
+		and optionName == "disabled" then
+		module.ApplyContextOptions()
 	end
 end
 
@@ -2565,11 +2577,12 @@ local function UpdateBlizzardTextCategories(refreshed)
 		state.original = {}
 	end
 	for kind, info in pairs(types) do
-		local disabled
+		local disabled = state.notificationsDisabled
 		if BLIZZARD_INCOMING_TYPES[kind] then
 			disabled = state.incomingDisabled
-		else
-			disabled = state.notificationsDisabled
+		elseif state.hideResourceGains
+			and (kind == "ENERGIZE" or kind == "PERIODIC_ENERGIZE") then
+			disabled = true
 		end
 		if disabled then
 			if not state.original[kind] then
@@ -2628,8 +2641,10 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText, prof
 	WriteCVar("floatingCombatTextPetSpellDamage_v2", value)
 	local resourceSettings = profile and profile.events
 		and profile.events.NOTIFICATION_RESOURCE_GAIN
-	if Client.hasModernAPI and suppressOtherText and resourceSettings
-		and not resourceSettings.disabled and not profile.msbtNotificationsDisabled then
+	local resourceFeedEnabled = Client.hasModernAPI and suppressOtherText
+		and resourceSettings and not resourceSettings.disabled
+		and not profile.msbtNotificationsDisabled
+	if resourceFeedEnabled then
 		-- Resource notices need their own feed even when Blizzard text is hidden.
 		WriteCVar("floatingCombatTextEnergyGains_v2", 1)
 		WriteCVar("floatingCombatTextPeriodicEnergyGains_v2", 1)
@@ -2639,6 +2654,9 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText, prof
 		local state = blizzardCategoryState
 		state.incomingDisabled = profile.blizzardIncomingDisabled
 		state.notificationsDisabled = profile.blizzardNotificationsDisabled
+		-- Forever's Blizzard renderer compares the gain amount against zero.
+		-- Keep the source enabled for MSBT, but skip that renderer.
+		state.hideResourceGains = Client.isForever and resourceFeedEnabled
 		if hooksecurefunc and not state.hooked then
 			local function Refreshed() UpdateBlizzardTextCategories(true) end
 			if CombatText and CombatText.UpdateDisplayedMessages then
@@ -2793,8 +2811,9 @@ local function UpdateProfiles(profiles)
 end
 
 local function MigrateCombatTextOptions(profile)
-	if profile.blizzardDamageEnabled == nil then
-		profile.blizzardDamageEnabled = not profile.enableBlizzardV2CombatText
+	-- The profile's own values: one that was selected before can no longer look up its defaults.
+	if rawget(profile, "blizzardDamageEnabled") == nil then
+		profile.blizzardDamageEnabled = not rawget(profile, "enableBlizzardV2CombatText")
 	end
 
 	local removedOptions = {

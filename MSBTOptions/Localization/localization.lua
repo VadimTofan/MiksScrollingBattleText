@@ -516,6 +516,10 @@ obj["NOTIFICATION_DEBUFF_FADE"]			= { label="Debuff Fades", tooltip="Enable debu
 obj["NOTIFICATION_BUFF_FADE"]			= { label="Buff Fades", tooltip="Enable buffs that have faded from you."}
 obj["NOTIFICATION_ITEM_BUFF_FADE"]		= { label="Item Buff Fades", tooltip="Enable item buffs that have faded from you."}
 obj["NOTIFICATION_ITEM_COOLDOWN"] = { label="Item Ready", tooltip="Notify when a used trinket or potion cooldown finishes."}
+obj["NOTIFICATION_ABILITY_READY"] = {
+	label = "Ability Ready",
+	tooltip = "Notify when a player ability's cooldown finishes.",
+}
 obj["NOTIFICATION_COMBAT_ENTER"]		= { label="Enter Combat", tooltip="Enable when you have entered combat."}
 obj["NOTIFICATION_COMBAT_LEAVE"]		= { label="Leave Combat", tooltip="Enable when you have left combat."}
 obj["NOTIFICATION_HONOR_GAIN"]			= { label="Honor Gains", tooltip="Enable when you gain honor."}

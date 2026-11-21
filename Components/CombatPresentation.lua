@@ -509,7 +509,9 @@ function Presentation:Out(record)
 			self.config.batcher:DisplayRestricted(
 				spell, record.amount, record.crit, icon, isSpell,
 				result.who == "pet", result.tick, key, school, candidateSpell,
-				inferenceGroup)
+				inferenceGroup,
+				self.config.formatBlockedTrailer
+					and self.config.formatBlockedTrailer(record))
 		else
 			self.config.batcher:Queue(
 				spell, record.amount, record.crit, icon, isSpell,
@@ -582,6 +584,11 @@ function Presentation:Alert(record)
 	end
 	if not key then return end
 	local displayRecord = { name = record.text, icon = record.icon }
+	-- The reader names what a line tells in English. Crowd control a hit of yours broke is told in
+	-- the locale's words where it has them.
+	if record.kind == "broke" then
+		displayRecord.name = (MikSBT.translations or {}).MSG_CONTROL_BROKEN or record.text
+	end
 	if record.args then
 		local value = record.args[1]
 		if RestrictedValue:IsRestricted(value) then
