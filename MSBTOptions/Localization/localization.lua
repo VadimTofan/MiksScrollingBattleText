@@ -136,6 +136,22 @@ obj["disableIncoming"] = {
 	label = "Disable incoming",
 	tooltip = "Hide incoming damage and healing text for this system.",
 }
+obj["spellMechanicsOwn"] = {
+	label = "Effects on targets",
+	tooltip = "Blizzard's text over your target's head for effects such as slowed or bleeding. This is the game's own setting (Text on Target: Effects).",
+}
+obj["spellMechanicsOthers"] = {
+	label = "Effects on other players' targets",
+	tooltip = "Blizzard's text over the heads of other players' targets for effects such as slowed or bleeding. This is the game's own setting (Text on Target: Show for other players' targets).",
+}
+obj["blizzardReputation"] = {
+	label = "Reputation Changes",
+	tooltip = "Blizzard's text at your character when your reputation with a faction changes. This is the game's own setting (Text on Me: Reputation Changes). It shows only while Enable Blizzard Text is checked and Blizzard's Disable notifications is not. A change shows after the next reload of the interface.",
+}
+obj["blizzardHonor"] = {
+	label = "Honorable Kills",
+	tooltip = "Blizzard's text at your character for the honor you gain from killing other players. This is the game's own setting (Text on Me: Honorable Kills). It shows only while Enable Blizzard Text is checked and Blizzard's Disable notifications is not. A change shows after the next reload of the interface.",
+}
 obj["stickyCrits"]				= { label="Sticky Crits", tooltip="Display crits using the sticky style."}
 obj["colorPartialEffects"]		= { label="Color Partial Effects", tooltip="Apply specified colors to partial effects."}
 obj["crushing"]					= { label="Crushing Blows", tooltip="Display the crushing blows trailer."}

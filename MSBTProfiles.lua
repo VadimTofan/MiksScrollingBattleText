@@ -2519,6 +2519,93 @@ local function SetupBlizzardOptions()
 	end
 end
 
+-- Switches for the client's own text settings. Until the player sets one in a profile, it shows
+-- the client's value and MSBT leaves the setting alone. Once set, the profile keeps the value in
+-- blizzardSwitches (1 shown, 0 hidden) and MSBT writes it each time it applies its settings.
+-- "version" keeps that table from being empty, as an empty table is dropped from a profile.
+-- Each switch is entered below with the client settings behind it. The first of them is read
+-- while the switch is unset.
+local BLIZZARD_SWITCH_SETTINGS = {}
+
+-- Returns the value a profile keeps for a switch. Only 1 and 0 count; anything else, such as from
+-- an edited import, counts as not set.
+local function StoredBlizzardSwitch(switches, name)
+	local value = type(switches) == "table" and switches[name]
+	if value == 1 or value == 0 then return value end
+end
+
+-- Writes a switch's settings, as "1" or "0", where the client has them and their value differs.
+-- None of them is secure, so this works in combat too.
+local function WriteBlizzardSwitch(name, isShown)
+	local wanted = isShown and "1" or "0"
+	for _, setting in ipairs(BLIZZARD_SWITCH_SETTINGS[name]) do
+		local current = GetCVar(setting)
+		if current ~= nil and current ~= wanted then
+			SetCVar(setting, wanted)
+		end
+	end
+end
+
+-- Writes the switches the profile has set.
+local function ApplyBlizzardSwitches(profile)
+	local switches = profile and profile.blizzardSwitches
+	for name in pairs(BLIZZARD_SWITCH_SETTINGS) do
+		local stored = StoredBlizzardSwitch(switches, name)
+		if stored then WriteBlizzardSwitch(name, stored == 1) end
+	end
+end
+
+-- Returns whether the switch's text is shown, nil where the client lacks the setting, and
+-- whether the current profile has it set.
+local function GetBlizzardSwitch(name)
+	local settings = BLIZZARD_SWITCH_SETTINGS[name]
+	if not settings then return nil, false end
+	local stored = StoredBlizzardSwitch(currentProfile and currentProfile.blizzardSwitches, name)
+	if GetCVar(settings[1]) == nil then return nil, stored ~= nil end
+	if stored ~= nil then return stored == 1, true end
+	return GetCVarBool(settings[1]) and true or false, false
+end
+
+-- The current profile's table of switches, made where it is missing.
+local function CurrentBlizzardSwitches()
+	local switches = currentProfile.blizzardSwitches
+	if type(switches) ~= "table" then
+		switches = { version = 1 }
+		currentProfile.blizzardSwitches = switches
+	end
+	return switches
+end
+
+local function SetBlizzardSwitch(name, isShown)
+	if not BLIZZARD_SWITCH_SETTINGS[name] or not currentProfile then return end
+	CurrentBlizzardSwitches()[name] = isShown and 1 or 0
+	WriteBlizzardSwitch(name, isShown)
+end
+
+-- Records the current profile's switches and the client's value of every setting behind them,
+-- for an options window that puts both back on Cancel.
+local function TakeBlizzardSwitches()
+	local record = { marks = {}, settings = {} }
+	local switches = currentProfile and currentProfile.blizzardSwitches
+	for name, settings in pairs(BLIZZARD_SWITCH_SETTINGS) do
+		record.marks[name] = StoredBlizzardSwitch(switches, name)
+		for _, setting in ipairs(settings) do record.settings[setting] = GetCVar(setting) end
+	end
+	return record
+end
+
+-- Puts back what TakeBlizzardSwitches recorded: each switch set as it was or not set, and each
+-- client setting that has changed, where the client has it.
+local function RestoreBlizzardSwitches(record)
+	if type(record) ~= "table" or not currentProfile then return end
+	local switches = CurrentBlizzardSwitches()
+	for name in pairs(BLIZZARD_SWITCH_SETTINGS) do switches[name] = record.marks[name] end
+	for setting, value in pairs(record.settings) do
+		local current = GetCVar(setting)
+		if current ~= nil and current ~= value then SetCVar(setting, value) end
+	end
+end
+
 local blizzardCategoryState = { original = {} }
 local BLIZZARD_INCOMING_TYPES = {
 	DAMAGE = true, DAMAGE_CRIT = true, SPELL_DAMAGE = true,
@@ -2604,6 +2691,8 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText, prof
 		WriteCVar("floatingCombatTextCombatHealing_v2", profile and value or 0)
 		SHOW_COMBAT_TEXT = "1"
 	end
+	-- The client's text settings with a switch are written as the profile has set them.
+	ApplyBlizzardSwitches(profile)
 
 	WriteCVar("floatingCombatTextCombatDamage", value)
 	WriteCVar("floatingCombatTextCombatDamage_v2", value)
@@ -2652,6 +2741,22 @@ local function SetBlizzardCombatTextV2Enabled(isEnabled, suppressOtherText, prof
 			CombatText:Show()
 		end
 	end
+end
+
+-- The switches for what spells do to a target, such as slowed or bleeding, for own and other
+-- players' targets.
+BLIZZARD_SWITCH_SETTINGS.effectsOwn = { "floatingCombatTextSpellMechanics_v2" }
+BLIZZARD_SWITCH_SETTINGS.effectsOthers = { "floatingCombatTextSpellMechanicsOther_v2" }
+-- The switches for what the client shows at the character for reputation and honor changes.
+BLIZZARD_SWITCH_SETTINGS.reputation = { "floatingCombatTextRepChanges_v2" }
+BLIZZARD_SWITCH_SETTINGS.honor = { "floatingCombatTextHonorGains_v2" }
+
+local function GetSpellMechanicsText()
+	return (GetBlizzardSwitch("effectsOwn")), (GetBlizzardSwitch("effectsOthers"))
+end
+
+local function SetSpellMechanicsText(which, isShown)
+	SetBlizzardSwitch(({ own = "effectsOwn", others = "effectsOthers" })[which], isShown)
 end
 
 local function SetAddonEnabled(isEnabled)
@@ -3075,6 +3180,12 @@ module.ImportProfile				= ImportProfile
 module.SetOption					= SetOption
 module.SetOptionUserDisabled		= SetOptionUserDisabled
 module.IsModDisabled				= IsModDisabled
+module.GetBlizzardSwitch			= GetBlizzardSwitch
+module.SetBlizzardSwitch			= SetBlizzardSwitch
+module.TakeBlizzardSwitches		= TakeBlizzardSwitches
+module.RestoreBlizzardSwitches		= RestoreBlizzardSwitches
 module.ApplyContextOptions			= ApplyContextOptions
+module.GetSpellMechanicsText		= GetSpellMechanicsText
+module.SetSpellMechanicsText		= SetSpellMechanicsText
 module.ResetOfficialBlizzardCombatText = ResetOfficialBlizzardCombatText
 

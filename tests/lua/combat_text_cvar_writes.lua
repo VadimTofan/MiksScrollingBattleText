@@ -3,12 +3,13 @@ local source = file:read("*a")
 file:close()
 
 -- Describe: combat text settings are written only when they change.
+-- The function is taken with the switches of the client's text settings, which it applies.
 local body = assert(source:match(
-	"local function SetBlizzardCombatTextV2Enabled%b()%s*.-\nend"))
-local action = assert(loadstring(body ..
-	"\nreturn SetBlizzardCombatTextV2Enabled"))()
+	"(local BLIZZARD_SWITCH_SETTINGS.-)local function SetAddonEnabled"))
+local build = assert(loadstring(body ..
+	"\nreturn SetBlizzardCombatTextV2Enabled"))
 
-local cvars, writes
+local cvars, writes, action
 local function Environment(getCVar)
 	writes = {}
 	local frame = { Hide = function() end, Show = function() end }
@@ -21,8 +22,10 @@ local function Environment(getCVar)
 		end,
 		GetCVar = getCVar,
 		pcall = pcall, tostring = tostring,
+		pairs = pairs, ipairs = ipairs, type = type,
 	}
-	setfenv(action, environment)
+	setfenv(build, environment)
+	action = build()
 	return environment
 end
 local function Read(name) return cvars[name] end
