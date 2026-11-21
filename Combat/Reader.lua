@@ -10,6 +10,7 @@ local reader = {
     epoch = 0, plateGeneration = 0, plates = {}, held = {},
     lastGlow = {}, lastCC = {}, swingTimes = {}, castTargets = {},
     windfuryCasts = {},
+    windfuryCooldownFrames = {},
     pendingHits = setmetatable({}, { __mode = "k" }),
 }
 ns.reader = reader
@@ -1353,6 +1354,7 @@ end
 local lastCast
 local queuedStrike
 local WINDFURY_ATTACK_SPELL_ID = 439440
+local WINDFURY_TOTEM_ATTACK_SPELL_ID = 10610
 local MAX_WINDFURY_CASTS = 16
 
 local function FirstWindfuryCast(guid)
@@ -1373,12 +1375,27 @@ local function WindfuryNotice(spell, now)
 
     local router = Router()
     if router then
+        local fallbackSpell = spell == WINDFURY_ATTACK_SPELL_ID
+            and WINDFURY_WEAPON_SPELL_ID
         router:Alert({ kind = "proc",
             text = ns.SpellName(spell)
-                or ns.SpellName(WINDFURY_WEAPON_SPELL_ID) or "Windfury",
+                or (fallbackSpell and ns.SpellName(fallbackSpell)) or "Windfury",
             icon = ns.SpellIcon(spell)
-                or ns.SpellIcon(WINDFURY_WEAPON_SPELL_ID) })
+                or (fallbackSpell and ns.SpellIcon(fallbackSpell)) or nil })
     end
+end
+
+local function ClassWindfuryTotemTriggerAt(at)
+    local rules = ns.PlayerClassRules()
+    local triggers = rules and rules.windfuryTotemTriggers
+    if not triggers then return false end
+    for spell in pairs(triggers) do
+        for _, cast in ipairs(ns.mine.casts[spell] or {}) do
+            if cast.caster == "you"
+                and math.abs(cast.at - at) <= SWING_FRAME then return true end
+        end
+    end
+    return false
 end
 
 local function WindfuryTriggerAt(at)
@@ -1407,20 +1424,23 @@ end
 local function WindfuryCooldown(spell)
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     if not (client and client.isForever) or not ns.Number(spell, 1)
-        or spell ~= WINDFURY_ATTACK_SPELL_ID then return end
+        or (spell ~= WINDFURY_ATTACK_SPELL_ID
+            and spell ~= WINDFURY_TOTEM_ATTACK_SPELL_ID) then return end
     local at = Now()
-    local pending = reader.windfuryCooldownFrame
+    local triggerAt = spell == WINDFURY_TOTEM_ATTACK_SPELL_ID
+        and ClassWindfuryTotemTriggerAt or WindfuryTriggerAt
+    local pending = reader.windfuryCooldownFrames[spell]
     if pending and math.abs(pending.at - at) <= SWING_FRAME then return end
     pending = { at = at }
-    reader.windfuryCooldownFrame = pending
+    reader.windfuryCooldownFrames[spell] = pending
 
     -- Recorded Forever frames expose this update beside the melee trigger
     -- and direct lines, without a cast event. Evaluate after all arrive.
     -- This correlation is an activity cue, not a hit identity or proc count.
     C_Timer.After(0, function()
-        if reader.windfuryCooldownFrame ~= pending
+        if reader.windfuryCooldownFrames[spell] ~= pending
             or not (ns.LineKindsReady and ns.LineKindsReady())
-            or not WindfuryTriggerAt(at) then return end
+            or not triggerAt(at) then return end
         for _, line in ipairs(reader.logLines) do
             if line.source == "mine" and math.abs(line.at - at) <= SWING_FRAME
                 and (line.kind == "spell" or line.kind == "spellMiss") then
@@ -2320,8 +2340,9 @@ local function OnEvent(_, event, ...)
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         local spell = ...
         if ns.windfuryInference and ns.Number(spell, 1)
-            and (spell == 10610 or (spell == WINDFURY_ATTACK_SPELL_ID
-                and ActiveWindfurySpell(ns.SCHOOL_PHYSICAL) == 8232)) then
+            and (spell == WINDFURY_TOTEM_ATTACK_SPELL_ID
+                or (spell == WINDFURY_ATTACK_SPELL_ID
+                    and ActiveWindfurySpell(ns.SCHOOL_PHYSICAL) == 8232)) then
             ns.windfuryInference:Signal(Now(), spell)
         end
         WindfuryCooldown(...)
@@ -2426,7 +2447,7 @@ local function OnEvent(_, event, ...)
         ReadShieldBlock()
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
-        reader.windfuryCooldownFrame, reader.windfuryNoticeAt = nil, nil
+        reader.windfuryCooldownFrames, reader.windfuryNoticeAt = {}, nil
         reader.windfuryCasts = {}
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil

@@ -4,6 +4,7 @@ MikSBT = {
 }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+dofile("Combat/Classes/Paladin.lua")
 dofile("Combat/Classes/Shaman.lua")
 dofile("Combat/Helpers.lua")
 dofile("Combat/SpellCatalog.lua")
@@ -313,6 +314,39 @@ EndFrame()
 -- Then physical damage alone does not establish melee reach.
 assert(#displayed == before, "unknown ability reach corroborated Windfury")
 C_Spell.SpellHasRange = hasRange
+
+-- Given Holy Strike on a Forever Paladin and a direct player line.
+playerClass = "PALADIN"
+now = 47326.72
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-holy-strike", 678)
+Line("SPELL_DAMAGE")
+
+-- When both cooldown updates arrive and only Totem fits Holy Strike.
+Cooldown(439440)
+Cooldown(10610)
+EndFrame()
+
+-- Then the Totem notice is displayed once with its own spell metadata.
+assert(#displayed == before + 1, "Holy Strike did not corroborate Windfury Totem")
+assert(displayed[#displayed].message == "Spell 10610")
+assert(displayed[#displayed].icon == "icon-10610")
+
+-- Given a Holy Strike whose Totem cooldown signal or player line is missing.
+before = #displayed
+for _, missing in ipairs({ "cooldown", "line", "class" }) do
+    now = now + 0.01
+    playerClass = missing == "class" and "MAGE" or "PALADIN"
+
+    -- When the remaining evidence arrives in the same frame.
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-holy-" .. missing, 678)
+    if missing ~= "line" then Line("SPELL_DAMAGE") end
+    if missing ~= "cooldown" then Cooldown(10610) end
+    EndFrame()
+
+    -- Then incomplete or wrong-class evidence stays silent.
+    assert(#displayed == before, "missing " .. missing .. " still displayed Totem")
+end
+playerClass = "SHAMAN"
 
 -- Given a melee frame whose extra attack is avoided.
 now = 47326.8
