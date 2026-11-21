@@ -72,6 +72,7 @@ local savedMedia
 
 local currentProfile
 local runtimeController
+local profileSnapshots
 
 local pathTable = {}
 
@@ -2498,7 +2499,35 @@ local function SetupBlizzardOptions()
 		end)
 	end
 
+	-- A design that can stand in the game's settings window shows its own pages there, one
+	-- category for each page, and takes over the panels' scripts.
+	local designs = MSBTOptions.Designs
+	local selected = designs.GetSelected()
+	local design = designs.designs[selected]
+	local dockPages = design.DockPages and design.DockPages()
+	if dockPages and #dockPages > 0 then
+		local openers = {}
+		for index, page in ipairs(dockPages) do
+			local panel = frame
+			if index > 1 then
+				panel = CreateFrame("Frame")
+				panel:Hide()
+				panel.name = page.label
+			end
+			openers[page.key] = Register(panel, index > 1)
+			panel:SetScript("OnShow", function(this)
+				design.Dock(this, page.key, openers)
+			end)
+			panel:SetScript("OnHide", function(this)
+				design.Undock(this)
+			end)
+		end
+		designs.SetSettingsDesign(selected, openers[dockPages[1].key])
+		return
+	end
+
 	local reopen = Register(frame)
+	designs.SetSettingsDesign("classic", reopen)
 
 	local tabs = optionsMain.GetTabs()
 	local generalIndex
@@ -2940,6 +2969,23 @@ local function InitSavedVariables()
 	module.savedMedia = savedMedia
 end
 
+local function GetProfileSnapshots()
+	if not profileSnapshots then
+		profileSnapshots = MikSBT.Configuration.ProfileSnapshots:New({
+			savedVariables = savedVariables,
+			savedVariablesPerChar = savedVariablesPerChar,
+			masterProfile = masterProfile,
+			selectProfile = function(profileName)
+				if not savedVariables.profiles[profileName] then
+					profileName = DEFAULT_PROFILE_NAME
+				end
+				SelectProfile(profileName)
+			end,
+		})
+	end
+	return profileSnapshots
+end
+
 local function GetNextParameter(paramString)
 	local remainingParams
 	local currentParam = paramString
@@ -3047,6 +3093,10 @@ local function OnEvent(this, event, arg1)
 		end
 		collectgarbage("collect")
 	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
+		if event == "PLAYER_ENTERING_WORLD" then
+			-- Clients without the event arguments count as an initial login.
+			GetProfileSnapshots():UpdateLoginSnapshot(arg1 ~= false)
+		end
 		ApplyContextOptions()
 	end
 end
@@ -3077,4 +3127,5 @@ module.SetOptionUserDisabled		= SetOptionUserDisabled
 module.IsModDisabled				= IsModDisabled
 module.ApplyContextOptions			= ApplyContextOptions
 module.ResetOfficialBlizzardCombatText = ResetOfficialBlizzardCombatText
+module.GetProfileSnapshots			= GetProfileSnapshots
 
