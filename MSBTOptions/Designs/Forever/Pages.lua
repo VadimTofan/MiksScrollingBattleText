@@ -644,6 +644,11 @@ end
 
 
 
+-- The helpers a file outside the design builds its own page with.
+MSBTWindow.CreateText = CreateText
+MSBTWindow.CreateSection = CreateSection
+MSBTWindow.CreateButton = CreateButton
+
 MSBTWindow.RegisterPage("general", CreateGeneral, RefreshGeneral)
 MSBTWindow.RegisterPage("fontsColors", CreateFontsColors)
 MSBTWindow.RegisterPage("sounds", CreateSounds, RefreshSounds)

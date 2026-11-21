@@ -47,6 +47,16 @@ class OptionsWindowTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
+    def test_a_file_outside_the_design_adds_a_page(self):
+        # Given
+        script_name = "options_window_added_page.lua"
+
+        # When
+        result = run_lua_test(script_name)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

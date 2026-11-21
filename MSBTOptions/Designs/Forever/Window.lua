@@ -89,6 +89,7 @@ local BLIZZARD_ATLASES = {
 }
 
 -- Sidebar order; tab names the classic tab whose label and hint an entry without its own text uses.
+-- An entry added from outside has its own label and hint and no tab.
 local ENTRIES = {
 	{ group = "groupDisplay" },
 	{ key = "general", tab = "general" },
@@ -983,7 +984,7 @@ end
 -- The label of an entry, also where no sidebar is built.
 local function EntryLabel(entry)
 	local tabLocale = entry.tab and L.TABS[entry.tab]
-	return L.WINDOW[entry.key] or tabLocale.label
+	return entry.label or L.WINDOW[entry.key] or tabLocale.label
 end
 
 
@@ -1008,7 +1009,7 @@ local function CreateEntry(parent, entry)
 
 	local tabLocale = entry.tab and L.TABS[entry.tab]
 	button.label = EntryLabel(entry)
-	button.hint = L.WINDOW[entry.key .. "Hint"] or tabLocale.tooltip:match("^[^\n]*")
+	button.hint = entry.hint or L.WINDOW[entry.key .. "Hint"] or tabLocale.tooltip:match("^[^\n]*")
 	fontString:SetText(button.label)
 
 	button.key = entry.key
@@ -1433,6 +1434,18 @@ end
 
 local function RegisterPage(key, create, refresh, arg)
 	pages[key] = { create = create, refresh = refresh, arg = arg }
+end
+
+
+-- Adds a page after the pages of the design. A file outside the design calls it while the addon's
+-- files load: the game's settings window takes its list once the addon has loaded, and the sidebar
+-- is built with the window; a page added later is missing from them. The key must be new, and
+-- label and hint are required. A field of the module: the main chunk is close to Lua's limit of
+-- 200 locals.
+function module.AddPage(key, label, hint, create, refresh)
+	assert(label and hint and not pages[key], "AddPage needs a new key, a label and a hint")
+	ENTRIES[#ENTRIES + 1] = { key = key, label = label, hint = hint }
+	RegisterPage(key, create, refresh)
 end
 
 
