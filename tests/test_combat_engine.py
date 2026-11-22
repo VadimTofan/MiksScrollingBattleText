@@ -1,4 +1,8 @@
+import argparse
+import os
+import re
 import unittest
+from pathlib import Path
 
 from tests.lua_test_runner import run_lua_test
 
@@ -134,6 +138,75 @@ class CombatEngineTests(unittest.TestCase):
 
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_damage_shields_come_from_the_client_spell_data(self):
+        # Given
+        from scripts import generate_damage_shields as generator
+
+        root = Path(__file__).resolve().parents[1]
+        table = (root / "Combat" / "DamageShields.lua").read_text(encoding="utf-8")
+        effects = [
+            {"SpellID": "467", "EffectAura": "15", "DifficultyID": "0"},
+            {"SpellID": "774", "EffectAura": "8", "DifficultyID": "0"},
+            {"SpellID": "9999", "EffectAura": "15", "DifficultyID": "1"},
+        ]
+        misc = [
+            {"SpellID": "467", "SchoolMask": "8", "DifficultyID": "0"},
+            {"SpellID": "467", "SchoolMask": "4", "DifficultyID": "2"},
+            {"SpellID": "774", "SchoolMask": "8", "DifficultyID": "0"},
+            {"SpellID": "9999", "SchoolMask": "4", "DifficultyID": "0"},
+        ]
+
+        # When
+        found = generator.shields(effects, misc)
+
+        # Then
+        self.assertEqual(found, {467: 8})
+        self.assertIn("\t[467]=8,\n", generator.render(found, "test"))
+        self.assertIn("[467]=8,", table)
+        for toc in ("MikScrollingBattleText.toc", "MikScrollingBattleText_Camelot.toc"):
+            lines = (root / toc).read_text(encoding="utf-8-sig").splitlines()
+            self.assertEqual(
+                lines.index("Combat\\DamageShields.lua") + 1,
+                lines.index("Combat\\Reader.lua"),
+            )
+
+    def test_the_damage_shield_table_names_the_build_of_its_source(self):
+        # Given
+        from scripts import generate_damage_shields as generator
+
+        root = Path(__file__).resolve().parents[1]
+        lines = (root / "Combat" / "DamageShields.lua").read_text(encoding="utf-8").splitlines()
+
+        # When
+        start = lines.index("MikSBT.TABLE_BUILDS = MikSBT.TABLE_BUILDS or {}")
+        build = re.search(r'build = "([^"]*)"', lines[start + 1]).group(1)
+        header = re.search(r"build (\d+\.\d+\.\d+\.\d+)[.,]", "\n".join(lines[:start]))
+
+        # Then
+        self.assertEqual(lines[start:start + 2], generator.registration(build))
+        self.assertEqual(lines.count(lines[start]), 1)
+        self.assertRegex(build, generator.BUILD_PATTERN)
+        self.assertEqual(header and header.group(1), build, "the header names another build than the entry")
+        self.assertTrue((root / generator.SCRIPT).is_file())
+        with self.assertRaises(argparse.ArgumentTypeError):
+            generator.build_argument("test")
+
+    @unittest.skipUnless(os.environ.get("MSBT_CSV_DIR"),
+                         "MSBT_CSV_DIR names no folder with the CSV files of the table's build")
+    def test_the_shipped_damage_shield_table_is_what_its_generator_writes(self):
+        # Given
+        from scripts import generate_damage_shields as generator
+
+        root = Path(__file__).resolve().parents[1]
+        table = (root / "Combat" / "DamageShields.lua").read_text(encoding="utf-8")
+        build = re.search(r'TABLE_BUILDS\.\w+ = \{[^}]*build = "([^"]*)"', table).group(1)
+
+        # When
+        written = generator.generate(Path(os.environ["MSBT_CSV_DIR"]), build)
+
+        # Then
+        self.assertEqual(table, written, "regenerate with the CSV files of build " + build)
 
     def test_engine_records_keep_msbt_event_settings_and_restricted_values(self):
         # Given

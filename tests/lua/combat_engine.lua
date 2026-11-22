@@ -92,6 +92,8 @@ local function Event(event, ...)
             or (kind == "hot" and "SPELL_PERIODIC_HEAL")
             or (kind == "swing" and "SWING_DAMAGE")
             or (kind == "swingMiss" and "SWING_MISSED")
+            or (kind == "shield" and "DAMAGE_SHIELD")
+            or (kind == "shieldMiss" and "DAMAGE_SHIELD_MISSED")
             or (kind == "spell" and "SPELL_DAMAGE" or "SPELL_PERIODIC_DAMAGE")
         local rgb = Blizzard_CombatLog_Filters.filters[1].colors.eventColoring[eventName]
         engine:HandleEvent(event, "opaque message", rgb.r, rgb.g, rgb.b, 1)
@@ -1165,5 +1167,394 @@ assert(outgoing[1].amount == 999 and outgoing[1].result.who == "unknown",
 assert(outgoing[2].amount == 40 and outgoing[2].result.who == "you"
 	and outgoing[2].result.melee,
 	"the player's later melee hit lost its confirmation")
+
+-- Describe: a damage shield's hit takes its shield's name and icon only when
+-- no other line of yours in its frame can be the hit's.
+do
+    -- Given Thorns and a permanent Retribution Aura among your buffs, read
+    -- out of combat, and the client's damage shields with their school.
+    MikSBT.DAMAGE_SHIELDS = { [467] = 8, [7294] = 2, [1213834] = 8, [1300680] = 1 }
+    local function Buff(id, spell, expires)
+        Event("UNIT_AURA", "player", { isFullUpdate = false, addedAuras = { { auraInstanceID = id,
+            isHarmful = false, spellId = spell, icon = "icon-" .. spell, name = "Spell " .. spell,
+            expirationTime = expires } } })
+    end
+    -- An enemy strikes you, a line of the given kind comes, and a hit lands
+    -- on the enemy; with a cast, a Fire spell of yours lands in the same frame;
+    -- soon, at once rather than four seconds on.
+    local function Struck(school, kind, cast, soon)
+        Advance(soon and 0 or 4)
+        local before, hit = #outgoing, {}
+        if cast then
+            Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 101)
+            Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+            Event("UNIT_COMBAT", "target", "WOUND", "", 100, 4)
+        end
+        Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, kind, 0, 0, 1)
+        Event("UNIT_COMBAT", "target", "WOUND", "", 3, school)
+        Advance(0.02) Advance(0.5)
+        for index = before + 1, #outgoing do
+            if outgoing[index].amount == 3 then hit = outgoing[index].result end
+        end
+        return hit
+    end
+    -- Every report of the school sent since before (count of them) is yours,
+    -- and none is shown as a shield's.
+    local function NoShield(before, school, count, message)
+        local seen = 0
+        for index = before + 1, #outgoing do
+            local record = outgoing[index]
+            if record.school == school then
+                seen = seen + 1
+                assert(record.result.who == "you" and not record.result.shield
+                    and record.result.procSpell == nil, message)
+            end
+        end
+        assert(seen == count, "a hit beside a damage shield's line went unshown")
+    end
+    Buff(901, 467, now + 600)
+    Buff(902, 7294, 0)
+    for _, example in ipairs({ { school = 8, spell = 467 }, { school = 2, spell = 7294 } }) do
+        -- When a shield's line comes with the hit alone.
+        local result = Struck(example.school, "shield")
+        -- Then the hit is the shield's of its school, shown as a damage shield.
+        assert(result.who == "you" and result.shield and result.procSpell == example.spell,
+            "a damage shield's hit was not named after its shield")
+    end
+    for _, amounts in ipairs({ { 9, 35 }, { 35, 9 } }) do
+        -- When your Nature spell and its line come in the frame of an enemy's
+        -- blow that sets off Thorns, Thorns' report first or the spell's.
+        Advance(4)
+        local before = #outgoing
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 301)
+        Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+        Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "shield", 0, 0, 1)
+        Event("UNIT_COMBAT", "target", "WOUND", "", amounts[1], 8)
+        Event("UNIT_COMBAT", "target", "WOUND", "", amounts[2], 8)
+        Advance(0.02) Advance(0.5)
+        -- Then either line can be either report's, and neither is Thorns'.
+        NoShield(before, 8, 2, "a Nature hit beside a Nature spell's line was named after Thorns")
+    end
+    for _, count in ipairs({ 2, 1 }) do
+        -- When your swing's seal lands with its line in the frame of an
+        -- enemy's blow that sets off Retribution Aura, with the aura's own
+        -- report or without it.
+        Advance(4)
+        local before = #outgoing
+        Event("PLAYER_SWING", 3.5, 0)
+        Event("COMBAT_LOG_MESSAGE", nil, "swing", 0, 0, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "spell", 0, 0, 1)
+        Event("UNIT_COMBAT", "target", "WOUND", "", 30, 2)
+        Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+        Event("COMBAT_LOG_MESSAGE", nil, "shield", 0, 0, 1)
+        if count == 2 then Event("UNIT_COMBAT", "target", "WOUND", "", 5, 2) end
+        Advance(0.02) Advance(0.5)
+        -- Then either line can be a Holy report's, and none is the aura's.
+        NoShield(before, 2, count, "a Holy hit beside the seal's line was named after Retribution Aura")
+    end
+    -- When a shield's line comes beside the line of your Fire spell.
+    local beside = Struck(8, "shield", true)
+    -- Then lines of two kinds do not say which is the hit's: it stays
+    -- yours, unnamed.
+    assert(beside.who == "you" and not beside.shield and beside.procSpell == nil,
+        "a hit beside a spell's line was named after a shield")
+    -- When a hit of no shield's school, or of no school read, comes with a
+    -- shield's line while a buff that is no shield is on too.
+    Buff(904, 1126, now + 600)
+    local other, unread = Struck(4, "shield"), Struck(nil, "shield")
+    -- Then neither is named after a shield or a buff.
+    assert(other.shield and other.procSpell == nil, "a hit was named after a shield of another school")
+    assert(unread.shield and unread.procSpell == nil, "a hit of no school was named after a buff")
+    -- When Thorns has run out, or a second Nature shield is on, its time
+    -- left unread.
+    Buff(901, 467, now + 1)
+    local expired = Struck(8, "shield")
+    Buff(901, 467, now + 600)
+    Buff(903, 1213834)
+    local twice = Struck(8, "shield")
+    -- Then the hit is named after none.
+    assert(expired.shield and expired.procSpell == nil, "a hit was named after a shield that had run out")
+    assert(twice.shield and twice.procSpell == nil, "a hit was named after one of two shields of its school")
+    -- When the second Nature shield's time left is read too.
+    Buff(903, 1213834, now + 600)
+    local both = Struck(8, "shield")
+    -- Then the hit is still named after neither.
+    assert(both.shield and both.procSpell == nil, "two shields of one school, both read, named a hit")
+    Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 903 } })
+    -- When a Physical shield is on beside Thorns, and a shield's miss comes,
+    -- which the client reports as Physical whatever shield caused it.
+    Buff(912, 1300680, 0)
+    Advance(4)
+    local beforeMiss, missed = #outgoing, nil
+    Event("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+    Event("COMBAT_LOG_MESSAGE", nil, "shieldMiss", 0, 0, 1)
+    Event("UNIT_COMBAT", "target", "RESIST", "", 0, 1)
+    Advance(0.02) Advance(0.5)
+    for index = beforeMiss + 1, #outgoing do
+        if outgoing[index].event == "miss" then missed = outgoing[index].result end
+    end
+    -- Then the miss is named after no shield.
+    assert(missed and missed.shield and missed.procSpell == nil, "a damage shield's miss was named after a shield")
+    Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 912 } })
+
+    -- Given values the client hides, your buffs and debuffs as a scan reads
+    -- them, and whether your target is a friend other than you.
+    local secrets, scan, debuffs, friend = {}, {}, {}, false
+    local secretCheck = issecretvalue
+    issecretvalue = function(value) return secrets[value] == true end
+    local function Secret(value)
+        secrets[value] = true
+        return value
+    end
+    local function Aura(id, spell, expires)
+        return { auraInstanceID = id, isHarmful = false, spellId = spell, icon = "icon-" .. spell,
+            name = "Spell " .. spell, expirationTime = expires }
+    end
+    C_UnitAuras.GetAuraDataByIndex = function(_, index, filter)
+        if filter == "HELPFUL" then return scan[index] end
+        return debuffs[index]
+    end
+    UnitCanAssist = function() return friend end
+    local function Hidden(payload) Event("UNIT_AURA", "player", Secret(payload or {})) end
+    local function Full() Event("UNIT_AURA", "player", { isFullUpdate = true }) end
+
+    -- When Thorns' time left cannot be read.
+    Buff(901, 467, Secret({}))
+    local unknown = Struck(8, "shield")
+    -- Then an unknown time left is no proof that it is on.
+    assert(unknown.shield and unknown.procSpell == nil, "a shield whose time left is unknown named a hit")
+
+    -- When a hidden change takes Thorns off and puts another Nature shield
+    -- on, and an enemy strikes you at once and again later.
+    Buff(901, 467, now + 600)
+    Advance(4)
+    Hidden({ isFullUpdate = false, removedAuraInstanceIDs = { 901 }, addedAuras = { Aura(905, 1213834, now + 600) } })
+    local soon, later = Struck(8, "shield", nil, true), Struck(8, "shield")
+    -- Then neither hit is named after Thorns, which the cache still holds.
+    assert(soon.shield and soon.procSpell == nil, "a hit right after a hidden change of your auras was named")
+    assert(later.shield and later.procSpell == nil, "a hit after a hidden change of your auras was named")
+
+    -- When the fight ends and a scan reads the other Nature shield and
+    -- Retribution Aura.
+    scan = { Aura(905, 1213834, now + 600), Aura(902, 7294, 0) }
+    Event("PLAYER_REGEN_ENABLED")
+    local ended = Struck(8, "shield")
+    -- Then the hit is named after the shield the scan found, not Thorns.
+    assert(ended.procSpell == 1213834, "the end of a fight did not read your shields again")
+    -- When the client still hides your auras in the frame the fight ends,
+    -- and shows them a frame later.
+    C_Secrets = { ShouldAurasBeSecret = function() return true end }
+    Event("PLAYER_REGEN_ENABLED")
+    C_Secrets = nil
+    local settled = Struck(8, "shield")
+    -- Then the hit after it is named.
+    assert(settled.procSpell == 1213834, "the end of a fight read your auras while they were hidden")
+
+    -- When a hidden change comes, and then scans that cannot read all your
+    -- buffs: the client hides the second, or the second is hidden, or its
+    -- spell is.
+    Hidden()
+    for _, blind in ipairs({ "check", "aura", "spell" }) do
+        local second = Aura(906, 1126, now + 600)
+        if blind == "aura" then Secret(second) end
+        if blind == "spell" then second.spellId = Secret({}) end
+        if blind == "check" then
+            C_Secrets = { ShouldUnitAuraIndexBeSecret = function(_, index) return index == 2 end }
+        end
+        scan[2] = second
+        Full()
+        C_Secrets = nil
+        local blinded = Struck(8, "shield")
+        -- Then hits are still not named.
+        assert(blinded.shield and blinded.procSpell == nil, "a scan blind to a buff (" .. blind .. ") named a hit")
+    end
+    -- When the buff whose spell the last scan could not read goes.
+    local faded = #auras
+    Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 906 } })
+    -- Then its fade is still shown.
+    assert(#auras == faded + 1 and auras[#auras][1] == false and auras[#auras][3] == "Spell 1126",
+        "a buff whose spell a scan could not read lost its fade notice")
+    -- When a scan reads them all, right after a hidden change.
+    scan[2] = Aura(902, 7294, 0)
+    Advance(4)
+    Hidden()
+    Full()
+    local read = Struck(8, "shield")
+    -- Then hits are named again.
+    assert(read.procSpell == 1213834, "a scan that read all your buffs did not name a hit again")
+    -- When a scan after a hidden change reads all your buffs, but a debuff
+    -- is hidden, or the client hides your debuffs, or a debuff's spell is
+    -- hidden.
+    for _, blind in ipairs({ "aura", "check", "spell" }) do
+        debuffs = {}
+        if blind == "aura" then debuffs = { Secret({}) } end
+        if blind == "spell" then
+            debuffs = { { auraInstanceID = 910, isHarmful = true, spellId = Secret({}), name = "Debuff" } }
+        end
+        if blind == "check" then
+            C_Secrets = { ShouldUnitAuraIndexBeSecret = function(_, _, filter) return filter == "HARMFUL" end }
+        end
+        Advance(4)
+        Hidden()
+        Full()
+        C_Secrets, debuffs = nil, {}
+        local debuffed = Struck(8, "shield")
+        -- Then a debuff, which is no damage shield, does not keep hits unnamed.
+        assert(debuffed.procSpell == 1213834, "a hidden debuff (" .. blind .. ") kept hits unnamed after a scan")
+    end
+
+    -- When a change is hidden in part: whether it is a full update, with no
+    -- list or beside removed auras, the list of added auras, or an aura in it.
+    for _, payload in ipairs({ { isFullUpdate = Secret({}) },
+            { isFullUpdate = Secret({}), addedAuras = Secret({}), removedAuraInstanceIDs = Secret({}) },
+            { isFullUpdate = Secret({}), addedAuras = { Aura(908, 1126, now + 600) }, removedAuraInstanceIDs = Secret({}) },
+            { isFullUpdate = false, addedAuras = Secret({}) },
+            { isFullUpdate = false, addedAuras = { Secret(Aura(907, 1126, now + 600)) } } }) do
+        Advance(4)
+        Event("UNIT_AURA", "player", payload)
+        local partly = Struck(8, "shield")
+        -- Then hits are not named until a scan.
+        assert(partly.shield and partly.procSpell == nil, "a hit after a change hidden in part was named")
+        Full()
+    end
+    -- When a readable change adds a buff that can be read but its spell.
+    local unnamedBuff = Aura(909, 1213834, now + 600)
+    unnamedBuff.spellId = Secret({})
+    Advance(4)
+    Event("UNIT_AURA", "player", { isFullUpdate = false, addedAuras = { unnamedBuff } })
+    local addedUnread = Struck(8, "shield")
+    -- Then it may be a second shield, and hits are not named until a scan.
+    assert(addedUnread.shield and addedUnread.procSpell == nil, "an added buff whose spell is hidden named a hit")
+    Full()
+    -- When a readable change adds a debuff whose spell is hidden.
+    Advance(4)
+    Event("UNIT_AURA", "player", { isFullUpdate = false, addedAuras = { { auraInstanceID = 911,
+        isHarmful = true, spellId = Secret({}), name = "Debuff" } } })
+    local addedDebuff = Struck(8, "shield")
+    -- Then a debuff, which is no damage shield, does not stop the names.
+    assert(addedDebuff.procSpell == 1213834, "an added debuff whose spell is hidden kept a shield's hit unnamed")
+    Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 911 } })
+    -- Given a known Nature shield and a permanent Holy shield.
+    scan = { Aura(905, 1213834, now + 600), Aura(902, 7294, 0) }
+    Full()
+    -- When an update hides the full flag but identifies the removed shield.
+    Event("UNIT_AURA", "player", { isFullUpdate = Secret({}), removedAuraInstanceIDs = { 905 } })
+    -- Then the removed shield gives no icon and the other shield still does.
+    local removed = Struck(8, "shield")
+    assert(removed.shield and removed.procSpell == nil,
+        "a shield named a hit after a readable removal with a hidden full flag")
+    assert(Struck(2, "shield").procSpell == 7294,
+        "a readable removal invalidated an unrelated permanent shield")
+
+    -- When an update reports a removal without readable identity.
+    for _, example in ipairs({
+        { full = Secret({}), ids = Secret({}) },
+        { full = false, ids = { Secret({}) } },
+    }) do
+        Full()
+        Event("UNIT_AURA", "player", { isFullUpdate = example.full, removedAuraInstanceIDs = example.ids })
+        -- Then a cached shield gives no icon until the next readable scan.
+        local uncertain = Struck(8, "shield")
+        assert(uncertain.shield and uncertain.procSpell == nil,
+            "an unreadable removal left a possibly removed shield eligible")
+    end
+
+    -- Given a shield identified by its self-cast during a hidden update.
+    scan = {}
+    Full()
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 467)
+    Hidden()
+    assert(Struck(8, "shield").procSpell == 467, "self-cast shield was not learned")
+    -- When a readable removal can be for that shield's unknown aura instance.
+    Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 999 } })
+    -- Then the learned spell cannot name any later hit.
+    local faded = Struck(8, "shield")
+    assert(faded.shield and faded.procSpell == nil, "a learned shield named a hit after it faded")
+
+    -- An update with no addition or removal can preserve the cached shield.
+    scan = { Aura(905, 1213834, now + 600) }
+    Full()
+    Event("UNIT_AURA", "player", { isFullUpdate = Secret({}), updatedAuraInstanceIDs = Secret({}) })
+    assert(Struck(8, "shield").procSpell == 1213834,
+        "an update without a removal invalidated the cached shield")
+
+
+    -- When a hidden change comes with a debuff's notice alone, or with a
+    -- buff's too, the notices after the change or first in its frame, the
+    -- buff's first or the debuff's; and when a debuff's notice came a moment
+    -- before the change.
+    for _, example in ipairs({ { order = "after", kinds = { "SPELL_AURA_START_HARMFUL" } },
+            { order = "first", kinds = { "SPELL_AURA_START_HARMFUL" } },
+            { order = "after", kinds = { "SPELL_AURA_START_HARMFUL", "SPELL_AURA_START" } },
+            { order = "first", kinds = { "SPELL_AURA_START_HARMFUL", "SPELL_AURA_START" } },
+            { order = "first", kinds = { "SPELL_AURA_START", "SPELL_AURA_START_HARMFUL" }, name = "buff then debuff" },
+            { order = "earlier", kinds = { "SPELL_AURA_START_HARMFUL" } } }) do
+        Advance(4)
+        local function Notices()
+            for _, kind in ipairs(example.kinds) do Event("COMBAT_TEXT_UPDATE", kind) end
+        end
+        if example.order ~= "after" then Notices() end
+        if example.order == "earlier" then Advance(0.05) end
+        Hidden()
+        if example.order == "after" then
+            Advance(0.15)
+            Notices()
+        end
+        local noticed = Struck(8, "shield")
+        -- Then a debuff alone put no shield on you; a buff may have; a
+        -- notice of another moment says nothing of the change.
+        local label = " (" .. (example.name or example.order) .. ")"
+        if example.order == "earlier" then
+            assert(noticed.shield and noticed.procSpell == nil, "a debuff's notice of an earlier moment explained a change")
+        elseif #example.kinds == 1 then
+            assert(noticed.procSpell == 1213834, "a hidden debuff kept a shield's hit unnamed" .. label)
+        else
+            assert(noticed.shield and noticed.procSpell == nil, "a hidden buff beside a debuff named a hit" .. label)
+        end
+        Full()
+    end
+
+    -- When you cast Thorns on yourself after a hidden change, with only
+    -- Retribution Aura read before; before one, with Thorns read too; on a
+    -- friend you target, before or after; when you cast a buff of yours
+    -- that is no damage shield after one, with Thorns read; and when you
+    -- cast Thorns on yourself 0.2 s before or after one.
+    for _, example in ipairs({ { order = "after", spell = 467, scan = {} },
+            { order = "before", spell = 467, scan = { Aura(901, 467, now + 600) } },
+            { order = "friend before", spell = 467, scan = {} }, { order = "friend after", spell = 467, scan = {} },
+            { order = "buff after", spell = 1126, scan = { Aura(901, 467, now + 600), Aura(904, 1126, now + 600) } },
+            { order = "before", spell = 467, scan = {}, gap = 0.2 }, { order = "after", spell = 467, scan = {}, gap = 0.2 } }) do
+        scan = { Aura(902, 7294, 0), example.scan[1], example.scan[2] }
+        Full()
+        friend = example.order:find("friend") ~= nil
+        local after = example.order:find("after") ~= nil
+        Advance(4)
+        if not after then Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example.spell) end
+        if example.gap and not after then Advance(example.gap) end
+        Hidden()
+        if example.gap and after then Advance(example.gap) end
+        if after then Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example.spell) end
+        local cast = Struck(8, "shield")
+        -- Then the cast explains the change and Thorns names the hit, but
+        -- not one cast on a friend, nor a buff that is no damage shield, nor
+        -- one of another moment, which may be another change's.
+        if example.gap then
+            assert(cast.shield and cast.procSpell == nil,
+                "Thorns cast 0.2 s " .. example.order .. " a hidden change explained it")
+        elseif example.spell ~= 467 then
+            assert(cast.shield and cast.procSpell == nil, "a buff that is no damage shield explained a hidden change")
+        elseif friend then
+            assert(cast.shield and cast.procSpell == nil,
+                "Thorns cast on a friend (" .. example.order .. ") named your shield's hit")
+        else
+            assert(cast.procSpell == 467, "Thorns cast on yourself (" .. example.order .. ") did not name its hit")
+        end
+    end
+    friend, UnitCanAssist, C_UnitAuras.GetAuraDataByIndex = false, nil, nil
+    issecretvalue = secretCheck
+    MikSBT.DAMAGE_SHIELDS = nil
+end
 engine:Stop()
 print("Adapted combat engine tests passed")
