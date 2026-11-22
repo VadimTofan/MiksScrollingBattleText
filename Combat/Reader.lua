@@ -1744,6 +1744,34 @@ local function RebuildAuras()
     reader.aurasUnsure = hidden or nil
     if not hidden then reader.auraChanges = {} end
 end
+local function RemovePlayerAuras(removed, router)
+    if not ns.Public(removed) then
+        reader.aurasUnsure = true
+        return false
+    end
+    if type(removed) ~= "table" then return false end
+    local any = false
+    for _, id in ipairs(removed) do
+        if not ns.Number(id) then
+            reader.aurasUnsure = true
+        else
+            local entry = reader.auras[id]
+            if entry then
+                any = true
+                reader.auras[id] = nil
+                if entry.spell then reader.auras["cast" .. entry.spell] = nil end
+                if router then router:Aura(false, entry.harmful, entry.name, entry.icon, entry.spell) end
+            else
+                -- A shield learned from a cast has no aura instance ID.
+                for key, cached in pairs(reader.auras) do
+                    if cached.learned then reader.auras[key] = nil end
+                end
+            end
+        end
+    end
+    return any
+end
+
 local function OnPlayerAura(info)
     if type(info) ~= "table" or not ns.Public(info) then
         reader.unreadAuraAt = Now()
@@ -1751,17 +1779,17 @@ local function OnPlayerAura(info)
         Recast()
         return
     end
+    reader.auras = reader.auras or {}
     local full = info.isFullUpdate
     if not ns.Bool(full) then
-        -- In a fight the full flag is hidden, but which lists came can be
-        -- read: removed or updated auras with no list of added ones added
-        -- none. A payload with no list at all may be a full update.
+        -- A delta can still identify a removal when the full flag is hidden.
+        -- A payload with no list at all may be a full update.
         local added, removed, updated = info.addedAuras, info.removedAuraInstanceIDs, info.updatedAuraInstanceIDs
+        RemovePlayerAuras(removed)
         local other = not ns.Public(removed) or removed ~= nil or not ns.Public(updated) or updated ~= nil
         if not ns.Public(added) or added ~= nil or not other then HiddenAuraChange() end
         return
     end
-    reader.auras = reader.auras or {}
     if full then RebuildAuras() return end
     local router = Router()
     local any = false
@@ -1801,17 +1829,7 @@ local function OnPlayerAura(info)
             end
         end
     end
-    if type(removed) == "table" and ns.Public(removed) then
-        for _, id in ipairs(removed) do
-            local entry = ns.Number(id) and reader.auras[id]
-            if entry then
-                any = true
-                reader.auras[id] = nil
-                if router then router:Aura(false, entry.harmful, entry.name, entry.icon, entry.spell) end
-            end
-        end
-    end
-    if any then reader.auraReadAt = Now() end
+    if RemovePlayerAuras(removed, router) or any then reader.auraReadAt = Now() end
 end
 
 -- A spell of yours cast in the same frame as at, and its icon (0.3.19:

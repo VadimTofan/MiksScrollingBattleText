@@ -1352,15 +1352,50 @@ do
     -- Then a debuff, which is no damage shield, does not stop the names.
     assert(addedDebuff.procSpell == 1213834, "an added debuff whose spell is hidden kept a shield's hit unnamed")
     Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 911 } })
-    -- When a change whose full flag is hidden has only removed or only
-    -- updated auras.
-    for _, list in ipairs({ "removedAuraInstanceIDs", "updatedAuraInstanceIDs" }) do
-        Advance(4)
-        Event("UNIT_AURA", "player", { isFullUpdate = Secret({}), [list] = Secret({}) })
-        local removal = Struck(8, "shield")
-        -- Then it added no shield, and hits are still named.
-        assert(removal.procSpell == 1213834, "a hidden change with " .. list .. " alone kept a shield's hit unnamed")
+    -- Given a known Nature shield and a permanent Holy shield.
+    scan = { Aura(905, 1213834, now + 600), Aura(902, 7294, 0) }
+    Full()
+    -- When an update hides the full flag but identifies the removed shield.
+    Event("UNIT_AURA", "player", { isFullUpdate = Secret({}), removedAuraInstanceIDs = { 905 } })
+    -- Then the removed shield gives no icon and the other shield still does.
+    local removed = Struck(8, "shield")
+    assert(removed.shield and removed.procSpell == nil,
+        "a shield named a hit after a readable removal with a hidden full flag")
+    assert(Struck(2, "shield").procSpell == 7294,
+        "a readable removal invalidated an unrelated permanent shield")
+
+    -- When an update reports a removal without readable identity.
+    for _, example in ipairs({
+        { full = Secret({}), ids = Secret({}) },
+        { full = false, ids = { Secret({}) } },
+    }) do
+        Full()
+        Event("UNIT_AURA", "player", { isFullUpdate = example.full, removedAuraInstanceIDs = example.ids })
+        -- Then a cached shield gives no icon until the next readable scan.
+        local uncertain = Struck(8, "shield")
+        assert(uncertain.shield and uncertain.procSpell == nil,
+            "an unreadable removal left a possibly removed shield eligible")
     end
+
+    -- Given a shield identified by its self-cast during a hidden update.
+    scan = {}
+    Full()
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 467)
+    Hidden()
+    assert(Struck(8, "shield").procSpell == 467, "self-cast shield was not learned")
+    -- When a readable removal can be for that shield's unknown aura instance.
+    Event("UNIT_AURA", "player", { isFullUpdate = false, removedAuraInstanceIDs = { 999 } })
+    -- Then the learned spell cannot name any later hit.
+    local faded = Struck(8, "shield")
+    assert(faded.shield and faded.procSpell == nil, "a learned shield named a hit after it faded")
+
+    -- An update with no addition or removal can preserve the cached shield.
+    scan = { Aura(905, 1213834, now + 600) }
+    Full()
+    Event("UNIT_AURA", "player", { isFullUpdate = Secret({}), updatedAuraInstanceIDs = Secret({}) })
+    assert(Struck(8, "shield").procSpell == 1213834,
+        "an update without a removal invalidated the cached shield")
+
 
     -- When a hidden change comes with a debuff's notice alone, or with a
     -- buff's too, the notices after the change or first in its frame, the
