@@ -947,6 +947,31 @@ local function AmbiguousDirectResult(self, key, school, now, bestScore)
     return AmbiguousResult(self, owner, mixedOwners, false)
 end
 
+-- A recipient can be settled only from a report the cast could produce.
+-- A projectile cannot corroborate a recipient in its own cast frame.
+function Mine:CanSettle(cast, key, kind, school, now)
+    local facts = self.facts(cast.spell)
+    if type(facts) == "table" and facts.travels then return false end
+    for _, entry in ipairs(self.pending) do
+        if entry.cast == cast and not entry.used
+            and (kind == "miss" or DirectCandidateScore(self, entry, key, school, now)) then
+            return true
+        end
+    end
+    return false
+end
+
+function Mine:Settle(cast, key)
+    cast.key, cast.targetUncertain, cast.candidates = key, false, nil
+    for _, list in ipairs({ self.pending, self.dots }) do
+        for _, entry in ipairs(list) do
+            if entry.cast == cast then
+                entry.key, entry.targetUncertain = key, false
+            end
+        end
+    end
+end
+
 local function RememberAmount(self, spell)
     local amount = self.amountNow
     if self.lineNow ~= true or self.ambiguous or type(amount) ~= "number" or amount <= 0 then return end
