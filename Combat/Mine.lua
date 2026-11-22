@@ -674,6 +674,12 @@ function Mine:SwingsBefore(key, now, stray)
     return found
 end
 
+function Mine:SwingMatchDeadline(swing)
+    local _, usualLate = self:MeleeWindow(swing.hand)
+    local lag = self:SwingDelay(swing.hand) or USUAL_DELAY
+    return swing.at + math.max(usualLate, lag + DELAYED_TO)
+end
+
 -- Optional diagnostics observe the same windows without tidying or spending.
 function Mine:AccountingSwingChecks(key, at)
     if self.accountingEnabled ~= true then return nil end

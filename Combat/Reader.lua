@@ -526,7 +526,7 @@ local function NoteStranger(key, at)
     for other, seen in pairs(reader.strangers) do
         if at - seen > STRANGER_QUIET then reader.strangers[other] = nil end
     end
-    reader.strangers[key] = at
+    reader.strangers[key] = math.max(reader.strangers[key] or at, at)
 end
 local function Alone(key, at)
     local party, raid = IsInGroup and IsInGroup(), IsInRaid and IsInRaid()
@@ -989,6 +989,29 @@ local function TakeSwing(hit, line, swing)
     ns.mine.pairedSwing = swing
 end
 
+local function StraySwingDeadline(swing)
+    return ns.mine:SwingMatchDeadline(swing) + LATE_LINE + MISS_SETTLE
+end
+
+-- Let an in-window report spend the swing before committing a fallback.
+local function DeferStraySwing(hit)
+    local line, swing = StraySwingLine(hit)
+    if not line then return false end
+    local deadline = StraySwingDeadline(swing)
+    C_Timer.After(math.max(0, deadline - Now()), function()
+        if not reader.pendingHits[hit] then return end
+        local availableLine, availableSwing = SwingLine(hit, true)
+        if availableLine == line and availableSwing == swing and Alone(hit.key, Now()) then
+            TakeSwing(hit, line, swing)
+            ConfirmingEvidence(hit, line)
+            ns.DecideHit(hit, true, LineRestrict(line))
+        else
+            ns.DecideHit(hit, false)
+        end
+    end)
+    return true
+end
+
 -- Hits that fit a line of yours equally well, with fewer such lines than
 -- hits: the others are yours too where a swing of yours with no hit yet
 -- covers each of them, while Alone. A swing's hit held back one more
@@ -997,23 +1020,47 @@ end
 -- (1.60.1.70959). Which hit is which stays open, so none is named
 -- (Mine:ConfirmUnidentified).
 local function SettleTie(hits, lines, Decide)
-    local need, taken = #hits - lines, {}
+    local need, matches, swings, deadline = #hits - lines, {}, {}, Now()
     for _, hit in ipairs(hits) do
-        if #taken < need and Alone(hit.key, hit.at) then
-            local line = SwingLine(hit, true)
-            if line then
+        if #matches < need and Alone(hit.key, hit.at) then
+            local line, swing = SwingLine(hit, true)
+            if line and not swings[swing] then
                 line.claimed = true
-                taken[#taken + 1] = line
+                swings[swing] = true
+                matches[#matches + 1] = { hit = hit, line = line, swing = swing }
+                deadline = math.max(deadline, StraySwingDeadline(swing))
             end
         end
     end
-    if #taken < need then
-        for _, line in ipairs(taken) do line.claimed = nil end
-        return false
+    for _, match in ipairs(matches) do match.line.claimed = nil end
+    if #matches < need then return false end
+
+    for _, hit in ipairs(hits) do hit.unidentified = true end
+    local function DecideTie()
+        if not reader.pendingHits[hits[1]] then return end
+        local confirmed = true
+        for _, match in ipairs(matches) do
+            local hit, line, swing = match.hit, match.line, match.swing
+            if line.claimed or line.hit or swing.used or swing.key ~= hit.key
+                or not Alone(hit.key, Now()) then
+                confirmed = false
+                break
+            end
+        end
+        if confirmed then
+            for _, match in ipairs(matches) do
+                match.line.claimed, match.swing.used = true, true
+            end
+        end
+        for _, hit in ipairs(hits) do
+            hit.unidentified = confirmed
+            Decide(hit, confirmed)
+        end
     end
-    for _, hit in ipairs(hits) do
-        hit.unidentified = true
-        Decide(hit, true)
+    if deadline > Now() then
+        C_Timer.After(deadline - Now(), DecideTie)
+    else
+        DecideTie()
     end
     return true
 end
@@ -1089,7 +1136,7 @@ function DecideGroup(group, frameLines, decided, settled)
         if not PeriodicLine(line) then ordinary[#ordinary + 1] = line end
     end
     for _, line in ipairs(frameLines) do
-        if PeriodicLine(line) then
+        if PeriodicLine(line) and not line.claimed then
             local best, score, tied, tie
             for index, hit in ipairs(remaining) do
                 local fit
@@ -1123,9 +1170,17 @@ function DecideGroup(group, frameLines, decided, settled)
                 return
             elseif tied and periodicConfirmations < #group then
                 line.claimed, best = true, nil
-                -- One of them is the tick; a swing may cover the other.
+                local tickLines = { line }
+                if #tie == #remaining then
+                    for _, spare in ipairs(frameLines) do
+                        if #tickLines < #tie and not spare.claimed and PeriodicLine(spare) then
+                            tickLines[#tickLines + 1] = spare
+                        end
+                    end
+                end
                 for _, hit in ipairs(tie) do hit.tied = true end
-                if SettleTie(tie, 1, Decide) then
+                if SettleTie(tie, #tickLines, Decide) then
+                    for _, ownLine in ipairs(tickLines) do ownLine.claimed = true end
                     for _, hit in ipairs(tie) do
                         for index = #remaining, 1, -1 do
                             if remaining[index] == hit then table.remove(remaining, index) end
@@ -1220,14 +1275,8 @@ function DecideGroup(group, frameLines, decided, settled)
                 -- 0.3.49: a miss's report can come a frame after its line
                 -- (DecideLateMiss).
                 C_Timer.After(LATE_LINE, function() ns.DecideLateMiss(hit) end)
-            else
-                local strayLine, straySwing = StraySwingLine(hit)
-                if strayLine then
-                    TakeSwing(hit, strayLine, straySwing)
-                    Decide(hit, true, LineRestrict(strayLine), strayLine)
-                else
-                    Decide(hit, false)
-                end
+            elseif not DeferStraySwing(hit) then
+                Decide(hit, false)
             end
         end
     else
@@ -1277,12 +1326,7 @@ function DecideGroup(group, frameLines, decided, settled)
         end
         if named < lines then SettleTie(tie, lines - named, Decide) end
         for _, hit in ipairs(group) do
-            local strayLine, straySwing
-            if not flags[hit] then strayLine, straySwing = StraySwingLine(hit) end
-            if strayLine then
-                TakeSwing(hit, strayLine, straySwing)
-                Decide(hit, true, LineRestrict(strayLine), strayLine)
-            elseif not hit.unidentified then
+            if not hit.unidentified and (flags[hit] or not DeferStraySwing(hit)) then
                 Decide(hit, flags[hit], restrict)
             end
         end
@@ -1318,11 +1362,7 @@ function ns.DecideLate(hit)
             best, bestGap = line, math.abs(gap)
         end
     end
-    if not best then
-        local swing
-        best, swing = StraySwingLine(hit)
-        if best then TakeSwing(hit, best, swing) end
-    end
+    if not best and DeferStraySwing(hit) then return end
     if best then best.claimed = true end
     ConfirmingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
@@ -1344,11 +1384,7 @@ function ns.DecideLateMiss(hit)
             best, bestGap = line, math.abs(gap)
         end
     end
-    if not best then
-        local swing
-        best, swing = StraySwingLine(hit)
-        if best then TakeSwing(hit, best, swing) end
-    end
+    if not best and DeferStraySwing(hit) then return end
     if best then best.claimed = true end
     ConfirmingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)

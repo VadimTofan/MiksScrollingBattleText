@@ -232,7 +232,7 @@ local function SwingHit(at, late)
     Swing()
     At(at + late)
     local amount = Report()
-    At(at + late + 0.5)
+    At(math.max(at + 1.9, at + late + 0.5))
     return Result(amount)
 end
 
@@ -254,6 +254,73 @@ Replay("a swing's hit outside its learned times is its swing's while you fight a
             end)
         end
     end
+end)
+
+Replay("normal swing reports outrank an earlier tentative report", function()
+    for _, delay in ipairs({ 0.76, 1.1 }) do
+        Company("alone", function()
+            -- Given a learned swing delay and an actual native swing.
+            local start = LearnedDelay()
+            Swing()
+
+            -- When an unrelated report precedes the actual swing report.
+            At(start + 0.43)
+            local unrelated = Report()
+            At(start + delay)
+            local own = Report()
+            At(start + 2)
+
+            -- Then the real report keeps the native swing's confirmation.
+            assert(Result(unrelated).who == "unknown", "early report stole the swing")
+            assert(Result(own).who == "you" and Result(own).melee, "normal swing went unshown")
+        end)
+    end
+end)
+
+Replay("a tentative periodic tie cannot reserve a later confirmed swing", function()
+    Company("alone", function()
+        -- Given a due Rend tick and an outstanding swing.
+        local start = LearnedDelay()
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 772)
+        At(start + 2)
+        Swing()
+
+        -- When the tie arrives first and the real swing follows in its delayed window.
+        At(start + 3)
+        Line("tick")
+        local first, second = Report(), Report()
+        At(start + 3.3)
+        local own = Report()
+        At(start + 4)
+
+        -- Then the actual swing keeps its confirmation and the tie stays unresolved.
+        assert(Result(own).who == "you" and Result(own).melee, "periodic tie took the real swing")
+        assert(Result(first).who == "unknown" and Result(second).who == "unknown")
+    end)
+end)
+
+Replay("a periodic tie counts all available tick lines", function()
+    Company("alone", function()
+        -- Given a due Rend tick and an outstanding swing.
+        local start = LearnedDelay()
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 772)
+        At(start + 2)
+        Swing()
+
+        -- When three same-frame reports tie for two periodic confirmations.
+        At(start + 3)
+        Line("tick")
+        Line("tick")
+        local first, second, third = Report(), Report(), Report()
+        At(start + 4)
+
+        -- Then the two lines and the swing cover three plain amounts.
+        for _, amount in ipairs({ first, second, third }) do
+            local result = Result(amount)
+            assert(result.who == "you" and not result.spell and not result.melee,
+                "a periodic line was left unused")
+        end
+    end)
 end)
 
 Replay("a miss of a swing outside its learned times is shown while you fight alone", function()
@@ -447,7 +514,7 @@ Replay("a late swing's hit is found while a bolt of yours is in flight", functio
     end)
 end)
 
-Replay("a proc after a late swing's hit is found by that hit", function()
+Replay("a separately confirmed proc can coexist with a tentative swing", function()
     Company("alone", function()
         -- Given a swing whose hit came before the swing's time.
         local start = LearnedDelay()
@@ -458,7 +525,7 @@ Replay("a proc after a late swing's hit is found by that hit", function()
         -- When a proc's line follows, and the proc's hit comes after the swing's hit.
         At(start + 0.46)
         Line("spell")
-        At(start + 0.8)
+        At(start + 0.65)
         local proc = Report()
         At(start + 2)
 
