@@ -346,8 +346,8 @@ function ns.MatchHealing(key, now, tick, confirmed)
 	return { who = best.who, spell = best.spell, tick = tick }
 end
 
-function ns.TagIncomingHeal(record, unit, now)
-	local result = ns.MatchHealing(unit, now, record.tick, nil)
+function ns.TagIncomingHeal(record, unit, now, confirmed)
+	local result = ns.MatchHealing(unit, now, record.tick, confirmed)
 	if not result then return end
 	record.selfHeal = unit == "player" and result.who == "you"
 	record.spell = result.spell

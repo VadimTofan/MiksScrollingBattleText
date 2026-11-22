@@ -364,6 +364,64 @@ targetIsPlayer = false
 Event("PLAYER_TARGET_CHANGED")
 
 do
+    -- Given a Forever player casting Mend Pet with an enemy selected.
+    local ns = MikSBT.CombatEngine
+    local compatibility = MikSBT.Compatibility
+    local helpful = C_Spell.IsSpellHelpful
+    local getSpellName = C_Spell.GetSpellName
+    MikSBT.Compatibility = { Client = { isForever = true } }
+    dofile("Combat/HealSpells.lua")
+    local mendPet = 136
+    C_Spell.IsSpellHelpful = function(spell)
+        return spell == mendPet or helpful(spell)
+    end
+    C_Spell.GetSpellName = function(spell)
+        return spell == mendPet and "Mend Pet" or getSpellName(spell)
+    end
+    petExists = true
+
+    for _, case in ipairs({
+        { timing = "without confirmation" },
+        { timing = "with a same-frame line", confirmed = true },
+        { timing = "with a late line", confirmed = true, late = true },
+    }) do
+        ns.ResetHealing()
+        Advance(5)
+        Event("UNIT_SPELLCAST_SENT", "player", "", "mend-pet-first-tick", mendPet)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "mend-pet-first-tick", mendPet)
+        Advance(1)
+        local beforeOut, beforeIn = #outgoing, #incoming
+
+        -- When the first heal arrives before the cadence can be learned.
+        Event("UNIT_COMBAT", "pet", "HEAL", "", 68, 2)
+        if case.late then Advance(0.05) end
+        if case.confirmed then Event("COMBAT_LOG_MESSAGE", nil, "hot") end
+        Advance(0)
+        Advance(0.13)
+
+        -- Then a confirmed tick uses Mend Pet in both displays.
+        assert(#incoming == beforeIn + 1, case.timing)
+        local received = incoming[#incoming]
+        if case.confirmed then
+            assert(received.spell == mendPet and received.icon == "icon-136"
+                and received.tick, "first incoming Mend Pet tick lost its icon " .. case.timing)
+            assert(#outgoing == beforeOut + 1, case.timing)
+            local sent = outgoing[#outgoing]
+            assert(sent.result.spell == mendPet and sent.result.tick, case.timing)
+        else
+            assert(received.spell == nil and received.icon == nil, case.timing)
+            assert(#outgoing == beforeOut, case.timing)
+        end
+    end
+
+    ns.ResetHealing()
+    petExists = false
+    C_Spell.IsSpellHelpful = helpful
+    C_Spell.GetSpellName = getSpellName
+    MikSBT.Compatibility = compatibility
+end
+
+do
     -- Given a helpful player cast while their pet is selected.
     local ns = MikSBT.CombatEngine
     local isUnit = UnitIsUnit
