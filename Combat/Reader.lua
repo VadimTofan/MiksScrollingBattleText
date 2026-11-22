@@ -149,7 +149,7 @@ local function LineRestrict(line)
 end
 local EARLY_LINE, LATE_LINE = 0.35, 0.12
 
-local function OutgoingLocalHeal(record, unit, at, result)
+local function FindLocalHealLine(at)
     local best, distance
     for _, line in ipairs(reader.logLines or {}) do
         local gap = line.at - at
@@ -160,24 +160,43 @@ local function OutgoingLocalHeal(record, unit, at, result)
             best, distance = line, math.abs(gap)
         end
     end
-    if not best and ns.EventAvailable("COMBAT_LOG_MESSAGE") then return end
-    local tick = record.tick
-    if best then tick = LineRestrict(best) == "tick" end
-    result = result or ns.MatchHealing(unit, at, tick, true)
+    return best
+end
+
+local function SendOutgoingLocalHeal(live, record, at, result, line, tick)
     if not result then return end
-    local live = Router()
-    if not live then return end
     local outgoing = {}
     for field, value in pairs(record) do outgoing[field] = value end
     -- Pet here describes the recipient, not the caster.
     outgoing.pet, outgoing.selfHeal = nil, nil
     outgoing.tick = tick
     outgoing.result = { who = result.who, spell = result.spell, tick = tick }
-    if best then
-        best.claimed, best.hit = true, { at = at, record = outgoing }
+    if line then
+        line.claimed, line.hit = true, { at = at, record = outgoing }
     end
     live:Out(outgoing)
 end
+
+local function OutgoingLocalHeal(record, unit, at, result)
+    local line = FindLocalHealLine(at)
+    if not line and ns.EventAvailable("COMBAT_LOG_MESSAGE") then return end
+    local tick = record.tick
+    if line then tick = LineRestrict(line) == "tick" end
+    result = result or ns.MatchHealing(unit, at, tick, true)
+    local live = Router()
+    if live then SendOutgoingLocalHeal(live, record, at, result, line, tick) end
+end
+
+local function PresentForeverLocalHeal(live, record, unit, at)
+    local line = FindLocalHealLine(at)
+    local inferredTick = record.tick
+    if line then record.tick = LineRestrict(line) == "tick" end
+    local result = ns.TagIncomingHeal(record, unit, at, line and true)
+    if not result then record.tick = inferredTick end
+    live:In(record)
+    if line then SendOutgoingLocalHeal(live, record, at, result, line, record.tick) end
+end
+
 local function RecordClass(record) return record and (record.event == "miss" and "miss" or record.event) end
 -- Whether a line of yours may be the one of this hit (any hit without one):
 -- a grey line (no kinds) any; a coloured one only a hit of its class.
@@ -322,6 +341,16 @@ local function OnUnitCombat(unit, event, flag, amount, school)
             record.blocked, record.blockedAmount = true, reader.shieldBlock
         end
         if record.event == "heal" then
+            local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+            if client and client.isForever and ns.HEAL_SPELLS
+                and ns.EventAvailable("COMBAT_LOG_MESSAGE") then
+                -- The first tick has no cadence yet. Wait for a log line
+                -- so both displays can use its classification and spell.
+                ns.Timer.After(LATE_LINE, function()
+                    PresentForeverLocalHeal(router, record, unit, now)
+                end)
+                return
+            end
             -- A heal can arrive before its cast succeeds in the same frame.
             -- Resolve the spell before presentation copies the record.
             C_Timer.After(0, function()

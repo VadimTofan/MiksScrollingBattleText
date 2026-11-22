@@ -1,0 +1,145 @@
+import argparse
+import os
+import re
+import unittest
+from pathlib import Path
+
+from tests.lua_test_runner import run_lua_test
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+# Describe: your own heals keep their spell by the client's heal facts.
+class OwnHealIconTests(unittest.TestCase):
+    def test_own_heals_and_ticks_keep_their_spell_in_every_language(self):
+        # Given
+        script = "own_heal_icons.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_the_heal_table_matches_its_generator_and_loads(self):
+        # Given
+        from scripts import generate_heal_spells as generator
+
+        table = (ROOT / "Combat" / "HealSpells.lua").read_text(encoding="utf-8")
+
+        def effect(spell, kind, aura="0", period="0", target="1", difficulty="0"):
+            return {"SpellID": spell, "Effect": kind, "EffectAura": aura, "EffectAuraPeriod": period,
+                    "ImplicitTarget_0": target, "DifficultyID": difficulty}
+
+        effects = [
+            effect("774", "6", "8", "3000", "21"),
+            effect("774", "6", "4", target="5"),
+            effect("8936", "10", target="21"),
+            effect("8936", "6", "8", "3000", "21"),
+            effect("740", "35", "8", "2000"),
+            effect("633", "67", target="21"),
+            effect("7500", "75", target="21"),
+            effect("13600", "136", target="21"),
+            effect("755", "6", "8", "1000", "5"),
+            effect("755", "6", "10", target="5"),
+            effect("1181", "6", "8", "0"),
+            effect("20000", "6", "20", "1000"),
+            effect("768", "6", "23", "5000"),
+            effect("20473", "3", target="25"),
+            effect("783", "6", "4"),
+            effect("9000", "10", difficulty="1"),
+        ]
+        misc = [
+            {"SpellID": "774", "DurationIndex": "29", "DifficultyID": "0"},
+            {"SpellID": "8936", "DurationIndex": "9", "DifficultyID": "0"},
+            {"SpellID": "8936", "DurationIndex": "1", "DifficultyID": "1"},
+            {"SpellID": "740", "DurationIndex": "21", "DifficultyID": "0"},
+            {"SpellID": "30000", "DurationIndex": "0", "DifficultyID": "0"},
+        ]
+        durations = [
+            {"ID": "1", "Duration": "10000"},
+            {"ID": "9", "Duration": "21000"},
+            {"ID": "21", "Duration": "-1"},
+            {"ID": "29", "Duration": "12000"},
+        ]
+        spells = [
+            {"ID": "774", "Description_lang": "Heals the target for 756 over 12 sec."},
+            {"ID": "20473", "Description_lang": "Blasts the target, causing 182 Holy damage to an enemy, or 156 healing to an ally."},
+            {"ID": "783", "Description_lang": "Shapeshift into Travel Form, increasing movement speed by 40%."},
+            {"ID": "768", "Description_lang": "Shapeshift into Cat Form, increasing Attack Power by 40 plus Agility."},
+        ]
+
+        # When
+        found, unknown, last = generator.heal_facts(effects, misc, durations, spells)
+        rendered = generator.render(found, unknown, last, "test")
+
+        # Then
+        self.assertNotIn(9000, found, "a heal of another difficulty is listed")
+        self.assertNotIn(1181, found, "a periodic heal without a period is listed")
+        for spell, kind in ((633, 67), (7500, 75), (13600, 136)):
+            self.assertEqual(found.get(spell), (1, 0, 0, 0), "effect %d is not read as a heal at once" % kind)
+        self.assertEqual(found.get(755), (0, 1000, 0, 1), "a heal on the pet is not marked")
+        self.assertEqual(found.get(774), (0, 3000, 12000, 0), "a heal on a friend is marked as one on the pet")
+        self.assertEqual(found.get(20000), (0, 1000, 0, 0), "a periodic heal for a percentage is not read as a HoT")
+        self.assertEqual(found.get(740), (0, 2000, 0, 0), "an unlimited duration is not written as 0")
+        self.assertEqual(found.get(8936), (1, 3000, 21000, 0), "a duration of another difficulty is taken")
+        self.assertIn(20473, unknown, "a heal through a dummy effect is not unknown")
+        self.assertNotIn(783, unknown, "a form with a dummy effect is unknown")
+        self.assertNotIn(774, unknown, "a spell whose own effects heal is unknown")
+        self.assertEqual(last, 30000, "the highest spell id is wrong")
+        self.assertIn("    [633]={1,0,0,0}, [740]={0,2,0,0}, [755]={0,1,0,1}, [774]={0,3,12,0}, [7500]={1,0,0,0},"
+                      " [8936]={1,3,21,0},\n    [13600]={1,0,0,0}, [20000]={0,1,0,0},\n}\n", rendered, "the heal facts are not written")
+        self.assertIn("MikSBT.CombatEngine.HEAL_SPELLS_UNKNOWN = {\n    [20473]=true,\n}\n", rendered,
+                      "the unknown spells are not written")
+        self.assertIn("MikSBT.CombatEngine.HEAL_SPELLS_LAST = 30000\n", rendered, "the highest spell id is not written")
+        self.assertTrue(table.startswith("-- Generated by scripts/generate_heal_spells.py"),
+                        "Combat/HealSpells.lua is not the generated table")
+        self.assertIn("[8936]={1,3,21,0},", table, "Combat/HealSpells.lua lacks the facts of Regrowth")
+        for toc in ("MikScrollingBattleText.toc", "MikScrollingBattleText_Camelot.toc"):
+            lines = (ROOT / toc).read_text(encoding="utf-8-sig").splitlines()
+            self.assertIn("Combat\\HealSpells.lua", lines, toc + " does not load the heal table")
+            self.assertLess(lines.index("Combat\\Context.lua"), lines.index("Combat\\HealSpells.lua"),
+                            toc + " loads the heal table before Context.lua")
+            self.assertLess(lines.index("Combat\\HealSpells.lua"), lines.index("Combat\\Healing.lua"),
+                            toc + " loads the heal table after Healing.lua")
+
+    def test_the_heal_table_names_the_build_of_its_source(self):
+        # Given
+        from scripts import generate_heal_spells as generator
+
+        root = Path(__file__).resolve().parents[1]
+        lines = (root / "Combat" / "HealSpells.lua").read_text(encoding="utf-8").splitlines()
+
+        # When
+        start = lines.index("MikSBT.TABLE_BUILDS = MikSBT.TABLE_BUILDS or {}")
+        build = re.search(r'build = "([^"]*)"', lines[start + 1]).group(1)
+        header = re.search(r"build (\d+\.\d+\.\d+\.\d+)[.,]", "\n".join(lines[:start]))
+
+        # Then
+        self.assertEqual(lines[start:start + 2], generator.registration(build))
+        self.assertEqual(lines.count(lines[start]), 1)
+        self.assertRegex(build, generator.BUILD_PATTERN)
+        self.assertEqual(header and header.group(1), build, "the header names another build than the entry")
+        self.assertTrue((root / generator.SCRIPT).is_file())
+        with self.assertRaises(argparse.ArgumentTypeError):
+            generator.build_argument("test")
+
+    @unittest.skipUnless(os.environ.get("MSBT_CSV_DIR"),
+                         "MSBT_CSV_DIR names no folder with the CSV files of the table's build")
+    def test_the_shipped_heal_table_is_what_its_generator_writes(self):
+        # Given
+        from scripts import generate_heal_spells as generator
+
+        root = Path(__file__).resolve().parents[1]
+        table = (root / "Combat" / "HealSpells.lua").read_text(encoding="utf-8")
+        build = re.search(r'TABLE_BUILDS\.\w+ = \{[^}]*build = "([^"]*)"', table).group(1)
+
+        # When
+        written = generator.generate(Path(os.environ["MSBT_CSV_DIR"]), build)
+
+        # Then
+        self.assertEqual(table, written, "regenerate with the CSV files of build " + build)
+
+
+if __name__ == "__main__":
+    unittest.main()
