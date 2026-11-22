@@ -11,6 +11,13 @@ LoadFile("Libs/LibSerialize.lua")
 LoadFile("Libs/LibDeflate.lua")
 
 local function Noop() end
+local function CopyTable(source)
+	local copy = {}
+	for key, value in pairs(source) do
+		copy[key] = type(value) == "table" and CopyTable(value) or value
+	end
+	return copy
+end
 local frame
 function CreateFrame()
 	local created = setmetatable({ scripts = {} }, {
@@ -43,6 +50,7 @@ MikSBT = {
 	} },
 	GetSkillName = function(id) return "Spell " .. tostring(id) end,
 	Print = Noop,
+	CopyTable = CopyTable,
 	EraseTable = function(value) for key in pairs(value) do value[key] = nil end end,
 	SplitString = function(value, pattern, target)
 		for part in value:gmatch("[^.]+") do target[#target + 1] = part end
@@ -69,12 +77,10 @@ local environment = setmetatable({}, {
 local sourceFile = assert(io.open("MSBTProfiles.lua", "rb"))
 local source = sourceFile:read("*a"):gsub("^\239\187\191", "")
 sourceFile:close()
-local optionsFile = assert(io.open("MSBTOptions/MSBTOptionsTabs.lua", "rb"))
-local optionsSource = optionsFile:read("*a")
-optionsFile:close()
 local exports = {}
-for _, classic in ipairs({ false, true }) do
-	MikSBT.Compatibility.Client.isClassicContent = classic
+for _, forever in ipairs({ false, true }) do
+	MikSBT.Compatibility.Client.isClassicContent = forever
+	MikSBT.Compatibility.Client.isForever = forever
 	frame = nil
 	local chunk = assert(loadstring(source, "@MSBTProfiles.lua"))
 	setfenv(chunk, environment)
@@ -106,6 +112,26 @@ for _, classic in ipairs({ false, true }) do
 	assert(profiles.currentProfile.inferredWindfuryIcons == nil,
 		"existing profile inherited a retired preference")
 	profiles.SelectProfile("Default")
+
+	if forever then
+		-- Given only Blizzard is showing resource gains.
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", true)
+		CombatTextTypeInfo = {
+			ENERGIZE = { show = 1, cvar = "floatingCombatTextEnergyGains_v2" },
+		}
+
+		-- When the player enables MSBT Resource Gains from the Events settings.
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", false)
+
+		-- Then the native renderer is suppressed immediately.
+		assert(CombatTextTypeInfo.ENERGIZE.show == nil,
+			"the resource switch left the native renderer active")
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", true)
+		assert(CombatTextTypeInfo.ENERGIZE.show == 1)
+		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", false)
+		CombatTextTypeInfo = nil
+	end
+
 	assert(defaults.lowHealthSoundDisabled == false,
 		"low-health sounds are not enabled by default")
 	assert(defaults.lowManaSoundDisabled == false,
@@ -241,18 +267,89 @@ for _, classic in ipairs({ false, true }) do
 	assert(not auraTransfer:Validate(auraPayload))
 	auraPayload.sections.SpamControl.auraTracking["name:"] = nil
 
-	-- Given every event offered by the actual options list on this client.
-	for eventType in optionsSource:gmatch(
-		'EventsTab_AddEvent%([^,]+,%s*"([A-Z_]+)"') do
-		-- When the list resolves settings from the active profile.
-		local eventSettings = profiles.currentProfile.events[eventType]
+	-- Given the real options module on this client.
+	local previousOptions = MSBTOptions
+	MikSBT.translations = {}
+	LoadFile("MSBTOptions/Localization/localization.lua")
+	MSBTOptions.Main = { AddTab = Noop }
+	MSBTOptions.Popups = {}
+	LoadFile("MSBTOptions/MSBTOptionsTabs.lua")
+	MikSBT.translations = translations
 
-		-- Then its rendering/editing controls have a complete settings object.
-		assert(type(eventSettings) == "table",
-			"missing options event defaults: " .. eventType
-				.. " (classic=" .. tostring(classic) .. ")")
-		assert(type(eventSettings.message) == "string",
-			"missing options event message: " .. eventType)
+	-- When each Events category resolves its rows.
+	local eventOptions = MSBTOptions.Tabs.events
+	MSBTOptions = previousOptions
+	local outgoing = {}
+	local abilityReady
+	for _, category in ipairs({
+		"INCOMING_PLAYER_EVENTS", "INCOMING_PET_EVENTS", "OUTGOING_PLAYER_EVENTS",
+		"OUTGOING_PET_EVENTS", "NOTIFICATION_EVENTS",
+	}) do
+		for _, row in ipairs(eventOptions.GetEvents(category)) do
+			-- Then each row has a complete settings object.
+			local settings = eventOptions.GetSettings(row.eventType)
+			assert(type(settings) == "table",
+				"missing options event defaults: " .. row.eventType)
+			assert(type(settings.message) == "string",
+				"missing options event message: " .. row.eventType)
+			if category == "OUTGOING_PLAYER_EVENTS" then
+				outgoing[row.eventType] = row
+			end
+			if category == "NOTIFICATION_EVENTS"
+				and row.eventType == "NOTIFICATION_ABILITY_READY" then
+				abilityReady = settings
+			end
+		end
+	end
+	assert(abilityReady and abilityReady.disabled
+		and abilityReady.soundFile == "MSBT Cooldown",
+		"Ability Ready should be opt-in with the original cooldown sound")
+	-- Then only Forever offers ranged swing settings, enabled by default.
+	for _, suffix in ipairs({ "DAMAGE", "DAMAGE_CRIT", "MISS" }) do
+		local eventType = "OUTGOING_RANGED_" .. suffix
+		assert((outgoing[eventType] ~= nil) == forever,
+			"wrong client for ranged swing option: " .. eventType)
+		assert((defaults.events[eventType] ~= nil) == forever, eventType)
+		assert(not outgoing["OUTGOING_AUTO_SHOT_" .. suffix])
+		if forever then
+			local settings = eventOptions.GetSettings(eventType)
+			assert(not settings.disabled and settings.textCategory == "Outgoing", eventType)
+			assert(settings.scrollArea == "Outgoing", eventType)
+			assert(not not settings.isCrit == (suffix == "DAMAGE_CRIT"), eventType)
+		end
+	end
+
+	if forever then
+		-- Given saved Skill settings and an explicitly enabled Auto Shot preview.
+		profiles.savedVariables.profiles.LegacyRanged = {
+			creationVersion = "12.054.0",
+			events = {
+				OUTGOING_SPELL_DAMAGE = { soundFile = 5678901 },
+				OUTGOING_SPELL_MISS = { disabled = true },
+				OUTGOING_AUTO_SHOT_DAMAGE_CRIT = { disabled = false, soundFile = 5678902 },
+			},
+		}
+
+		-- When the saved profile is selected and upgraded.
+		profiles.SelectProfile("LegacyRanged")
+
+		-- Then ranged outcomes retain their previously effective settings.
+		local hit = "OUTGOING_RANGED_DAMAGE"
+		assert(eventOptions.GetSettings(hit).soundFile == 5678901)
+		assert(eventOptions.GetSettings("OUTGOING_RANGED_DAMAGE_CRIT").soundFile == 5678902)
+		assert(eventOptions.GetSettings("OUTGOING_RANGED_MISS").disabled)
+		eventOptions.SaveOption(hit, "disabled", true)
+		eventOptions.SaveOption(hit, "soundFile", 5678903)
+		profiles.SelectProfile("LegacyRanged")
+		assert(eventOptions.GetSettings(hit).disabled)
+		assert(eventOptions.GetSettings(hit).soundFile == 5678903)
+		assert(eventOptions.GetSettings("OUTGOING_SPELL_DAMAGE").soundFile == 5678901)
+		local exported = assert(profiles.ExportProfile("LegacyRanged"))
+		local payload = assert(legacyTransfer:Decode(exported))
+		assert(payload.sections.Events[hit].soundFile == 5678903)
+		assert(payload.sections.Events.OUTGOING_AUTO_SHOT_DAMAGE_CRIT == nil)
+		assert(payload.sections.General.rangedEventsMigrated == nil)
+		profiles.SelectProfile("Default")
 	end
 
 	-- Given the loaded defaults for a buff ending on either client branch.

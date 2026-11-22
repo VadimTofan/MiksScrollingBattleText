@@ -649,7 +649,13 @@ end
 -- to RANGED_WINDOW before it. Nothing is changed; the reader looks for the
 -- line that came with one (Reader.lua, SwingLine) and hands it back as
 -- self.pairedSwing for the hit's decision.
-function Mine:SwingsBefore(key, now)
+-- With stray, also a melee swing whose hit comes at neither of its times:
+-- anywhere from SWING_MIN to the end of the delayed window. A druid's swings
+-- in Cat Form were reported 0.43, 0.77 or 1.0 s after their lines; once 0.76 s
+-- was learned, the first came before the window and the last between the two
+-- (1.60.1.70959). The reader asks so only once nothing else placed the hit
+-- and nobody else is seen to strike the unit (Reader.lua, StraySwingLine).
+function Mine:SwingsBefore(key, now, stray)
     local found = {}
     if not key then return found end
     for _, swing in ipairs(self.swings) do
@@ -661,10 +667,17 @@ function Mine:SwingsBefore(key, now)
             local early, late = self:MeleeWindow(swing.hand)
             local lag = self:SwingDelay(swing.hand) or USUAL_DELAY
             fits = (since >= early and since <= late) or (since >= lag + DELAYED_FROM and since <= lag + DELAYED_TO)
+                or (stray == true and since >= SWING_MIN and since <= lag + DELAYED_TO)
         end
         if not swing.used and swing.key == key and fits then found[#found + 1] = swing end
     end
     return found
+end
+
+function Mine:SwingMatchDeadline(swing)
+    local _, usualLate = self:MeleeWindow(swing.hand)
+    local lag = self:SwingDelay(swing.hand) or USUAL_DELAY
+    return swing.at + math.max(usualLate, lag + DELAYED_TO)
 end
 
 -- Optional diagnostics observe the same windows without tidying or spending.
@@ -934,24 +947,21 @@ local function AmbiguousDirectResult(self, key, school, now, bestScore)
     return AmbiguousResult(self, owner, mixedOwners, false)
 end
 
--- The unit keyed key took cast, sent to a name several units carried
--- (cast.candidates, set by Reader.lua's OnCast; SettleSharedName), when the
--- report of its frame there can be its own: a miss, or a hit its spell makes
--- at once. A spell whose missile flies lands after its cast's frame, so such
--- a report is another's and its recipient stays unknown.
-function Mine:Settle(cast, key, kind, school, now)
+-- A recipient can be settled only from a report the cast could produce.
+-- A projectile cannot corroborate a recipient in its own cast frame.
+function Mine:CanSettle(cast, key, kind, school, now)
     local facts = self.facts(cast.spell)
-    if type(facts) == "table" and facts.travels then return end
-    if kind == "damage" then
-        local fits = false
-        for _, entry in ipairs(self.pending) do
-            if entry.cast == cast
-                and DirectCandidateScore(self, entry, key, school, now) then
-                fits = true
-            end
+    if type(facts) == "table" and facts.travels then return false end
+    for _, entry in ipairs(self.pending) do
+        if entry.cast == cast and not entry.used
+            and (kind == "miss" or DirectCandidateScore(self, entry, key, school, now)) then
+            return true
         end
-        if not fits then return end
     end
+    return false
+end
+
+function Mine:Settle(cast, key)
     cast.key, cast.targetUncertain, cast.candidates = key, false, nil
     for _, list in ipairs({ self.pending, self.dots }) do
         for _, entry in ipairs(list) do
@@ -1503,9 +1513,11 @@ local function Yours(self, key, kind, school, now)
                         hand = swing.hand, who = "you", ordinal = 1,
                     }
                 end
-                -- 0.6.2: the delay of a melee hit paired by its swing's line.
-                local _, usualLate = self:MeleeWindow(swing.hand)
-                if paired and not ranged and since <= usualLate then
+                -- 0.6.2: the delay of a melee hit paired by its swing's line. One
+                -- paired before its swing's time (SwingsBefore, stray) teaches
+                -- nothing: it would open the window to everyone's hits.
+                local usualEarly, usualLate = self:MeleeWindow(swing.hand)
+                if paired and not ranged and since >= usualEarly and since <= usualLate then
                     self.swingLags = self.swingLags or {}
                     local lags = self.swingLags[swing.hand] or {}
                     self.swingLags[swing.hand] = lags

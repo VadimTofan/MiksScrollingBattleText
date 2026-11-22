@@ -11,6 +11,9 @@
 --   t:After(seconds, callback)    a timer that does nothing once the test has stopped
 --   t:OnStop(callback)            runs once when the test stops, whatever stops it
 --   t:Stop()                      ends the test, as removing its tick does
+--   t:Limit(n)                    n, the limit a test sets itself, in rows or seconds; while the log
+--                                 is recorded at least the recording's own limit, so that the test
+--                                 goes on with the recording
 --   t:IsSecret(value)             whether the client hides a value from addons, or the content of
 --                                 a table
 --   t:Show(...)                   draws values into the window instead of logging them and says
@@ -33,10 +36,11 @@ game.tests = {
 		label = "Sources: gains and log messages",
 		tooltip = "For 30 seconds logs the client's build, each resource gain from the combat text with the fields of"
 			.. " its payload, the first 20 combat log messages by their number of arguments and whether their"
-			.. " text is hidden, and the player's own casts with their spell id as context.",
+			.. " text is hidden, and the player's own casts with their spell id as context. A recording lifts"
+			.. " the 30 seconds.",
 		run = function(t)
 			-- The test ends itself after this many seconds.
-			local DURATION = 30
+			local DURATION = t:Limit(30)
 			-- Of the combat log messages only the first ones are described, the rest are counted.
 			local FIRST_MESSAGES = 20
 			-- The kinds of combat text that are a resource gain.
@@ -89,10 +93,10 @@ addon.tests = {
 		tooltip = "Watches the display service of the addon, through which the events reach the screen, and logs"
 			.. " every line handed to it, shown or not: per line the event, scroll area, whether it is sticky, whether"
 			.. " the display takes the line or why it drops it, the text or template and the further arguments."
-			.. " Ends itself after 300 rows.",
+			.. " Ends itself after 300 rows, unless a recording runs.",
 		run = function(t)
 			-- A fight shows many lines: this many rows are logged, then the test ends itself.
-			local MAX_LINES = 300
+			local MAX_LINES = t:Limit(300)
 			-- The settings of a line may be a copy that reads through to the event's own table, and that
 			-- one through another: this many steps are followed.
 			local MAX_CLIMB = 3
@@ -186,11 +190,11 @@ addon.tests = {
 		label = "Trace: a strike through the addon",
 		tooltip = "Watches the five functions of the addon that /msbttrace watches, from the combat engine to the"
 			.. " display. Logs each stage, and draws it into the rows of this window with the amount as the"
-			.. " client draws it.",
+			.. " client draws it. After 300 stages it only draws them, unless a recording runs.",
 		run = function(t)
 			-- The first rows of a run are logged; after that the stages only go round the rows the
 			-- window draws into.
-			local MAX_ROWS = 300
+			local MAX_ROWS = t:Limit(300)
 			-- A result that is none stands for an empty one.
 			local NO_RESULT = {}
 			local components = MikSBT.Components or {}

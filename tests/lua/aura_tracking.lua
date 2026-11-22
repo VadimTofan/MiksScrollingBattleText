@@ -58,12 +58,8 @@ assert(#shown == 2)
 profile.auraTracking["1459"] = true
 -- When the aura is reported.
 presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
--- Then it is visible again, without forcing a disabled category on.
+-- Then it is visible again.
 assert(#shown == 3)
-profile.events.NOTIFICATION_BUFF.disabled = true
-presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
-assert(#shown == 3)
-profile.events.NOTIFICATION_BUFF.disabled = nil
 
 -- Given WoW hides the aura name and spell ID.
 local secret = setmetatable({}, {

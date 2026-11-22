@@ -74,17 +74,15 @@ assert(shown[6][2] == "Gain Power Word: Shield")
 assert(shown[6][1].alwaysSticky == true)
 assert(profile.events.NOTIFICATION_BUFF.colorR == 0.2)
 
--- Given an unchecked custom aura, then a disabled category.
+-- Given an unchecked custom aura with a saved style.
 profile.auraTracking["1459"] = false
+-- When it is reported.
 presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
-profile.auraTracking["1459"] = true
-profile.events.NOTIFICATION_BUFF.disabled = true
-presentation:Aura(true, false, "Arcane Intellect", 135932, 1459)
--- Then custom styling never forces a hidden notification to display.
+-- Then its saved style cannot make it visible.
 assert(#shown == 6)
+profile.auraTracking["1459"] = true
 
 -- Given category defaults supplied by the real profile inheritance pattern.
-profile.events.NOTIFICATION_BUFF.disabled = nil
 profile.events.NOTIFICATION_BUFF.skillIconsDisabled = true
 profile.events.NOTIFICATION_BUFF = setmetatable({}, {
 	__index = profile.events.NOTIFICATION_BUFF,
@@ -112,3 +110,45 @@ presentation:Aura(false, false, "Arcane Intellect", 135932)
 -- Then both use the all-ranks style and keep their category messages.
 assert(shown[9][1].fontSize == 32 and shown[10][1].fontSize == 32)
 assert(shown[10][2] == "Lost Arcane Intellect")
+
+-- Given both generic buff events are off and Stealth is tracked by name.
+profile.events.NOTIFICATION_BUFF.disabled = true
+profile.events.NOTIFICATION_BUFF_FADE.disabled = true
+profile.auraTracking = { ["name:Stealth"] = true }
+local before = #shown
+
+-- When Stealth gains and fades and another buff also changes.
+presentation:Aura(true, false, "Stealth", 132320)
+presentation:Aura(false, false, "Stealth", 132320)
+presentation:Aura(true, false, "Power Word: Shield", 135940, 17)
+presentation:Aura(false, false, "Power Word: Shield", 135940, 17)
+
+-- Then only Stealth displays, using the gain and fade templates.
+assert(#shown == before + 2, "tracked Stealth depended on generic buff switches")
+assert(shown[before + 1][2] == "Gain Stealth")
+assert(shown[before + 2][2] == "Lost Stealth")
+assert(not shown[before + 1][1].disabled and not shown[before + 2][1].disabled)
+assert(profile.events.NOTIFICATION_BUFF.disabled)
+assert(profile.events.NOTIFICATION_BUFF_FADE.disabled)
+
+-- Given a tracked spell ID with a saved sound and no readable name.
+profile.auraTracking = { ["1459"] = true }
+before = #shown
+-- When the ID is known on gain and fade and a separate notice has no ID.
+presentation:Aura(true, false, secret, 135932, 1459)
+presentation:Aura(false, false, secret, 135932, 1459)
+presentation:Aura(true, false, secret, 135932)
+-- Then only the identifiable notices use the dedicated settings.
+assert(#shown == before + 2)
+assert(shown[before + 1][2] == secret and shown[before + 2][2] == secret)
+assert(shown[before + 1][1].soundFile == 123456)
+assert(not shown[before + 1][1].disabled and not shown[before + 2][1].disabled)
+
+-- Given Stealth is explicitly unchecked and generic buffs are off.
+profile.auraTracking = { ["name:Stealth"] = false }
+before = #shown
+-- When Stealth gains and fades.
+presentation:Aura(true, false, "Stealth", 132320)
+presentation:Aura(false, false, "Stealth", 132320)
+-- Then neither notice displays.
+assert(#shown == before)

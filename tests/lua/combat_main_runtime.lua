@@ -657,6 +657,82 @@ for _, forever in ipairs({ false, true }) do
 	events.OUTGOING_SPELL_DAMAGE.message = "Hit %a"
 	events.INCOMING_DAMAGE.message = "Taken %a"
 
+	do
+		-- Given independent settings for melee, ranged swings, and skills.
+		local savedHit = events.OUTGOING_SPELL_DAMAGE
+		local savedCrit = events.OUTGOING_SPELL_DAMAGE_CRIT
+		local savedMiss = events.OUTGOING_SPELL_MISS
+		local savedDodge = events.OUTGOING_SPELL_DODGE
+		events.OUTGOING_SPELL_DAMAGE = { message = "Skill %a" }
+		events.OUTGOING_SPELL_DAMAGE_CRIT = { message = "Skill crit %a" }
+		events.OUTGOING_SPELL_MISS = { message = "Skill miss" }
+		events.OUTGOING_SPELL_DODGE = { message = "Skill dodge" }
+		events.OUTGOING_RANGED_DAMAGE = { message = "Ranged %a", soundFile = "hit" }
+		events.OUTGOING_RANGED_DAMAGE_CRIT = { message = "Ranged crit %a",
+			soundFile = "crit" }
+		events.OUTGOING_RANGED_MISS = { message = "Ranged miss", soundFile = "miss" }
+
+		local engine = MikSBT.CombatEngine
+		local function Shot(event, crit, amount, school, missWord)
+			local result = { who = "you", melee = true, hand = "ranged" }
+			if forever then
+				Dispatch("PLAYER_SWING", 2.6, Enum.PlayerSwingType.Ranged)
+				Advance(0.2)
+				engine.mine.wandSchool = school
+				result = assert(engine.mine:Hit(engine.TargetKey(), event, school,
+					now, false, true, amount, crit, "shot"))
+				engine.mine.wandSchool = nil
+			end
+			local before = #displayed
+			engine.liveRouter:Out({ result = result, event = event, crit = crit,
+				school = school, amount = amount, missWord = missWord or "MISS" })
+			Advance(0.31)
+			if #displayed > before then return displayed[#displayed] end
+		end
+
+		-- When physical and wand swings land, they use the same ranged row.
+		local hit = assert(Shot("damage", false, 42, 1))
+		assert(hit[2] == (forever and "Ranged 42" or "Skill 42"),
+			"ranged hit did not select its own row")
+		assert(hit[1].colorB == 1)
+		assert(hit[1].soundFile == (forever and "hit" or nil))
+		local wand = assert(Shot("damage", false, 42, 16))
+		assert(wand[1].soundFile == (forever and "hit" or nil))
+		assert(Shot("damage", true, 42, 1)[2]
+			== (forever and "Ranged crit 42" or "Skill crit 42"))
+		assert(Shot("miss", false, nil, 1)[2]
+			== (forever and "Ranged miss" or "Skill miss"))
+		assert(Shot("miss", false, nil, 1, "DODGE")[2] == "Skill dodge")
+
+		if forever then
+			-- Then disabling one outcome hides it without falling back.
+			events.OUTGOING_RANGED_DAMAGE_CRIT.disabled = true
+			assert(not Shot("damage", true, 42, 1), "disabled ranged crit was shown")
+			assert(Shot("damage", false, 42, 1))
+			events.OUTGOING_RANGED_DAMAGE.disabled = true
+			assert(not Shot("damage", false, 42, 1), "disabled ranged hit was shown")
+			events.OUTGOING_RANGED_MISS.disabled = true
+			assert(not Shot("miss", false, nil, 1), "disabled ranged miss was shown")
+			events.OUTGOING_RANGED_DAMAGE.disabled = false
+		end
+
+		-- Given a native-only damage amount, the same ranged settings apply.
+		local opaque, secretCheck = {}, issecretvalue
+		issecretvalue = function(value) return value == opaque end
+		local hidden = Shot("damage", false, opaque, 1)
+		issecretvalue = secretCheck
+		assert(hidden[4] == opaque and hidden[1].colorB == 1)
+		assert(hidden[1].soundFile == (forever and "hit" or nil))
+
+		events.OUTGOING_SPELL_DAMAGE = savedHit
+		events.OUTGOING_SPELL_DAMAGE_CRIT = savedCrit
+		events.OUTGOING_SPELL_MISS = savedMiss
+		events.OUTGOING_SPELL_DODGE = savedDodge
+		events.OUTGOING_RANGED_DAMAGE = { message = savedHit.message }
+		events.OUTGOING_RANGED_DAMAGE_CRIT = { message = savedHit.message }
+		events.OUTGOING_RANGED_MISS = nil
+	end
+
 	-- Given incoming heals have their own styling and damage-school colours are on.
 	profile.damageColoringDisabled = false
 

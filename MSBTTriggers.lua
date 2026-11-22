@@ -5,6 +5,7 @@ MikSBT[moduleName] = module
 
 local MSBTProfiles = MikSBT.Profiles
 local MSBTParser = MikSBT.Parser
+local L = MikSBT.translations or {}
 
 local string_find = string.find
 local string_gsub = string.gsub
@@ -393,7 +394,7 @@ local alertCurves = {}
 local alertProbe
 
 local lowHealthSettings = {
-	message = "Low Health!",
+	message = (L.MSG_TRIGGER_LOW_HEALTH or "Low Health") .. "!",
 	scrollArea = "Notification",
 	colorR = 1, colorG = 0, colorB = 0,
 	fontSize = 26,
@@ -403,7 +404,7 @@ local lowHealthSettings = {
 	soundDisabledOption = "lowHealthSoundDisabled",
 }
 local lowManaSettings = {
-	message = "Low Mana!",
+	message = (L.MSG_TRIGGER_LOW_MANA or "Low Mana") .. "!",
 	scrollArea = "Notification",
 	colorR = 0, colorG = 0.5, colorB = 1,
 	fontSize = 26,
@@ -474,6 +475,10 @@ local function IsResourceLow(value, isHealth)
 	if success then return result end
 end
 
+local function PlayerIsAlive()
+	return not UnitIsDeadOrGhost or not UnitIsDeadOrGhost("player")
+end
+
 local function CheckLowHealth()
 	if not alertsEnabled or type(UnitHealthPercent) ~= "function" then
 		return
@@ -481,7 +486,7 @@ local function CheckLowHealth()
 
 	local isLow = IsResourceLow(UnitHealthPercent("player", false), true)
 	if isLow == nil then return end
-	if isLow and not healthAlerted then
+	if isLow and not healthAlerted and PlayerIsAlive() then
 		healthAlerted = true
 		DisplayTrigger(lowHealthSettings)
 	elseif not isLow then
@@ -503,7 +508,7 @@ local function CheckLowMana()
 	)
 	if isLow == nil then return end
 
-	if isLow and not manaAlerted then
+	if isLow and not manaAlerted and PlayerIsAlive() then
 		manaAlerted = true
 		DisplayTrigger(lowManaSettings)
 	elseif not isLow then

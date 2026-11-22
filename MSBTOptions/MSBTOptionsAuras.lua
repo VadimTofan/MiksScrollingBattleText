@@ -42,10 +42,10 @@ function module.SaveSetting(id, field, value)
 	Profiles.SetOption(nil, "auraSettings", styles)
 end
 
-function module.AddRows(list, firstID)
+function module.AddRows(list, firstID, includes)
 	local ids = {}
 	for id in pairs(Profiles.currentProfile.auraTracking or {}) do
-		ids[#ids + 1] = id
+		if not includes or includes(id) then ids[#ids + 1] = id end
 	end
 	table.sort(ids, function(left, right)
 		if left == firstID then return right ~= firstID end
@@ -53,6 +53,7 @@ function module.AddRows(list, firstID)
 		return left < right
 	end)
 	for _, id in ipairs(ids) do list:AddItem(id) end
+	return ids
 end
 
 function module.CreateLine(parent, refresh, handlers)

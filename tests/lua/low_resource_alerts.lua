@@ -4,6 +4,7 @@ local profile, area = {}, {}
 local disabled = false
 local mana, powerType = 1, 0
 local health = 1
+local dead, ghost = false, false
 local now = 0
 GetTime = function() return now end
 local secret = newproxy(true)
@@ -14,6 +15,10 @@ canaccessvalue = function(value) return not rawequal(value, secret) end
 Enum = { PowerType = { Mana = 0 } }
 UnitClass = function() return "Mage", "MAGE" end
 UnitPowerType = function() return powerType end
+UnitIsDeadOrGhost = function(unit)
+	assert(unit == "player")
+	return dead or ghost
+end
 UnitPowerPercent = function(unit, power)
 	assert(unit == "player" and power == 0)
 	return mana
@@ -231,6 +236,87 @@ frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
 
 -- Then the lower mana threshold produces its own alert.
 assert(#displayed == 10 and displayed[10] == "Low Mana!")
+MikSBT.Triggers.Disable()
+
+-- Given a living player with full health and mana and enabled alerts.
+now = 50
+health, mana = 1, 1
+MikSBT.Triggers.Enable()
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+local textBefore, soundBefore = #displayed, #played
+
+-- When death empties both resource bars.
+dead, health, mana = true, 0, 0
+frame.scripts.OnEvent(frame, "UNIT_HEALTH", "player")
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then neither warning emits text or sound.
+assert(#displayed == textBefore and #played == soundBefore,
+	"death triggered a low resource alert")
+
+-- When the player releases spirit and enters the world as a ghost.
+dead, ghost = false, true
+frame.scripts.OnEvent(frame, "PLAYER_ENTERING_WORLD")
+
+-- Then the alert stays silent until the player is alive again.
+assert(#displayed == textBefore and #played == soundBefore,
+	"a ghost triggered a low resource alert")
+ghost, health, mana = false, 1, 1
+frame.scripts.OnEvent(frame, "UNIT_HEALTH", "player")
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+health, mana = 0.1, 0.1
+frame.scripts.OnEvent(frame, "UNIT_HEALTH", "player")
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+assert(#displayed == textBefore + 2 and displayed[textBefore + 1] == "Low Health!"
+	and displayed[textBefore + 2] == "Low Mana!")
+assert(#played == soundBefore + 2 and played[soundBefore + 1]:match("LowHealth%.ogg$")
+	and played[soundBefore + 2]:match("LowMana%.ogg$"))
+
+-- Given an armed mana alert, check life after sampling the resource.
+mana = 1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+local readMana = UnitPowerPercent
+UnitPowerPercent = function()
+	dead = true
+	return 0
+end
+
+-- When the mana update reveals the player died during the check.
+now = 60
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then neither text nor sound is emitted.
+assert(#displayed == textBefore + 2 and #played == soundBefore + 2,
+	"the alert used the life state from before the mana check")
+dead, UnitPowerPercent = false, readMana
+MikSBT.Triggers.Disable()
+
+-- Given the core translations loaded for a Russian client.
+MikSBT.COMMAND = "/msbt"
+MikSBT.translations = {}
+GetLocale = function() return "ruRU" end
+for _, path in ipairs({ "Localization/localization.lua", "Localization/localization.ru.lua" }) do
+	local file = assert(io.open(path, "rb"))
+	local source = file:read("*a"):gsub("^\239\187\191", "")
+	file:close()
+	assert(loadstring(source, "@" .. path))()
+end
+dofile("MSBTTriggers.lua")
+MikSBT.Triggers.Enable()
+frame = frames[#frames]
+local before = #displayed
+
+-- When both player resources cross their thresholds.
+ShowLowHealth()
+mana = 1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+mana = 0.1
+frame.scripts.OnEvent(frame, "UNIT_POWER_UPDATE", "player")
+
+-- Then the display service receives each localized warning.
+assert(#displayed == before + 2)
+assert(displayed[before + 1] == "Малый запас здоровья!", "health alert ignored ruRU")
+assert(displayed[before + 2] == "Малый запас маны!", "mana alert ignored ruRU")
 MikSBT.Triggers.Disable()
 
 print("Low resource alert tests passed")

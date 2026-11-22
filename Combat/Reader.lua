@@ -9,7 +9,7 @@ local C_Timer = ns.Timer
 local reader = {
     epoch = 0, plateGeneration = 0, plates = {}, held = {},
     lastGlow = {}, lastCC = {}, swingTimes = {}, castTargets = {},
-    windfuryNotices = {},
+    windfuryCasts = {},
     pendingHits = setmetatable({}, { __mode = "k" }),
 }
 ns.reader = reader
@@ -79,6 +79,9 @@ local function RekeyTarget(old, new)
     if reader.lastCastTarget then Move(reader.lastCastTarget) end
     if reader.targetKey == old then reader.targetKey = new end
     if reader.departedTargetKey == old then reader.departedTargetKey = new end
+    if reader.strangers[old] then
+        reader.strangers[new], reader.strangers[old] = reader.strangers[old], nil
+    end
     if ns.traceCombat then
         ns.traceCombat("rekey", nil, { old = old, new = new })
     end
@@ -362,6 +365,11 @@ local function OnUnitCombat(unit, event, flag, amount, school)
     if record.event == "damage" then
         record.victimKey, record.victim = key, CaptureVictim(unit, key)
     end
+    -- A partly blocked hit on this unit. How much it blocked is not told, so
+    -- its trailer names no amount.
+    if record.event == "damage" and ns.Text(flag) and flag == "BLOCK_REDUCED" then
+        record.blocked = true
+    end
     local hit = { record = record, key = key, at = now, unit = unit,
         petOn = PetAttacking(token) }
     reader.pendingHits[hit] = true
@@ -514,6 +522,25 @@ local function ConfirmingEvidence(hit, evidence, shared)
     hit.accountingEvidence = info
 end
 
+-- Whether nobody else is seen to strike this unit: you are in no party or
+-- raid, your pet is at nothing, and for STRANGER_QUIET no report on the unit
+-- went without a line of yours (ns.DecideHit). It cannot see the first
+-- strike of someone who joins.
+local STRANGER_QUIET = 5
+reader.strangers = {}
+local function NoteStranger(key, at)
+    for other, seen in pairs(reader.strangers) do
+        if at - seen > STRANGER_QUIET then reader.strangers[other] = nil end
+    end
+    reader.strangers[key] = math.max(reader.strangers[key] or at, at)
+end
+local function Alone(key, at)
+    local party, raid = IsInGroup and IsInGroup(), IsInRaid and IsInRaid()
+    if not ns.Bool(party) or party or (ns.Bool(raid) and raid) or ns.mine.petOut then return false end
+    local seen = reader.strangers[key]
+    return not seen or at - seen > STRANGER_QUIET
+end
+
 function ns.DecideHit(hit, line, restrict)
     local router = Router()
     if not router then return end
@@ -556,6 +583,7 @@ function ns.DecideHit(hit, line, restrict)
             swingChecks = swingChecks,
         }
     end
+    if line == false and (kind == "damage" or kind == "miss") then NoteStranger(hit.key, hit.at) end
     reader.pendingHits[hit] = nil
     if ns.traceCombat then
         ns.traceCombat("decision", hit, { stage = "decision",
@@ -779,8 +807,9 @@ end
 -- with no line in its frame takes the spare line that came in the frame of a
 -- swing of yours on its unit just before, when that line can be a swing's:
 -- a melee line of its class with the "swing" role (0.6.3: never an enemy's
--- blow on you in the same frame), or one of no known kind.
-local function SwingLine(hit)
+-- blow on you in the same frame), or one of no known kind. With stray, the
+-- swing may be one whose hit comes at neither of its times (Mine:SwingsBefore).
+local function SwingLine(hit, stray)
     local record = hit.record
     if record.event ~= "damage" and record.event ~= "miss" then return nil end
     -- A melee swing's hit is physical (Mine.lua, Yours), so a hit whose school
@@ -789,7 +818,7 @@ local function SwingLine(hit)
     -- as a proc of yours, and the swing's hit went unshown (predicted, not
     -- yet seen in client).
     local otherSchool = record.event == "damage" and record.school ~= nil and record.school ~= ns.SCHOOL_PHYSICAL
-    for _, swing in ipairs(ns.mine:SwingsBefore(hit.key, hit.at)) do
+    for _, swing in ipairs(ns.mine:SwingsBefore(hit.key, hit.at, stray)) do
         for _, line in ipairs(reader.logLines or {}) do
             if not line.claimed and not line.hit and Pairs(line, record) and math.abs(line.at - swing.at) <= SWING_FRAME then
                 if line.kind == nil and swing.hand ~= "ranged" then return line, swing end
@@ -956,6 +985,96 @@ local function NoteSwingHit(hit, line)
     while list[1] and (hit.at - list[1].at > 2 or #list > 16) do table.remove(list, 1) end
 end
 
+-- A swing's hit that comes at none of its swing's times (Mine:SwingsBefore,
+-- stray). Looked for last, once no line, no swing in its time, no proc and
+-- no bolt in flight placed the hit, and only while Alone. Not for a hit that
+-- tied with others for a line: which of them the swing's is stays open.
+local function StraySwingLine(hit)
+    if hit.tied or not Alone(hit.key, hit.at) then return nil end
+    return SwingLine(hit, true)
+end
+local function TakeSwing(hit, line, swing)
+    NoteSwingHit(hit, line)
+    line.claimed, line.hit = true, { at = hit.at, record = hit.record }
+    ns.mine.pairedSwing = swing
+end
+
+local function StraySwingDeadline(swing)
+    return ns.mine:SwingMatchDeadline(swing) + LATE_LINE + MISS_SETTLE
+end
+
+-- Let an in-window report spend the swing before committing a fallback.
+local function DeferStraySwing(hit)
+    local line, swing = StraySwingLine(hit)
+    if not line then return false end
+    local deadline = StraySwingDeadline(swing)
+    C_Timer.After(math.max(0, deadline - Now()), function()
+        if not reader.pendingHits[hit] then return end
+        local availableLine, availableSwing = SwingLine(hit, true)
+        if availableLine == line and availableSwing == swing and Alone(hit.key, Now()) then
+            TakeSwing(hit, line, swing)
+            ConfirmingEvidence(hit, line)
+            ns.DecideHit(hit, true, LineRestrict(line))
+        else
+            ns.DecideHit(hit, false)
+        end
+    end)
+    return true
+end
+
+-- Hits that fit a line of yours equally well, with fewer such lines than
+-- hits: the others are yours too where a swing of yours with no hit yet
+-- covers each of them, while Alone. A swing's hit held back one more
+-- animation comes with the next swing and with what you cast on that swing:
+-- a druid's Rake and the swing before it were both taken for someone else's
+-- (1.60.1.70959). Which hit is which stays open, so none is named
+-- (Mine:ConfirmUnidentified).
+local function SettleTie(hits, lines, Decide)
+    local need, matches, swings, deadline = #hits - lines, {}, {}, Now()
+    for _, hit in ipairs(hits) do
+        if #matches < need and Alone(hit.key, hit.at) then
+            local line, swing = SwingLine(hit, true)
+            if line and not swings[swing] then
+                line.claimed = true
+                swings[swing] = true
+                matches[#matches + 1] = { hit = hit, line = line, swing = swing }
+                deadline = math.max(deadline, StraySwingDeadline(swing))
+            end
+        end
+    end
+    for _, match in ipairs(matches) do match.line.claimed = nil end
+    if #matches < need then return false end
+
+    for _, hit in ipairs(hits) do hit.unidentified = true end
+    local function DecideTie()
+        if not reader.pendingHits[hits[1]] then return end
+        local confirmed = true
+        for _, match in ipairs(matches) do
+            local hit, line, swing = match.hit, match.line, match.swing
+            if line.claimed or line.hit or swing.used or swing.key ~= hit.key
+                or not Alone(hit.key, Now()) then
+                confirmed = false
+                break
+            end
+        end
+        if confirmed then
+            for _, match in ipairs(matches) do
+                match.line.claimed, match.swing.used = true, true
+            end
+        end
+        for _, hit in ipairs(hits) do
+            hit.unidentified = confirmed
+            Decide(hit, confirmed)
+        end
+    end
+    if deadline > Now() then
+        C_Timer.After(deadline - Now(), DecideTie)
+    else
+        DecideTie()
+    end
+    return true
+end
+
 -- Classic ranks of the three queued-strike families supported on Forever.
 local QUEUED_STRIKES = {
     -- Heroic Strike.
@@ -1027,8 +1146,8 @@ function DecideGroup(group, frameLines, decided, settled)
         if not PeriodicLine(line) then ordinary[#ordinary + 1] = line end
     end
     for _, line in ipairs(frameLines) do
-        if PeriodicLine(line) then
-            local best, score, tied
+        if PeriodicLine(line) and not line.claimed then
+            local best, score, tied, tie
             for index, hit in ipairs(remaining) do
                 local fit
                 if not CompetingPeriodic(hit) then fit = TickFit(hit) end
@@ -1043,9 +1162,10 @@ function DecideGroup(group, frameLines, decided, settled)
                     end
                 end
                 if fit ~= nil and (not score or fit < score) then
-                    best, score, tied = index, fit, false
+                    best, score, tied, tie = index, fit, false, { hit }
                 elseif fit ~= nil and fit == score then
                     tied = true
+                    tie[#tie + 1] = hit
                 end
             end
             if tied and #frameLines >= #group and #ordinary > 0 then
@@ -1060,6 +1180,23 @@ function DecideGroup(group, frameLines, decided, settled)
                 return
             elseif tied and periodicConfirmations < #group then
                 line.claimed, best = true, nil
+                local tickLines = { line }
+                if #tie == #remaining then
+                    for _, spare in ipairs(frameLines) do
+                        if #tickLines < #tie and not spare.claimed and PeriodicLine(spare) then
+                            tickLines[#tickLines + 1] = spare
+                        end
+                    end
+                end
+                for _, hit in ipairs(tie) do hit.tied = true end
+                if SettleTie(tie, #tickLines, Decide) then
+                    for _, ownLine in ipairs(tickLines) do ownLine.claimed = true end
+                    for _, hit in ipairs(tie) do
+                        for index = #remaining, 1, -1 do
+                            if remaining[index] == hit then table.remove(remaining, index) end
+                        end
+                    end
+                end
             end
             -- Spell identity is optional when the typed confirmations cover
             -- every report. A known offscreen tick remains a competing source.
@@ -1148,7 +1285,7 @@ function DecideGroup(group, frameLines, decided, settled)
                 -- 0.3.49: a miss's report can come a frame after its line
                 -- (DecideLateMiss).
                 C_Timer.After(LATE_LINE, function() ns.DecideLateMiss(hit) end)
-            else
+            elseif not DeferStraySwing(hit) then
                 Decide(hit, false)
             end
         end
@@ -1186,7 +1323,23 @@ function DecideGroup(group, frameLines, decided, settled)
             flags[entry.hit] = rank <= lines and entry.fit ~= nil
                 and not (contested and entry.fit == cutoff)
         end
-        for _, hit in ipairs(group) do Decide(hit, flags[hit], restrict) end
+        -- The hits that tie for the lines no hit took (SettleTie): a cast's
+        -- own frame gives no hit a fit. Any other hit the lines leave out
+        -- may be a late swing's.
+        local tie, named = {}, 0
+        for _, entry in ipairs(ranked) do
+            if flags[entry.hit] then
+                named = named + 1
+            elseif entry.fit == cutoff then
+                tie[#tie + 1], entry.hit.tied = entry.hit, true
+            end
+        end
+        if named < lines then SettleTie(tie, lines - named, Decide) end
+        for _, hit in ipairs(group) do
+            if not hit.unidentified and (flags[hit] or not DeferStraySwing(hit)) then
+                Decide(hit, flags[hit], restrict)
+            end
+        end
     end
 end
 
@@ -1219,6 +1372,7 @@ function ns.DecideLate(hit)
             best, bestGap = line, math.abs(gap)
         end
     end
+    if not best and DeferStraySwing(hit) then return end
     if best then best.claimed = true end
     ConfirmingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
@@ -1240,6 +1394,7 @@ function ns.DecideLateMiss(hit)
             best, bestGap = line, math.abs(gap)
         end
     end
+    if not best and DeferStraySwing(hit) then return end
     if best then best.claimed = true end
     ConfirmingEvidence(hit, best)
     ns.DecideHit(hit, best ~= nil, best and LineRestrict(best) or nil)
@@ -1247,6 +1402,20 @@ end
 
 -- Your casts and swings -----------------------------------------------------------
 local CAST_TARGET_KEEP, MAX_CAST_TARGETS = 30, 64
+
+-- A unit's name as the game writes it in what it sends, from the two values
+-- of UnitName. Forever gives a player a surname as the second value, where
+-- other clients give the realm, and joins the two with its own separator.
+-- Without a readable surname or separator the name comes back as it is.
+local function WrittenName(name, surname)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    local separators = Constants and Constants.CharacterNameSeparatorConsts
+    local separator = separators and separators.CHARACTERNAME_SURNAME_SEPARATOR
+    if client and client.isForever and ns.Text(name) and ns.Text(surname) and ns.Text(separator) then
+        return name .. separator .. surname
+    end
+    return name
+end
 
 local function RecipientKey(unit)
     local same = UnitIsUnit(unit, "target")
@@ -1266,7 +1435,8 @@ local function NamedRecipient(target)
     for _, token in ipairs(tokens) do
         local ok, name, realm = pcall(UnitName, token)
         if ok and ns.Text(name) and (target == name
-            or (ns.Text(realm) and target == name .. "-" .. realm)) then
+            or (ns.Text(realm) and target == name .. "-" .. realm)
+            or target == WrittenName(name, realm)) then
             local candidate = RecipientKey(token)
             if candidate then
                 if key and key ~= candidate then uncertain = true end
@@ -1282,30 +1452,32 @@ local function NamedRecipient(target)
     return key, key == nil
 end
 
--- A cast sent to a name several units in view carry has no recipient
--- (NamedRecipient). A report of yours that a cast could have made (its line
--- not a tick's, swing's or shot's), on one of those units in the cast's own
--- frame, with no report of that moment on another of them, shows which one
--- took it (Mine:Settle; predicted, not yet seen in client).
+-- A confirmed direct report can resolve a shared name when only one cast
+-- could have produced it and no other candidate unit received a report.
 SettleSharedName = function(hit, kind, restrict)
     local landed = hit.landed
-    if not landed or (kind ~= "damage" and kind ~= "miss")
+    if not landed or hit.unidentified or (kind ~= "damage" and kind ~= "miss")
         or (restrict ~= nil and restrict ~= "direct") then return end
+
+    local match
     for _, casts in pairs(ns.mine.casts) do
         for _, cast in ipairs(casts) do
             local candidates = cast.candidates
-            if candidates and candidates[hit.key]
-                and math.abs(cast.at - hit.at) <= SWING_FRAME then
-                local alone = true
-                for key in pairs(candidates) do
-                    if key ~= hit.key and landed[key] then alone = false end
-                end
-                if alone then
-                    ns.mine:Settle(cast, hit.key, kind, hit.record.school, hit.at)
-                end
+            local canReach = cast.key == hit.key or (candidates and candidates[hit.key])
+                or (cast.targetUncertain and not candidates)
+            if canReach and math.abs(cast.at - hit.at) <= SWING_FRAME
+                and ns.mine:CanSettle(cast, hit.key, kind, hit.record.school, hit.at) then
+                if match then return end
+                match = cast
             end
         end
     end
+    local candidates = match and match.candidates
+    if not candidates then return end
+    for key in pairs(candidates) do
+        if key ~= hit.key and landed[key] then return end
+    end
+    ns.mine:Settle(match, hit.key)
 end
 
 local function NoteCastTarget(unit, target, guid, spell, now)
@@ -1373,23 +1545,20 @@ end
 local lastCast
 local queuedStrike
 local WINDFURY_ATTACK_SPELL_ID = 439440
-local MAX_WINDFURY_NOTICES = 16
+local MAX_WINDFURY_CASTS = 16
 
-local function WindfuryNotice(unit, spell, guid, now)
-    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
-    if not (client and client.isForever) or unit ~= "player"
-        or spell ~= WINDFURY_ATTACK_SPELL_ID then return end
-
-    -- Windfury activity is separate from any particular damage amount.
-    -- Keep duplicate casts bounded; coalesce multiple attacks in one frame.
-    local recent = reader.windfuryNotices
-    if ns.Text(guid) then
-        for _, seen in ipairs(recent) do
-            if seen == guid then return end
-        end
-        recent[#recent + 1] = guid
-        if #recent > MAX_WINDFURY_NOTICES then table.remove(recent, 1) end
+local function FirstWindfuryCast(guid)
+    if not ns.Text(guid) then return true end
+    local recent = reader.windfuryCasts
+    for _, seen in ipairs(recent) do
+        if seen == guid then return false end
     end
+    recent[#recent + 1] = guid
+    if #recent > MAX_WINDFURY_CASTS then table.remove(recent, 1) end
+    return true
+end
+
+local function WindfuryNotice(spell, now)
     if reader.windfuryNoticeAt
         and now <= reader.windfuryNoticeAt + SWING_FRAME then return end
     reader.windfuryNoticeAt = now
@@ -1444,7 +1613,7 @@ local function WindfuryCooldown(spell)
         for _, line in ipairs(reader.logLines) do
             if line.source == "mine" and math.abs(line.at - at) <= SWING_FRAME
                 and (line.kind == "spell" or line.kind == "spellMiss") then
-                WindfuryNotice("player", spell, nil, at)
+                WindfuryNotice(spell, at)
                 return
             end
         end
@@ -1454,7 +1623,19 @@ end
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
-    WindfuryNotice(unit, spell, guid, now)
+    if unit == "player" and spell == WINDFURY_ATTACK_SPELL_ID then
+        local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+        if client and client.isForever then
+            if FirstWindfuryCast(guid) then
+                -- Let the proc corroborate the burst without reserving a normal hit.
+                if ns.windfuryInference then
+                    ns.windfuryInference:Signal(now, spell)
+                end
+                WindfuryNotice(spell, now)
+            end
+            if ns.windfuryInference then return end
+        end
+    end
     local key, uncertain, observed, candidates =
         CastTarget(unit, spell, guid, now, true)
     if not observed and unit == "player" then
@@ -1574,7 +1755,7 @@ local function OnInterrupted(unit, interruptedBy)
         -- 0.3.48: your interrupts come as combat log lines of their own
         -- colour, so the line settles it (KindAlert) and this only lends it
         -- the enemy's name; a teammate's interrupt sends none.
-        local name = UnitName(unit)
+        local name = WrittenName(UnitName(unit))
         reader.interruptHeld = { at = now, name = ns.Text(name) and name or nil }
         return
     else
@@ -1582,7 +1763,7 @@ local function OnInterrupted(unit, interruptedBy)
     end
     if not mine or not lastCast then return end
     lastInterrupt = now
-    local name = UnitName(unit)
+    local name = WrittenName(UnitName(unit))
     local router = Router()
     if router then
         router:Alert({ kind = "interrupt", icon = ns.SpellIcon(lastCast.spell), text = INTERRUPTED or "Interrupted",
@@ -2441,7 +2622,7 @@ local function OnEvent(_, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildAuras()
         reader.windfuryCooldownFrame, reader.windfuryNoticeAt = nil, nil
-        reader.windfuryNotices = {}
+        reader.windfuryCasts = {}
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil
         reader.pendingHits = setmetatable({}, { __mode = "k" })

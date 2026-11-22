@@ -145,6 +145,16 @@ class CombatEngineTests(unittest.TestCase):
         # Then
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
+    def test_broken_crowd_control_is_told_in_the_locales_words(self):
+        # Given
+        script = "control_broken_text.lua"
+
+        # When
+        result = run_lua_test(script)
+
+        # Then
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     def test_hot_ticks_retain_spell_identity_when_buffs_or_direct_heals_are_cast(self):
         # Given an active HoT followed by a helpful buff or direct heal
         script = "hot_attribution.lua"

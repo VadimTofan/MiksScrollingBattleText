@@ -79,6 +79,7 @@ local log = Log:New({
 assert(log:WriteSettings())
 local profile = { stackSimilarHits = true, events = {
     OUTGOING_DAMAGE = {}, OUTGOING_SPELL_DAMAGE = {}, OUTGOING_SPELL_DOT = {},
+    NOTIFICATION_PROC = { disabled = true },
 } }
 local batcher = Batcher:New({
     getProfile = function() return profile end,
@@ -120,7 +121,9 @@ local engine = Engine:New({
             end
             presentation:Out(record)
         end,
-        In = function() end, Alert = function() end, Aura = function() end,
+        In = function() end,
+        Alert = function(_, record) presentation:Alert(record) end,
+        Aura = function() end,
         Healer = function() end, Resource = function() end,
         ComboPoints = function() end,
     },
@@ -229,6 +232,51 @@ Replay("baseline clean Windfury extras receive icons after full accounting", fun
         end
         assert(Record(normal).melee and Displayed(normal) == 1)
         profile.stackSimilarHits = true
+    end
+end)
+
+Replay("explicit player Windfury casts help identify clean extra hits", function()
+    for _, scenario in ipairs({ "clean", "pet-cast", "both-signals",
+        "duplicate-cast" }) do
+        -- Given a swing and two extra reports with Ability Procs disabled.
+        local start = Start()
+        local first, second, normal = Amount(), Amount(), Amount()
+        if scenario == "duplicate-cast" then
+            Event("UNIT_SPELLCAST_SUCCEEDED", "player", "windfury-cast", 439440)
+            At(start + 0.05)
+        end
+        Event("PLAYER_SWING", 3.2, 0)
+        Line("swing")
+        Line("spell")
+        Line("spell")
+
+        -- When the cast arrives without a Weapon cooldown update.
+        local unit = scenario == "pet-cast" and "pet" or "player"
+        Event("UNIT_SPELLCAST_SUCCEEDED", unit, "windfury-cast", 439440)
+        if scenario == "both-signals" then
+            Event("SPELL_UPDATE_COOLDOWN", 10610)
+        end
+        Hit(first)
+        At(start + 0.216)
+        Hit(second)
+        At(start + 0.585)
+        Hit(normal)
+        At(start + 1.7)
+
+        -- Then only the clean player burst gets inferred icons.
+        local expectedIcon = scenario == "clean" and "icon-8232" or nil
+        for _, amount in ipairs({ first, second }) do
+            assert(Displayed(amount) == 1,
+                scenario .. " did not display the extra exactly once")
+            for _, output in ipairs(displayed) do
+                if output.amount == amount then
+                    assert(output.icon == expectedIcon,
+                        scenario .. " displayed the wrong Windfury icon")
+                end
+            end
+            assert(Record(amount).spell == nil and Record(amount).procSpell == nil)
+        end
+        assert(Record(normal).melee and Displayed(normal) == 1)
     end
 end)
 

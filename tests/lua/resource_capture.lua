@@ -18,7 +18,7 @@ local secret = setmetatable({}, {
     __concat = function() error("diagnostic concatenated a secret") end,
 })
 issecretvalue = function(value) return value == secret end
-local chunk = loadfile("Diagnostics/ResourceCapture.lua")
+local chunk = loadfile("Developer/ResourceCapture.lua")
 assert(chunk, "resource source diagnostic is missing")
 local capture = chunk()
 

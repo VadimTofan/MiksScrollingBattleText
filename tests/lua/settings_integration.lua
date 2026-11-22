@@ -64,6 +64,12 @@ MikSBT.Profiles = {savedVariables = {}}
 dofile("MSBTOptions/MSBTOptionsDesigns.lua")
 dofile("MSBTOptions/MSBTOptionsMain.lua")
 local options = MSBTOptions.Main
+local openers = {}
+local dock = options.DockMainFrame
+options.DockMainFrame = function(panel, reopen, ...)
+	openers[panel] = reopen
+	return dock(panel, reopen, ...)
+end
 local designs = MSBTOptions.Designs
 -- Another design whose window is open.
 local other = {shown = true}
@@ -88,8 +94,9 @@ Settings = {
 	RegisterAddOnCategory = Noop,
 	OpenToCategory = function(id)
 		if currentPanel then currentPanel:Hide() end
-		-- The root category uses its name as its ID.
-		currentPanel = panels[type(id) == "string" and 1 or id]
+		-- The game's function takes the number the category got, the root category's too.
+		assert(type(id) == "number", "Settings was asked to open a category by something but its number")
+		currentPanel = panels[id]
 		currentPanel:Show()
 		SettingsPanel:Show()
 	end,
@@ -123,6 +130,14 @@ Settings.OpenToCategory(2)
 assert(main:GetParent() == panels[2] and scrollAreas:IsShown(),
 	"Scroll Areas did not dock when its category opened")
 assert(not general:IsShown(), "previous tab stayed visible")
+
+-- When the opener of the main panel runs from there.
+openers[panels[1]]()
+
+-- Then the addon's own category opens, by its number.
+assert(currentPanel == panels[1],
+	"the opener of the main panel did not open the addon's own category by its number")
+Settings.OpenToCategory(2)
 
 -- When the other design is chosen there and the options are requested.
 designs.Select("other")
