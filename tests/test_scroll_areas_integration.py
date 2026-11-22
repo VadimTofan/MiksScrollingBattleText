@@ -6,6 +6,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 ANIMATIONS_FILE = REPOSITORY_ROOT / "Display" / "AnimationEngine.lua"
 DISPLAY_SERVICE_FILE = REPOSITORY_ROOT / "Display" / "DisplayService.lua"
 TOC_FILE = REPOSITORY_ROOT / "MikScrollingBattleText.toc"
+MAIN_FILE = REPOSITORY_ROOT / "MSBTMain.lua"
 
 
 # Describe: scroll-area integration
@@ -22,6 +23,21 @@ class ScrollAreasIntegrationTests(unittest.TestCase):
         self.assertNotIn("local externalScrollAreas", source)
         self.assertNotIn("local function UpdateScrollAreas", source)
         self.assertNotIn("local function IsScrollAreaSuppressedInGroup", source)
+
+    def test_combat_presentation_receives_the_scroll_areas(self):
+        # Given
+        main_source = MAIN_FILE.read_text(encoding="utf-8-sig")
+        toc_lines = TOC_FILE.read_text(encoding="utf-8-sig").splitlines()
+
+        # When / Then
+        # The batcher decides at display time whether the area a line waits for is still on.
+        self.assertEqual(
+            main_source.count("scrollAreas = MikSBT.Display.ScrollAreas,"), 2
+        )
+        self.assertLess(
+            toc_lines.index("Display\\ScrollAreas.lua"),
+            toc_lines.index("MSBTMain.lua"),
+        )
 
     def test_scroll_area_service_loads_before_animations(self):
         # Given

@@ -197,6 +197,28 @@ do
 	assert(not transfer:Decode(encode(payload)), "future format was accepted")
 end
 
+-- Describe: the second scroll area of an event passes import, export and copy.
+do
+	-- Given an event with a second area as a key, and one with the choice of no second area.
+	for _, value in ipairs({ "Custom", false }) do
+		local profile = { events = { INCOMING_DAMAGE = { scrollAreaOther = value } } }
+		-- When the profile is exported and imported.
+		local exported = assert(transfer:Export("Second", profile, {}))
+		local payload = assert(transfer:Decode(exported))
+		local profiles = {}
+		local name = assert(transfer:Import(exported, "Second", profiles, {}))
+		-- Then the value arrives unchanged.
+		assert(payload.sections.Events.INCOMING_DAMAGE.scrollAreaOther == value)
+		assert(profiles[name].events.INCOMING_DAMAGE.scrollAreaOther == value)
+		-- And a value of another type is refused as it is for the other fields.
+		for _, wrong in ipairs({ 5, true, {} }) do
+			payload.sections.Events.INCOMING_DAMAGE.scrollAreaOther = wrong
+			assert(not transfer:Decode(encode(payload)),
+				"a second area of type " .. type(wrong) .. " was accepted")
+		end
+	end
+end
+
 print("Profile transfer tests passed")
 
 -- Describe: individual resource choices survive portable profile transfer.

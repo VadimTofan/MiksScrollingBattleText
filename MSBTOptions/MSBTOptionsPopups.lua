@@ -1733,6 +1733,12 @@ local function CreateEvent()
 	dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", 44, -85)
 	controls.scrollAreaDropdown = dropdown
 
+	dropdown = MSBTControls.CreateDropdown(frame)
+	objLocale = L.DROPDOWNS["outputScrollAreaOther"]
+	dropdown:Configure(150, objLocale.label, objLocale.tooltip)
+	dropdown:SetPoint("TOPLEFT", controls.scrollAreaDropdown, "BOTTOMLEFT", 0, -20)
+	controls.scrollAreaOtherDropdown = dropdown
+
 	local editbox = MSBTControls.CreateEditbox(frame)
 	local objLocale = L.EDITBOXES["eventMessage"]
 	editbox:Configure(250, objLocale.label, nil)
@@ -1763,6 +1769,9 @@ local function CreateEvent()
 	button:SetClickHandler(function(this)
 		EraseTable(returnSettings)
 		returnSettings.scrollArea = controls.scrollAreaDropdown:GetSelectedID()
+		if frame.showScrollAreaOther then
+			returnSettings.scrollAreaOther = controls.scrollAreaOtherDropdown:GetSelectedID()
+		end
 		returnSettings.message = controls.messageEditbox:GetText()
 		returnSettings.soundFile = controls.soundDropdown:GetSelectedID()
 		returnSettings.alwaysSticky = controls.stickyCheckbox:GetChecked()
@@ -1809,6 +1818,33 @@ local function ShowEvent(configTable)
 	controls.scrollAreaDropdown:Sort()
 	controls.scrollAreaDropdown:SetSelectedID(configTable.scrollArea)
 
+	-- The second scroll area is offered for the events whose caller asks for it; the message
+	-- box follows whichever dropdown is the last one shown.
+	frame.showScrollAreaOther = configTable.showScrollAreaOther
+	local lastDropdown = controls.scrollAreaDropdown
+	if configTable.showScrollAreaOther then
+		local otherDropdown = controls.scrollAreaOtherDropdown
+		local selected = configTable.scrollAreaOther
+		if type(selected) ~= "string" or selected == "" then selected = false end
+		local isListed = not selected
+		otherDropdown:Clear()
+		for saKey, saSettings in pairs(MSBTAnimations.scrollAreas) do
+			otherDropdown:AddItem(saSettings.name, saKey)
+			if saKey == selected then isListed = true end
+		end
+		-- An area that no longer exists stays listed under its key.
+		if not isListed then otherDropdown:AddItem(selected, selected) end
+		otherDropdown:Sort()
+		otherDropdown:AddItem(L.MSG_SAME_AS_ABOVE, false)
+		otherDropdown:SetSelectedID(selected)
+		otherDropdown:Show()
+		lastDropdown = otherDropdown
+	else
+		controls.scrollAreaOtherDropdown:Hide()
+	end
+	controls.messageEditbox:ClearAllPoints()
+	controls.messageEditbox:SetPoint("TOPLEFT", lastDropdown, "BOTTOMLEFT", 0, -20)
+
 	local objLocale = L.EDITBOXES["eventMessage"]
 	controls.messageEditbox:SetText(configTable.message)
 	controls.messageEditbox:SetTooltip(objLocale.tooltip .. "\n\n" .. (configTable.codes or ""))
@@ -1819,12 +1855,14 @@ local function ShowEvent(configTable)
 
 	if (configTable.isCrit) then controls.stickyCheckbox:Hide() else controls.stickyCheckbox:Show() end
 
+	-- A dropdown is 38 high and sits 20 below the one above it.
+	local extraHeight = configTable.showScrollAreaOther and 58 or 0
 	if (configTable.showIconSkillEditbox) then
-		frame:SetHeight(430)
+		frame:SetHeight(430 + extraHeight)
 		controls.iconSkillEditbox:Show()
 	else
 		controls.iconSkillEditbox:Hide()
-		frame:SetHeight(370)
+		frame:SetHeight(370 + extraHeight)
 	end
 
 	frame:SetWidth(380)
@@ -1837,7 +1875,7 @@ local function ShowEvent(configTable)
 		for token, checkbox in pairs(frame.resourceCheckboxes) do
 			checkbox:SetChecked(frame.resourceExclusions[token] ~= true)
 		end
-		frame:SetSize(730, 430)
+		frame:SetSize(730, 430 + extraHeight)
 		frame.resourcePanel:Show()
 	elseif frame.resourcePanel then
 		frame.resourcePanel:Hide()

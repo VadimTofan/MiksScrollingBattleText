@@ -2305,6 +2305,27 @@ masterProfile.scrollAreas.IncomingPet = CreatePetScrollArea(
 masterProfile.scrollAreas.OutgoingPet = CreatePetScrollArea(
 	masterProfile.scrollAreas.Outgoing)
 
+-- Whether an event can name a second scroll area, for its lines on units other than the target:
+-- an outgoing event of yours that a hit report can reach (interrupts and dispels are alerts).
+local function EventTakesOtherArea(eventType)
+	return type(eventType) == "string" and eventType:match("^OUTGOING_") ~= nil
+		and eventType ~= "OUTGOING_SPELL_INTERRUPT" and eventType ~= "OUTGOING_DISPEL"
+end
+
+-- On the clients whose lines go through the combat presentation, an area beside Outgoing for
+-- your lines on units other than your target; off by default.
+if Client.isMainline or Client.isForever then
+	local outgoing = masterProfile.scrollAreas.Outgoing
+	local otherArea = {}
+	for setting, value in pairs(outgoing) do
+		otherArea[setting] = value
+	end
+	otherArea.name = outgoing.name .. " (" .. L.MSG_OTHERS .. ")"
+	otherArea.offsetX = outgoing.offsetX + 100
+	otherArea.disabled = true
+	masterProfile.scrollAreas.OutgoingOther = otherArea
+end
+
 masterProfile.lowHealthSoundDisabled = false
 masterProfile.lowManaSoundDisabled = false
 masterProfile.lowHealthThreshold = 35
@@ -2345,6 +2366,10 @@ for eventType, settings in pairs(masterProfile.events) do
 		settings.scrollArea = "IncomingPet"
 	elseif eventType:match("^PET_OUTGOING_") then
 		settings.scrollArea = "OutgoingPet"
+	end
+	if masterProfile.scrollAreas.OutgoingOther and EventTakesOtherArea(eventType)
+		and settings.scrollArea == "Outgoing" then
+		settings.scrollAreaOther = "OutgoingOther"
 	end
 end
 
@@ -3065,6 +3090,7 @@ eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 
 module.masterProfile = masterProfile
+module.EventTakesOtherArea = EventTakesOtherArea
 
 module.CopyProfile					= CopyProfile
 module.DeleteProfile				= DeleteProfile

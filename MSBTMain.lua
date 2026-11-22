@@ -657,6 +657,7 @@ local outgoingBatcher = OutgoingBatcher:New({
 	display = DisplayEvent,
 	displayRestricted = DisplayRestrictedAmount,
 	displayRestrictedGroup = DisplayRestrictedGroup,
+	scrollAreas = MikSBT.Display.ScrollAreas,
 	after = C_Timer.After,
 	getSpellTexture = function(spellID)
 		local _, _, texture = GetSpellInfo(spellID)
@@ -732,6 +733,7 @@ if Client.isMainline or Client.isForever then
 		getProfile = function() return MSBTProfiles.currentProfile end,
 		getTime = GetTime,
 		batcher = outgoingBatcher,
+		scrollAreas = MikSBT.Display.ScrollAreas,
 		after = C_Timer.After,
 		delay = INCOMING_GROUP_DELAY,
 		damageDelay = INCOMING_DAMAGE_GROUP_DELAY,

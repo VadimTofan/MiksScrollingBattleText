@@ -138,6 +138,7 @@ local function LoadAddonFile(path)
 	return assert(loadstring(source, "@" .. path))()
 end
 LoadAddonFile("MSBTParser.lua")
+MikSBT.Display = MikSBT.Display or {}
 LoadAddonFile("MSBTMain.lua")
 local parserFrame = frames[1]
 local parser = MikSBT.Parser

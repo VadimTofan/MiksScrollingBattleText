@@ -81,6 +81,8 @@ local messages = {}
 MikSBT.Print = function(value) messages[#messages + 1] = value end
 MikSBT.Profiles = {
 	currentProfile = { auraTracking = {} },
+	-- Only the player's damage event takes a second scroll area here, whatever the real rule is.
+	EventTakesOtherArea = function(eventType) return eventType == "OUTGOING_DAMAGE" end,
 	SetOption = function(path, key, value)
 		assert(path == nil and (key == "auraTracking" or key == "auraSettings"))
 		MikSBT.Profiles.currentProfile[key] = value
@@ -315,6 +317,68 @@ for eventType, locale in pairs(petEvents) do
     assert(eventPopup.saveArg1 == eventType)
     assert(eventPopup.scrollArea == "Notification")
 end
+
+-- Describe: only the events that take a second scroll area offer one in their settings.
+-- Given a client with the area for lines on other units, and a spy on what the tab saves.
+MikSBT.Profiles.masterProfile = { scrollAreas = { OutgoingOther = {} } }
+local savedOptions = {}
+local savingOption = MikSBT.Profiles.SetOption
+MikSBT.Profiles.SetOption = function(path, field, value, default)
+    savedOptions[#savedOptions + 1] = { path, field, value, default }
+end
+local function Settings(eventType, category)
+    controls.eventCategoryDropdown:SetSelectedID(category)
+    controls.eventCategoryDropdown:change(category)
+    for _, line in ipairs(list.lines) do
+        if line.eventType == eventType then
+            line.settingsButton:click()
+            return
+        end
+    end
+    error(eventType .. " has no row")
+end
+local function SavedSecondAreas()
+    local saved = {}
+    for _, call in ipairs(savedOptions) do
+        if call[2] == "scrollAreaOther" then saved[#saved + 1] = call end
+    end
+    return saved
+end
+-- When the settings of an event that takes one are opened.
+MikSBT.Profiles.currentProfile.events.OUTGOING_DAMAGE = { message = "%a", scrollArea = "Outgoing",
+    scrollAreaOther = "OutgoingOther" }
+Settings("OUTGOING_DAMAGE", "OUTGOING_PLAYER_EVENTS")
+-- Then the popup is told to offer it, with the event's choice.
+assert(eventPopup.showScrollAreaOther == true and eventPopup.scrollAreaOther == "OutgoingOther")
+-- When the user keeps it, picks another area, or picks "Same as above".
+for _, choice in ipairs({ "OutgoingOther", "Custom", false }) do
+    savedOptions = {}
+    eventPopup.saveHandler({ message = "%a", scrollArea = "Outgoing", scrollAreaOther = choice },
+        eventPopup.saveArg1)
+    -- Then the choice is saved for that field alone, without a default that could hide it.
+    local saved = SavedSecondAreas()
+    assert(#saved == 1 and saved[1][1] == "events.OUTGOING_DAMAGE" and saved[1][3] == choice
+        and saved[1][4] == nil, "the second area was not saved as chosen")
+end
+-- And a save from a popup that offered no second area saves none.
+savedOptions = {}
+eventPopup.saveHandler({ message = "%a", scrollArea = "Outgoing" }, eventPopup.saveArg1)
+assert(#SavedSecondAreas() == 0 and #savedOptions > 0, "a save without a second area wrote one")
+-- When the settings of events that take none are opened.
+Settings("OUTGOING_HEAL", "OUTGOING_PLAYER_EVENTS")
+assert(not eventPopup.showScrollAreaOther, "an outgoing event the profile refuses was offered a second area")
+Settings("PET_OUTGOING_DAMAGE", "OUTGOING_PET_EVENTS")
+assert(not eventPopup.showScrollAreaOther, "a pet event was offered a second area")
+Settings("NOTIFICATION_BUFF", "NOTIFICATION_EVENTS")
+assert(not eventPopup.showScrollAreaOther, "a notification was offered a second area")
+list.lines[1].auraLine.settingsButton:click()
+assert(not eventPopup.showScrollAreaOther, "an aura was offered a second area")
+-- When a client has no such area.
+MikSBT.Profiles.masterProfile.scrollAreas.OutgoingOther = nil
+Settings("OUTGOING_DAMAGE", "OUTGOING_PLAYER_EVENTS")
+assert(not eventPopup.showScrollAreaOther, "a client without the area was offered it")
+MikSBT.Profiles.masterProfile, MikSBT.Profiles.SetOption = nil, savingOption
+MikSBT.Profiles.currentProfile.events.OUTGOING_DAMAGE = nil
 
 -- Describe: entering a name and an ID creates independently scoped rows.
 -- Given the notification category with an existing ID rule.

@@ -3,9 +3,11 @@ local ScrollAreas = {
 	areas = {},
 	names = {},
 }
-local PET_AREA_FALLBACKS = {
+-- A switched-off area whose lines show in the area it was split from.
+local AREA_FALLBACKS = {
 	OutgoingPet = "Outgoing",
 	IncomingPet = "Incoming",
+	OutgoingOther = "Outgoing",
 }
 
 local function Clear(values)
@@ -54,13 +56,20 @@ function ScrollAreas:Resolve(identifier)
 	end
 
 	if settings and settings.disabled then
-		local fallbackKey = PET_AREA_FALLBACKS[areaKey]
+		local fallbackKey = AREA_FALLBACKS[areaKey]
 		if fallbackKey then
 			settings = self.areas[fallbackKey] or settings
 		end
 	end
 
 	return settings or self.areas[self.config.defaultArea]
+end
+
+-- Whether an area with exactly this key exists and is switched on, without the fallbacks of
+-- Resolve; nil and false name no area.
+function ScrollAreas:IsSwitchedOn(key)
+	local settings = self.areas[key]
+	return type(settings) == "table" and not settings.disabled
 end
 
 function ScrollAreas:ResolveKey(settings)

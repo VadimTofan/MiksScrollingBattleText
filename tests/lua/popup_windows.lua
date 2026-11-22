@@ -5,7 +5,7 @@ local function NewFrame(parent, template)
 	local frame = {
 		parent = parent, template = template, scripts = {}, points = {},
 		text = "", width = 100, height = 24, enabled = true,
-		items = {}, textures = {}, children = {},
+		items = {}, itemIDs = {}, textures = {}, children = {},
 	}
 	setmetatable(frame, { __index = function(_, key)
 		if key:match("^[A-Z]") then return Noop end
@@ -55,8 +55,21 @@ local function NewFrame(parent, template)
 	function frame:GetChecked() return self.checked end
 	function frame:SetSelectedID(value) self.selected = value end
 	function frame:GetSelectedID() return self.selected end
-	function frame:AddItem(value) self.items[#self.items + 1] = value end
-	function frame:Clear() self.items = {} end
+	function frame:AddItem(value, id)
+		self.items[#self.items + 1] = value
+		self.itemIDs[#self.items] = id
+	end
+	function frame:Clear() self.items, self.itemIDs = {}, {} end
+	function frame:Sort()
+		for index = 2, #self.items do
+			local text, id, before = self.items[index], self.itemIDs[index], index - 1
+			while before > 0 and self.items[before] > text do
+				self.items[before + 1], self.itemIDs[before + 1] = self.items[before], self.itemIDs[before]
+				before = before - 1
+			end
+			self.items[before + 1], self.itemIDs[before + 1] = text, id
+		end
+	end
 	function frame:SetValue(value) self.value = value end
 	function frame:GetValue() return self.value end
 	function frame:SetMinMaxValues(minimum, maximum)
@@ -392,6 +405,88 @@ assert(eventSaves == 1)
 assert(not event.controls.iconSkillEditbox.shown)
 assert(event:GetHeight() < iconHeight)
 
+-- Describe: the event editor offers a second scroll area to the events that take one.
+-- Given the areas of a profile and the editor opened for an event that takes no second area.
+MikSBT.Animations.scrollAreas.Custom = { name = "Custom" }
+MikSBT.Animations.scrollAreas.OutgoingOther = { name = "Outgoing (others)" }
+MikSBT.Animations.scrollAreas.Zone = { name = "Zone" }
+local second, first = event.controls.scrollAreaOtherDropdown, event.controls.scrollAreaDropdown
+local messageBox = event.controls.messageEditbox
+local savedSettings
+local function OpenEvent(fields)
+	local opened = Config()
+	opened.title, opened.scrollArea, opened.message, opened.soundFile = "Event", "Incoming", "Message", "test.ogg"
+	for field, value in pairs(fields) do opened[field] = value end
+	opened.saveHandler = function(settings) savedSettings = settings end
+	savedSettings = nil
+	P.ShowEvent(opened)
+end
+local function Items(dropdown)
+	local listed = {}
+	for index, text in ipairs(dropdown.items) do listed[dropdown.itemIDs[index] == false and "same" or dropdown.itemIDs[index]] = text end
+	return listed
+end
+local SAVE = MikSBT.translations.BUTTONS.genericSave.label
+OpenEvent({})
+-- Then without the flag there is no second dropdown and the old layout stands.
+assert(second and not second.shown, "the second dropdown shows for an event that takes none")
+assert(event:GetHeight() == 370 and messageBox.points[1][2] == first)
+Click(event, SAVE)
+assert(savedSettings.scrollArea == "Incoming" and savedSettings.scrollAreaOther == nil,
+	"an event without a second area returned one")
+OpenEvent({ showIconSkillEditbox = true })
+assert(event:GetHeight() == 430 and not second.shown)
+
+-- When it is opened for an event that takes one, with an area chosen.
+OpenEvent({ showScrollAreaOther = true, scrollAreaOther = "Custom" })
+-- Then the second dropdown is shown below the first, lists every area and "Same as above" last,
+-- shows the chosen area, and pushes the message box down by what it needs.
+assert(second.shown and second.points[1][2] == first and second.points[1][3] == "BOTTOMLEFT")
+local listed = Items(second)
+assert(listed.Custom == "Custom" and listed.OutgoingOther == "Outgoing (others)" and listed.Incoming == "Incoming"
+	and listed.same == "Same as above", "the second dropdown lacks an item")
+assert(second.itemIDs[#second.itemIDs] == false and second.items[#second.items] == "Same as above",
+	"Same as above is not the last item")
+assert(#second.items == 5, "the second dropdown lists " .. #second.items .. " items")
+assert(second.selected == "Custom" and messageBox.points[1][2] == second)
+assert(event:GetHeight() == 370 + 58 and event:GetWidth() == 380)
+-- And the choice returns with the other settings.
+Click(event, SAVE)
+assert(savedSettings.scrollAreaOther == "Custom" and savedSettings.scrollArea == "Incoming")
+-- And choosing "Same as above" returns false.
+OpenEvent({ showScrollAreaOther = true, scrollAreaOther = "Custom" })
+second:SetSelectedID(false)
+Click(event, SAVE)
+assert(savedSettings.scrollAreaOther == false, "Same as above did not return false")
+-- And an event with the choice of none, false or nil, opens on "Same as above".
+for _, none in ipairs({ false, "" }) do
+	OpenEvent({ showScrollAreaOther = true, scrollAreaOther = none })
+	assert(second.selected == false, "no second area did not select Same as above")
+end
+OpenEvent({ showScrollAreaOther = true })
+assert(second.selected == false)
+Click(event, SAVE)
+assert(savedSettings.scrollAreaOther == false)
+-- And an area that no longer exists is listed under its key and selected.
+OpenEvent({ showScrollAreaOther = true, scrollAreaOther = "Deleted" })
+assert(Items(second).Deleted == "Deleted" and second.selected == "Deleted", "a deleted area was not listed")
+OpenEvent({ showScrollAreaOther = true, scrollAreaOther = "Custom" })
+assert(Items(second).Deleted == nil, "a deleted area stayed in the list")
+-- And the editor with an icon field grows by the same amount.
+OpenEvent({ showScrollAreaOther = true, showIconSkillEditbox = true })
+assert(event:GetHeight() == 430 + 58)
+
+-- When the editor is opened again for an event without a second area.
+OpenEvent({})
+-- Then the second dropdown and the larger size do not stay behind.
+assert(not second.shown and event:GetHeight() == 370 and messageBox.points[1][2] == first)
+Click(event, SAVE)
+assert(savedSettings.scrollAreaOther == nil, "the second area returned for an event that takes none")
+OpenEvent({ showIconSkillEditbox = true })
+assert(event:GetHeight() == 430)
+MikSBT.Animations.scrollAreas.Custom, MikSBT.Animations.scrollAreas.OutgoingOther = nil, nil
+MikSBT.Animations.scrollAreas.Zone = nil
+
 -- Describe: Blizzard's color picker remains usable above raised editors.
 -- Given the real colorswatch control and an open menu popup.
 NORMAL_FONT_COLOR = { r = 1, g = 0.82, b = 0 }
@@ -480,6 +575,15 @@ resourcePopup.resourceCheckboxes.COMBO_POINTS.clickHandler(
 Click(resourcePopup, MikSBT.translations.BUTTONS.genericSave.label)
 assert(savedResources.MANA == nil and savedResources.COMBO_POINTS == true)
 assert(config.resourceExclusions.MANA == true, "editing mutated saved choices")
+
+-- Given the resource configuration of an event that also takes a second scroll area.
+config.showScrollAreaOther = true
+-- When it opens, then the wide editor grows by the second dropdown too.
+P.ShowEvent(config)
+assert(resourcePopup:GetWidth() == 730 and resourcePopup:GetHeight() == 430 + 58)
+config.showScrollAreaOther = nil
+P.ShowEvent(config)
+assert(resourcePopup:GetHeight() == 430)
 
 -- Given another event using the cached editor.
 config.showResources = false

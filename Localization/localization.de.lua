@@ -42,6 +42,7 @@ L.MSG_INCOMING			= "Eingehend"
 L.MSG_OUTGOING			= "Ausgehend"
 L.MSG_NOTIFICATION		= "Benachrichtigung"
 L.MSG_STATIC			= "Statisch"
+L.MSG_OTHERS			= "andere"
 
 L.MSG_COMBAT					= "Kampf"
 L.MSG_DISPEL					= "Dispel"

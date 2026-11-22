@@ -83,6 +83,9 @@ end
 function Presentation:Emit(key, record, eventSettings)
 	local settings = eventSettings or self:Settings(key, record.crit)
 	if not settings then return end
+	if record.otherArea and self.config.scrollAreas:IsSwitchedOn(record.otherArea) then
+		settings = setmetatable({ scrollArea = record.otherArea }, { __index = settings })
+	end
 	local icon = record.icon or (record.spell
 		and self.config.getSpellTexture(record.spell))
 	if record.event == "heal" and self.config.displayHeal
@@ -400,6 +403,7 @@ function Presentation:Queue(key, record, incomingHeal)
 	end
 	local batchKey = key .. (record.crit and ":crit" or "")
 		.. ":" .. tostring(record.spell or record.icon or "")
+	if record.otherArea then batchKey = batchKey .. ":" .. record.otherArea end
 	local batch = self.batches[batchKey]
 	if batch then
 		batch.amount = batch.amount + record.amount
@@ -462,6 +466,24 @@ local function RangedEventKey(record, key)
 	return key
 end
 
+-- The area for a line of yours on a unit other than your target: the second area its
+-- event names, while that area is switched on and differs from the event's own.
+-- Nil leaves the line where its event puts it.
+function Presentation:OtherArea(record, key)
+	local areas = self.config.scrollAreas
+	if not areas or not record.plate or record.result.who ~= "you" then return nil end
+	local settings
+	if record.event == "damage" then
+		settings = select(2, self.config.batcher:ResolveSettings(nil, nil, nil, key, record.crit))
+	else
+		settings = self:Settings(key, record.crit)
+	end
+	local area = settings and settings.scrollAreaOther
+	if not areas:IsSwitchedOn(area) then return nil end
+	if areas.areas[area] == areas:Resolve(settings.scrollArea) then return nil end
+	return area
+end
+
 function Presentation:Out(record)
 	local result = record.result
 	if not result or (result.who ~= "you" and result.who ~= "pet") then return end
@@ -500,6 +522,7 @@ function Presentation:Out(record)
 			icon = self.config.getSpellTexture(8232)
 		end
 	end
+	local otherArea = self:OtherArea(record, key)
 	if record.event == "damage" then
 		local school = RestrictedValue:Number(record.school)
 		local isSpell = not result.melee
@@ -511,18 +534,19 @@ function Presentation:Out(record)
 				result.who == "pet", result.tick, key, school, candidateSpell,
 				inferenceGroup,
 				self.config.formatBlockedTrailer
-					and self.config.formatBlockedTrailer(record))
+					and self.config.formatBlockedTrailer(record), otherArea)
 		else
 			self.config.batcher:Queue(
 				spell, record.amount, record.crit, icon, isSpell,
 				result.who == "pet", result.tick, key, nil, school, candidateSpell,
-				inferenceGroup)
+				inferenceGroup, otherArea)
 		end
 		return
 	end
 	local displayRecord = {}
 	for field, value in pairs(record) do displayRecord[field] = value end
 	displayRecord.spell, displayRecord.icon = spell, icon
+	displayRecord.otherArea = otherArea
 	self:Queue(key, displayRecord)
 end
 

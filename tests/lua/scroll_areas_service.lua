@@ -147,6 +147,53 @@ for _, direction in ipairs({ "Outgoing", "Incoming" }) do
 	assert(#rendered == 2, "disabled pet event was redirected")
 end
 
+-- Describe: a line for the switched-off area of your lines on other units shows in Outgoing.
+do
+	-- Given that area switched off, as after a line was queued for it.
+	local mainArea = { name = "Outgoing" }
+	local otherArea = { name = "Outgoing (others)", disabled = true }
+	profile.scrollAreas.Outgoing = mainArea
+	profile.scrollAreas.OutgoingOther = otherArea
+	ScrollAreas:Update()
+	local rendered = {}
+	DisplayService.config.display = function(...) rendered[#rendered + 1] = { ... } end
+
+	-- When the line reaches display.
+	DisplayService:DisplayEvent({ scrollArea = "OutgoingOther", textCategory = "Outgoing" }, "12")
+
+	-- Then it is not lost but shown in Outgoing, and the area itself stays off.
+	assert(#rendered == 1 and rendered[1][2] == mainArea, "a line for the switched-off area was lost")
+	assert(ScrollAreas:Resolve("OutgoingOther") == mainArea and otherArea.disabled)
+
+	-- When the area is switched on, then it takes its lines itself.
+	otherArea.disabled = false
+	DisplayService:DisplayEvent({ scrollArea = "OutgoingOther", textCategory = "Outgoing" }, "13")
+	assert(#rendered == 2 and rendered[2][2] == otherArea)
+	profile.scrollAreas.OutgoingOther = nil
+	ScrollAreas:Update()
+end
+
+-- Describe: an area counts as switched on only under its own key.
+do
+	-- Given an area that is on, one that is off, and an off area with a fallback.
+	profile.scrollAreas.SwitchedOn = { name = "Shown" }
+	profile.scrollAreas.SwitchedOff = { name = "Hidden", disabled = true }
+	profile.scrollAreas.OutgoingPet = { name = "Pet", disabled = true }
+	ScrollAreas:Update()
+
+	-- When they are asked about, with a key that does not exist and with no key at all.
+	-- Then only the first is on, however the others resolve.
+	assert(ScrollAreas:IsSwitchedOn("SwitchedOn") == true)
+	assert(ScrollAreas:IsSwitchedOn("SwitchedOff") == false)
+	assert(ScrollAreas:IsSwitchedOn("OutgoingPet") == false, "a fallback made an area count as on")
+	assert(ScrollAreas:IsSwitchedOn("Nowhere") == false, "the default area stood in for a missing one")
+	assert(ScrollAreas:IsSwitchedOn("Shown") == false, "an area was found by its name")
+	assert(ScrollAreas:IsSwitchedOn(nil) == false and ScrollAreas:IsSwitchedOn(false) == false)
+	profile.scrollAreas.SwitchedOn, profile.scrollAreas.SwitchedOff = nil, nil
+	profile.scrollAreas.OutgoingPet = nil
+	ScrollAreas:Update()
+end
+
 -- Given an unrelated disabled custom area.
 local custom = { name = "Custom", disabled = true }
 profile.scrollAreas.Custom = custom

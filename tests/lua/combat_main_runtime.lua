@@ -2,6 +2,7 @@
 -- modern clients through the real main module and real adapted reader.
 dofile("tests/lua/notification_runtime.lua")
 MikSBT.Configuration = MikSBT.Configuration or {}
+MikSBT.Display = MikSBT.Display or {}
 dofile("Configuration/ResourcePolicy.lua")
 MikSBT.translations.SETUP_RELOAD_PROMPT = "重新加载界面以启用 MSBT。"
 

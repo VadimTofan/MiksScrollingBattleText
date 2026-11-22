@@ -1327,6 +1327,10 @@ local function EventsTab_SaveEventSettings(settings, eventType)
 	end
 	EventsTab_SaveOption(eventType, "soundFile", settings.soundFile)
 	EventsTab_SaveOption(eventType, "scrollArea", settings.scrollArea, DEFAULT_SCROLL_AREA)
+	-- The popup returns a key, or false for "Same as above"; nil when it offered no second area.
+	if settings.scrollAreaOther ~= nil then
+		EventsTab_SaveOption(eventType, "scrollAreaOther", settings.scrollAreaOther)
+	end
 	EventsTab_SaveOption(eventType, "message", settings.message)
 	EventsTab_SaveOption(eventType, "alwaysSticky", settings.alwaysSticky)
 
@@ -1353,6 +1357,9 @@ local function EventsTab_SettingsButtonOnClick(this)
 	configTable.scrollArea = eventSettings.scrollArea or DEFAULT_SCROLL_AREA
 	configTable.alwaysSticky = eventSettings.alwaysSticky
 	configTable.isCrit = eventSettings.isCrit
+	configTable.showScrollAreaOther = MSBTProfiles.EventTakesOtherArea(eventType)
+		and MSBTProfiles.masterProfile.scrollAreas.OutgoingOther ~= nil
+	configTable.scrollAreaOther = eventSettings.scrollAreaOther
 	configTable.showResources = eventType == "NOTIFICATION_RESOURCE_GAIN"
 	configTable.resourceExclusions = MSBTProfiles.currentProfile.resourceExclusions
 	configTable.parentFrame = tabFrames.events

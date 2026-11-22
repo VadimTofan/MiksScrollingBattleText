@@ -62,7 +62,7 @@ local OPTIONAL_TYPES = {
 local RECORD_TYPES = {
 	name = "string", message = "string", mainEvents = "string",
 	exceptions = "string", classes = "string", scrollArea = "string",
-	textCategory = "string",
+	scrollAreaOther = "string", textCategory = "string",
 	fontName = "string", normalFontName = "string", critFontName = "string",
 	animationStyle = "string", stickyAnimationStyle = "string",
 	direction = "string", stickyDirection = "string", behavior = "string",

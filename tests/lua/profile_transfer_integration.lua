@@ -154,6 +154,134 @@ for _, forever in ipairs({ false, true }) do
 		assert(area.animationStyle == defaults.scrollAreas[direction].animationStyle)
 		assert(area ~= defaults.scrollAreas[direction])
 	end
+	do
+		-- Then on Forever the area for your lines on other units lies beside Outgoing, switched off;
+		-- a client that is neither Forever nor Mainline shows its lines without the combat
+		-- presentation and has no such area.
+		local outgoing = defaults.scrollAreas.Outgoing
+		local other = defaults.scrollAreas.OutgoingOther
+		if not forever then
+			assert(other == nil, "a client without plates has the area for other units")
+		else
+			assert(other and other.disabled == true, "the area for other units is missing or on")
+			assert(other.name == outgoing.name .. " (" .. translations.MSG_OTHERS .. ")",
+				"the area for other units is named " .. tostring(other.name))
+			assert(other.offsetX == outgoing.offsetX + 100 and other.offsetY == outgoing.offsetY
+				and other.animationStyle == outgoing.animationStyle and other.behavior == outgoing.behavior
+				and other.iconAlign == outgoing.iconAlign and other ~= outgoing,
+				"the area for other units did not copy Outgoing")
+		end
+
+		-- And every outgoing event of yours that shows in Outgoing names it as its second area,
+		-- on the clients that have the area, and no other event has the field.
+		for eventType, settings in pairs(defaults.events) do
+			local expected = forever and profiles.EventTakesOtherArea(eventType)
+				and settings.scrollArea == "Outgoing" and "OutgoingOther" or nil
+			assert(settings.scrollAreaOther == expected, eventType .. " has the second area "
+				.. tostring(settings.scrollAreaOther) .. ", not " .. tostring(expected))
+		end
+		for _, eventType in ipairs({ "OUTGOING_DAMAGE", "OUTGOING_DAMAGE_CRIT", "OUTGOING_SPELL_DAMAGE",
+			"OUTGOING_SPELL_DOT", "OUTGOING_SPELL_DAMAGE_SHIELD", "OUTGOING_HEAL", "OUTGOING_HEAL_CRIT",
+			"OUTGOING_HOT", "OUTGOING_MISS", "OUTGOING_SPELL_MISS" }) do
+			assert(defaults.events[eventType].scrollArea == "Outgoing", eventType)
+			assert(defaults.events[eventType].scrollAreaOther == (forever and "OutgoingOther" or nil), eventType)
+		end
+		for _, eventType in ipairs({ "OUTGOING_SPELL_INTERRUPT", "OUTGOING_DISPEL", "PET_OUTGOING_DAMAGE",
+			"INCOMING_DAMAGE", "SELF_HEAL", "NOTIFICATION_BUFF" }) do
+			assert(defaults.events[eventType].scrollAreaOther == nil, eventType .. " has a second area")
+		end
+		-- And the predicate accepts your outgoing events and refuses every other kind.
+		for eventType, expected in pairs({ OUTGOING_DAMAGE = true, OUTGOING_SPELL_DAMAGE_CRIT = true,
+			OUTGOING_RANGED_MISS = true, OUTGOING_SPELL_INTERRUPT = false, OUTGOING_DISPEL = false,
+			PET_OUTGOING_DAMAGE = false, INCOMING_DAMAGE = false, NOTIFICATION_BUFF = false,
+			SELF_HEAL = false, ["12345"] = false, ["name:Thorns"] = false, [""] = false }) do
+			assert(profiles.EventTakesOtherArea(eventType) == expected, eventType)
+		end
+		assert(profiles.EventTakesOtherArea(nil) == false and profiles.EventTakesOtherArea(5) == false)
+
+		-- Given the running display, and a hit of yours on another unit.
+		MikSBT.Display, MikSBT.Components = {}, {}
+		LoadFile("API/RestrictedValue.lua")
+		local areas = LoadFile("Display/ScrollAreas.lua")
+		local service = LoadFile("Display/DisplayService.lua")
+		areas:Configure({
+			getProfile = function() return profiles.currentProfile end,
+			getMasterProfile = function() return profiles.masterProfile end,
+			defaultArea = "Notification",
+		})
+		areas:Update()
+		local shownIn = {}
+		service:Configure({
+			scrollAreas = areas, getProfile = function() return profiles.currentProfile end,
+			isModDisabled = function() return false end, fonts = {}, defaultArea = "Notification",
+			display = function(_, area) shownIn[#shownIn + 1] = area end,
+		})
+		local function Display(...) service:DisplayEvent(...) end
+		local batcher = LoadFile("Components/OutgoingBatcher.lua"):New({
+			getProfile = function() return profiles.currentProfile end,
+			formatEventMessage = function(_, amount) return tostring(amount) end,
+			display = Display, after = function(_, callback) callback() end,
+			getSpellTexture = function() return "icon" end,
+			isAutoAttack = function() return false end, delay = 0, scrollAreas = areas,
+		})
+		local presentation = LoadFile("Components/CombatPresentation.lua"):New({
+			getProfile = function() return profiles.currentProfile end,
+			batcher = batcher, getSpellTexture = function() return "icon" end, display = Display,
+			scrollAreas = areas,
+		})
+		local function HitOnAnotherUnit()
+			presentation:Out({ event = "damage", amount = 10, plate = "nameplate2",
+				result = { who = "you", spell = 101 } })
+			return shownIn[#shownIn]
+		end
+		assert(HitOnAnotherUnit() == areas:Resolve("Outgoing"), "a switched-off or absent area took a line")
+
+		if forever then
+			-- When the area is switched on the way the options do it.
+			profiles.SetOption("scrollAreas.OutgoingOther", "disabled", false)
+			areas:Update()
+
+			-- Then it resolves with the default settings and receives the line.
+			local enabled = areas:Resolve("OutgoingOther")
+			assert(enabled.disabled == false and enabled.name == other.name
+				and enabled.offsetX == other.offsetX, "the switched-on area lost its default settings")
+			assert(HitOnAnotherUnit() == enabled, "the switched-on area did not receive the line")
+
+			-- When it is switched off again, then the event's own display returns.
+			profiles.SetOption("scrollAreas.OutgoingOther", "disabled", true)
+			areas:Update()
+			assert(HitOnAnotherUnit() == areas:Resolve("Outgoing"), "switching the area off kept moving lines")
+
+			-- When the options save a second area the way the Events tab does.
+			local events = profiles.currentProfile.events
+			local function Saved(eventType)
+				local table = rawget(profiles.currentProfile, "events")
+				table = table and rawget(table, eventType)
+				return table and rawget(table, "scrollAreaOther")
+			end
+			-- Then the area the master profile already has leaves no entry behind,
+			profiles.SetOption("events.OUTGOING_DAMAGE", "scrollAreaOther", "OutgoingOther")
+			assert(Saved("OUTGOING_DAMAGE") == nil and events.OUTGOING_DAMAGE.scrollAreaOther == "OutgoingOther")
+			-- and "Same as above" is stored as false, which survives selecting the profile again,
+			profiles.SetOption("events.OUTGOING_DAMAGE", "scrollAreaOther", false)
+			assert(Saved("OUTGOING_DAMAGE") == false)
+			profiles.SelectProfile("Default")
+			assert(profiles.currentProfile.events.OUTGOING_DAMAGE.scrollAreaOther == false,
+				"the choice of no second area was lost")
+			-- and choosing the master's area again removes the entry.
+			profiles.SetOption("events.OUTGOING_DAMAGE", "scrollAreaOther", "OutgoingOther")
+			assert(Saved("OUTGOING_DAMAGE") == nil and
+				profiles.currentProfile.events.OUTGOING_DAMAGE.scrollAreaOther == "OutgoingOther")
+			-- An event without a master value stores a chosen area and no entry for none.
+			profiles.SetOption("events.OUTGOING_SPELL_INTERRUPT", "scrollAreaOther", false)
+			assert(Saved("OUTGOING_SPELL_INTERRUPT") == nil)
+			profiles.SetOption("events.OUTGOING_SPELL_INTERRUPT", "scrollAreaOther", "Static")
+			assert(Saved("OUTGOING_SPELL_INTERRUPT") == "Static")
+			profiles.SetOption("events.OUTGOING_SPELL_INTERRUPT", "scrollAreaOther", false)
+			assert(Saved("OUTGOING_SPELL_INTERRUPT") == nil)
+		end
+		MikSBT.Display, MikSBT.Components = nil, nil
+	end
 	for eventType, settings in pairs(defaults.events) do
 		if eventType:match("^PET_INCOMING_") then
 			assert(settings.scrollArea == "IncomingPet", eventType)
@@ -379,6 +507,41 @@ for _, forever in ipairs({ false, true }) do
 	-- Then both complete client schemas can be exported.
 	assert(exported, errorCode)
 	exports[#exports + 1] = exported
+end
+
+-- Describe: Mainline shows your lines through the same combat presentation as Forever.
+do
+	-- Given the defaults of a Mainline client.
+	local client = MikSBT.Compatibility.Client
+	local loaded, loadedFrame = MikSBT.Profiles, frame
+	client.isClassicContent, client.isForever, client.isMainline = false, false, true
+	local chunk = assert(loadstring(source, "@MSBTProfiles.lua"))
+	setfenv(chunk, environment)
+	chunk()
+	local mainline = MikSBT.Profiles.masterProfile
+	MikSBT.Profiles, frame = loaded, loadedFrame
+	client.isClassicContent, client.isForever, client.isMainline = true, true, nil
+
+	-- And a client whose heal event shows in another area leaves that event without a second area.
+	local patched, replaced = source:gsub('(	OUTGOING_HEAL = {[^}]-scrollArea%s*= )"Outgoing"', '%1"Static"')
+	assert(replaced == 2, "the heal event was not found in both default tables")
+	client.isClassicContent, client.isForever, client.isMainline = false, false, true
+	chunk = assert(loadstring(patched, "@MSBTProfiles.lua"))
+	setfenv(chunk, environment)
+	chunk()
+	local moved = MikSBT.Profiles.masterProfile
+	MikSBT.Profiles, frame = loaded, loadedFrame
+	client.isClassicContent, client.isForever, client.isMainline = true, true, nil
+	assert(moved.events.OUTGOING_HEAL.scrollAreaOther == nil
+		and moved.events.OUTGOING_DAMAGE.scrollAreaOther == "OutgoingOther",
+		"an event that does not show in Outgoing got a second area")
+
+	-- Then they have the area for your lines on other units too.
+	assert(mainline.scrollAreas.OutgoingOther and mainline.scrollAreas.OutgoingOther.disabled == true,
+		"a Mainline client lacks the area for other units")
+	assert(mainline.events.OUTGOING_SPELL_DAMAGE.scrollAreaOther == "OutgoingOther"
+		and mainline.events.PET_OUTGOING_SPELL_DAMAGE.scrollAreaOther == nil,
+		"a Mainline client lacks the second area of its events")
 end
 
 -- Describe: profiles from older versions retain retired settings in storage.

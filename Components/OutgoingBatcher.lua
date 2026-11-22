@@ -67,6 +67,13 @@ function OutgoingBatcher:DamageSettings(settings, isSpell, isDot, school)
 	}, { __index = settings })
 end
 
+-- Lays the area a line moves to over its event's settings, while that area is still
+-- switched on when the line is shown.
+local function MovedSettings(settings, area, areas)
+	if not area or not (areas and areas:IsSwitchedOn(area)) then return settings end
+	return setmetatable({ scrollArea = area }, { __index = settings })
+end
+
 -- Finds the event settings to use.
 -- For critical hits, check the _CRIT event first; if disabled or absent,
 -- fall back to the normal base event.
@@ -132,6 +139,7 @@ function OutgoingBatcher:Flush(batchKey)
 	if not displaySettings then
 		return
 	end
+	displaySettings = MovedSettings(displaySettings, batch.otherArea, self.config.scrollAreas)
 	displaySettings = self:DamageSettings(displaySettings,
 		batch.isSpell, batch.isDot, batch.school)
 	local school = batch.school
@@ -165,11 +173,13 @@ function OutgoingBatcher:DisplayRestricted(
 	school,
 	candidateSpell,
 	inferenceGroup,
-	suffix
+	suffix,
+	otherArea
 )
 	if self:ShouldStackWindfury(spellID, isPet, isDot, candidateSpell) then
 		self:Queue(spellID, amount, isCrit, effectTexture, forceIsSpell,
-			isPet, isDot, eventKey, true, school, candidateSpell, inferenceGroup)
+			isPet, isDot, eventKey, true, school, candidateSpell, inferenceGroup,
+			otherArea)
 		return
 	end
 	if not effectTexture and not isDot and not eventKey then
@@ -185,6 +195,7 @@ function OutgoingBatcher:DisplayRestricted(
 	if not settings then
 		return
 	end
+	settings = MovedSettings(settings, otherArea, self.config.scrollAreas)
 	settings = self:DamageSettings(settings, isSpell, isDot, school)
 	if settings.attackColorOverride then school = nil end
 	local message = not eventKey and not isPet and not isSpell and "%a" or nil
@@ -204,7 +215,8 @@ function OutgoingBatcher:Queue(
 	isRestricted,
 	school,
 	candidateSpell,
-	inferenceGroup
+	inferenceGroup,
+	otherArea
 )
 	if not isRestricted and (not amount or amount <= 0) then
 		return
@@ -232,6 +244,7 @@ function OutgoingBatcher:Queue(
 	if inferenceGroup then batchKey = batchKey .. ":inference:" .. inferenceGroup end
 	if eventKey then batchKey = eventKey .. ":" .. batchKey end
 	if school then batchKey = batchKey .. ":school:" .. school end
+	if otherArea then batchKey = batchKey .. ":" .. otherArea end
 	local batch = self.batches[batchKey]
 	if not batch then
 		local isSpell = forceIsSpell
@@ -249,6 +262,7 @@ function OutgoingBatcher:Queue(
 			isPet = isPet,
 			isDot = isDot,
 			eventKey = eventKey,
+			otherArea = otherArea,
 			effectTexture = effectTexture,
 			amounts = stackWindfury and {} or nil,
 		}

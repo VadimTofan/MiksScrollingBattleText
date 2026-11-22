@@ -191,3 +191,27 @@ assert(outputs[1][2] == "10" and outputs[1][3] == nil)
 assert(outputs[2][2] == "20" and outputs[2][3] == "wf-icon")
 assert(delays[1] == 1 and delays[2] == 0,
 	"settled inference group waited through a second proc collection window")
+
+-- Given a batcher that was given no scroll areas.
+do
+	local shown, pending = {}, {}
+	local plain = OutgoingBatcher:New({
+		getProfile = function() return profile end,
+		formatAmount = function(amount) return tostring(amount) end,
+		formatEventMessage = function(_, amount) return tostring(amount) end,
+		display = function(settings) shown[#shown + 1] = settings end,
+		after = function(_, callback) pending[#pending + 1] = callback end,
+		getSpellTexture = function() return "texture" end,
+		isAutoAttack = function(spellID) return spellID == 6603 end,
+		autoAttackSpellID = 6603,
+		delay = 0.2,
+	})
+
+	-- When a hit that names an area to move to is shown.
+	plain:Queue(1234, 30, false, nil, nil, nil, nil, nil, nil, nil, nil, nil, "Custom")
+	for _, callback in ipairs(pending) do callback() end
+
+	-- Then it shows where its event puts it.
+	assert(#shown == 1 and shown[1] == profile.events.OUTGOING_SPELL_DAMAGE,
+		"a hit with an area to move to left its event's area in a batcher without scroll areas")
+end

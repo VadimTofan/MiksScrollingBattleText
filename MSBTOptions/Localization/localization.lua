@@ -29,6 +29,7 @@ L.MSG_NEW_PROFILE					= "New Profile"
 L.MSG_PROFILE_ALREADY_EXISTS		= "Profile already exists."
 L.MSG_INVALID_PROFILE_NAME			= "Invalid profile name."
 L.MSG_NEW_SCROLL_AREA				= "New Scroll Area"
+L.MSG_SAME_AS_ABOVE					= "Same as above"
 L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "Scroll area name already exists."
 L.MSG_INVALID_SCROLL_AREA_NAME		= "Invalid scroll area name."
 L.MSG_ACKNOWLEDGE_TEXT				= "Are you sure you wish to perform this action?"
@@ -187,6 +188,7 @@ obj["textAlign"]			= { label="Text Align:", tooltip="The alignment of the text f
 obj["iconAlign"]			= { label="Icon Align:", tooltip="The alignment of skill icons relative to the text."}
 obj["eventCategory"]		= { label="Event Category:", tooltip="The category of events to configure."}
 obj["outputScrollArea"]		= { label="Output Scroll Area:", tooltip="Selects the scroll area to use for output."}
+obj["outputScrollAreaOther"]	= { label="Scroll Area (Other Units):", tooltip="Selects the scroll area for this event's lines that land on a unit other than your target, while that scroll area is enabled."}
 obj["optionsDesign"]		= { label="Options Design:", tooltip="Selects the options window that /msbt opens."}
 
 

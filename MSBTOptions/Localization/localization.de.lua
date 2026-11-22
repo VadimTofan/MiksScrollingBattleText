@@ -9,6 +9,7 @@ L.MSG_NEW_PROFILE					= "Neues Profil"
 L.MSG_PROFILE_ALREADY_EXISTS		= "Profil existiert bereits."
 L.MSG_INVALID_PROFILE_NAME			= "Ungültiger Profilname."
 L.MSG_NEW_SCROLL_AREA				= "Neuer Scroll-Bereich"
+L.MSG_SAME_AS_ABOVE					= "Wie oben"
 L.MSG_SCROLL_AREA_ALREADY_EXISTS	= "Name für Scroll-Bereich existiert bereits."
 L.MSG_INVALID_SCROLL_AREA_NAME		= "Ungültiger Name für Scroll-Bereich."
 L.MSG_ACKNOWLEDGE_TEXT				= "Bist du sicher, dass du diese Aktion durchführen willst?"
@@ -79,6 +80,7 @@ obj["textAlign"]			= { label="Text ausrichten:", tooltip="Die Ausrichtung des Te
 obj["iconAlign"]			= { label="Symbol ausrichten:", tooltip="Die Ausrichtung des Symbols für die Animation."}
 obj["eventCategory"]		= { label="Ereigniskategorie:", tooltip="Die Kategorie der zu konfigurienden Ereignisse."}
 obj["outputScrollArea"]		= { label="Scroll-Bereich:", tooltip="Den Scroll-Bereich für die Textausgabe auswählen."}
+obj["outputScrollAreaOther"]	= { label="Scroll-Bereich (andere Einheiten):", tooltip="Den Scroll-Bereich für Zeilen dieses Ereignisses auswählen, die nicht auf deinem Ziel landen; er gilt, solange er eingeschaltet ist."}
 obj["optionsDesign"]		= { label="Optionen-Design:", tooltip="Wählt das Optionsfenster, das /msbt öffnet."}
 
 
