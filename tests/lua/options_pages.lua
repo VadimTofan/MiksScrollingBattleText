@@ -1,0 +1,793 @@
+-- Describe: the General, Fonts & Colors, Sounds and Profile pages of the new options window.
+local env = dofile("tests/lua/options_window_env.lua")
+local calls, Profiles, L, tabs, Window = env.calls, env.Profiles, env.L, env.tabs, env.Window
+local Find, FindAll, Labelled, Click, ClickEntry, IsInWindow, Footer =
+	env.Find, env.FindAll, env.Labelled, env.Click, env.ClickEntry, env.IsInWindow, env.Footer
+
+-- Which icon each icon button was built with.
+local skinned = {}
+local createIconButton = Window.CreateIconButton
+Window.CreateIconButton = function(parent, icon, tooltip, handler)
+	local button = createIconButton(parent, icon, tooltip, handler)
+	skinned[button] = icon
+	return button
+end
+
+-- Popups, classic exports and the sound media record what the pages hand them.
+local shown = {}
+local function Recorder(name)
+	return function(...) shown[#shown + 1] = { name, ... } end
+end
+GetLocale = function() return "deDE" end
+MikSBT.Print = Recorder("Print")
+MSBTOptions.Popups = {
+	ShowAcknowledge = Recorder("ShowAcknowledge"), ShowInput = Recorder("ShowInput"),
+	ShowPartialEffects = Recorder("ShowPartialEffects"), ShowDamageColors = Recorder("ShowDamageColors"),
+	ShowClassColors = Recorder("ShowClassColors"), DisableControls = Recorder("DisableControls"),
+	UseDesignPopups = env.Popups.UseDesignPopups,
+}
+MSBTOptions.Tabs = { general = {
+	ShowMasterFont = Recorder("ShowMasterFont"), ShowAddFont = Recorder("ShowAddFont"),
+	ResetBlizzardSCT = Recorder("ResetBlizzardSCT"), ReportImport = Recorder("ReportImport"),
+} }
+MSBTOptions.ProfileTransfer = { ShowExport = Recorder("ShowExport"), ShowImport = Recorder("ShowImport") }
+local media = { sounds = { Alarm = "b.ogg", Beep = "a.ogg" } }
+MikSBT.Media = { sounds = media.sounds, PlaySound = function(name) Recorder("PlaySound")(name) return true end }
+-- Like the shared media library, a name registered once cannot be registered again.
+function MikSBT.Media.RegisterSound(name, file)
+	if media.sounds[name] then return false end
+	media.sounds[name] = file
+	return true
+end
+MikSBT.API = { Sounds = { NormalizeFile = function(_, file) return file end } }
+Profiles.savedMedia.sounds = { Alarm = "b.ogg", Beep = "a.ogg" }
+-- The game resolves missing values from the master profile; this store has none.
+for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
+-- The game's own text over a target: the client's values live outside the profile.
+local mechanics = { own = false, others = true }
+function Profiles.GetSpellMechanicsText() return mechanics.own, mechanics.others end
+function Profiles.SetSpellMechanicsText(which, isShown)
+	shown[#shown + 1] = { "SetSpellMechanicsText", which, isShown }
+	mechanics[which] = isShown
+end
+L.CHECKBOXES.spellMechanicsOwn = { label = "Effects on targets", tooltip = "Effects tip" }
+L.CHECKBOXES.spellMechanicsOthers = { label = "Effects on other players' targets", tooltip = "Others tip" }
+dofile("MSBTOptions/MSBTOptionsSounds.lua")
+dofile("MSBTOptions/Designs/Forever/Pages.lua")
+local general = MSBTOptions.Tabs.general
+
+local function Last() return shown[#shown] end
+local function NoteTop()
+	local note = Find(MSBTOptionsWindowFrame, function(frame)
+		for _, region in ipairs(frame.regions) do
+			if region.GetText and region:GetText() == L.LANGUAGE_INFO then return true end
+		end
+	end)
+	for _, region in ipairs(note.regions) do
+		if region.GetText and region:GetText() == L.LANGUAGE_INFO then return region.points.TOPLEFT.y end
+	end
+end
+local function Checkboxes(label)
+	return FindAll(MSBTOptionsWindowFrame, function(region)
+		return region.checkFrame and region.fontString:GetText() == label and region.shown
+	end)
+end
+local function Toggle(checkbox, isChecked)
+	checkbox.checkFrame:SetChecked(isChecked)
+	Click(checkbox.checkFrame)
+end
+-- An entry of the two Blizzard dropdowns by its label, and a click on it where it does not stand as wanted.
+local ON_ME, ON_TARGET = L.WINDOW.blizzardOnMe, L.WINDOW.blizzardOnTarget
+local function MenuEntry(label)
+	return env.MenuEntry(ON_ME, label) or env.MenuEntry(ON_TARGET, label)
+end
+local function Tick(label, isTicked)
+	local entry = MenuEntry(label)
+	if entry:IsSelected() ~= isTicked then entry:Pick() end
+end
+
+-- Rule: the sidebar shows the rebuilt entries as pages, not as classic tabs.
+do
+	Window.Show()
+	local function Entry(key)
+		return Find(MSBTOptionsWindowFrame, function(region) return region.key == key end)
+	end
+	assert(Entry("fontsColors") and not Entry("resetBlizzardSCT") and not Entry("language"),
+		"the sidebar entries are not the new ones")
+	for _, key in ipairs({ "general", "sounds", "profile" }) do
+		ClickEntry(key)
+		assert(not IsInWindow(tabs[key]) and not tabs[key]:IsShown(), key .. " hosts the classic tab")
+	end
+end
+
+-- Rule: each General control saves the field, value and default of the classic General tab.
+do
+	ClickEntry("general")
+	-- Label, which of equal labels, field, value saved when checked, reapplies context.
+	local expected = {
+		{ "enableBlizzardDamage", 1, "blizzardDamageEnabled", true, true },
+		{ "disableOutgoing", 1, "msbtOutgoingDisabled", true, true },
+		{ "disableNotifications", 1, "msbtNotificationsDisabled", true, true },
+		{ "disableIncoming", 1, "msbtIncomingDisabled", true, true },
+		{ "enableNames", 1, "hideSkills", false },
+		{ "enableIcons", 1, "skillIconsDisabled", false },
+		{ "stickyCrits", 1, "stickyCritsDisabled", false },
+		{ "stackSimilarHits", 1, "stackSimilarHits", true },
+		{ "shortenNumbers", 1, "shortenNumbers", true },
+	}
+	for _, case in ipairs(expected) do
+		MikSBT.EraseTable(calls)
+		Toggle(Checkboxes(L.CHECKBOXES[case[1]].label)[case[2]], true)
+		assert(calls[1][1] == "SetOption" and calls[1][2] == nil and calls[1][3] == case[3]
+			and calls[1][4] == case[4] and calls[1][5] == nil, "wrong save for " .. case[3])
+		assert((calls[2] ~= nil and calls[2][1] == "ApplyContextOptions") == (case[5] == true),
+			"wrong context reapply for " .. case[3])
+	end
+
+	MikSBT.EraseTable(calls)
+	Toggle(Checkboxes(L.CHECKBOXES.enableMSBT.label)[1], false)
+	assert(calls[1][1] == "SetOptionUserDisabled" and calls[1][2] == true, "MSBT switch differs")
+
+	MikSBT.EraseTable(calls)
+	local slider = Find(MSBTOptionsWindowFrame, function(region)
+		return region.labelFontString and region.sliderFrame and region.shown
+	end)
+	slider.sliderFrame:SetValue(120)
+	assert(calls[1][3] == "animationSpeed" and calls[1][4] == 120 and calls[1][5] == nil,
+		"the speed slider differs")
+
+	-- When the profile changes elsewhere, the page shows it on the next show.
+	Profiles.currentProfile.hideSkills = true
+	ClickEntry("sounds")
+	ClickEntry("general")
+	assert(not Checkboxes(L.CHECKBOXES.enableNames.label)[1]:GetChecked(), "the page did not refresh")
+	Profiles.currentProfile.hideSkills = nil
+end
+
+-- Rule: the Blizzard part offers its text in two dropdowns under its switch, as the game's combat options do.
+do
+	ClickEntry("general")
+	local onMe, meDropdown = env.Menu(ON_ME)
+	local onTarget, targetDropdown = env.Menu(ON_TARGET)
+	assert(onMe and onTarget, "the two dropdowns were not built")
+	-- Then the Blizzard column has no sub-option checkboxes any more; MSBT's own remain.
+	for _, key in ipairs({ "disableOutgoing", "disableNotifications", "disableIncoming" }) do
+		assert(#Checkboxes(L.CHECKBOXES[key].label) == 1, "the Blizzard column kept the checkbox " .. key)
+	end
+	-- And each dropdown lists what this tree offers: the text at the character, and the text over targets.
+	local function Labels(entries)
+		local labels = {}
+		for _, entry in ipairs(entries) do labels[#labels + 1] = entry.text end
+		return table.concat(labels, "|")
+	end
+	assert(Labels(onMe) == L.WINDOW.incoming .. "|" .. L.WINDOW.notifications,
+		"the text at the character differs: " .. Labels(onMe))
+	assert(Labels(onTarget) == L.WINDOW.blizzardNumbers .. "|" .. L.CHECKBOXES.spellMechanicsOwn.label .. "|"
+		.. L.CHECKBOXES.spellMechanicsOthers.label, "the text over targets differs: " .. Labels(onTarget))
+	-- And they stand under the Blizzard switch, indented like sub-options, one below the other.
+	local blizzard = Checkboxes(L.CHECKBOXES.enableBlizzardDamage.label)[1]
+	local first, second = meDropdown.points.TOPLEFT, targetDropdown.points.TOPLEFT
+	assert(first.relative == blizzard and first.relativePoint == "BOTTOMLEFT" and first.x == 20 and first.y == -8,
+		"the first dropdown is not under the Blizzard switch")
+	assert(second.relative == blizzard and second.relativePoint == "BOTTOMLEFT" and second.x == 20 and second.y == -42,
+		"the second dropdown is not under the first")
+	assert(meDropdown.width == 240 and targetDropdown.width == 240, "the dropdowns have another width")
+	-- And they are the game's own dropdowns, in the section of the Blizzard switch.
+	assert(meDropdown.template == "WowStyle2DropdownTemplate" and targetDropdown.template == "WowStyle2DropdownTemplate"
+		and meDropdown.parent == blizzard.parent and targetDropdown.parent == blizzard.parent,
+		"the dropdowns are not the game's own in the section of the Blizzard switch")
+	-- The game's menu stands at the screen's scale: it is made as wide as the dropdown looks at the window's scale.
+	local _, _, width = env.Menu(ON_ME)
+	assert(width == 240, "the menu is not as wide as its dropdown: " .. tostring(width))
+	MSBTOptionsWindowFrame:SetScale(1.25)
+	_, _, width = env.Menu(ON_ME)
+	MSBTOptionsWindowFrame:SetScale(1)
+	assert(width == 300, "the menu does not follow the window's scale: " .. tostring(width))
+
+	-- Then the sections keep their heights and gaps whatever the dropdowns list, and the language note its place.
+	local function Section(top)
+		return Find(MSBTOptionsWindowFrame, function(region)
+			local point = region.points and region.points.TOPLEFT
+			return region.height and point and point.y == -top and point.x == 0 and region.points.TOPRIGHT
+		end)
+	end
+	assert(Section(0) and Section(140) and Section(300) and Section(0).height == 130
+		and Section(140).height == 150 and Section(300).height == 156, "the sections changed with the dropdowns")
+	assert(NoteTop() == -96, "the language note moved")
+end
+
+-- Rule: an entry for a "...Disabled" field of the profile is ticked while its text shows, and saves like the classic checkbox.
+do
+	for _, case in ipairs({
+		{ L.WINDOW.incoming, "blizzardIncomingDisabled", L.WINDOW.blizzardIncomingTooltip },
+		{ L.WINDOW.notifications, "blizzardNotificationsDisabled", L.WINDOW.blizzardNotificationsTooltip },
+		{ L.WINDOW.blizzardNumbers, "blizzardOutgoingDisabled", L.WINDOW.blizzardNumbersTooltip },
+	}) do
+		local label, field = case[1], case[2]
+		-- Given the profile has not switched the text off, then the entry is ticked.
+		assert(Profiles.currentProfile[field] == nil and MenuEntry(label):IsSelected() == true,
+			label .. " is not ticked while its text shows")
+		-- When it is clicked, then the field is saved as disabled and the Blizzard text is reapplied. The click
+		-- answers nothing, so the game leaves the menu open and draws the ticks anew.
+		MikSBT.EraseTable(calls)
+		assert(MenuEntry(label):Pick() == nil, label .. " answers the click")
+		assert(calls[1][1] == "SetOption" and calls[1][2] == nil and calls[1][3] == field and calls[1][4] == true
+			and calls[1][5] == nil, "wrong save for " .. field)
+		assert(calls[2] ~= nil and calls[2][1] == "ApplyContextOptions", "no context reapply for " .. field)
+		assert(MenuEntry(label):IsSelected() == false, label .. " stayed ticked")
+		-- When it is clicked again, then the text is back on.
+		MenuEntry(label):Pick()
+		assert(Profiles.currentProfile[field] == false and MenuEntry(label):IsSelected() == true,
+			label .. " was not ticked again")
+		-- And it tells what it stands for.
+		local title, text = env.MenuTooltip(MenuEntry(label))
+		assert(title == label and text == case[3] and text ~= nil, label .. " has another tooltip")
+		MenuEntry(label):Pick()
+	end
+	MikSBT.EraseTable(calls)
+end
+
+-- Rule: the entries for the client's text over targets show the client's values and save through the profiles module.
+do
+	local ownLabel, othersLabel = L.CHECKBOXES.spellMechanicsOwn.label, L.CHECKBOXES.spellMechanicsOthers.label
+	-- Then each is ticked as the client says, and has the text of its classic checkbox.
+	assert(MenuEntry(ownLabel):IsSelected() == false and MenuEntry(othersLabel):IsSelected() == true,
+		"the entries differ from the client")
+	local title, text = env.MenuTooltip(MenuEntry(ownLabel))
+	assert(title == ownLabel and text == L.CHECKBOXES.spellMechanicsOwn.tooltip, "the entry has another tooltip")
+
+	-- When one is clicked, then the profiles module is asked with the part and the new state.
+	MikSBT.EraseTable(calls)
+	local profileBefore = {}
+	for key, value in pairs(Profiles.currentProfile) do profileBefore[key] = value end
+	assert(MenuEntry(ownLabel):Pick() == nil, "the entry answers the click")
+	assert(Last()[1] == "SetSpellMechanicsText" and Last()[2] == "own" and Last()[3] == true, "own was not set")
+	MenuEntry(othersLabel):Pick()
+	assert(Last()[2] == "others" and Last()[3] == false, "others was not set")
+	assert(#calls == 0, "a click wrote to the profile")
+	for key, value in pairs(Profiles.currentProfile) do
+		assert(profileBefore[key] == value, "a click changed the profile field " .. key)
+	end
+	for key in pairs(profileBefore) do
+		assert(Profiles.currentProfile[key] ~= nil, "a click removed the profile field " .. key)
+	end
+
+	-- When the client value changed elsewhere, then the entries have it the next time the menu opens.
+	mechanics.own, mechanics.others = false, true
+	assert(MenuEntry(ownLabel):IsSelected() == false and MenuEntry(othersLabel):IsSelected() == true,
+		"the entries did not take the client's values")
+
+	-- When a client lacks one setting, then its entry is left out and the others stay.
+	mechanics.own = nil
+	assert(not MenuEntry(ownLabel) and MenuEntry(othersLabel) and #env.Menu(ON_TARGET) == 2, "a nil value kept its entry")
+	mechanics.own = false
+	assert(MenuEntry(ownLabel) and #env.Menu(ON_TARGET) == 3, "the entry did not return")
+end
+
+-- Rule: Cancel and Undo all put the client's text settings back to their values from when the window opened.
+do
+	local function Sets()
+		local found = {}
+		for _, entry in ipairs(shown) do
+			if entry[1] == "SetSpellMechanicsText" then found[#found + 1] = entry end
+		end
+		return found
+	end
+	local function Open(own, others)
+		Window.Hide()
+		mechanics.own, mechanics.others = own, others
+		Window.Show()
+		ClickEntry("general")
+		MikSBT.EraseTable(shown)
+	end
+	local function Cancel() Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.cancel))) end
+
+	-- When only one changed, then Cancel writes only that one back.
+	Open(false, true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 1 and Sets()[1][2] == "own" and Sets()[1][3] == false, "Cancel did not put back only the changed one")
+	assert(mechanics.own == false and mechanics.others == true, "Cancel left the client changed")
+
+	-- When both changed, then both go back.
+	Open(false, true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
+	Tick(L.CHECKBOXES.spellMechanicsOthers.label, false)
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 2 and mechanics.own == false and mechanics.others == true, "Cancel did not put both back")
+
+	-- When nothing changed, then Cancel writes nothing.
+	Open(false, true)
+	Cancel()
+	assert(#Sets() == 0, "Cancel wrote an unchanged setting")
+
+	-- When a client lacks a setting, then Cancel does not write it.
+	Open(nil, true)
+	Tick(L.CHECKBOXES.spellMechanicsOthers.label, false)
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 1 and Sets()[1][2] == "others" and mechanics.own == nil, "Cancel wrote a setting the client lacks")
+
+	-- When the client lost a setting meanwhile, then Cancel does not write it.
+	Open(false, true)
+	mechanics.own = nil
+	Cancel()
+	assert(#Sets() == 0 and mechanics.own == nil, "Cancel wrote a setting the client lacks")
+
+	-- When the window was put away for a moment and shown again, then Cancel goes back to the opening.
+	Open(false, true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
+	Window.Hide(true)
+	Window.Show()
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 1 and mechanics.own == false, "Cancel took the changed state as its base after a short hide")
+
+	-- When Apply was clicked (it needs a profile change to be enabled), then Cancel goes back to that state.
+	Open(false, true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
+	Profiles.SetOption(nil, "animationSpeed", 60)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)))
+	MikSBT.EraseTable(shown)
+	Cancel()
+	assert(#Sets() == 0 and mechanics.own == true, "Cancel went back past Apply")
+	Profiles.SetOption(nil, "animationSpeed", 100)
+
+	-- When Undo all is clicked, then the client's settings are left alone: only Cancel covers them.
+	Open(false, true)
+	Tick(L.CHECKBOXES.spellMechanicsOwn.label, true)
+	Profiles.SetOption(nil, "animationSpeed", 50)
+	Click(Footer())
+	MikSBT.EraseTable(shown)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.undoAll)))
+	assert(#Sets() == 0 and mechanics.own == true, "Undo all touched the client setting")
+	Profiles.SetOption(nil, "animationSpeed", 100)
+	-- Undo all restored the login state, which has no speed; the later rules expect the window open on General.
+	for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
+	Window.Hide()
+	mechanics.own, mechanics.others = false, true
+	Window.Show()
+	ClickEntry("general")
+	MikSBT.EraseTable(shown)
+	MikSBT.EraseTable(calls)
+end
+
+-- Rule: the Options Design dropdown lists the registered designs, shows the chosen one and switches.
+do
+	local Designs = MSBTOptions.Designs
+	local dropdown = Find(MSBTOptionsWindowFrame, function(region)
+		return region.labelFontString and region.labelFontString:GetText() == L.DROPDOWNS.optionsDesign.label
+	end)
+	-- Given the new design is chosen and the page shows again.
+	Designs.Select("forever")
+	ClickEntry("sounds")
+	ClickEntry("general")
+
+	-- Then every design is listed with its label in order, and the chosen one is shown.
+	assert(table.concat(dropdown.items, ",") == L.MSG_CLASSIC_DESIGN .. "," .. L.MSG_FOREVER_DESIGN
+		and table.concat(dropdown.itemIDs, ",") == "classic,forever", "the page does not list the registered designs")
+	assert(dropdown:GetSelectedID() == "forever", "the page does not show the chosen design")
+
+	-- When Classic is picked, then it is saved and the classic window replaces this one with its popups.
+	dropdown:changeHandler("classic")
+	assert(Profiles.savedVariables.optionsDesign == nil, "the pick was not saved")
+	assert(MSBTMainOptionsFrame:IsShown() and not MSBTOptionsWindowFrame:IsShown(),
+		"choosing Classic did not switch to the classic window")
+	assert(env.Popups.design == "classic", "the classic window opened with the new design's popups")
+
+	-- When New is chosen again, then this window replaces the classic one with its popups.
+	Designs.Select("forever")
+	assert(MSBTOptionsWindowFrame:IsShown() and not MSBTMainOptionsFrame:IsShown(),
+		"choosing New did not switch to the new window")
+	assert(env.Popups.design == "forever", "the new window opened with the classic popups")
+end
+
+-- Rule: a reload button stands beside the design dropdown while the chosen design differs from the game's settings window.
+do
+	local Designs = MSBTOptions.Designs
+	local reloads, flagAtReload = 0, nil
+	ReloadUI = function()
+		reloads = reloads + 1
+		flagAtReload = Profiles.savedVariables.openSettingsAfterReload
+	end
+	local function Button()
+		return Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.reloadDesign.label))
+	end
+	local dropdown = Find(MSBTOptionsWindowFrame, function(region)
+		return region.labelFontString and region.labelFontString:GetText() == L.DROPDOWNS.optionsDesign.label
+	end)
+
+	-- Given the game's settings window shows the new design, which is chosen.
+	Designs.SetSettingsDesign("forever")
+	Designs.Select("forever")
+	ClickEntry("sounds")
+	ClickEntry("general")
+	-- Then the button is hidden.
+	assert(Button() and not Button().shown, "the reload button shows without a pending switch")
+
+	-- Given the game's settings window shows the classic design.
+	Designs.SetSettingsDesign("classic")
+	ClickEntry("sounds")
+	ClickEntry("general")
+	-- Then the button shows, beside the dropdown and clear of the reset button.
+	assert(Button().shown, "the reload button does not show for a pending switch")
+	local point = Button().points.BOTTOMLEFT
+	assert(point and point.relative == dropdown and point.relativePoint == "BOTTOMRIGHT",
+		"the reload button does not stand beside the dropdown")
+
+	-- When it is clicked while the options stand in their own window.
+	Click(Button())
+	-- Then the interface reloads to open the options window.
+	assert(reloads == 1 and flagAtReload == "window", "the button did not reload for the options window")
+
+	-- When Classic is picked, which ends the pending switch.
+	dropdown:changeHandler("classic")
+	-- Then the button is hidden.
+	assert(not Button().shown, "the reload button stayed after the switch was undone")
+	-- When the new design is chosen again.
+	Designs.Select("forever")
+	-- Then it shows again.
+	assert(Button().shown, "the reload button did not show for a switch chosen in the dropdown")
+	Profiles.savedVariables.openSettingsAfterReload = nil
+	Designs.SetSettingsDesign(nil)
+end
+
+-- Rule: Reset Blizzard SCT asks first and runs the classic reset.
+do
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.resetBlizzardSCT.label)))
+	assert(Last()[1] == "ShowAcknowledge", "the reset did not ask")
+	Last()[2].acknowledgeHandler()
+	assert(Last()[1] == "ResetBlizzardSCT", "the classic reset did not run")
+end
+
+-- Rule: the page explains the reset and the language with the texts every language has.
+do
+	local function Tells(text)
+		return Find(MSBTOptionsWindowFrame, function(frame)
+			for _, region in ipairs(frame.regions) do
+				if region.GetText and region:GetText() == text then return true end
+			end
+		end)
+	end
+	assert(Tells(L.TABS.resetBlizzardSCT.tooltip), "the reset is not explained in the classic words")
+	assert(Tells(L.LANGUAGE_INFO), "the language is not explained in the classic words")
+end
+
+-- Rule: Fonts & Colors opens each existing popup at its button.
+do
+	ClickEntry("fontsColors")
+	local buttons = FindAll(MSBTOptionsWindowFrame, function(region)
+		return region.kind == "Button" and region:GetText() == L.WINDOW.edit and region.shown
+	end)
+	assert(#buttons == 4, "Fonts & Colors does not list four entries")
+	Click(buttons[1])
+	assert(Last()[1] == "ShowMasterFont" and Last()[3] == buttons[1], "master fonts did not open")
+	assert(not buttons[2]:IsEnabled(), "the other entries stayed enabled while a popup is open")
+	Click(buttons[2])
+	assert(Last()[1] == "ShowMasterFont", "a second popup opened over the first")
+	Last()[6]()
+	assert(buttons[2]:IsEnabled(), "closing the popup did not enable the entries")
+	for index, name in ipairs({ "ShowPartialEffects", "ShowDamageColors", "ShowClassColors" }) do
+		Click(buttons[index + 1])
+		local popup = Last()[2]
+		assert(Last()[1] == name and popup.anchorFrame == buttons[index + 1]
+			and popup.anchorPoint == "TOPRIGHT" and popup.relativePoint == "BOTTOMRIGHT", name .. " did not open")
+		popup.hideHandler()
+	end
+end
+
+-- Rule: Fonts & Colors offers the classic General tab's custom font dialog in the row below the master fonts.
+do
+	ClickEntry("fontsColors")
+	local function Shown(kind, text)
+		return FindAll(MSBTOptionsWindowFrame, function(region)
+			return region.kind == kind and region:GetText() == text and region.shown
+		end)
+	end
+	local edits, adds = Shown("Button", L.WINDOW.edit), Shown("Button", L.WINDOW.add)
+	local add = adds[1]
+
+	-- Then the entry has the classic button's label and help as its name and hint, and an Add button.
+	assert(#adds == 1 and #edits == 4, "Fonts & Colors does not offer the custom font entry beside the four others")
+	assert(#Shown("FontString", L.CUSTOM_FONTS.add) == 1 and #Shown("FontString", L.CUSTOM_FONTS.help) == 1
+		and add.tooltip == L.CUSTOM_FONTS.help, "the entry does not show the classic button's texts")
+
+	-- And it is the second of five rows 70 apart, which still fit the page.
+	local function Top(text) return Shown("FontString", text)[1].points.TOPLEFT.y end
+	local master = Top(L.BUTTONS.masterFont.label)
+	assert(Top(L.CUSTOM_FONTS.add) == master - 70 and Top(L.BUTTONS.partialEffects.label) == master - 140
+		and Top(L.BUTTONS.classColors.label) == master - 280 and add.points.TOPRIGHT.y == master - 78,
+		"the entry is not the row below the master fonts")
+	local section = add:GetParent()
+	assert(section.height == 5 * 70 + 10 and section.height <= section:GetParent():GetParent():GetHeight(),
+		"the entries do not fit the page")
+
+	-- When its button is clicked, then the classic export opens the dialog over the page at the button,
+	-- as the master fonts open, and the other entries wait until it hides.
+	Click(add)
+	local call = Last()
+	assert(call[1] == "ShowAddFont" and call[2] == section and IsInWindow(call[2]:GetParent()) and call[3] == add
+		and call[4] == "TOPRIGHT" and call[5] == "BOTTOMRIGHT", "the custom font dialog did not open at its button")
+	for _, button in ipairs(edits) do
+		assert(not button:IsEnabled(), "an entry stayed enabled behind the custom font dialog")
+	end
+	call[6]()
+	assert(add:IsEnabled() and edits[1]:IsEnabled(), "closing the dialog did not enable the entries")
+
+	-- When another entry's popup is open, then the entry waits too.
+	Click(edits[1])
+	assert(Last()[1] == "ShowMasterFont" and Last()[2] == section and not add:IsEnabled(),
+		"the custom font entry stayed enabled behind the master fonts")
+	Click(add)
+	assert(Last()[1] == "ShowMasterFont", "the custom font dialog opened over the master fonts")
+	Last()[6]()
+	assert(add:IsEnabled(), "closing the master fonts did not enable the custom font entry")
+end
+
+-- Rule: Sounds lists, plays and removes custom sounds through the classic functions.
+do
+	ClickEntry("sounds")
+	local function Rows()
+		return FindAll(MSBTOptionsWindowFrame, function(region)
+			return region.nameFontString and region.shown
+		end)
+	end
+	local rows = Rows()
+	assert(#rows == 2 and rows[1].nameFontString:GetText() == "Alarm"
+		and rows[1].fileFontString:GetText() == "b.ogg", "the custom sounds are not listed in order")
+
+	local function IconButton(label)
+		return Find(rows[1], function(region) return region.kind == "Button" and region.tooltip == label end)
+	end
+	local play = IconButton(L.BUTTONS.playSound.label .. "\n" .. L.BUTTONS.playSound.tooltip)
+	local remove = IconButton(L.WINDOW.remove .. "\n" .. L.WINDOW.removeTooltip)
+	assert(play and remove and skinned[play] == "Play" and skinned[remove] == "Delete"
+		and (play:GetText() or "") == "" and (remove:GetText() or "") == "",
+		"Play and Remove are not icon buttons with their label and explanation as tooltips")
+	Click(play)
+	assert(Last()[1] == "PlaySound" and Last()[2] == "Alarm", "Play did not use the classic path")
+
+	Click(remove)
+	local ask = Last()
+	assert(ask[1] == "ShowAcknowledge" and ask[2].saveArg1 == "Alarm"
+		and ask[2].anchorPoint == "TOPRIGHT", "Remove did not ask inside the window")
+	ask[2].acknowledgeHandler(ask[2].saveArg1)
+	assert(Profiles.savedMedia.sounds.Alarm == nil, "Remove kept the saved sound")
+	assert(media.sounds.Alarm == "b.ogg", "Remove dropped the registered sound before a reload")
+	assert(#Rows() == 1, "the list did not refresh")
+
+	MikSBT.EraseTable(calls)
+	Toggle(Checkboxes(L.CHECKBOXES.enableSounds.label)[1], true)
+	assert(calls[1][3] == "soundsDisabled" and calls[1][4] == false, "the sound switch differs")
+
+	-- When sounds are added through the popup, which hides before it saves.
+	local function Add(name, file)
+		Click(Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.addCustomSound.label)))
+		local input = Last()[2]
+		assert(Last()[1] == "ShowInput", "Add sound did not open the classic popup")
+		local problem = input.validateHandler(name, file)
+		if problem then return problem end
+		input.hideHandler()
+		input.saveHandler({ inputText = name, secondInputText = file })
+	end
+
+	-- Then a new sound and the removed name added again both show at once,
+	-- and a name another addon registered stays taken.
+	assert(not Add("Chime", "c.ogg") and #Rows() == 2, "the added sound is not listed")
+	assert(not Add("Alarm", "d.ogg") and #Rows() == 3, "the removed name cannot be added again")
+	assert(Profiles.savedMedia.sounds.Alarm == "d.ogg" and media.sounds.Alarm == "d.ogg",
+		"adding the name again did not replace the sound")
+	media.sounds.Foreign = "f.ogg"
+	assert(Add("Foreign", "g.ogg") == L.MSG_SOUND_NAME_ALREADY_EXISTS, "a foreign sound was replaced")
+
+	-- When a saved sound lost its name to another addon's sound and is removed,
+	-- then that sound stays and the name stays taken.
+	Profiles.savedMedia.sounds.Foreign = "mine.ogg"
+	MSBTOptions.Sounds.RemoveSound("Foreign")
+	assert(media.sounds.Foreign == "f.ogg" and Add("Foreign", "g.ogg") == L.MSG_SOUND_NAME_ALREADY_EXISTS,
+		"removing took over another addon's sound")
+
+	-- The empty-list text lies on the list, above its ground.
+	local listbox = Rows()[1]:GetParent():GetParent()
+	assert(Find(listbox, function(region) return region:GetText() == L.WINDOW.noSounds end),
+		"the empty-list text is not on the list")
+end
+
+-- Rule: Sounds offers the two alert thresholds as sliders that show the profile and write on input only.
+do
+	local function Slider(option)
+		return Find(MSBTOptionsWindowFrame, function(region)
+			return region.labelFontString and region.sliderFrame and region.shown
+				and region.labelFontString:GetText():find(L.SLIDERS[option].label, 1, true) == 1
+		end)
+	end
+	local function Writes()
+		local found = {}
+		for _, call in ipairs(calls) do
+			if call[1] == "SetOption" and (call[3] == "lowHealthThreshold" or call[3] == "lowManaThreshold") then
+				found[#found + 1] = call
+			end
+		end
+		return found
+	end
+	local function Cancel() Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.cancel))) end
+	-- Opening the page writes nothing, whatever the profile holds.
+	local function Open()
+		Window.Hide()
+		MikSBT.EraseTable(calls)
+		Window.Show()
+		ClickEntry("sounds")
+		assert(#Writes() == 0, "opening the page wrote a threshold")
+		MikSBT.EraseTable(calls)
+	end
+
+	-- Then both are there, with the classic range, step and tooltip, in the skin of the other sliders.
+	Profiles.currentProfile.lowHealthThreshold = 40
+	Profiles.currentProfile.lowManaThreshold = 20
+	Open()
+	local health, mana = Slider("lowHealthThreshold"), Slider("lowManaThreshold")
+	assert(health and mana, "a threshold slider is missing")
+	local minValue, maxValue = health.sliderFrame:GetMinMaxValues()
+	assert(minValue == 1 and maxValue == 99, "the range differs")
+	assert(health.sliderFrame.stepSet == 1 and mana.sliderFrame.stepSet == 1, "the step was not set to 1")
+	assert(health.sliderFrame.tooltip == L.SLIDERS.lowHealthThreshold.tooltip, "the tooltip differs")
+	local speed = Find(MSBTOptionsWindowFrame, function(region)
+		return region.labelFontString and region.sliderFrame and region.labelFontString:GetText():find(L.SLIDERS.animationSpeed.label, 1, true) == 1
+	end)
+	assert(health.sliderFrame.backdropColor and health.sliderFrame.backdropColor[1] == speed.sliderFrame.backdropColor[1],
+		"the slider is not skinned")
+
+	-- And they show the profile; a missing or invalid value shows the default.
+	assert(health:GetValue() == 40 and mana:GetValue() == 20, "the sliders do not show the profile")
+	for _, value in ipairs({ 0, 100, "x", true }) do
+		Profiles.currentProfile.lowManaThreshold = value
+		Open()
+		assert(Slider("lowManaThreshold"):GetValue() == 35, "an invalid value did not show the default")
+	end
+	Profiles.currentProfile.lowManaThreshold = nil
+	Open()
+	assert(Slider("lowManaThreshold"):GetValue() == 35, "a missing value did not show the default")
+	assert(Slider("lowManaThreshold").labelFontString:GetText():find("35", 1, true), "the label does not show the value")
+
+	-- When the page shows again, then nothing is written, whatever the profile holds.
+	Profiles.currentProfile.lowHealthThreshold = 55
+	ClickEntry("general")
+	ClickEntry("sounds")
+	assert(Slider("lowHealthThreshold"):GetValue() == 55 and #Writes() == 0, "showing the page again wrote a threshold")
+
+	-- When the player moves one, then the rounded value is saved in the profile.
+	Profiles.currentProfile.lowHealthThreshold = 40
+	Open()
+	Slider("lowHealthThreshold").sliderFrame:SetValue(61.6)
+	local writes = Writes()
+	assert(#writes == 1 and writes[1][2] == nil and writes[1][3] == "lowHealthThreshold" and writes[1][4] == 62
+		and writes[1][5] == nil, "the health slider saved the wrong value")
+	Slider("lowManaThreshold").sliderFrame:SetValue(10)
+	writes = Writes()
+	assert(#writes == 2 and writes[2][3] == "lowManaThreshold" and writes[2][4] == 10, "the mana slider saved the wrong value")
+
+	-- Then the change counts like any profile change.
+	assert(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)).enabled, "the change did not enable Apply")
+
+	-- When Cancel puts the profile back, then the sliders show it on the next show and nothing is written.
+	MikSBT.EraseTable(calls)
+	Cancel()
+	assert(Profiles.currentProfile.lowHealthThreshold == 40, "Cancel did not put the profile back")
+	Window.Show()
+	ClickEntry("sounds")
+	assert(Slider("lowHealthThreshold"):GetValue() == 40 and Slider("lowManaThreshold"):GetValue() == 35,
+		"the sliders did not follow Cancel")
+	assert(#Writes() == 0, "Cancel wrote a threshold")
+
+	-- And Undo all does the same through the login snapshot.
+	Open()
+	Slider("lowHealthThreshold").sliderFrame:SetValue(70)
+	Click(Footer())
+	MikSBT.EraseTable(calls)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.undoAll)))
+	assert(#Writes() == 0, "Undo all wrote a threshold")
+	ClickEntry("sounds")
+	assert(Slider("lowHealthThreshold"):GetValue() == 35 and #Writes() == 0, "the sliders did not follow Undo all")
+	-- Undo all restored the login state, which has no speed; the General page of the later rules needs one.
+	for _, profile in pairs(Profiles.savedVariables.profiles) do profile.animationSpeed = 100 end
+	Profiles.currentProfile.lowHealthThreshold, Profiles.currentProfile.lowManaThreshold = nil, nil
+
+	-- And the sliders stand one below the other under the switches, in a section that holds both, and the
+	-- list below it fills the page to its bottom (456 high).
+	Window.Hide()
+	Window.Show()
+	ClickEntry("sounds")
+	local rows = FindAll(MSBTOptionsWindowFrame, function(region) return region.nameFontString and region.shown end)
+	local listbox = rows[1]:GetParent():GetParent()
+	local section = Find(MSBTOptionsWindowFrame, function(region)
+		local point = region.points and region.points.TOPLEFT
+		return region.height and point and point.y == 0 and point.x == 0 and region.points.TOPRIGHT
+			and region ~= MSBTOptionsWindowFrame and region:GetParent() == listbox:GetParent()
+	end)
+	local healthPoint, manaPoint = health.points.TOPLEFT, mana.points.TOPLEFT
+	assert(healthPoint.x == 32 and healthPoint.y == -112, "the health slider is not where the switches leave room")
+	assert(manaPoint.x == 32 and manaPoint.y == -162, "the mana slider is not one step below the health slider")
+	assert(section and section.height == 204, "the section does not hold the sliders")
+	assert(listbox.points.TOPLEFT.y == -214, "the list does not start below the section")
+	assert(listbox.height == 242, "the list does not end at the page bottom")
+	MikSBT.EraseTable(calls)
+end
+
+-- Rule: Profile copy, reset, delete, export and import take the classic paths.
+do
+	ClickEntry("profile")
+	MikSBT.EraseTable(calls)
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.BUTTONS.copyProfile.label)))
+	local input = Last()[2]
+	assert(input.validateHandler("Default") == L.MSG_PROFILE_ALREADY_EXISTS
+		and input.validateHandler("") == L.MSG_INVALID_PROFILE_NAME and not input.validateHandler("New"),
+		"the copy name is not validated")
+	local delete = Find(MSBTOptionsWindowFrame, function(region)
+		return region.kind == "Button" and region:GetText() == L.BUTTONS.deleteProfile.label and region.shown
+	end)
+	assert(not delete:IsEnabled(), "Default can be deleted")
+	-- The popup hides before it saves.
+	input.hideHandler()
+	input.saveHandler({ inputText = "New" })
+	assert(calls[1][1] == "CopyProfile" and calls[1][2] == "Default" and calls[1][3] == "New"
+		and calls[2][1] == "SelectProfile" and calls[2][2] == "New", "copy differs")
+	assert(Find(MSBTOptionsWindowFrame, function(region)
+		return region.kind == "FontString" and region:GetText() == string.format(L.WINDOW.currentProfile, "New")
+	end) and delete:IsEnabled(), "the page still shows the old profile after the copy")
+
+	Profiles.SelectProfile("Default")
+	MikSBT.EraseTable(calls)
+	local page = delete:GetParent()
+	Click(Find(page, Labelled(L.BUTTONS.resetProfile.label)))
+	Last()[2].acknowledgeHandler()
+	assert(calls[1][1] == "ResetProfile" and calls[1][2] == "Default", "reset differs")
+	Profiles.currentProfile.animationSpeed = 100
+
+	Last()[2].hideHandler()
+	assert(not delete:IsEnabled(), "Default can be deleted")
+	Profiles.SelectProfile("Alt")
+	ClickEntry("general")
+	ClickEntry("profile")
+	assert(delete:IsEnabled(), "Delete stayed disabled")
+	MikSBT.EraseTable(calls)
+	Click(delete)
+	Last()[2].acknowledgeHandler()
+	assert(calls[1][1] == "DeleteProfile" and calls[1][2] == "Alt", "delete differs")
+	Profiles.SelectProfile("Default")
+
+	Profiles.ExportProfile = function(name) return "TEXT:" .. name end
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.PROFILE_TRANSFER.export)))
+	assert(Last()[1] == "ShowExport" and Last()[3] == "TEXT:Default", "export differs")
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.PROFILE_TRANSFER.import)))
+	assert(Last()[1] == "ShowImport" and Last()[2].importHandler == Profiles.ImportProfile
+		and Last()[2].successHandler == general.ReportImport, "import differs")
+	Window.Hide()
+end
+
+-- Rule: the German texts give the Sounds and Profile pages their own hints, Inherit a word of its own
+-- and the custom font entry its button word.
+do
+	local classic = L.CHECKBOXES.inheritField.label
+	-- English keeps its classic word, as every language does that defines no other.
+	assert(L.CHECKBOXES.inheritValue == nil, "English has a second Inherit text")
+	-- The game skips the byte order mark of the file; the loader here does not.
+	local file = io.open("MSBTOptions/Localization/localization.de.lua", "rb")
+	local source = file:read("*a"):gsub("^" .. string.char(239, 187, 191), "")
+	file:close()
+	assert(loadstring(source, "@localization.de.lua"))()
+	assert(L.WINDOW.soundsHint == "Ereignis-Sounds einschalten und eigene Sounddateien hinzuf\195\188gen.",
+		"the Sounds hint is not German")
+	assert(L.WINDOW.profileHint == "Profile kopieren, zur\195\188cksetzen, l\195\182schen, exportieren und importieren.",
+		"the Profile hint is not German")
+	assert(L.CHECKBOXES.inheritValue.label == "Erben" and L.CHECKBOXES.inheritValue.tooltip
+		== "Erbt den Wert der \195\188bergeordneten Einstellung.\n\nHaken entfernen, um ihn zu \195\188berschreiben.",
+		"Inherit has no German word of its own")
+	assert(L.CHECKBOXES.inheritValue.label ~= L.WINDOW.apply, "Inherit reads like Apply")
+	assert(L.WINDOW.add == "Hinzuf\195\188gen", "the custom font entry's button is not German")
+	assert(L.CHECKBOXES.inheritField.label == "\195\156bernehmen" and classic == "Inherit",
+		"the classic Inherit label changed")
+end
+
+print("Options pages tests passed")

@@ -19,6 +19,7 @@ Configuration\ProfileStore.lua
 Configuration\MediaRegistry.lua
 Configuration\RuntimeController.lua
 Configuration\ProfileTransfer.lua
+Configuration\ProfileSnapshots.lua
 API\RestrictedValue.lua
 API\Sounds.lua
 API\Spells.lua
@@ -78,3 +79,7 @@ MSBTOptions\MSBTOptionsSounds.lua
 MSBTOptions\MSBTOptionsProfileTransfer.lua
 MSBTOptions\MSBTOptionsAuras.lua
 MSBTOptions\MSBTOptionsTabs.lua
+MSBTOptions\Designs\Forever\Window.lua
+MSBTOptions\Designs\Forever\Events.lua
+MSBTOptions\Designs\Forever\Areas.lua
+MSBTOptions\Designs\Forever\Pages.lua
