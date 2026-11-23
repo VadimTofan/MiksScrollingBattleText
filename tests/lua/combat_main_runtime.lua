@@ -1050,7 +1050,80 @@ for _, forever in ipairs({ false, true }) do
 	assert(restrictedDamage[2] == "-%s" and restrictedDamage[4] == opaque,
 		"restricted incoming damage lost its negative template")
 	assert(restrictedDamage[1].colorG == 0 and restrictedDamage[1].colorB == 0)
+
+	if forever then
+		-- Given opaque incoming amounts and the client's native formatting helpers.
+		local values = {}
+		local function Hidden(value)
+			local token = setmetatable({}, {
+				__tostring = function() error("converted restricted value directly") end,
+				__concat = function() error("concatenated restricted value directly") end,
+			})
+			values[token] = value
+			return token
+		end
+		local function Read(value)
+			return values[value] or value
+		end
+		local originalStringUtil, originalFormat = C_StringUtil, string.format
+		local originalType = type
+		type = function(value) return originalType(Read(value)) end
+		issecretvalue = function(value) return values[value] ~= nil end
+		BreakUpLargeNumbers = function(value)
+			value = Read(value)
+			return Hidden(value == 4500 and "4,500" or tostring(value))
+		end
+		C_StringUtil = {
+			TruncateWhenZero = function(value)
+				value = Read(value)
+				return Hidden(value == 0 and "" or tostring(value))
+			end,
+			WrapString = function(value, prefix, suffix)
+				value = Read(value)
+				return Hidden(value == "" and "" or prefix .. value .. suffix)
+			end,
+			StripHyperlinks = function(value)
+				return Hidden((Read(value):gsub("|H.-|h(.-)|h", "%1")))
+			end,
+		}
+		string.format = function(template, ...)
+			local arguments, hidden = { ... }, false
+			for index = 1, select("#", ...) do
+				local argument = arguments[index]
+				if argument ~= nil and issecretvalue(argument) then
+					arguments[index], hidden = Read(argument), true
+				end
+			end
+			local result = originalFormat(template, unpack(arguments, 1, select("#", ...)))
+			return hidden and Hidden(result) or result
+		end
+
+		for _, case in ipairs({
+			{ amount = 0, school = 1, desired = "0" },
+			{ amount = 0, school = 4, desired = "0" },
+			{ amount = 4500, school = 1, desired = "-4,500" },
+		}) do
+			-- When the incoming amount reaches the real display template.
+			Dispatch("UNIT_COMBAT", "player", "WOUND", "", Hidden(case.amount), case.school)
+			local damage = displayed[#displayed]
+
+			-- Then only zero omits the minus and the number stays protected.
+			local rendered = string.format(damage[2], damage[4])
+			assert(issecretvalue(rendered) and Read(rendered) == case.desired,
+				"restricted incoming damage showed " .. Read(rendered)
+					.. " instead of " .. case.desired)
+		end
+		string.format, C_StringUtil, type = originalFormat, originalStringUtil, originalType
+	end
+
 	issecretvalue, BreakUpLargeNumbers = wasSecret, largeNumbers
+	local absorbSettings = events.INCOMING_ABSORB
+	events.INCOMING_ABSORB = { message = "Absorb! <%a>", scrollArea = "Incoming" }
+	-- Given a readable zero with an explicit absorb flag.
+	-- When the reader receives the hit, then the absorb notice still appears.
+	Dispatch("UNIT_COMBAT", "player", "WOUND", "ABSORB", 0, 1)
+	assert(displayed[#displayed][2] == "Absorb!", "the full absorb notice changed")
+	events.INCOMING_ABSORB = absorbSettings
 	events.INCOMING_DAMAGE.message = incomingMessage
 	events.INCOMING_SPELL_DAMAGE = incomingSpellSettings
 

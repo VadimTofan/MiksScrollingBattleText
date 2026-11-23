@@ -116,7 +116,7 @@ function Presentation:Emit(key, record, eventSettings)
 		local suffix = self.config.formatBlockedTrailer
 			and self.config.formatBlockedTrailer(record)
 		self.config.displayRestricted(settings, record.amount, icon, message,
-			suffix)
+			suffix, nil, nil, record.event == "damage")
 		return
 	end
 	local message
