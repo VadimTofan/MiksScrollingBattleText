@@ -1077,6 +1077,58 @@ Replay("battleground reports keep competing direct spells unresolved", function(
     assert(Displayed(hit) == 1)
 end)
 
+Replay("a battleground icon can be contested by a cast on another target", function()
+    -- Given Lightning Bolt traveling to a different selected target.
+    local start, hit = Start(), Amount()
+    local previousInstance = IsInInstance
+    IsInInstance = function() return true, "pvp" end
+    local firstTarget = ns.TargetKey()
+    Event("UNIT_SPELLCAST_SENT", "player", nil, "pvp-bolt", 403)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-bolt", 403)
+    At(start + 0.3)
+    Event("PLAYER_TARGET_CHANGED")
+    assert(ns.TargetKey() ~= firstTarget)
+
+    -- When an untargeted Earth Shock overlaps a spell line and a Nature hit.
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "pvp-shock", 10414)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-shock", 10414)
+    Line("spell")
+    Hit(hit, "target", 8)
+    At(start + 2)
+    IsInInstance = previousInstance
+
+    -- Then the line can still belong to the Lightning Bolt on the old target.
+    assert(Displayed(hit) == 1 and Record(hit).spell == nil,
+        "an off-target Lightning Bolt line gave the hit an Earth Shock icon")
+end)
+
+Replay("a battleground drain cannot borrow a non-draining cast's icon", function()
+    -- Given one Earth Shock with an unreadable recipient.
+    local start, damage = Start(), 37
+    local previousInstance = IsInInstance
+    IsInInstance = function() return true, "pvp" end
+    local previousDisplay = batcher.config.display
+    local previousFormat = batcher.config.formatEventMessage
+    batcher.config.display = function() end
+    batcher.config.formatEventMessage = function() return "" end
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "pvp-shock", 10414)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-shock", 10414)
+
+    -- When an owned Nature hit also heals the player for its amount.
+    Event("UNIT_COMBAT", "player", "HEAL", "", damage, 8)
+    Line("spell")
+    Hit(damage, "target", 8)
+    At(start + 2)
+    IsInInstance = previousInstance
+    batcher.config.display = previousDisplay
+    batcher.config.formatEventMessage = previousFormat
+
+    -- Then the received healing rules out Earth Shock.
+    local result = Record(damage)
+    assert(result.who == "you" and result.spell == nil,
+        "a non-draining cast supplied the icon for a confirmed drain")
+end)
+
 Replay("unresolved battleground casts need an isolated spell confirmation", function()
     for _, typed in ipairs({ false, true }) do
         -- Given one Earth Shock with a hidden recipient.

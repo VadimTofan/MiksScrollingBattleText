@@ -1777,7 +1777,8 @@ local function ConfirmUntargetedDirect(self, key, school, now)
 
     local candidate
     for _, entry in ipairs(self.pending) do
-        if DirectCandidateScore(self, entry, key, school, now) then
+        -- A spell line can come from an impact outside the selected target.
+        if DirectCandidateScore(self, entry, entry.key or key, school, now) then
             if candidate then return nil end
             candidate = entry
         end
@@ -1788,7 +1789,8 @@ local function ConfirmUntargetedDirect(self, key, school, now)
     local facts = self.facts(candidate.spell)
     if not facts or facts.direct ~= true or facts.ticks ~= false
         or facts.school ~= school or facts.area or facts.nextSwing or facts.shot
-        or (facts.directHits or 1) ~= 1 then return nil end
+        or (facts.directHits or 1) ~= 1
+        or (self.leechNow == true and not facts.leech) then return nil end
 
     for spell, casts in pairs(self.casts) do
         for _, cast in ipairs(casts) do
