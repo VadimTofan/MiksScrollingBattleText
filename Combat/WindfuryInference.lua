@@ -122,6 +122,11 @@ end
 local function Block(self, source)
     source.blocked = true
     Release(self, source, false)
+    local partner = source.swingSource or source.extraSource
+    if partner then
+        partner.blocked = true
+        Release(self, partner, false)
+    end
 end
 
 local function BlockAll(self)
@@ -129,7 +134,11 @@ local function BlockAll(self)
 end
 
 local function Retire(self, source)
-    Release(self, source, false)
+    if not source.closed and (source.swingSource or source.extraSource) then
+        Block(self, source)
+    else
+        Release(self, source, false)
+    end
     source.alive = false
     self.retiredAt = math.max(self.retiredAt or 0, source.at)
     for index, entry in ipairs(self.sources) do
@@ -151,6 +160,7 @@ local function ObserveTime(self, at)
 end
 
 local function Complete(self, source)
+    source = source.extraSource or source
     if source.closed or not source.sealed then return end
     if source.blocked then Release(self, source, false) return end
     if #source.frames ~= 1 then return end
@@ -158,24 +168,35 @@ local function Complete(self, source)
     local capacity = source.weapon and 2 or (source.totem and 1)
     if not capacity then return end
     local frame = source.frames[1]
+    local swingSource = source.swingSource or source
+    if not swingSource.alive or not swingSource.sealed
+        or swingSource.blocked or #swingSource.frames ~= 1 then return end
+    local swingFrame = swingSource.frames[1]
+    if swingSource ~= source and (swingSource.weapon or swingSource.totem
+        or swingFrame.key ~= frame.key or swingFrame.directLines ~= 0
+        or frame.swingLines ~= 0 or #frame.reservations ~= 0) then
+        Block(self, source)
+        return
+    end
     if frame.extras > capacity then Block(self, source) return end
     if frame.sharedCapacity and (frame.sharedUsed > frame.sharedCapacity
         or frame.sharedCapacity ~= frame.directLines) then
         Block(self, source)
         return
     end
-    if frame.swingUsed > frame.swingLines
+    if swingFrame.swingUsed > swingFrame.swingLines
         or frame.directUsed > frame.directLines then
         Block(self, source)
         return
     end
-    if #frame.reservations == 0 or frame.extras ~= capacity then return end
-    for _, reservation in ipairs(frame.reservations) do
+    if #swingFrame.reservations == 0 or frame.extras ~= capacity then return end
+    for _, reservation in ipairs(swingFrame.reservations) do
         if not reservation.used then return end
     end
-    if frame.swingUsed ~= frame.swingLines
+    if swingFrame.swingUsed ~= swingFrame.swingLines
         or frame.directUsed ~= frame.directLines then return end
     source.closed = true
+    swingSource.closed = true
     Release(self, source, true)
 end
 
@@ -270,27 +291,41 @@ end
 
 local function LinkWeaponCooldown(self, signal, key)
     if signal.blocked or signal.totem or #signal.frames > 0 then return end
-    local candidate
+    local swingSource, extraSource
     for _, source in ipairs(self.sources) do
         if source ~= signal and math.abs(source.at - signal.at) <= WEAPON_SIGNAL_WINDOW then
-            if source.blocked or source.weapon or source.totem then return end
+            if source.blocked or source.weapon or source.totem or source.extraSource then return end
             if #source.frames > 0 then
-                if candidate then return end
-                candidate = source
+                if not source.sealed or #source.frames ~= 1 then return end
+                local frame = source.frames[1]
+                if frame.key ~= key then return end
+                if not swingSource and frame.swingLines == 1 and #frame.reservations == 1
+                    and frame.reservations[1].kind == "swing"
+                    and (frame.directLines == 0 or frame.directLines == 2) then
+                    swingSource = source
+                elseif not extraSource and frame.swingLines == 0
+                    and #frame.reservations == 0 and frame.directLines == 2 then
+                    extraSource = source
+                else
+                    return
+                end
             end
         end
     end
-    if not candidate or not candidate.sealed or #candidate.frames ~= 1 then return end
-    local frame = candidate.frames[1]
-    if frame.key ~= key or frame.swingLines ~= 1 or frame.directLines ~= 2
-        or #frame.reservations ~= 1 or frame.reservations[1].kind ~= "swing" then
-        return
+    if not swingSource then return end
+    if swingSource.frames[1].directLines == 2 then
+        if extraSource then return end
+        extraSource = swingSource
+    else
+        if not extraSource or swingSource.at >= signal.at or extraSource.at <= signal.at
+            or extraSource.at - swingSource.at > WEAPON_SIGNAL_WINDOW then return end
+        -- Keep both original frames so receipts and confirmations retain
+        -- their own timestamps.
+        swingSource.extraSource, extraSource.swingSource = extraSource, swingSource
     end
 
-    -- The update supplies only the Weapon signal. Every hit still needs
-    -- its own evidence from the melee source.
-    candidate.weapon = true
-    Complete(self, candidate)
+    extraSource.weapon = true
+    Complete(self, extraSource)
 end
 
 function Inference:Signal(at, spell, cooldownTarget)

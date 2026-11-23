@@ -317,6 +317,48 @@ Replay("a nearby Weapon cooldown can corroborate one complete swing", function()
     end
 end)
 
+Replay("captured Windfury accounts across swing, cooldown, and spell frames", function()
+    for _, normalArrives in ipairs({ true, false }) do
+        -- Given the live swing at 33.873 and cooldown at 33.896.
+        local start = Start()
+        local first, normal, second = Amount(), Amount(), Amount()
+        Event("PLAYER_SWING", 2.242, 0)
+        Line("swing")
+        At(start + 0.023)
+        Event("SPELL_UPDATE_COOLDOWN", 439440)
+        At(start + 0.039)
+        Line("spell")
+        Line("spell")
+
+        -- When the extra reports use the separate spell frame and the
+        -- ordinary hit uses its original swing frame.
+        At(start + 0.237)
+        Hit(first)
+        if normalArrives then
+            At(start + 0.607)
+            Hit(normal)
+        end
+        At(start + 0.963)
+        Hit(second)
+        At(start + 2)
+
+        -- Then both owned extras show once, with icons only if the full
+        -- burst includes the ordinary hit.
+        for _, extra in ipairs({ first, second }) do
+            assert(Record(extra).who == "you" and Displayed(extra) == 1)
+            for _, output in ipairs(displayed) do
+                if output.amount == extra then
+                    assert((output.icon == "icon-8232") == normalArrives,
+                        "split Windfury source decorated without both extras and the ordinary hit")
+                end
+            end
+        end
+        if normalArrives then
+            assert(Record(normal).melee and Displayed(normal) == 1)
+        end
+    end
+end)
+
 Replay("explicit player Windfury casts help identify clean extra hits", function()
     for _, scenario in ipairs({ "clean", "pet-cast", "both-signals",
         "duplicate-cast" }) do
