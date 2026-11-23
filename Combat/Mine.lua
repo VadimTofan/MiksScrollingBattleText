@@ -342,6 +342,9 @@ local function DirectAvailable(self, spell, cast, key, now, area)
         or age <= AREA_MOMENT)) then return false end
     local limit = type(facts) == "table" and facts.directHits or 1
     local count = cast.outcomes and cast.outcomes[key or false] or 0
+    if key and cast.targetUncertain and cast.outcomes then
+        count = count + (cast.outcomes[false] or 0)
+    end
     return count < (limit or 1)
 end
 
@@ -1765,6 +1768,42 @@ function Mine:MixedFrameDirectSchool(key, firstSchool, secondSchool, now)
     return facts.school
 end
 
+-- A battleground spell line can identify a cast while its target stays hidden.
+local function ConfirmUntargetedDirect(self, key, school, now)
+    if not school or self.petOut then return nil end
+    for _, channel in pairs(self.channels) do
+        if ChannelFits(channel, key, school, now) then return nil end
+    end
+
+    local candidate
+    for _, entry in ipairs(self.pending) do
+        if DirectCandidateScore(self, entry, key, school, now) then
+            if candidate then return nil end
+            candidate = entry
+        end
+    end
+    if not candidate or candidate.at > now or candidate.caster ~= "you"
+        or not candidate.targetUncertain or candidate.key or candidate.cast.candidates
+        or candidate.ambiguous or candidate.cast.ambiguous then return nil end
+    local facts = self.facts(candidate.spell)
+    if not facts or facts.direct ~= true or facts.ticks ~= false
+        or facts.school ~= school or facts.area or facts.nextSwing or facts.shot
+        or (facts.directHits or 1) ~= 1 then return nil end
+
+    for spell, casts in pairs(self.casts) do
+        for _, cast in ipairs(casts) do
+            if cast ~= candidate.cast then
+                local _, _, direct = HistoricalFit(
+                    self, spell, cast, school, now, "direct", key, true)
+                if direct then return nil end
+            end
+        end
+    end
+
+    SpendDirect(self, candidate.spell, candidate.cast, nil, false)
+    return Result("you", candidate.spell, false)
+end
+
 function Mine:Likeliest(school, now, restrict, key)
     local bestSpell, bestCast, bestScore, bestTick, bestDirect
     for spell, casts in pairs(self.casts) do
@@ -1919,7 +1958,8 @@ end
 -- leech (0.3.49): true when a heal on you of the hit's amount came in its
 -- moment, false when heals on you were read and none matched, nil unknown.
 -- avoid: the game's word for a miss ("PARRY", "DODGE", "MISS", ...), nil unknown.
-function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, restrict, leech, avoid)
+function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit,
+    restrict, leech, avoid, isolatedBattlegroundSpell)
     self.lastOutcomeReceipt = nil
     self:Tidy(now)
     self.amountNow, self.lineNow, self.ambiguous, self.critNow = amount, line, false, crit == true
@@ -1942,6 +1982,10 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit, rest
     self.restrictNow = line == true and restrict or nil
     self.leechNow = kind == "damage" and leech or nil
     local allowed = Allowed(self.restrictNow)
+    if isolatedBattlegroundSpell and self.restrictNow == "direct" then
+        local result = ConfirmUntargetedDirect(self, key, school, now)
+        if result then return result end
+    end
     -- 0.3.49: a damage shield's line (Thorns on you, an item): the hit on
     -- the enemy that struck you is yours, whatever cast or swing came before
     -- (four were left out in a battleground, 1.60.1.70374).

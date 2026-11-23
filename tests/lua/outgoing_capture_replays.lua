@@ -883,6 +883,98 @@ Replay("a same-frame direct cast distinguishes two due periodic schools", functi
     end
 end)
 
+Replay("battleground direct confirmations recover icons for unresolved casts", function()
+    for _, spell in ipairs({
+        { id = 17364, school = 1, flight = 0 },
+        { id = 10414, school = 8, flight = 0 },
+        { id = 403, school = 8, flight = 0.2 },
+    }) do
+        -- Given a successful cast whose recipient is hidden.
+        local start = Start()
+        local hit, later = Amount(), Amount()
+        local previousInstance = IsInInstance
+        IsInInstance = function() return true, "pvp" end
+        Event("UNIT_SPELLCAST_SENT", "player", Amount(), "pvp-cast", spell.id)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-cast", spell.id)
+
+        -- When an isolated typed line confirms a same-school hit.
+        At(start + spell.flight)
+        Line("spell")
+        Hit(hit, "target", spell.school)
+        At(start + 0.4)
+        Line("spell")
+        Hit(later, "target", spell.school)
+        At(start + 4)
+        IsInInstance = previousInstance
+
+        -- Then the first amount has its icon and the cast stays untargeted.
+        local cast = ns.mine.casts[spell.id][1]
+        assert(cast.targetUncertain and cast.key == nil)
+        assert(Record(hit).who == "you" and Record(hit).spell == spell.id,
+            "confirmed battleground hit lost its icon for spell " .. spell.id)
+        assert(Record(later).who == "you" and Record(later).spell == nil,
+            "an unresolved cast named two hits")
+        assert(Displayed(hit) == 1 and Displayed(later) == 1)
+        for _, output in ipairs(displayed) do
+            if output.amount == hit then assert(output.icon == "icon-" .. spell.id) end
+            if output.amount == later then assert(output.icon == nil) end
+        end
+    end
+end)
+
+Replay("battleground reports keep competing direct spells unresolved", function()
+    -- Given two Nature spells in flight with hidden cast targets.
+    local previousInstance = IsInInstance
+    IsInInstance = function() return true, "pvp" end
+    local start, hit = Start(), Amount()
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "pvp-bolt", 403)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-bolt", 403)
+    At(start + 0.2)
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "pvp-shock", 10414)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-shock", 10414)
+
+    -- When a typed line confirms one matching report.
+    Line("spell")
+    Hit(hit, "target", 8)
+    At(start + 1)
+    IsInInstance = previousInstance
+
+    -- Then it shows once without choosing a spell.
+    assert(Record(hit).who == "you" and Record(hit).spell == nil)
+    assert(Displayed(hit) == 1)
+end)
+
+Replay("unresolved battleground casts need an isolated spell confirmation", function()
+    for _, typed in ipairs({ false, true }) do
+        -- Given one Earth Shock with a hidden recipient.
+        local start = Start()
+        local hit, rival = Amount(), Amount()
+        local previousInstance = IsInInstance
+        IsInInstance = function() return true, "pvp" end
+        Event("UNIT_SPELLCAST_SENT", "player", Amount(), "pvp-shock", 10414)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "pvp-shock", 10414)
+
+        -- When either no line confirms the report, or two hits compete.
+        if typed then
+            Line("spell")
+            Line("spell")
+            Hit(rival, "target", 8)
+        end
+        Hit(hit, "target", 8)
+        At(start + 1)
+        IsInInstance = previousInstance
+
+        -- Then the cast supplies no identity to either report.
+        assert(Record(hit).spell == nil)
+        if typed then
+            assert(Record(rival).spell == nil)
+            assert(Displayed(hit) == 1 and Displayed(rival) == 1)
+        else
+            assert(Record(hit).who == "unknown" and Displayed(hit) == 0)
+        end
+    end
+end)
+
 Replay("periodic-only initial zero report does not reject its application", function()
     -- Given a catalogued periodic-only Corruption application and no miss line.
     local start, tick = Start(), Amount()

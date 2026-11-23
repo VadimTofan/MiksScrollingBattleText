@@ -622,7 +622,8 @@ function ns.DecideHit(hit, line, restrict)
             or { who = "other" }
     else
         result = ns.mine:Hit(hit.key, kind, record.school, hit.at, hit.petOn, line,
-            ns.Number(record.amount) and record.amount or nil, record.crit, restrict, leech, record.avoid)
+            ns.Number(record.amount) and record.amount or nil, record.crit,
+            restrict, leech, record.avoid, hit.isolatedBattlegroundSpell)
     end
     if line == true and restrict == "direct" and result.who == "you"
         and not result.ambiguous
@@ -1199,11 +1200,28 @@ local function MixedFrameDirectHit(first, second, directLine, tickLine)
     if school == secondSchool then return second, first end
 end
 
+local function IsolatedBattlegroundSpell(hit, line)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not client or not client.isForever or not IsInInstance
+        or hit.record.event ~= "damage" or hit.unit ~= "target"
+        or line.kind ~= "spell" or line.source ~= "mine" or line.hit
+        or line.at ~= hit.at or line.targetContext ~= hit.key then return false end
+    local _, instance = IsInInstance()
+    if not ns.Text(instance) or instance ~= "pvp" then return false end
+    if hit.record.school ~= ns.SCHOOL_PHYSICAL then return true end
+    return not (SwingLine(hit) or OrphanSwingLine(hit)
+        or SwingFrame(hit.at, WEAPON_PROC_TRIGGER_WINDOW))
+end
+
 -- One frame's hits (of one class, with lines by kind) against the lines of
 -- yours that may be theirs: as many lines as hits (or more: a DoT of yours
 -- on an enemy without a plate also sends one) and every hit is yours; none
 -- and none is; fewer, and the engine decides as it would without lines.
 function DecideGroup(group, frameLines, decided, settled)
+    if #group == 1 and #frameLines == 1
+        and IsolatedBattlegroundSpell(group[1], frameLines[1]) then
+        group[1].isolatedBattlegroundSpell = true
+    end
     local reportsBySchool, periodicConfirmations = {}, 0
     for _, line in ipairs(frameLines) do
         if PeriodicLine(line) then periodicConfirmations = periodicConfirmations + 1 end
