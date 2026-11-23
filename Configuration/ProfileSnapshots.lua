@@ -157,6 +157,13 @@ function ProfileSnapshots:Revert(snapshot, path)
 
 	local base, value = bases[last - 1], nil
 	if type(base) == "table" then value = rawget(base, path[last]) end
+	-- Restoring the login selection also restores its profile if it was deleted.
+	if last == 1 and path[1] == "currentProfileName" and value
+		and not state.profiles[value] then
+		local profile = snapshot.profiles[value]
+		if type(profile) ~= "table" then return end
+		state.profiles[value] = CopyTable(profile)
+	end
 	if type(value) == "table" then value = CopyTable(value) end
 	rawset(tables[last - 1], path[last], value)
 

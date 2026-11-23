@@ -354,6 +354,7 @@ local function CreateGeneral(page)
 	end
 	designDropdown:SetChangeHandler(function(this, id)
 		MSBTDesigns.Select(id)
+		this:SetSelectedID(MSBTDesigns.GetSelected())
 		RefreshReloadButton()
 	end)
 	MSBTWindow.SkinDropdown(designDropdown)

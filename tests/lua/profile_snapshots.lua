@@ -353,4 +353,25 @@ do
 	MikSBT.Compatibility.Client.isForever = nil
 end
 
+-- Rule: undoing a profile selection can restore a deleted login profile.
+do
+	-- Given a login profile that was deleted after selecting another profile.
+	profiles.CopyProfile("Default", "Login Profile")
+	profiles.SelectProfile("Login Profile")
+	profiles.SetOption(nil, "fontSize", 27)
+	local login = snapshots:Take()
+	profiles.CopyProfile("Default", "Other Profile")
+	profiles.SelectProfile("Other Profile")
+	profiles.DeleteProfile("Login Profile")
+
+	-- When the selected profile change is undone.
+	snapshots:Revert(login, { "currentProfileName" })
+
+	-- Then the original profile and its settings are back.
+	assert(snapshots:GetState().currentProfileName == "Login Profile",
+		"undo selected an unrelated profile")
+	assert(profiles.currentProfile.fontSize == 27,
+		"undo did not restore the deleted profile's settings")
+end
+
 print("Profile snapshot tests passed")

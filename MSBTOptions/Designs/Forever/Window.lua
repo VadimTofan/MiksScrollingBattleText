@@ -878,13 +878,24 @@ local function SameValue(left, right)
 end
 
 
+local function HasPendingChanges()
+	return baseSnapshot and (switchesChanged or snapshots:Count(baseSnapshot, 1) > 0)
+end
+
+
+local function RestorePendingChanges()
+	snapshots:Restore(baseSnapshot)
+	RestoreMechanics()
+end
+
+
 -- Runs after every profile write while the window exists, so it must not create tables.
 local function UpdateState()
 	if not frame:IsShown() then return end
 	profileDropdown:SetSelectedID(CurrentProfileName())
 	changesButton:SetLabel(string.format(L.WINDOW.changesCount,
 		snapshots:Count(snapshots:GetLoginSnapshot())))
-	if snapshots:Count(baseSnapshot, 1) > 0 or switchesChanged then applyButton:Enable() else applyButton:Disable() end
+	if HasPendingChanges() then applyButton:Enable() else applyButton:Disable() end
 end
 
 
@@ -1183,8 +1194,7 @@ local function CreateFooter()
 	cancelButton:Configure(30, L.WINDOW.cancel, L.WINDOW.cancelTooltip)
 	cancelButton:SetPoint("RIGHT", applyButton, "LEFT", -10, 0)
 	cancelButton:SetClickHandler(function()
-		snapshots:Restore(baseSnapshot)
-		RestoreMechanics()
+		RestorePendingChanges()
 		module.Hide()
 	end)
 	SkinButton(cancelButton)
@@ -1379,6 +1389,7 @@ local function CreateChangeLine(listbox)
 	button:SetClickHandler(UndoChange)
 	SkinButton(button)
 
+	line.undoButton = button
 	line.keyFontString = keyFontString
 	line.oldFontString = oldFontString
 	line.newFontString = newFontString
@@ -1389,6 +1400,9 @@ end
 local function DisplayChangeLine(listbox, line, item)
 	local entry = changes[item]
 	line.item = item
+	local tooltip = entry.path[1] == "currentProfileName"
+		and L.WINDOW.undoSelectedProfileTooltip or L.WINDOW.undoTooltip
+	line.undoButton:SetTooltip(tooltip)
 	line.keyFontString:SetText(entry.key)
 	line.oldFontString:SetText(FormatValue(entry.old))
 	line.newFontString:SetText(FormatValue(entry.new))
@@ -1603,7 +1617,10 @@ end
 -- settings window that window closes, and the next Show opens it again at this page.
 local function Hide(keepBase)
 	if not frame then return end
-	if not keepBase then baseSnapshot, baseMechanics, switchesChanged = nil, nil, false end
+	if not keepBase then
+		baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+		reopenSettings = nil
+	end
 	keepBaseOnHide = keepBase
 	if dockedPanel then
 		if keepBase then reopenSettings = dockedOpeners[dockedKey] end
@@ -1614,6 +1631,32 @@ local function Hide(keepBase)
 	end
 	frame:Hide()
 	keepBaseOnHide = nil
+end
+
+
+function module.ConfirmSwitch(switch)
+	if dockedPanel or not HasPendingChanges() then return false end
+	local dialog = "MSBT_APPLY_BEFORE_DESIGN_SWITCH"
+	if not StaticPopupDialogs[dialog] then
+		local function Finish(data, discard)
+			if not data or data.snapshot ~= baseSnapshot then return end
+			if discard then RestorePendingChanges() end
+			data.switch()
+		end
+		StaticPopupDialogs[dialog] = {
+			text = L.WINDOW.designSwitchPending,
+			button1 = L.WINDOW.applyAndSwitch,
+			button2 = L.WINDOW.cancel,
+			button3 = L.WINDOW.discardAndSwitch,
+			OnAccept = function(_, data) Finish(data, false) end,
+			OnAlt = function(_, data) Finish(data, true) end,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+		}
+	end
+	StaticPopup_Show(dialog, nil, nil, { snapshot = baseSnapshot, switch = switch })
+	return true
 end
 
 
@@ -1652,4 +1695,5 @@ module.IsDocked			= IsDocked
 MSBTOptions.Designs.Register("forever", {
 	label = L.MSG_FOREVER_DESIGN, Show = Show, Hide = Hide, IsShown = IsShown, SkinPopup = SkinPopup,
 	DockPages = DockPages, Dock = Dock, Undock = Undock, IsDocked = IsDocked,
+	ConfirmSwitch = module.ConfirmSwitch,
 })

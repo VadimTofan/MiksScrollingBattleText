@@ -249,6 +249,61 @@ do
 	Window.Hide()
 end
 
+-- Rule: switching designs gives pending Forever edits an explicit resolution.
+do
+	local previousDialogs, previousShow = StaticPopupDialogs, StaticPopup_Show
+	local dialog, data
+	StaticPopupDialogs = {}
+	StaticPopup_Show = function(which, _, _, value)
+		dialog, data = StaticPopupDialogs[which], value
+	end
+	Designs.Select("forever")
+	Designs.Show()
+	Profiles.SetOption(nil, "fontSize", 31)
+
+	-- The switch waits for a decision. Dismissing the dialog keeps the edit pending.
+	Designs.Select("classic")
+	assert(dialog and Designs.GetSelected() == "forever" and Window.IsShown(),
+		"switching silently kept pending edits")
+	if dialog.OnCancel then dialog.OnCancel(nil, data) end
+	assert(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.apply)):IsEnabled())
+
+	-- Discard rolls back the change and completes the switch.
+	Designs.Select("classic")
+	dialog.OnAlt(nil, data)
+	assert(Designs.GetSelected() == "classic" and not Window.IsShown())
+	assert(Profiles.currentProfile.fontSize == nil, "discard kept a pending edit")
+
+	-- Apply keeps the edit and completes the switch.
+	Designs.Select("forever")
+	Profiles.SetOption(nil, "fontSize", 31)
+	Designs.Select("classic")
+	dialog.OnAccept(nil, data)
+	assert(Designs.GetSelected() == "classic" and not Window.IsShown())
+	assert(Profiles.currentProfile.fontSize == 31, "apply lost a pending edit")
+	Profiles.SetOption(nil, "fontSize", nil)
+	Designs.Select("forever")
+
+	-- Applying also ends the original editing session when the window is put away.
+	Profiles.SetOption(nil, "fontSize", 28)
+	Designs.Hide()
+	MSBTScrollAreasConfigFrame = CreateFrame("Frame")
+	Designs.Select("classic")
+	Designs.Show()
+	Designs.Select("classic")
+	Designs.Show()
+	assert(Designs.GetSelected() == "forever", "a repeated command bypassed the prompt")
+	dialog.OnAccept(nil, data)
+	assert(Designs.GetSelected() == "classic" and not Window.IsShown())
+	MSBTScrollAreasConfigFrame = nil
+	Designs.Select("forever")
+	Designs.Show()
+	Click(Find(MSBTOptionsWindowFrame, Labelled(L.WINDOW.cancel)))
+	assert(Profiles.currentProfile.fontSize == 28, "Cancel undid an already applied edit")
+	Profiles.SetOption(nil, "fontSize", nil)
+	StaticPopupDialogs, StaticPopup_Show = previousDialogs, previousShow
+end
+
 -- Rule: Cancel restores the state from opening and closes.
 do
 	-- Given the window opened and a setting changed.

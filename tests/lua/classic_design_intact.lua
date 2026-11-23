@@ -40,6 +40,12 @@ local STATES = { "Normal", "Pushed", "Disabled", "Highlight", "Checked", "Disabl
 local function NewWorld()
 	local G = setmetatable({}, { __index = _G })
 	G._G = G
+	G.StaticPopupDialogs = {}
+	G.StaticPopup_Show = function(which, _, _, data)
+		if which == "MSBT_APPLY_BEFORE_DESIGN_SWITCH" then
+			G.StaticPopupDialogs[which].OnAccept(nil, data)
+		end
+	end
 	local world = { G = G, all = {}, counts = {}, steps = {}, dirty = {}, skinned = {}, shownClassic = 0, options = {},
 		opened = 0 }
 	local Methods, Meta, cache = {}, {}, {}

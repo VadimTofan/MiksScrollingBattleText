@@ -138,11 +138,11 @@ end
 -- back into the game's settings window when it was put away from there.
 local function Show()
 	local key = reopenKey or GetSelected()
-	reopenKey = nil
 	if IsDocked() then return end
-	HideOthers(key)
 	local positioning = MSBTScrollAreasConfigFrame
 	if key ~= DEFAULT_DESIGN and positioning and positioning:IsShown() then return end
+	reopenKey = nil
+	HideOthers(key)
 	designs[key].Show()
 end
 
@@ -158,13 +158,28 @@ end
 -- a choice made while the options are put away is what the next Show opens. The game's settings
 -- window changes with the next reload only. When the options stand in it, the choice asks to
 -- reload at once; otherwise the options show a reload button while the switch is pending.
-local function Select(key)
-	if not designs[key] then return false end
+local function SwitchTo(key, previous)
 	MikSBT.Profiles.savedVariables.optionsDesign = key ~= DEFAULT_DESIGN and key or nil
 	reopenKey = nil
+	-- A window put away for another panel can still have an editing session.
+	if previous and previous ~= designs[key] and previous.ConfirmSwitch
+		and not previous.IsShown() then
+		previous.Hide()
+	end
 	if IsSwitchPending() and IsDocked() then AskToReload() end
 	if GetShown() then Show() end
 	return true
+end
+
+
+local function Select(key)
+	if not designs[key] then return false end
+	local active = designs[GetShown() or reopenKey]
+	if key ~= GetSelected() and active and active.ConfirmSwitch
+		and active.ConfirmSwitch(function() SwitchTo(key, active) end) then
+		return true
+	end
+	return SwitchTo(key, active)
 end
 
 
