@@ -47,6 +47,7 @@ local speedSlider
 local inheritCheckbox
 local iconDropdown
 local hideIconsCheckbox
+local mergePetAreaCheckbox
 local scale
 local sketchMaxWidth
 local screenWidth
@@ -186,6 +187,14 @@ local function Fill()
 
 	iconDropdown:SetSelectedID(settings.iconAlign or DEFAULTS.iconAlign)
 	hideIconsCheckbox:SetChecked(settings.skillIconsDisabled)
+	local destination = Areas.GetPetMergeDestination(selected)
+	mergePetAreaCheckbox:SetShown(destination ~= nil)
+	if destination then
+		local locale = L.CHECKBOXES.mergePetScrollArea
+		mergePetAreaCheckbox:SetLabel(locale.label:format(destination))
+		mergePetAreaCheckbox:SetTooltip(locale.tooltip:format(destination))
+		mergePetAreaCheckbox:SetChecked(settings.mergeWhenDisabled == true)
+	end
 	filling = false
 end
 
@@ -516,6 +525,9 @@ local function CreatePanel(height)
 	iconDropdown:AddItem(L.TEXT_ALIGNS[1], "Left")
 	iconDropdown:AddItem(L.TEXT_ALIGNS[3], "Right")
 	hideIconsCheckbox = CreateCheckbox("hideSkillIcons", COLUMN_LEFT, -388, OnHideIconsClicked)
+	mergePetAreaCheckbox = CreateCheckbox("mergePetScrollArea", COLUMN_LEFT, -414, function(_, isChecked)
+		Save("mergeWhenDisabled", isChecked and true or nil)
+	end)
 end
 
 

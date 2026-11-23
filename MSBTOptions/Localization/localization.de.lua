@@ -127,6 +127,7 @@ obj["overkill"]					= { label="Über Tod", tooltip="Zeigt die Menge des Schadens
 obj["colorUnitNames"]			= { label="Farbige Namen", tooltip="Färbt die Namen in Klassenfarbe ein."}
 obj["colorClassEntry"]			= { tooltip="Aktiviert Farbe für diese Klasse."}
 obj["enableScrollArea"]			= { tooltip="Scroll-Bereich aktivieren."}
+obj["mergePetScrollArea"]		= { label="Mit %s zusammenführen", shortLabel="Zusammenführen", tooltip="Zeigt die Ereignisse dieses Begleiterbereichs unter %s an, wenn der Begleiterbereich deaktiviert ist."}
 obj["inheritField"]				= { label="Übernehmen", tooltip="Übernimmt die eingegebenen Werte.\n\nHacken entfernen, um zu überschreiben."}
 obj["inheritValue"]				= { label="Erben", tooltip="Erbt den Wert der übergeordneten Einstellung.\n\nHaken entfernen, um ihn zu überschreiben."}
 obj["hideSkillIcons"]			= { label="Symbole verstecken", tooltip="Keine Symbole in diesem Scroll-Bereich anzeigen."}

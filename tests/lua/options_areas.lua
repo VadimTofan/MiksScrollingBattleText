@@ -1103,4 +1103,49 @@ do
 	end
 end
 
+-- Rule: the two built-in pet areas offer independent merge checkboxes.
+do
+	-- Given both pet areas in the current profile.
+	local previous = Profiles.currentProfile.scrollAreas
+	previous.OutgoingPet = { name = "Outgoing Pet" }
+	previous.IncomingPet = { name = "Incoming Pet" }
+	Animations.UpdateScrollAreas()
+	ClickEntry("scrollAreas")
+
+	-- When the outgoing option is enabled and then the incoming area is selected.
+	local outgoingBox = Box("OutgoingPet")
+	outgoingBox.scripts.OnMouseDown(outgoingBox, "LeftButton")
+	local merge = Control("Merge into Outgoing", 12)
+	assert(merge and merge.shown and not merge:GetChecked())
+	ClickCheckbox(merge, true)
+	local incomingBox = Box("IncomingPet")
+	incomingBox.scripts.OnMouseDown(incomingBox, "LeftButton")
+
+	-- Then the incoming option is independent, and player areas hide the control.
+	assert(merge.fontString:GetText() == "Merge into Incoming" and not merge:GetChecked())
+	assert(previous.OutgoingPet.mergeWhenDisabled and not previous.IncomingPet.mergeWhenDisabled)
+	ClickRow("Incoming")
+	assert(not merge.shown)
+
+	-- When Classic opens the same profile and the outgoing merge is unchecked.
+	Window.Hide()
+	local main = MSBTOptions.Main
+	local panel = CreateFrame("Frame")
+	for _, tab in ipairs(main.GetTabs()) do
+		if tab.text == L.TABS.scrollAreas.label then
+			main.DockMainFrame(panel, Noop, tab.index)
+			break
+		end
+	end
+	local classicRow = Find(MSBTMainOptionsFrame, function(region)
+		return region.mergeCheckbox and region.scrollAreaKey == "OutgoingPet"
+	end)
+	assert(classicRow.mergeCheckbox.shown and classicRow.mergeCheckbox:GetChecked())
+	ClickCheckbox(classicRow.mergeCheckbox, false)
+
+	-- Then Classic saves to the same per-area setting.
+	assert(not previous.OutgoingPet.mergeWhenDisabled)
+	main.UndockMainFrame(panel)
+end
+
 print("Options areas tests passed")

@@ -904,6 +904,13 @@ local function ScrollAreasTab_FontButtonOnClick(this)
 end
 
 
+local function ScrollAreasTab_GetPetMergeDestination(key)
+	local scrollAreas = MikSBT.Display and MikSBT.Display.ScrollAreas
+	local target = scrollAreas and scrollAreas:GetPetMergeTarget(key)
+	return target and L.WINDOW[target:lower()]
+end
+
+
 local function ScrollAreasTab_CreateLine(this)
 	local controls = tabFrames.scrollAreas.controls
 
@@ -941,6 +948,17 @@ local function ScrollAreasTab_CreateLine(this)
 	button:SetClickHandler(ScrollAreasTab_FontButtonOnClick)
 	controls[#controls+1] = button
 
+	checkbox = MSBTControls.CreateCheckbox(frame)
+	checkbox:Configure(20, L.CHECKBOXES.mergePetScrollArea.shortLabel)
+	checkbox:SetPoint("RIGHT", button, "LEFT", -8, 0)
+	checkbox:SetClickHandler(function(this, isChecked)
+		local areaKey = this:GetParent().scrollAreaKey
+		MSBTProfiles.SetOption("scrollAreas." .. areaKey, "mergeWhenDisabled", isChecked)
+		MSBTAnimations.UpdateScrollAreas()
+	end)
+	frame.mergeCheckbox = checkbox
+	controls[#controls+1] = checkbox
+
 	return frame
 end
 
@@ -950,6 +968,12 @@ local function ScrollAreasTab_DisplayLine(this, line, key, isSelected)
 	line.scrollAreaKey = key
 	line.enableCheckbox:SetLabel(saSettings.name)
 	line.enableCheckbox:SetChecked(not saSettings.disabled)
+	local destination = ScrollAreasTab_GetPetMergeDestination(key)
+	line.mergeCheckbox:SetShown(destination ~= nil)
+	if destination then
+		line.mergeCheckbox:SetChecked(saSettings.mergeWhenDisabled == true)
+		line.mergeCheckbox:SetTooltip(L.CHECKBOXES.mergePetScrollArea.tooltip:format(destination))
+	end
 
 	if (ScrollAreasTab_IsBuiltIn(key)) then
 		line.deleteButton:Disable()
@@ -2353,6 +2377,7 @@ module.scrollAreas = {
 	Remove = ScrollAreasTab_RemoveScrollArea,
 	IsBuiltIn = ScrollAreasTab_IsBuiltIn,
 	EnableOnClick = ScrollAreasTab_EnableOnClick,
+	GetPetMergeDestination = ScrollAreasTab_GetPetMergeDestination,
 	ShowFont = ScrollAreasTab_ShowFont,
 	ConfigureOnScreen = ScrollAreasTab_ConfigureOnScreen,
 }

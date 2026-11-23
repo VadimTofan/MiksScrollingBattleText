@@ -203,6 +203,7 @@ obj["overkill"]					= { label="Overkills", tooltip="Display overkill amounts."}
 obj["colorUnitNames"]			= { label="Color Unit Names", tooltip="Apply specified class colors to unit names."}
 obj["colorClassEntry"]			= { tooltip="Enable coloring for this class."}
 obj["enableScrollArea"]			= { tooltip="Enable the scroll area."}
+obj["mergePetScrollArea"]		= { label="Merge into %s", shortLabel="Merge", tooltip="Show this pet area's events in %s when the pet area is disabled."}
 obj["inheritField"]				= { label="Inherit", tooltip="Inherit the field's value. Uncheck to override."}
 obj["hideSkillIcons"]			= { label="Hide Icons", tooltip="Do not show icons in this scroll area."}
 obj["stickyEvent"]				= { label="Always Sticky", tooltip="Always display the event using the sticky style."}

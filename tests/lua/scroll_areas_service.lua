@@ -84,7 +84,7 @@ end
 -- Then every enabled message displays regardless of the old restrictions.
 assert(displayed == 12, "legacy group restrictions still hide MSBT messages")
 
--- Describe: unchecked pet areas redirect to the matching main area.
+-- Describe: disabled pet areas redirect only when their merge option is set.
 for _, direction in ipairs({ "Outgoing", "Incoming" }) do
 	-- Given distinct pet and main areas, with pet output unchecked.
 	local petKey = direction .. "Pet"
@@ -99,6 +99,16 @@ for _, direction in ipairs({ "Outgoing", "Incoming" }) do
 	end
 	local event = { scrollArea = petKey, textCategory = direction }
 	local amount = {} -- Stand-in for an amount passed untouched to rendering.
+
+	-- When an existing profile disables the area with no merge option.
+	DisplayService:DisplayEvent(event, "Hidden pet damage")
+
+	-- Then neither the area key nor its name redirects the event.
+	assert(ScrollAreas:Resolve(petArea.name) == petArea)
+	assert(not ScrollAreas:IsActive(petKey))
+	assert(#rendered == 0, "disabled pet area displayed damage without opt-in")
+
+	petArea.mergeWhenDisabled = true
 
 	-- When pet damage resolves by key or localized name and reaches display.
 	local resolved = ScrollAreas:Resolve(petKey)
