@@ -822,6 +822,67 @@ Replay("late catalogued projectile survives target departure", function()
     assert(ns.TargetKey() == nil)
 end)
 
+Replay("a same-frame direct cast distinguishes two due periodic schools", function()
+    for _, scenario in ipairs({
+        { name = "direct first" },
+        { name = "periodic first", reverse = true },
+        { name = "grouped", grouped = true },
+        { name = "competing direct cast", rival = 686 },
+    }) do
+        -- Given Immolate and Corruption are both due on the current target.
+        local start = Start()
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 348)
+        Line("spell")
+        Hit(Amount(), "target", 4)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 172)
+
+        -- When Searing Pain lands with a Corruption tick in the same frame.
+        At(start + 3)
+        local direct, tick = Amount(), Amount()
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 5676)
+        if scenario.rival then
+            Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, scenario.rival)
+        end
+        if scenario.reverse then
+            Line("tick")
+            Hit(tick, "target", 32)
+            Line("spell")
+            Hit(direct, "target", 4)
+        else
+            Line("spell")
+            Hit(direct, "target", 4)
+            Line("tick")
+            Hit(tick, "target", 32)
+        end
+        local previousIsInGroup = IsInGroup
+        IsInGroup = function() return scenario.grouped == true end
+        At(start + 3.25)
+        IsInGroup = previousIsInGroup
+
+        -- Then both amounts display once, with icons only for the solo,
+        -- uniquely assigned pair.
+        local directResult, tickResult = Record(direct), Record(tick)
+        assert(directResult.who == "you" and tickResult.who == "you", scenario.name)
+        assert(Displayed(direct) == 1 and Displayed(tick) == 1, scenario.name)
+        local directIcon, tickIcon
+        if scenario.grouped or scenario.rival then
+            assert(directResult.spell == nil and tickResult.spell == nil, scenario.name)
+        else
+            assert(directResult.spell == 5676 and not directResult.tick, scenario.name)
+            assert(tickResult.spell == 172 and tickResult.tick, scenario.name)
+            local directEvidence = forwarded[direct].accounting.evidence
+            local tickEvidence = forwarded[tick].accounting.evidence
+            assert(not directEvidence.shared and directEvidence.kind == "spell")
+            assert(not tickEvidence.shared and tickEvidence.kind == "tick")
+            directIcon, tickIcon = "icon-5676", "icon-172"
+        end
+        for _, output in ipairs(displayed) do
+            if output.amount == direct then assert(output.icon == directIcon, scenario.name) end
+            if output.amount == tick then assert(output.icon == tickIcon, scenario.name) end
+        end
+    end
+end)
+
 Replay("periodic-only initial zero report does not reject its application", function()
     -- Given a catalogued periodic-only Corruption application and no miss line.
     local start, tick = Start(), Amount()

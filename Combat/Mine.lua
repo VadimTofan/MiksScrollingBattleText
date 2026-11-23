@@ -1724,6 +1724,47 @@ local function HistoricalFit(self, spell, cast, school, now, restrict, key,
     return score, tick, directSelected
 end
 
+-- Test both schools before spending either outcome in a mixed frame.
+function Mine:MixedFrameDirectSchool(key, firstSchool, secondSchool, now)
+    for _, channel in pairs(self.channels) do
+        if ChannelFits(channel, key, firstSchool, now)
+            or ChannelFits(channel, key, secondSchool, now) then return nil end
+    end
+
+    local candidate
+    for _, entry in ipairs(self.pending) do
+        if DirectCandidateScore(self, entry, key, firstSchool, now)
+            or DirectCandidateScore(self, entry, key, secondSchool, now) then
+            if candidate then return nil end
+            candidate = entry
+        end
+    end
+    if not candidate or candidate.at ~= now or candidate.caster ~= "you"
+        or candidate.targetUncertain or candidate.ambiguous
+        or candidate.cast.ambiguous then return nil end
+    local facts = self.facts(candidate.spell)
+    if not facts or facts.direct ~= true or facts.area or facts.nextSwing
+        or (facts.directHits or 1) ~= 1 or candidate.school ~= facts.school
+        or (facts.school ~= firstSchool and facts.school ~= secondSchool) then
+        return nil
+    end
+
+    -- History also holds casts with no pending entry for this target.
+    for spell, casts in pairs(self.casts) do
+        for _, cast in ipairs(casts) do
+            if cast ~= candidate.cast then
+                local _, _, first = HistoricalFit(
+                    self, spell, cast, firstSchool, now, "direct", key, true)
+                if first then return nil end
+                local _, _, second = HistoricalFit(
+                    self, spell, cast, secondSchool, now, "direct", key, true)
+                if second then return nil end
+            end
+        end
+    end
+    return facts.school
+end
+
 function Mine:Likeliest(school, now, restrict, key)
     local bestSpell, bestCast, bestScore, bestTick, bestDirect
     for spell, casts in pairs(self.casts) do

@@ -1178,6 +1178,27 @@ local function PreferQueuedStrikeHit(group, lines, restrict)
     return false
 end
 
+local function MixedFrameDirectHit(first, second, directLine, tickLine)
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if not client or not client.isForever then return nil end
+    local key, at = first.key, first.at
+    if key ~= second.key or at ~= second.at or directLine.at ~= at
+        or tickLine.at ~= at or directLine.hit or tickLine.hit
+        or directLine.source ~= "mine"
+        or directLine.targetContext ~= key or tickLine.targetContext ~= key
+        or LineRestrict(directLine) ~= "direct" or not Alone(key, at) then
+        return nil
+    end
+    local firstSchool, secondSchool = first.record.school, second.record.school
+    if not firstSchool or not secondSchool or firstSchool == secondSchool
+        or firstSchool == ns.SCHOOL_PHYSICAL or secondSchool == ns.SCHOOL_PHYSICAL then
+        return nil
+    end
+    local school = ns.mine:MixedFrameDirectSchool(key, firstSchool, secondSchool, at)
+    if school == firstSchool then return first, second end
+    if school == secondSchool then return second, first end
+end
+
 -- One frame's hits (of one class, with lines by kind) against the lines of
 -- yours that may be theirs: as many lines as hits (or more: a DoT of yours
 -- on an enemy without a plate also sends one) and every hit is yours; none
@@ -1237,6 +1258,17 @@ function DecideGroup(group, frameLines, decided, settled)
                 end
             end
             if tied and #frameLines >= #group and #ordinary > 0 then
+                if #group == 2 and #remaining == 2 and #frameLines == 2 then
+                    local directLine = ordinary[1]
+                    local direct, tick = MixedFrameDirectHit(
+                        remaining[1], remaining[2], directLine, line)
+                    if direct then
+                        directLine.claimed, line.claimed = true, true
+                        Decide(direct, true, "direct", directLine)
+                        Decide(tick, true, "tick", line)
+                        return
+                    end
+                end
                 -- All amounts are confirmed, but the periodic/direct roles
                 -- cannot be assigned. Preserve numbers without spending a
                 -- guessed spell or teaching a false rhythm.
