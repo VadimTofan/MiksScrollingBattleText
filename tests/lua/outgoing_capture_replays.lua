@@ -235,6 +235,40 @@ Replay("baseline clean Windfury extras receive icons after full accounting", fun
     end
 end)
 
+Replay("an unconfirmed hit cannot undo two accounted Windfury extras", function()
+    -- Given a Weapon burst whose two direct lines already match both extras.
+    local start = Start()
+    local first, second, unconfirmed, normal = Amount(), Amount(), Amount(), Amount()
+    Event("PLAYER_SWING", 3.2, 0)
+    Line("swing")
+    Line("spell")
+    Line("spell")
+    Event("SPELL_UPDATE_COOLDOWN", 439440)
+    Hit(first)
+    At(start + 0.216)
+    Hit(second)
+
+    -- When another hit has no confirmation and the ordinary swing arrives later.
+    At(start + 0.24)
+    Hit(unconfirmed)
+    At(start + 0.3)
+    assert(Displayed(first) == 0 and Displayed(second) == 0,
+        "extras escaped before the ordinary swing matched")
+    At(start + 0.585)
+    Hit(normal)
+    At(start + 2)
+
+    -- Then only the two accounted extras get Windfury icons.
+    assert(Record(unconfirmed).who == "unknown" and Displayed(unconfirmed) == 0)
+    assert(Record(normal).melee and Displayed(normal) == 1)
+    assert(Displayed(first) == 1 and Displayed(second) == 1)
+    for _, output in ipairs(displayed) do
+        if output.amount == first or output.amount == second then
+            assert(output.icon == "icon-8232", "unconfirmed hit canceled Windfury icons")
+        end
+    end
+end)
+
 Replay("explicit player Windfury casts help identify clean extra hits", function()
     for _, scenario in ipairs({ "clean", "pet-cast", "both-signals",
         "duplicate-cast" }) do

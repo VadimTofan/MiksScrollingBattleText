@@ -363,13 +363,31 @@ local function ExtraEvidence(frame, info)
     return true
 end
 
-local function BlockUnlinked(self, info, publicRecord)
+local function AccountedWeaponExtras(source, frame, info, record, result)
+    local swing = frame.reservations[1]
+    -- An unrelated later report cannot consume already matched direct lines.
+    -- Complete still requires the native swing's own matching receipt.
+    return source.sealed and source.weapon and not source.totem
+        and #source.frames == 1 and #frame.reservations == 1
+        and swing.kind == "swing"
+        and frame.extras == 2 and frame.directUsed == 2 and frame.directLines == 2
+        and info.at > source.at + FRAME_WINDOW and info.confirmed == false
+        and record.event == "damage" and record.school == 1
+        and result.who == "unknown" and not result.ambiguous
+end
+
+local function BlockUnlinked(self, info, publicRecord, result)
     if publicRecord.school ~= 1 and publicRecord.event ~= "miss" then return end
     for _, source in ipairs(self.sources) do
         local age = info.at - source.at
         if age >= -FRAME_WINDOW and age <= SOURCE_WINDOW then
             for _, frame in ipairs(source.frames) do
-                if frame.key == info.key then Block(self, source) break end
+                if frame.key == info.key then
+                    if not AccountedWeaponExtras(source, frame, info, publicRecord, result) then
+                        Block(self, source)
+                    end
+                    break
+                end
             end
         end
     end
@@ -390,7 +408,7 @@ function Inference:Out(record, metadata)
     local receipt, evidence = info.receipt, info.evidence
     local sourceAt = receipt and receipt.at or (evidence and evidence.at)
     if not sourceAt then
-        BlockUnlinked(self, info, publicRecord)
+        BlockUnlinked(self, info, publicRecord, result)
         self.config.emit(record)
         return
     end
