@@ -290,11 +290,13 @@ function Inference:Cast(info)
 end
 
 local function LinkWeaponCooldown(self, signal, key)
-    if signal.blocked or signal.totem or #signal.frames > 0 then return end
+    if signal.blocked or signal.closed or signal.totem
+        or signal.swingSource or signal.extraSource then return end
     local swingSource, extraSource
     for _, source in ipairs(self.sources) do
-        if source ~= signal and math.abs(source.at - signal.at) <= WEAPON_SIGNAL_WINDOW then
-            if source.blocked or source.weapon or source.totem or source.extraSource then return end
+        if math.abs(source.at - signal.at) <= WEAPON_SIGNAL_WINDOW then
+            if source.blocked or source.totem or source.extraSource
+                or (source ~= signal and source.weapon) then return end
             if #source.frames > 0 then
                 if not source.sealed or #source.frames ~= 1 then return end
                 local frame = source.frames[1]
@@ -317,11 +319,12 @@ local function LinkWeaponCooldown(self, signal, key)
         if extraSource then return end
         extraSource = swingSource
     else
-        if not extraSource or swingSource.at >= signal.at or extraSource.at <= signal.at
+        if not extraSource or swingSource.at > signal.at or extraSource.at < signal.at
             or extraSource.at - swingSource.at > WEAPON_SIGNAL_WINDOW then return end
         -- Keep both original frames so receipts and confirmations retain
         -- their own timestamps.
         swingSource.extraSource, extraSource.swingSource = extraSource, swingSource
+        swingSource.weapon = nil
     end
 
     extraSource.weapon = true
@@ -338,7 +341,7 @@ function Inference:Signal(at, spell, cooldownTarget)
     if spell == WEAPON then source.weapon = true else source.totem = true end
     Complete(self, source)
     local key = spell == WEAPON and Text(cooldownTarget)
-    if key and #source.frames == 0 and not source.cooldownPending then
+    if key and not source.closed and not source.cooldownPending then
         source.cooldownPending = true
         local generation = self.generation
         self.config.after(WEAPON_SIGNAL_WINDOW + FRAME_WINDOW, function()

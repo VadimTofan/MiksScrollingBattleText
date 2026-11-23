@@ -318,23 +318,32 @@ Replay("a nearby Weapon cooldown can corroborate one complete swing", function()
 end)
 
 Replay("captured Windfury accounts across swing, cooldown, and spell frames", function()
-    for _, normalArrives in ipairs({ true, false }) do
-        -- Given the live swing at 33.873 and cooldown at 33.896.
+    for _, scenario in ipairs({
+        { name = "captured sequence", cooldown = 0.023, icons = true },
+        { name = "cooldown with swing", cooldown = 0, icons = true },
+        { name = "cooldown with spell lines", cooldown = 0.039, icons = true },
+        { name = "ordinary hit absent", cooldown = 0.023, missingNormal = true },
+    }) do
+        -- Given the captured swing at 33.873 and the two spell lines
+        -- at 33.912, with the cooldown in or between those frames.
         local start = Start()
         local first, normal, second = Amount(), Amount(), Amount()
         Event("PLAYER_SWING", 2.242, 0)
         Line("swing")
-        At(start + 0.023)
-        Event("SPELL_UPDATE_COOLDOWN", 439440)
+        if scenario.cooldown < 0.039 then
+            At(start + scenario.cooldown)
+            Event("SPELL_UPDATE_COOLDOWN", 439440)
+        end
         At(start + 0.039)
         Line("spell")
         Line("spell")
+        if scenario.cooldown == 0.039 then Event("SPELL_UPDATE_COOLDOWN", 439440) end
 
         -- When the extra reports use the separate spell frame and the
         -- ordinary hit uses its original swing frame.
         At(start + 0.237)
         Hit(first)
-        if normalArrives then
+        if not scenario.missingNormal then
             At(start + 0.607)
             Hit(normal)
         end
@@ -348,12 +357,12 @@ Replay("captured Windfury accounts across swing, cooldown, and spell frames", fu
             assert(Record(extra).who == "you" and Displayed(extra) == 1)
             for _, output in ipairs(displayed) do
                 if output.amount == extra then
-                    assert((output.icon == "icon-8232") == normalArrives,
-                        "split Windfury source decorated without both extras and the ordinary hit")
+                    assert((output.icon == "icon-8232") == (scenario.icons == true),
+                        "incorrect Windfury icon for " .. scenario.name)
                 end
             end
         end
-        if normalArrives then
+        if not scenario.missingNormal then
             assert(Record(normal).melee and Displayed(normal) == 1)
         end
     end
