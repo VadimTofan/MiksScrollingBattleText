@@ -1,5 +1,20 @@
 # Changelog
 
+## v12.057
+
+- On Forever, recover more spell icons in battlegrounds and when a direct hit
+  and a damage-over-time tick land together. Improve matching for shared target
+  names and delayed melee hits in solo combat.
+- Improve Windfury Weapon icons when confirmations arrive across frames, and
+  recognize more melee abilities for Windfury Totem notifications. Unresolved
+  Windfury bursts still show damage numbers.
+- On Forever, show icons for your own direct heals and healing-over-time ticks
+  and for damage shields that MSBT can identify.
+- Show zero incoming damage as `0` on Forever. Partially blocked outgoing hits
+  show a block trailer.
+- Fix profile reselection after toggling Blizzard combat text and suppress
+  low-health and low-mana alerts while dead.
+
 ## v12.056
 
 - On Forever, Auto Shot and wand attacks use the ranged Events settings. Set
