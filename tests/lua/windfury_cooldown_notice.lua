@@ -4,6 +4,11 @@ MikSBT = {
 }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+for _, class in ipairs({ "Druid", "Hunter", "Rogue", "Warrior" }) do
+    dofile("Combat/Classes/" .. class .. ".lua")
+end
+dofile("Combat/Classes/Paladin.lua")
+dofile("Combat/Classes/Shaman.lua")
 dofile("Combat/Helpers.lua")
 dofile("Combat/SpellCatalog.lua")
 dofile("Combat/Mine.lua")
@@ -36,6 +41,11 @@ UnitExists = function(unit) return unit == "target" end
 UnitIsUnit = function(a, b) return a == b end
 UnitGUID = function(unit) return unit == "target" and "Creature-test" end
 UnitName = function() return "Training target" end
+local playerClass = "SHAMAN"
+UnitClass = function(unit)
+    assert(unit == "player", "class filtering checked a unit other than player")
+    return "Localized class", playerClass
+end
 GetLocale = function() return "enUS" end
 C_Spell = {
     GetSpellName = function(spell) return "Spell " .. spell end,
@@ -44,7 +54,7 @@ C_Spell = {
         if spell == 21949 then
             return "Wounds the target causing them to bleed for 210 damage over 7 sec."
         end
-        if spell == 17364 or spell == 2643 then
+        if spell == 17364 or spell == 2643 or spell == 999999 then
             return "Deals 100 Physical damage."
         end
         return "Grants extra attacks."
@@ -263,23 +273,140 @@ EndFrame()
 assert(#displayed == before, "unready source filter corroborated Windfury")
 sources[4] = nil
 
--- Given a weapon ability whose range API is unavailable.
+-- Given the player is a Shaman and the range API is unavailable.
 local hasRange = C_Spell.SpellHasRange
 C_Spell.SpellHasRange = nil
 now = 47326.6
 
 -- When its physical cast, direct line, and cooldown update coincide.
-Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-unknown-reach", 17364)
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-catalogued-melee", 17364)
 Line("SPELL_DAMAGE")
 Cooldown(439440)
 EndFrame()
 
--- Then unknown reach does not establish a melee ability.
+-- Then the Shaman rule supplies the melee reach needed to corroborate Windfury.
+assert(#displayed == before + 1, "Shaman's Stormstrike did not corroborate Windfury")
+
+-- Given the same spell signal while the current player is another class.
+playerClass = "MAGE"
+before = #displayed
+now = 47326.65
+
+-- When the cast and Windfury update coincide with a direct line.
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-other-class", 17364)
+Line("SPELL_DAMAGE")
+Cooldown(439440)
+EndFrame()
+
+-- Then the Shaman rule cannot supply missing melee reach to another class.
+assert(#displayed == before, "another class inherited Shaman's Windfury rule")
+playerClass = "SHAMAN"
+
+-- Given a physical cast whose reach is absent from the catalog and API.
+before = #displayed
+now = 47326.7
+local unknown = ns.SpellFacts(999999)
+assert(unknown.direct and unknown.school == 1)
+
+-- When that cast, a direct line, and the Windfury update coincide.
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-unknown-reach", 999999)
+Line("SPELL_DAMAGE")
+Cooldown(439440)
+EndFrame()
+
+-- Then physical damage alone does not establish melee reach.
 assert(#displayed == before, "unknown ability reach corroborated Windfury")
 C_Spell.SpellHasRange = hasRange
 
+-- Given Holy Strike on a Forever Paladin and a direct player line.
+playerClass = "PALADIN"
+now = 47326.72
+Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-holy-strike", 678)
+Line("SPELL_DAMAGE")
+
+-- When both cooldown updates arrive and only Totem fits Holy Strike.
+Cooldown(439440)
+Cooldown(10610)
+EndFrame()
+
+-- Then the Totem notice is displayed once with its own spell metadata.
+assert(#displayed == before + 1, "Holy Strike did not corroborate Windfury Totem")
+assert(displayed[#displayed].message == "Spell 10610")
+assert(displayed[#displayed].icon == "icon-10610")
+
+-- Given a Holy Strike whose Totem cooldown signal or player line is missing.
+before = #displayed
+for _, missing in ipairs({ "cooldown", "line", "class" }) do
+    now = now + 0.01
+    playerClass = missing == "class" and "MAGE" or "PALADIN"
+
+    -- When the remaining evidence arrives in the same frame.
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-holy-" .. missing, 678)
+    if missing ~= "line" then Line("SPELL_DAMAGE") end
+    if missing ~= "cooldown" then Cooldown(10610) end
+    EndFrame()
+
+    -- Then incomplete or wrong-class evidence stays silent.
+    assert(#displayed == before, "missing " .. missing .. " still displayed Totem")
+end
+playerClass = "SHAMAN"
+
+for _, row in ipairs({
+    { "DRUID", 5221, 1822 }, -- Shred and Rake, whose application can also bleed.
+    { "HUNTER", 1495, 2643 }, -- Mongoose Bite and Multi-Shot.
+    { "ROGUE", 1752, 1310707 }, -- Sinister Strike and dual-hand Mutilate.
+    { "WARRIOR", 12294, 1680 }, -- Mortal Strike and dual-hand Whirlwind.
+}) do
+    -- Given the matching class and a direct combat line from a known strike.
+    playerClass = row[1]
+    now = now + 0.01
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-class-strike-" .. playerClass, row[2])
+    Line("SPELL_DAMAGE")
+
+    -- When the Totem cooldown update arrives in the same frame.
+    Cooldown(10610)
+    EndFrame()
+
+    -- Then the class rule corroborates exactly one Totem alert.
+    before = before + 1
+    assert(#displayed == before, playerClass .. " strike did not corroborate Totem")
+    assert(displayed[#displayed].message == "Spell 10610")
+
+    -- Given a cast outside this class's verified pool of triggers.
+    now = now + 0.01
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-other-strike-" .. playerClass, row[3])
+
+    -- When the line and cooldown match that frame.
+    Line("SPELL_DAMAGE")
+    Cooldown(10610)
+    EndFrame()
+
+    -- Then it stays silent without evidence of an eligible strike.
+    assert(#displayed == before, playerClass .. " used unverified Totem evidence")
+end
+playerClass = "SHAMAN"
+
+for _, class in ipairs({ "MAGE", "PRIEST", "WARLOCK" }) do
+    -- Given a class without melee ability rules and an observed player swing.
+    playerClass = class
+    for _, hand in ipairs({ 0, 1, 2 }) do
+        now = now + 0.01
+        Event("PLAYER_SWING", 2.5, hand)
+
+        -- When a direct player line and a Totem cooldown share the frame.
+        Line("SPELL_DAMAGE")
+        Cooldown(10610)
+        EndFrame()
+
+        -- Then only a main-hand melee swing corroborates the Totem alert.
+        if hand == 0 then before = before + 1 end
+        assert(#displayed == before, class .. " Totem alert did not match its swing hand")
+    end
+end
+playerClass = "SHAMAN"
+
 -- Given a melee frame whose extra attack is avoided.
-now = 47326.8
+now = 47326.99
 
 -- When a direct miss line corroborates its Windfury update.
 Event("PLAYER_SWING", 2.5, 0)
