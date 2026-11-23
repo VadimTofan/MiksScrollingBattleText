@@ -2753,7 +2753,8 @@ local function OnEvent(_, event, ...)
             and (spell == WINDFURY_TOTEM_ATTACK_SPELL_ID
                 or (spell == WINDFURY_ATTACK_SPELL_ID
                     and ActiveWindfurySpell(ns.SCHOOL_PHYSICAL) == 8232)) then
-            ns.windfuryInference:Signal(Now(), spell)
+            local target = spell == WINDFURY_ATTACK_SPELL_ID and ns.TargetKey() or nil
+            ns.windfuryInference:Signal(Now(), spell, target)
         end
         WindfuryCooldown(...)
     elseif event == "UNIT_SPELLCAST_SENT" then

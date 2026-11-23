@@ -269,6 +269,54 @@ Replay("an unconfirmed hit cannot undo two accounted Windfury extras", function(
     end
 end)
 
+Replay("a nearby Weapon cooldown can corroborate one complete swing", function()
+    for _, scenario in ipairs({
+        { name = "cooldown first", offset = -0.035, icons = true },
+        { name = "swing first", offset = 0.035, icons = true },
+        { name = "competing frame", offset = 0.035, rival = true },
+        { name = "outside window", offset = 0.09 },
+    }) do
+        -- Given one native swing with two typed direct confirmations.
+        local start = Start() + 0.1
+        local first, second, normal = Amount(), Amount(), Amount()
+        if scenario.offset < 0 then
+            At(start + scenario.offset)
+            Event("SPELL_UPDATE_COOLDOWN", 439440)
+        end
+        At(start)
+        Event("PLAYER_SWING", 3.2, 0)
+        Line("swing")
+        Line("spell")
+        Line("spell")
+        Hit(first)
+
+        -- When the Weapon update sits in a separate frame.
+        if scenario.offset > 0 then
+            At(start + scenario.offset)
+            Event("SPELL_UPDATE_COOLDOWN", 439440)
+        end
+        if scenario.rival then
+            At(start + 0.06)
+            Event("PLAYER_SWING", 3.2, 1)
+        end
+        At(start + 0.216)
+        Hit(second)
+        At(start + 0.585)
+        Hit(normal)
+        At(start + 2)
+
+        -- Then only an unambiguous nearby source gets both inferred icons.
+        assert(Record(normal).melee and Displayed(normal) == 1, scenario.name)
+        assert(Displayed(first) == 1 and Displayed(second) == 1, scenario.name)
+        local expected = scenario.icons and "icon-8232" or nil
+        for _, output in ipairs(displayed) do
+            if output.amount == first or output.amount == second then
+                assert(output.icon == expected, scenario.name)
+            end
+        end
+    end
+end)
+
 Replay("explicit player Windfury casts help identify clean extra hits", function()
     for _, scenario in ipairs({ "clean", "pet-cast", "both-signals",
         "duplicate-cast" }) do

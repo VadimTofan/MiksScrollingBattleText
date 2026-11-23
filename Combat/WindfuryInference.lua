@@ -6,6 +6,7 @@ MikSBT.Components.WindfuryInference = Inference
 
 local Restricted = MikSBT.API.RestrictedValue
 local FRAME_WINDOW, SOURCE_WINDOW = 0.001, 1.6
+local WEAPON_SIGNAL_WINDOW = 0.05
 local MAX_SOURCES, MAX_TARGETS, MAX_PENDING = 8, 2, 64
 local MAX_RESERVATIONS, MAX_LINES, MAX_OUTCOMES = 8, 32, 64
 local STORMSTRIKE, WEAPON, TOTEM, ICON = 17364, 439440, 10610, 8232
@@ -267,7 +268,32 @@ function Inference:Cast(info)
     end
 end
 
-function Inference:Signal(at, spell)
+local function LinkWeaponCooldown(self, signal, key)
+    if signal.blocked or signal.totem or #signal.frames > 0 then return end
+    local candidate
+    for _, source in ipairs(self.sources) do
+        if source ~= signal and math.abs(source.at - signal.at) <= WEAPON_SIGNAL_WINDOW then
+            if source.blocked or source.weapon or source.totem then return end
+            if #source.frames > 0 then
+                if candidate then return end
+                candidate = source
+            end
+        end
+    end
+    if not candidate or not candidate.sealed or #candidate.frames ~= 1 then return end
+    local frame = candidate.frames[1]
+    if frame.key ~= key or frame.swingLines ~= 1 or frame.directLines ~= 2
+        or #frame.reservations ~= 1 or frame.reservations[1].kind ~= "swing" then
+        return
+    end
+
+    -- The update supplies only the Weapon signal. Every hit still needs
+    -- its own evidence from the melee source.
+    candidate.weapon = true
+    Complete(self, candidate)
+end
+
+function Inference:Signal(at, spell, cooldownTarget)
     if not Enabled(self) then return end
     at, spell = Number(at), Number(spell)
     if not at or (spell ~= WEAPON and spell ~= TOTEM) then return end
@@ -276,6 +302,15 @@ function Inference:Signal(at, spell)
     if not source then return end
     if spell == WEAPON then source.weapon = true else source.totem = true end
     Complete(self, source)
+    local key = spell == WEAPON and Text(cooldownTarget)
+    if key and #source.frames == 0 and not source.cooldownPending then
+        source.cooldownPending = true
+        local generation = self.generation
+        self.config.after(WEAPON_SIGNAL_WINDOW + FRAME_WINDOW, function()
+            if generation ~= self.generation or not source.alive or not Enabled(self) then return end
+            LinkWeaponCooldown(self, source, key)
+        end)
+    end
 end
 
 function Inference:Line(at, key, origin, kind)
