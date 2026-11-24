@@ -88,3 +88,12 @@ local dotHit = mine:Hit("target", "damage", 106, 51, false, true,
 assert(dotHit.spell == 2 and dotHit.tick,
     "active channel stole a same-school DoT tick")
 print("Channel attribution tests passed")
+
+-- Given a direct channel whose class rules do not opt in to hidden targets.
+local direct = { damages = true, direct = true, ticks = false, school = 64 }
+local generic = ns.NewMine(nil, nil, function() return direct end)
+generic:StartChannel("player", 90001, nil, 70, true)
+
+-- When an isolated direct hit is reported, then it cannot name this channel.
+assert(not generic:UntargetedDirectCandidate("target", 64, 71, nil, true),
+    "an unregistered channel was eligible for the class-specific fallback")

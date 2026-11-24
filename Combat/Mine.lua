@@ -1807,6 +1807,7 @@ function Mine:UntargetedDirectCandidate(key, school, now, leech, allowChannel)
     if cast and (cast.candidates or cast.ambiguous) then return nil end
     local facts = self.facts(candidate.spell)
     if not facts or facts.direct ~= true or facts.ticks ~= false
+        or (isChannel and facts.allowUntargetedChannel ~= true)
         or facts.school ~= school or facts.area or facts.nextSwing or facts.shot
         or (facts.directHits or 1) ~= 1
         or (leech == true and not facts.leech) then return nil end

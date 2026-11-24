@@ -27,11 +27,11 @@ class SpellCatalogTests(unittest.TestCase):
                 files.index("Combat\\SpellCatalog.lua"),
                 files.index("Combat\\Spells.lua"),
             )
-            classes = ("Druid", "Hunter", "Paladin", "Rogue", "Shaman", "Warrior")
+            classes = ("Druid", "Hunter", "Mage", "Paladin", "Rogue", "Shaman", "Warrior")
             for class_name in classes:
                 rules = files.index(f"Combat\\Classes\\{class_name}.lua")
                 self.assertLess(files.index("Combat\\Context.lua"), rules)
-                self.assertLess(rules, files.index("Combat\\Reader.lua"))
+                self.assertLess(rules, files.index("Combat\\SpellCatalog.lua"))
         license_text = (
             root / "Combat/LICENSE-NameplateSCTReforged"
         ).read_text(encoding="utf-8")

@@ -35,6 +35,7 @@ Components\OutgoingBatcher.lua
 Combat\Context.lua
 Combat\Classes\Druid.lua
 Combat\Classes\Hunter.lua
+Combat\Classes\Mage.lua
 Combat\Classes\Paladin.lua
 Combat\Classes\Rogue.lua
 Combat\Classes\Shaman.lua

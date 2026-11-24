@@ -5,9 +5,9 @@ local descriptions = {
     [116] = "Causes 50 Fire damage over 20 sec.",
     [21949] = "Wounds the target causing them to bleed for 210 damage over 7 sec.",
 }
-local function Load(forever, catalog)
+local function Load(forever, catalog, classes)
     MikSBT = {
-        CombatEngine = {},
+        CombatEngine = { classRules = {} },
         Compatibility = { Client = { isForever = forever } },
     }
     local ns = MikSBT.CombatEngine
@@ -20,6 +20,9 @@ local function Load(forever, catalog)
         GetSpellDescription = function(spell) return descriptions[spell] end,
         IsSpellHelpful = function(spell) return spell == 20473 end,
     }
+    for _, class in ipairs(classes or {}) do
+        dofile("Combat/Classes/" .. class .. ".lua")
+    end
     if catalog then
         local available = io.open("Combat/SpellCatalog.lua", "r")
         assert(available, "verified spell catalog module is missing")
@@ -127,6 +130,29 @@ local frostbolt = ns.SpellFacts(116)
 
 -- Then metadata needs no tooltip or localization to establish its facts.
 assert(frostbolt.school == 16 and frostbolt.direct and not frostbolt.ticks)
+
+-- Given the shared catalog alone, when asking for an ability adjustment,
+-- then the catalog must have no class-specific override of its own.
+assert(ns.CatalogSpellFacts(20375) == nil, "the catalog still owns seal rules")
+assert(ns.CatalogSpellFacts(5143) == nil, "the catalog still owns Arcane Missiles rules")
+
+-- Given each class can load independently, when its spells are queried,
+-- then only its adjustments are available and their facts stay locale-neutral.
+local paladin = Load(true, true, { "Paladin" })
+local seal = paladin.SpellFacts(20375)
+assert(seal.helpful and not seal.damages and seal.weaponProc == "seal")
+assert(paladin.CatalogSpellFacts(5143) == nil)
+
+local mage = Load(true, true, { "Mage" })
+local missiles = mage.SpellFacts(5143)
+assert(missiles.direct and missiles.school == 64 and not missiles.ticks)
+assert(mage.CatalogSpellFacts(20375) == nil)
+
+-- When a caller changes the returned record, the class rule remains intact.
+local copy = mage.CatalogSpellFacts(5143)
+copy.school = 1
+assert(mage.CatalogSpellFacts(5143).school == 64)
+assert(mage.CatalogSpellFacts(25345).school == 64)
 
 -- Given a different client and an old harness without the optional catalog.
 locale = "enUS"
