@@ -335,17 +335,30 @@ end
 -- preserves legacy area impacts; it never reopens an outcome on the first.
 local function DirectAvailable(self, spell, cast, key, now, area)
     local age = now - cast.at
-    if age < -0.05 or age > DirectWindow(self, spell) then return false end
+    local window = DirectWindow(self, spell)
+    if age < -0.05 or age > window then return false end
     local facts = self.facts(spell)
-    local areaSpell = type(facts) == "table" and facts.area == true
-    if cast.key ~= key and not cast.targetUncertain and not (area and (areaSpell
-        or age <= AREA_MOMENT)) then return false end
-    local limit = type(facts) == "table" and facts.directHits or 1
-    local count = cast.outcomes and cast.outcomes[key or false] or 0
-    if key and cast.targetUncertain and cast.outcomes then
-        count = count + (cast.outcomes[false] or 0)
+    if type(facts) ~= "table" then facts = nil end
+    local areaWindow = AREA_MOMENT
+    if facts and facts.area then
+        areaWindow = facts.areaWindow or window
     end
-    return count < (limit or 1)
+    if cast.key ~= key and not cast.targetUncertain
+        and not (area and age <= areaWindow) then return false end
+
+    local outcomes = cast.outcomes
+    if not outcomes then return true end
+    local count = outcomes[key or false] or 0
+    local targetLimit = facts and facts.maxDirectTargets
+    if count == 0 and targetLimit then
+        local targets = 0
+        for _ in pairs(outcomes) do
+            targets = targets + 1
+            if targets >= targetLimit then return false end
+        end
+    end
+    if key and cast.targetUncertain then count = count + (outcomes[false] or 0) end
+    return count < (facts and facts.directHits or 1)
 end
 
 local function ApplicationFailed(self, spell, cast, key)
@@ -1751,6 +1764,7 @@ function Mine:MixedFrameDirectSchool(key, firstSchool, secondSchool, now)
         or candidate.cast.ambiguous then return nil end
     local facts = self.facts(candidate.spell)
     if not facts or facts.direct ~= true or facts.area or facts.nextSwing
+        or (facts.maxDirectTargets or 1) > 1
         or (facts.directHits or 1) ~= 1 or candidate.school ~= facts.school
         or (facts.school ~= firstSchool and facts.school ~= secondSchool) then
         return nil
@@ -1809,6 +1823,7 @@ function Mine:UntargetedDirectCandidate(key, school, now, leech, allowChannel)
     if not facts or facts.direct ~= true or facts.ticks ~= false
         or (isChannel and facts.allowUntargetedChannel ~= true)
         or facts.school ~= school or facts.area or facts.nextSwing or facts.shot
+        or (facts.maxDirectTargets or 1) > 1
         or (facts.directHits or 1) ~= 1
         or (leech == true and not facts.leech) then return nil end
 

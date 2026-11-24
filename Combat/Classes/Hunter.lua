@@ -1,4 +1,7 @@
 MikSBT.CombatEngine.classRules.HUNTER = {
+    spellFacts = {
+        [2643] = { maxDirectTargets = 3 }, -- Multi-Shot
+    },
     queuedStrikes = {
         -- Raptor Strike
         [2973] = true, [14260] = true, [14261] = true, [14262] = true,

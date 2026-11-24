@@ -169,6 +169,94 @@ assert(not queued.HUNTER.queuedStrikes[78])
 assert(queued.HUNTER.rangedAttackSpell == 75)
 assert(queued.HUNTER.targetlessHealRecipients[136] == "pet")
 
+-- Given the class rules on Forever with no English tooltip.
+local classes = { "Druid", "Hunter", "Mage", "Paladin", "Priest", "Rogue",
+    "Shaman", "Warlock", "Warrior" }
+ns = Load(true, true, classes)
+dofile("Combat/Mine.lua")
+local function CastAt(spell, key, uncertain)
+    local tracker = ns.NewMine(function() return nil end, function() end,
+        ns.SpellFacts)
+    tracker:Cast("player", spell, key, 10, uncertain)
+    return tracker
+end
+
+local function DirectHit(tracker, key, school, at, kind)
+    return tracker:Hit(key, kind or "damage", school, at, false, true, nil,
+        false, "direct")
+end
+
+-- When a capped attack produces distinct confirmed outcomes in its window.
+for _, example in ipairs({ { 9908, 1, 3, 10.1 }, { 2643, 1, 3, 10.1 },
+    { 10605, 8, 3, 10.1 }, { 11581, 1, 4, 10.1 }, { 1680, 1, 4, 10.1 } }) do
+    local spell, school, cap, impactAt = unpack(example)
+    local tracker = CastAt(spell, "target1")
+    assert(DirectHit(tracker, "target1", school, 10.05).spell == spell)
+    for index = 2, cap do
+        local hit = DirectHit(tracker, "target" .. index, school, impactAt)
+        assert(hit.who == "you" and hit.spell == spell,
+            "valid secondary target lost spell " .. spell)
+    end
+
+    -- Then a further confirmed report keeps its damage without that identity.
+    local extra = DirectHit(tracker, "extra", school, impactAt)
+    assert(extra.who == "you" and extra.spell == nil,
+        "cast exceeded its target cap for " .. spell)
+
+    -- A multi-target spell cannot satisfy a single-outcome fallback.
+    local known = CastAt(spell, "target")
+    assert(known:MixedFrameDirectSchool("target", school, 4, 10) == nil)
+    local hidden = CastAt(spell, nil, true)
+    assert(hidden:UntargetedDirectCandidate("target", school, 10.1) == nil)
+end
+
+-- Given either Mutilate weapon can miss.
+local mutilate = CastAt(399956, "target")
+
+-- When the off-hand damage follows a main-hand miss.
+assert(DirectHit(mutilate, "target", 1, 10.1, "miss").spell == 399956)
+assert(DirectHit(mutilate, "target", 1, 10.11).spell == 399956,
+    "Mutilate lost the off-hand result")
+
+-- Then a third confirmed report cannot reuse Mutilate.
+local extra = DirectHit(mutilate, "target", 1, 10.12)
+assert(extra.who == "you" and extra.spell == nil)
+
+-- Given area casts with no readable target.
+for _, example in ipairs({ { 10202, 64 }, { 10318, 2 }, { 27801, 2 } }) do
+    local spell, school = unpack(example)
+    local facts = ns.SpellFacts(spell)
+    assert(facts.area and facts.school == school and facts.direct)
+    local hidden = CastAt(spell, nil, true)
+
+    -- When only a targetless single-target fallback is available.
+    assert(hidden:UntargetedDirectCandidate("target", school, 10.1) == nil)
+
+    -- Then nearby confirmed hits still get the spell, within the area window.
+    local known = CastAt(spell, "target")
+    assert(DirectHit(known, "other", school, 10.1).spell == spell)
+    local late = DirectHit(known, "late", school, 10.5)
+    assert(late.who == "you" and late.spell == nil,
+        "nearby area attack took a later report for " .. spell)
+end
+
+-- Given a localized Drain Life channel and a tracked Siphon Life on the target.
+local drain = ns.SpellFacts(11700)
+assert(drain.leech and drain.ticks and drain.school == 32 and drain.period == 1)
+local siphon = 18881
+local warlock = CastAt(siphon, "target")
+warlock.amounts[siphon] = { n = 1, [20] = true }
+warlock:StartChannel("player", 11700, "target", 11)
+
+-- When both can produce a heal but a due tick matches Siphon Life's amount.
+local healedTick = warlock:Hit("target", "damage", 32, 13, false, true, 20,
+    false, "tick", true)
+
+-- Then the established draining DoT retains its identity in this locale.
+assert(healedTick.who == "you" and healedTick.spell == siphon,
+    "Drain Life took a localized Siphon Life tick")
+assert(Load(false, true, classes).SpellFacts(11700) == nil)
+
 -- Given a different client and an old harness without the optional catalog.
 locale = "enUS"
 for _, context in ipairs({ { false, true }, { true, false } }) do

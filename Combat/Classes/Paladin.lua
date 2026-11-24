@@ -19,6 +19,10 @@ for _, spellID in ipairs({
     spellFacts[spellID] = sealFacts
 end
 
+local holyWrath = { area = true, areaWindow = 0.2 }
+spellFacts[2812] = holyWrath
+spellFacts[10318] = holyWrath
+
 MikSBT.CombatEngine.classRules.PALADIN = {
     spellFacts = spellFacts,
     windfuryTotemTriggers = {

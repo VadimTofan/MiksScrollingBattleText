@@ -353,16 +353,12 @@ end
 -- A nil school is deliberate for Shoot, whose wand sets its school.
 function engine.CatalogSpellFacts(spellID)
     local override = classSpellFacts[spellID]
-    if override then
-        local facts = {}
-        for key, value in pairs(override) do facts[key] = value end
-        return facts
-    end
     local direct = source.DirectSpells[spellID]
     local ticking = source.TickSpells[spellID]
     local spell = ticking or direct
-    if not spell then return nil end
-    return {
+    if not spell and not override then return nil end
+
+    local facts = spell and {
         damages = true,
         school = spell.school,
         direct = direct ~= nil or spell.hits == true,
@@ -377,5 +373,9 @@ function engine.CatalogSpellFacts(spellID)
         learnsSchool = spell.learns == true,
         source = "nameplatesct-reforged",
         sourceBuild = "1.60.1.70888",
-    }
+    } or {}
+    if override then
+        for key, value in pairs(override) do facts[key] = value end
+    end
+    return facts
 end

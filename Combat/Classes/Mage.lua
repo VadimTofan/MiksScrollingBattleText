@@ -12,6 +12,11 @@ for _, spellID in ipairs({ 5143, 5144, 5145, 8416, 8417, 10211, 10212, 25345 }) 
     spellFacts[spellID] = arcaneMissiles
 end
 
+local arcaneExplosion = { area = true, areaWindow = 0.2 }
+for _, spellID in ipairs({ 1449, 8437, 8438, 8439, 10201, 10202 }) do
+    spellFacts[spellID] = arcaneExplosion
+end
+
 MikSBT.CombatEngine.classRules.MAGE = {
     spellFacts = spellFacts,
 }

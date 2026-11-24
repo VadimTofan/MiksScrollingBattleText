@@ -1,4 +1,11 @@
+local swipe = { maxDirectTargets = 3 }
+
 MikSBT.CombatEngine.classRules.DRUID = {
+    spellFacts = {
+        -- Swipe (Bear)
+        [779] = swipe, [780] = swipe, [769] = swipe,
+        [9754] = swipe, [9908] = swipe,
+    },
     queuedStrikes = {
         -- Maul
         [6807] = true, [6808] = true, [6809] = true, [8972] = true,
