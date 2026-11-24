@@ -95,3 +95,24 @@ registry:StageImportedMedia(saved)
 registry:FinishImportedMedia(true, saved)
 assert(registrations["font:Preview Font"] == imported.fonts["Preview Font"])
 assert(registrations["sound:Preview Sound"] == 1234)
+
+-- Given an imported font and sound staged before another addon registers them.
+local late = { fonts = { ["Late Shared"] = "Shared/font/Late Shared" },
+	sounds = { ["Late Sound"] = 5678 } }
+registry:StageImportedMedia(late)
+sharedMedia:Register("font", "Late Shared", late.fonts["Late Shared"])
+sharedMedia:Register("sound", "Late Sound", late.sounds["Late Sound"])
+local previousFetch = sharedMedia.Fetch
+sharedMedia.Fetch = function(self, kind, name)
+	return registrations[kind .. ":" .. name] or previousFetch(self, kind, name)
+end
+callback(nil, "font", "Late Shared")
+callback(nil, "sound", "Late Sound")
+
+-- When the import is cancelled.
+registry:FinishImportedMedia(false, late)
+
+-- Then the imported entries are removed and MSBT still sees the shared media.
+assert(next(late.fonts) == nil and next(late.sounds) == nil)
+assert(registry.fonts["Late Shared"] == "Shared/font/Late Shared")
+assert(registry.sounds["Late Sound"] == 5678)

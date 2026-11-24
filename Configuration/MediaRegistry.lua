@@ -30,13 +30,21 @@ function MediaRegistry:RegisterFont(name, path)
 end
 
 function MediaRegistry:ImportSharedMedia(mediaType, name)
+	local kind, file
 	if mediaType == "font" then
-		self.fonts[name] = self.sharedMedia:Fetch(mediaType, name)
+		kind = "fonts"
+		file = self.sharedMedia:Fetch(mediaType, name)
 	elseif mediaType == "sound" and name ~= "None" then
-		local file = self.sharedMedia:Fetch(mediaType, name)
+		kind = "sounds"
+		file = self.sharedMedia:Fetch(mediaType, name)
 		file = MikSBT.API.Sounds:NormalizeFile(file)
-		if file then self.sounds[name] = file end
 	end
+	if not file then return end
+	self[kind][name] = file
+
+	-- A shared registration now owns this name, even when its path matches.
+	local pending = self.importedMedia and self.importedMedia[kind][name]
+	if pending then pending.preview = nil end
 end
 
 function MediaRegistry:RegisterSound(name, file)
