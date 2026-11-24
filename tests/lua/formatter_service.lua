@@ -80,6 +80,21 @@ assert(string.find(message, "Physical", 1, true), "damage type was not replaced"
 assert(string.find(message, "|cFFff0000", 1, true),
 	"damage coloring was not applied")
 assert(hiddenName == " - 4,500", "hidden-name formatting changed")
+
+-- Given a literal percent sign in an ability substitution.
+for _, alias in ipairs({ "100% ready", "100%", "Phase %2", "Literal %s %t" }) do
+	profile.abilitySubstitutions["Ferocious Bite"] = alias
+
+	-- When both forms of the ability token are formatted.
+	local renamed = Formatter:FormatEvent({
+		message = "%s / %sl (%t)", effectName = "Ferocious Bite", damageType = 1,
+	})
+
+	-- Then the alias is printed verbatim in both places.
+	assert(renamed == alias .. " / " .. alias .. " (Physical)",
+		"ability alias was altered")
+end
+profile.abilitySubstitutions["Ferocious Bite"] = nil
 -- Given short-number formatting
 profile.shortenNumbers = true
 
