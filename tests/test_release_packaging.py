@@ -15,6 +15,13 @@ ARTWORK_NAMES = {
     "DeleteIcon", "DeleteIconDisable", "DeleteIconHighlight",
     "FontSettingsIcon", "FontSettingsIconDisable", "FontSettingsIconHighlight",
 }
+FOREVER_ARTWORK = {
+    f"MSBTOptions/Designs/Forever/Artwork/{name}.tga"
+    for name in (
+        "FlatChevron", "FlatDelete", "FlatFont", "FlatPlay", "FlatSettings",
+        "FlatSound", "RoundedBox",
+    )
+}
 DEVELOPMENT_DIRECTORIES = {
     "tests", "scripts", "dist", "docs", "skills", "Developer",
     "__pycache__",
@@ -78,7 +85,7 @@ def assert_runtime_archive(test: unittest.TestCase, archive: ZipFile) -> set[str
             path.parent == PurePosixPath("MSBTOptions/Artwork")
             and path.stem in ARTWORK_NAMES
             and path.suffix in {".blp", ".tga", ".dds"}
-        )
+        ) or name in FOREVER_ARTWORK
         is_sound = name in {
             "Sounds/Cooldown.ogg", "Sounds/LowHealth.ogg", "Sounds/LowMana.ogg",
         }
@@ -174,6 +181,8 @@ class ReleasePackagingTests(unittest.TestCase):
             "Sounds/Cooldown.ogg": "Cooldown audio",
             "Sounds/LowHealth.ogg": "Low health audio",
             "Sounds/LowMana.ogg": "Low mana audio",
+            "MSBTOptions/Designs/Forever/Artwork/FlatSound.tga": "Sound icon",
+            "MSBTOptions/Designs/Forever/Artwork/RoundedBox.tga": "Backdrop",
         }
 
         # When
@@ -192,6 +201,7 @@ class ReleasePackagingTests(unittest.TestCase):
             "Main.lua.bak", "Unused.lua", "Sounds/personal.ogg",
             "Fonts/.DS_Store", "Fonts/Thumbs.db", "Fonts/font.ttf.bak",
             "MSBTOptions/Artwork/TriggerSettingsIcon.blp",
+            "MSBTOptions/Designs/Forever/Artwork/Unused.tga",
         ):
             with self.subTest(path=unwanted):
                 files = self.runtime | {unwanted: "Not for release"}
@@ -231,6 +241,7 @@ class ReleasePackagingTests(unittest.TestCase):
                 path for path in (REPOSITORY_ROOT / "MSBTOptions/Artwork").glob("*.blp")
                 if path.stem in ARTWORK_NAMES
             ]
+            assets.extend(REPOSITORY_ROOT / name for name in sorted(FOREVER_ARTWORK))
             for path in assets:
                 relative = path.relative_to(REPOSITORY_ROOT).as_posix()
                 self.assertIn(relative, files)

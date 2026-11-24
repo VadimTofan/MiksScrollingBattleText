@@ -1,5 +1,19 @@
 # Changelog
 
+## v12.058
+
+- Added a Forever-style options window with General, Events, Sounds, and
+  scroll-area controls. The classic layout remains available.
+- Profiles can be compared with their settings at login and restored from
+  that snapshot. Fixed pending edits and Undo when switching layouts.
+- Disabled pet scroll areas hide pet combat text by default. Enable merging
+  to route that text to the matching player scroll area.
+- Improved Forever spell attribution for dungeon hits, multi-target attacks,
+  queued strikes, and effects such as Drain Life and Siphon Life when their
+  ticks overlap. Improved matching around Paladin seals and Shaman Windfury.
+- Fixed cancelled profile imports affecting shared media, ability names
+  containing percent signs, and currency notices with missing metadata.
+
 ## v12.057
 
 - On Forever, recover more spell icons in battlegrounds and when a direct hit
