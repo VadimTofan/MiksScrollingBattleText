@@ -553,4 +553,46 @@ assert(not name and errorCode == "IN_COMBAT")
 assert(profiles.currentProfile == active)
 assert(profiles.savedVariables.profiles["During Combat"] == nil)
 
+-- Given an options session and a portable profile with a new font.
+inCombat = false
+LoadFile("Configuration/ProfileSnapshots.lua")
+local snapshots = profiles.GetProfileSnapshots()
+local beforeImport = snapshots:Take()
+local transfer = MikSBT.Configuration.ProfileTransfer:New({
+	masterProfile = profiles.masterProfile, version = "12.057.0",
+	client = 16001, locale = "enUS",
+})
+local importedFonts = { ["Preview Font"] = "Fonts/Preview.ttf" }
+local text = assert(transfer:Export("Portable", {
+	normalFontName = "Preview Font",
+}, { fonts = importedFonts }))
+local stagedMedia
+MikSBT.Media.StageImportedMedia = function(additions)
+	stagedMedia = additions
+	MikSBT.Media.fonts["Preview Font"] = additions.fonts["Preview Font"]
+end
+MikSBT.Media.FinishImportedMedia = function(keep, savedMedia)
+	if not keep then
+		savedMedia.fonts["Preview Font"] = nil
+		MikSBT.Media.fonts["Preview Font"] = nil
+	end
+	stagedMedia = nil
+end
+
+-- When the Forever import is previewed and then discarded.
+assert(profiles.ImportProfile(text, "Preview import", true))
+assert(stagedMedia.fonts["Preview Font"] == importedFonts["Preview Font"])
+profiles.FinishImportedMedia(false)
+snapshots:Restore(beforeImport)
+
+-- Then its profile and media disappear together.
+assert(profiles.savedVariables.profiles["Preview import"] == nil)
+assert(profiles.savedMedia.fonts["Preview Font"] == nil)
+assert(MikSBT.Media.fonts["Preview Font"] == nil)
+
+-- When a later import is kept, then its media remains saved.
+assert(profiles.ImportProfile(text, "Kept import", true))
+profiles.FinishImportedMedia(true)
+assert(profiles.savedMedia.fonts["Preview Font"] == importedFonts["Preview Font"])
+
 print("Profile transfer integration tests passed")

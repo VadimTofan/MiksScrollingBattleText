@@ -356,6 +356,8 @@ local function NewProfiles(world)
 	local snapshots = G.MikSBT.Configuration.ProfileSnapshots:New({
 		savedVariables = saved, savedVariablesPerChar = perChar, selectProfile = Select })
 	function Profiles.GetProfileSnapshots() return snapshots end
+	Profiles.HasImportedMedia = Noop
+	Profiles.FinishImportedMedia = Noop
 	snapshots:UpdateLoginSnapshot(true)
 end
 

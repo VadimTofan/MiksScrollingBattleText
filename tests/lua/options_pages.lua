@@ -761,8 +761,15 @@ do
 	Click(Find(MSBTOptionsWindowFrame, Labelled(L.PROFILE_TRANSFER.export)))
 	assert(Last()[1] == "ShowExport" and Last()[3] == "TEXT:Default", "export differs")
 	Click(Find(MSBTOptionsWindowFrame, Labelled(L.PROFILE_TRANSFER.import)))
-	assert(Last()[1] == "ShowImport" and Last()[2].importHandler == Profiles.ImportProfile
+	assert(Last()[1] == "ShowImport"
 		and Last()[2].successHandler == general.ReportImport, "import differs")
+	local import = Last()[2].importHandler
+	Profiles.ImportProfile = function(text, name, previewMedia)
+		assert(text == "portable" and name == "Imported" and previewMedia,
+			"Forever import did not stage its media")
+		return name
+	end
+	assert(import("portable", "Imported") == "Imported")
 	Window.Hide()
 end
 

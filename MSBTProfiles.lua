@@ -2938,12 +2938,28 @@ local function ExportProfile(profileName)
 	})
 end
 
-local function ImportProfile(text, profileName)
+local function ImportProfile(text, profileName, previewMedia)
 	if InCombatLockdown() then return nil, "IN_COMBAT" end
+	local destination = savedMedia
+	if previewMedia then
+		destination = {
+			fonts = setmetatable({}, { __index = savedMedia.fonts }),
+			sounds = setmetatable({}, { __index = savedMedia.sounds }),
+		}
+	end
 	local name, details = GetProfileTransfer():Import(
-		text, profileName, savedVariables.profiles, savedMedia)
+		text, profileName, savedVariables.profiles, destination)
 	if not name then return nil, details end
-	MikSBT.Media.OnVariablesInitialized()
+	if previewMedia then
+		for _, kind in ipairs({ "fonts", "sounds" }) do
+			for mediaName, file in pairs(destination[kind]) do
+				savedMedia[kind][mediaName] = file
+			end
+		end
+		MikSBT.Media.StageImportedMedia(destination)
+	else
+		MikSBT.Media.OnVariablesInitialized()
+	end
 	SelectProfile(name)
 	return name, details
 end
@@ -3122,6 +3138,12 @@ module.ResetProfile					= ResetProfile
 module.SelectProfile				= SelectProfile
 module.ExportProfile				= ExportProfile
 module.ImportProfile				= ImportProfile
+module.HasImportedMedia = function()
+	return MikSBT.Media.HasImportedMedia()
+end
+module.FinishImportedMedia = function(keep)
+	MikSBT.Media.FinishImportedMedia(keep, savedMedia)
+end
 module.SetOption					= SetOption
 module.SetOptionUserDisabled		= SetOptionUserDisabled
 module.IsModDisabled				= IsModDisabled

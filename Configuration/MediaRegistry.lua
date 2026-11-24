@@ -73,6 +73,48 @@ function MediaRegistry:LoadSavedMedia(savedMedia)
 	end
 end
 
+-- Imported media can be used by MSBT before it is published to shared media.
+function MediaRegistry:StageImportedMedia(additions)
+	if not next(additions.fonts) and not next(additions.sounds) then return end
+	local pending = self.importedMedia or { fonts = {}, sounds = {} }
+	self.importedMedia = pending
+	for _, kind in ipairs({ "fonts", "sounds" }) do
+		for name, file in pairs(additions[kind]) do
+			local preview
+			if self[kind][name] == nil then
+				preview = file
+				if kind == "sounds" then
+					preview = MikSBT.API.Sounds:NormalizeFile(file)
+				end
+				self[kind][name] = preview
+			end
+			pending[kind][name] = { file = file, preview = preview }
+		end
+	end
+end
+
+function MediaRegistry:FinishImportedMedia(keep, savedMedia)
+	local pending = self.importedMedia
+	if not pending then return end
+	self.importedMedia = nil
+	local kept = { fonts = {}, sounds = {} }
+	for _, kind in ipairs({ "fonts", "sounds" }) do
+		for name, entry in pairs(pending[kind]) do
+			if entry.preview and self[kind][name] == entry.preview then
+				self[kind][name] = nil
+			end
+			if savedMedia[kind][name] == entry.file then
+				if keep then
+					kept[kind][name] = entry.file
+				else
+					savedMedia[kind][name] = nil
+				end
+			end
+		end
+	end
+	if keep then self:LoadSavedMedia(kept) end
+end
+
 function MediaRegistry:Initialize()
 	for name, path in pairs(self.defaultFonts) do
 		self:RegisterFont(name, path)

@@ -340,6 +340,34 @@ do
 	Profiles.currentProfile.fontSize = nil
 end
 
+-- Rule: a staged import can be discarded after its profile has been removed.
+do
+	-- Given that a staged import is the only remaining session change.
+	local pending = false
+	local discarded = false
+	local previousHasMedia = Profiles.HasImportedMedia
+	local previousFinishMedia = Profiles.FinishImportedMedia
+	Profiles.HasImportedMedia = function() return pending end
+	Profiles.FinishImportedMedia = function(keep)
+		if pending and not keep then discarded = true end
+		pending = false
+	end
+	Window.Show()
+	pending = true
+	Profiles.SetOption(nil, "fontSize", nil)
+
+	-- When the user clicks Cancel.
+	local window = MSBTOptionsWindowFrame
+	assert(Find(window, Labelled(L.WINDOW.apply)):IsEnabled(),
+		"pending media did not enable Apply")
+	Click(Find(window, Labelled(L.WINDOW.cancel)))
+
+	-- Then Cancel discards the staged media.
+	assert(discarded and not pending)
+	Profiles.HasImportedMedia = previousHasMedia
+	Profiles.FinishImportedMedia = previousFinishMedia
+end
+
 -- Rule: closing keeps the changes.
 do
 	-- Given a change in the open window.

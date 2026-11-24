@@ -234,6 +234,8 @@ local perChar = { currentProfileName = "Default" }
 local calls = {}
 local Profiles = {
 	savedVariables = saved, currentProfile = saved.profiles.Default, savedMedia = { sounds = {} },
+	FinishImportedMedia = Noop,
+	HasImportedMedia = Noop,
 }
 local function Record(name, ...) calls[#calls + 1] = { name, ... } end
 local function Select(name)

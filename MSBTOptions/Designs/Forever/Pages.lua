@@ -614,7 +614,9 @@ local function OnClickImport()
 	MSBTOptions.ProfileTransfer.ShowImport({
 		parentFrame = profilePage,
 		hideHandler = RefreshProfile,
-		importHandler = MSBTProfiles.ImportProfile,
+		importHandler = function(text, name)
+			return MSBTProfiles.ImportProfile(text, name, true)
+		end,
 		successHandler = MSBTGeneral.ReportImport,
 	})
 end

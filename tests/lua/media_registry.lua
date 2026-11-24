@@ -7,6 +7,7 @@ local callback
 local sharedMedia = {
 	Register = function(_, mediaType, name, path)
 		registrations[mediaType .. ":" .. name] = path
+		return true
 	end,
 	List = function(_, mediaType)
 		if mediaType == "sound" then return {} end
@@ -60,3 +61,37 @@ callback(nil, "font", "Late Font")
 -- Then it becomes available
 assert(registry.fonts["Late Font"] == "Shared/font/Late Font",
 	"late shared font was not imported")
+
+-- Given newly imported media and a pre-existing shared font.
+dofile("API/RestrictedValue.lua")
+dofile("API/Sounds.lua")
+local imported = { fonts = {
+	["Preview Font"] = "Fonts/Preview.ttf",
+	["Shared Font"] = "Fonts/Other.ttf",
+}, sounds = { ["Preview Sound"] = 1234 } }
+local saved = { fonts = {
+	["Preview Font"] = "Fonts/Preview.ttf",
+	["Shared Font"] = "Fonts/Other.ttf",
+}, sounds = { ["Preview Sound"] = 1234 } }
+
+-- When the import is staged, then MSBT can preview without publishing.
+registry:StageImportedMedia(imported)
+assert(registry.fonts["Preview Font"] == imported.fonts["Preview Font"])
+assert(registrations["font:Preview Font"] == nil)
+assert(registry.sounds["Preview Sound"] == 1234)
+assert(registrations["sound:Preview Sound"] == nil)
+assert(registry.fonts["Shared Font"] == "Shared/font/Shared Font")
+
+-- When the import is discarded, then the new entries disappear.
+registry:FinishImportedMedia(false, saved)
+assert(registry.fonts["Preview Font"] == nil and next(saved.fonts) == nil)
+assert(registry.sounds["Preview Sound"] == nil and next(saved.sounds) == nil)
+assert(registry.fonts["Shared Font"] == "Shared/font/Shared Font")
+
+-- When a later import is kept, then the registration becomes shared.
+saved.fonts["Preview Font"] = imported.fonts["Preview Font"]
+saved.sounds["Preview Sound"] = 1234
+registry:StageImportedMedia(saved)
+registry:FinishImportedMedia(true, saved)
+assert(registrations["font:Preview Font"] == imported.fonts["Preview Font"])
+assert(registrations["sound:Preview Sound"] == 1234)

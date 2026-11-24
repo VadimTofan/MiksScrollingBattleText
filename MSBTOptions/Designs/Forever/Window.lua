@@ -879,15 +879,21 @@ end
 
 
 local function HasPendingChanges()
-	return baseSnapshot and (switchesChanged or snapshots:Count(baseSnapshot, 1) > 0)
+	return baseSnapshot and (switchesChanged or MSBTProfiles.HasImportedMedia()
+		or snapshots:Count(baseSnapshot, 1) > 0)
 end
 
 
 local function RestorePendingChanges()
+	MSBTProfiles.FinishImportedMedia(false)
 	snapshots:Restore(baseSnapshot)
 	RestoreMechanics()
 end
 
+function module.EndSession()
+	MSBTProfiles.FinishImportedMedia(true)
+	baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+end
 
 -- Runs after every profile write while the window exists, so it must not create tables.
 local function UpdateState()
@@ -1183,6 +1189,7 @@ local function CreateFooter()
 	applyButton:Configure(30, L.WINDOW.apply, L.WINDOW.applyTooltip)
 	applyButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 9)
 	applyButton:SetClickHandler(function()
+		MSBTProfiles.FinishImportedMedia(true)
 		baseSnapshot = snapshots:Take()
 		baseMechanics = TakeMechanics()
 		switchesChanged = false
@@ -1292,7 +1299,7 @@ local function CreateWindow()
 		if not dockedPanel then PlaySound(799) end
 		MSBTOptMain.HidePopups()
 		if not keepBaseOnHide then
-			baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+			module.EndSession()
 			MSBTOptions.Popups.UseDesignPopups("classic")
 		end
 	end)
@@ -1340,7 +1347,7 @@ local function CreateWindow()
 	-- away for: its Cancel base is stale then.
 	hooksecurefunc(MSBTOptions.Popups, "UseDesignPopups", function(key)
 		if key ~= "forever" and not frame:IsShown() then
-			baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+			module.EndSession()
 			reopenSettings = nil
 		end
 	end)
@@ -1414,6 +1421,7 @@ local function CreateChangesPage(page, width, height)
 	undoAllButton:Configure(26, L.WINDOW.undoAll, L.WINDOW.undoAllTooltip)
 	undoAllButton:SetPoint("TOPRIGHT", page, "TOPRIGHT")
 	undoAllButton:SetClickHandler(function()
+		MSBTProfiles.FinishImportedMedia(false)
 		snapshots:Restore(snapshots:GetLoginSnapshot())
 		AfterRestore()
 	end)
@@ -1588,7 +1596,7 @@ local function Undock(panel)
 	keepBaseOnHide = wasKeeping
 	MSBTOptMain.HidePopups()
 	if isEnding then
-		baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+		module.EndSession()
 		MSBTOptions.Popups.UseDesignPopups("classic")
 	end
 	dockedPanel, dockedKey, dockedOpeners = nil, nil, nil
@@ -1618,7 +1626,7 @@ end
 local function Hide(keepBase)
 	if not frame then return end
 	if not keepBase then
-		baseSnapshot, baseMechanics, switchesChanged = nil, nil, false
+		module.EndSession()
 		reopenSettings = nil
 	end
 	keepBaseOnHide = keepBase

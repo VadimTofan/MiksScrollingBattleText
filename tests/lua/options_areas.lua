@@ -273,6 +273,8 @@ local snapshots = MikSBT.Configuration.ProfileSnapshots:New({
 	savedVariables = saved, savedVariablesPerChar = perChar, selectProfile = Select,
 })
 function Profiles.GetProfileSnapshots() return snapshots end
+Profiles.HasImportedMedia = Noop
+Profiles.FinishImportedMedia = Noop
 snapshots:UpdateLoginSnapshot(true)
 
 dofile("MSBTOptions/MSBTOptionsControls.lua")
