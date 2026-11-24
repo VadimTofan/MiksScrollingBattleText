@@ -59,3 +59,28 @@ callback(event)
 -- Then normal formatting and the cached icon remain intact.
 assert(displayed[2].message:find("Potion", 1, true), "cached name was lost")
 assert(displayed[2].texture == "icon", "cached item icon was lost")
+
+-- Given a currency notification whose fallback metadata is unavailable.
+profile.events.NOTIFICATION_CURRENCY = { message = "%e x%a (%t)" }
+C_CurrencyInfo = {
+	GetCurrencyInfoFromLink = function() return nil end,
+	GetCurrencyInfo = function() return nil end,
+}
+local currency = {
+	recipientUnit = "player", eventType = "loot", isCurrency = true,
+	itemLink = ", 2",
+}
+
+-- When the notification is processed, then it is skipped safely.
+callback(currency)
+assert(#displayed == 2, "missing currency metadata produced a notification")
+
+-- Given metadata is now available, when another notice arrives.
+C_CurrencyInfo.GetCurrencyInfo = function()
+	return { name = "Currency", quantity = 7, iconFileID = 42, quality = 1 }
+end
+callback(currency)
+
+-- Then the amount and icon still render.
+assert(displayed[3].message:find("x2 (7)", 1, true))
+assert(displayed[3].texture == 42)
