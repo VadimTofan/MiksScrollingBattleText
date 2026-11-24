@@ -623,7 +623,7 @@ function ns.DecideHit(hit, line, restrict)
     else
         result = ns.mine:Hit(hit.key, kind, record.school, hit.at, hit.petOn, line,
             ns.Number(record.amount) and record.amount or nil, record.crit,
-            restrict, leech, record.avoid, hit.isolatedBattlegroundSpell)
+            restrict, leech, record.avoid, hit.isolatedDirectSpell)
     end
     if line == true and restrict == "direct" and result.who == "you"
         and not result.ambiguous
@@ -1200,17 +1200,63 @@ local function MixedFrameDirectHit(first, second, directLine, tickLine)
     if school == secondSchool then return second, first end
 end
 
-local function IsolatedBattlegroundSpell(hit, line)
+local function UntargetedDirectInstance(hit)
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     if not client or not client.isForever or not IsInInstance
-        or hit.record.event ~= "damage" or hit.unit ~= "target"
-        or line.kind ~= "spell" or line.source ~= "mine" or line.hit
-        or line.at ~= hit.at or line.targetContext ~= hit.key then return false end
+        or hit.record.event ~= "damage" or hit.unit ~= "target" then return end
     local _, instance = IsInInstance()
-    if not ns.Text(instance) or instance ~= "pvp" then return false end
+    if ns.Text(instance) then return instance end
+end
+
+local function UntargetedDirectLine(hit, line)
+    return line.kind == "spell" and line.source == "mine" and not line.hit
+        and line.targetContext == hit.key
+end
+
+local function IsolatedDirectSpell(hit, line)
+    if not UntargetedDirectLine(hit, line) or line.at ~= hit.at then return false end
+    local instance = UntargetedDirectInstance(hit)
+    if instance ~= "pvp" and instance ~= "party" then return false end
     if hit.record.school ~= ns.SCHOOL_PHYSICAL then return true end
     return not (SwingLine(hit) or OrphanSwingLine(hit)
         or SwingFrame(hit.at, WEAPON_PROC_TRIGGER_WINDOW))
+end
+
+local function DecideDungeonDirect(hit)
+    if not reader.pendingHits[hit] then return end
+    local best
+    for _, line in ipairs(reader.logLines) do
+        if not line.claimed and UntargetedDirectLine(hit, line)
+            and math.abs(line.at - hit.at) <= LATE_LINE then
+            for other in pairs(reader.pendingHits) do
+                if other ~= hit and other.record.event == "damage"
+                    and math.abs(line.at - other.at) <= LATE_LINE then
+                    line.dungeonContested = true
+                    break
+                end
+            end
+            for _, at in pairs(reader.strangers) do
+                if math.abs(line.at - at) <= LATE_LINE then
+                    line.dungeonContested = true
+                    break
+                end
+            end
+            if best or line.dungeonContested then
+                best = nil
+                break
+            end
+            best = line
+        end
+    end
+    if best and ns.mine:UntargetedDirectCandidate(
+        hit.key, hit.record.school, hit.at, Leech(hit)) then
+        best.claimed = true
+        hit.isolatedDirectSpell = true
+        ConfirmingEvidence(hit, best)
+        ns.DecideHit(hit, true, "direct")
+    else
+        ns.DecideHit(hit, false)
+    end
 end
 
 -- One frame's hits (of one class, with lines by kind) against the lines of
@@ -1219,8 +1265,8 @@ end
 -- and none is; fewer, and the engine decides as it would without lines.
 function DecideGroup(group, frameLines, decided, settled)
     if #group == 1 and #frameLines == 1
-        and IsolatedBattlegroundSpell(group[1], frameLines[1]) then
-        group[1].isolatedBattlegroundSpell = true
+        and IsolatedDirectSpell(group[1], frameLines[1]) then
+        group[1].isolatedDirectSpell = true
     end
     local reportsBySchool, periodicConfirmations = {}, 0
     for _, line in ipairs(frameLines) do
@@ -1399,6 +1445,14 @@ function DecideGroup(group, frameLines, decided, settled)
 
                 ns.mine.procSwing = true
                 Decide(hit, true, LineRestrict(flight), flight)
+            elseif #group == 1 and record.school ~= ns.SCHOOL_PHYSICAL
+                and UntargetedDirectInstance(hit) == "party"
+                and ns.mine:UntargetedDirectCandidate(hit.key, record.school, hit.at) then
+                if settled then
+                    DecideDungeonDirect(hit)
+                else
+                    C_Timer.After(LATE_LINE, function() DecideDungeonDirect(hit) end)
+                end
             elseif record.event == "miss" and ns.LineKindsActive and ns.LineKindsActive() then
                 -- 0.3.49: a miss's report can come a frame after its line
                 -- (DecideLateMiss).

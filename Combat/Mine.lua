@@ -1768,8 +1768,8 @@ function Mine:MixedFrameDirectSchool(key, firstSchool, secondSchool, now)
     return facts.school
 end
 
--- A battleground spell line can identify a cast while its target stays hidden.
-local function ConfirmUntargetedDirect(self, key, school, now)
+-- A typed spell line can identify a cast while its target stays hidden.
+function Mine:UntargetedDirectCandidate(key, school, now, leech)
     if not school or self.petOut then return nil end
     for _, channel in pairs(self.channels) do
         if ChannelFits(channel, key, school, now) then return nil end
@@ -1790,7 +1790,7 @@ local function ConfirmUntargetedDirect(self, key, school, now)
     if not facts or facts.direct ~= true or facts.ticks ~= false
         or facts.school ~= school or facts.area or facts.nextSwing or facts.shot
         or (facts.directHits or 1) ~= 1
-        or (self.leechNow == true and not facts.leech) then return nil end
+        or (leech == true and not facts.leech) then return nil end
 
     for spell, casts in pairs(self.casts) do
         for _, cast in ipairs(casts) do
@@ -1802,8 +1802,7 @@ local function ConfirmUntargetedDirect(self, key, school, now)
         end
     end
 
-    SpendDirect(self, candidate.spell, candidate.cast, nil, false)
-    return Result("you", candidate.spell, false)
+    return candidate
 end
 
 function Mine:Likeliest(school, now, restrict, key)
@@ -1961,7 +1960,7 @@ end
 -- moment, false when heals on you were read and none matched, nil unknown.
 -- avoid: the game's word for a miss ("PARRY", "DODGE", "MISS", ...), nil unknown.
 function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit,
-    restrict, leech, avoid, isolatedBattlegroundSpell)
+    restrict, leech, avoid, isolatedDirectSpell)
     self.lastOutcomeReceipt = nil
     self:Tidy(now)
     self.amountNow, self.lineNow, self.ambiguous, self.critNow = amount, line, false, crit == true
@@ -1984,9 +1983,12 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit,
     self.restrictNow = line == true and restrict or nil
     self.leechNow = kind == "damage" and leech or nil
     local allowed = Allowed(self.restrictNow)
-    if isolatedBattlegroundSpell and self.restrictNow == "direct" then
-        local result = ConfirmUntargetedDirect(self, key, school, now)
-        if result then return result end
+    if isolatedDirectSpell and self.restrictNow == "direct" then
+        local candidate = self:UntargetedDirectCandidate(key, school, now, leech)
+        if candidate then
+            SpendDirect(self, candidate.spell, candidate.cast, nil, false)
+            return Result("you", candidate.spell, false)
+        end
     end
     -- 0.3.49: a damage shield's line (Thorns on you, an item): the hit on
     -- the enemy that struck you is yours, whatever cast or swing came before

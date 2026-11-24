@@ -1250,5 +1250,65 @@ Replay("catalogued long-flight Frostbolt pairs its late own line", function()
         "confirmed long-flight Frostbolt was not displayed exactly once")
 end)
 
+Replay("dungeon direct confirmation names hidden-target spells", function()
+    for _, example in ipairs({
+        { spell = 116, school = 16, gap = 0 },
+        { spell = 116, school = 16, gap = 0.06 },
+        { spell = 116, school = 16, gap = -0.02 },
+        { spell = 1240044, school = 16, gap = 0.06 },
+        { spell = 1326079, school = 64, gap = 0.06 },
+    }) do
+        -- Given a catalogue spell whose cast recipient is hidden in a dungeon.
+        local start, impact = Start(), Amount()
+        local previousInstance = IsInInstance
+        IsInInstance = function() return true, "party" end
+        Event("UNIT_SPELLCAST_SENT", "player", Amount(), "dungeon-cast", example.spell)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", "dungeon-cast", example.spell)
+
+        -- When the typed confirmation arrives before, with, or after the hit.
+        At(start + 2)
+        if example.gap >= 0 then Line("spell") end
+        At(start + 2 + math.max(0, example.gap))
+        Hit(impact, "target", example.school)
+        if example.gap < 0 then
+            At(start + 2 - example.gap)
+            Line("spell")
+        end
+        At(start + 2.6)
+        IsInInstance = previousInstance
+
+        -- Then this one confirmed amount gets its own spell identity and icon.
+        assert(Displayed(impact) == 1 and Record(impact).spell == example.spell,
+            "dungeon spell lost its confirmed identity: " .. example.spell)
+        for _, output in ipairs(displayed) do
+            if output.amount == impact then assert(output.icon == "icon-" .. example.spell) end
+        end
+    end
+end)
+
+Replay("dungeon fallback leaves competing reports unnamed", function()
+    -- Given an untargeted Frostbolt and a typed line outside the hit frame.
+    local start = Start()
+    local previousInstance = IsInInstance
+    IsInInstance = function() return true, "party" end
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "dungeon-bolt", 116)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "dungeon-bolt", 116)
+    At(start + 2)
+    Line("spell")
+
+    -- When two reports could belong to the line.
+    local first, second = Amount(), Amount()
+    At(start + 2.06)
+    Hit(first, "target", 16)
+    At(start + 2.08)
+    Hit(second, "target", 16)
+    At(start + 2.6)
+    IsInInstance = previousInstance
+
+    -- Then the fallback assigns neither report to the player.
+    assert(Displayed(first) == 0 and Displayed(second) == 0,
+        "a competing dungeon report took the player's confirmation")
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Outgoing capture replay tests passed")
