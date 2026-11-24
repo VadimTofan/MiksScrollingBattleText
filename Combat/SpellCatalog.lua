@@ -373,6 +373,15 @@ local arcaneMissiles = {
 -- Explicit per-spell windows and Pairing's 2.5-second shot window are retained.
 -- A nil school is deliberate for Shoot, whose wand sets its school.
 function engine.CatalogSpellFacts(spellID)
+    if source.Seals[spellID] ~= nil then
+        -- Applying a seal does not deal damage. Its melee proc is a separate
+        -- event, even when the tooltip describes it as part of the seal.
+        return {
+            damages = false, helpful = true, direct = false, ticks = false,
+            weaponProc = "seal", procSchool = 2,
+            source = "nameplatesct-reforged", sourceBuild = "1.60.1.70888",
+        }
+    end
     if arcaneMissiles[spellID] then
         return {
             damages = true, school = 64, direct = true, ticks = false,

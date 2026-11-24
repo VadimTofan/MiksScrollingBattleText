@@ -1467,5 +1467,57 @@ Replay("localized Arcane Missiles keeps the icon without English spell text", fu
     assert(displayed[1].icon == "icon-25345")
 end)
 
+Replay("a seal application cannot name an Unsealed Wrath damage report", function()
+    local previousClass, previousEnchant = UnitClass, GetWeaponEnchantInfo
+    local previousDescription = C_Spell.GetSpellDescription
+    UnitClass = function() return "Paladin", "PALADIN" end
+    GetWeaponEnchantInfo = function() return false end
+    C_Spell.GetSpellDescription = function(spell)
+        if spell == 20375 then
+            return "Gives your melee attacks a chance to deal additional Holy damage. Only one Seal can be active."
+        elseif spell == 20154 then
+            return "Adds Holy damage to each melee attack. Only one Seal can be active."
+        end
+        return previousDescription(spell)
+    end
+    for _, example in ipairs({ { 20375, 20154 }, { 20154, 20375 } }) do
+        -- Given a Paladin who swaps seals before a melee swing.
+        local start = Start()
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example[1])
+        At(start + 4)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", nil, example[2])
+
+        -- When four Holy hits share identical public timing and confirmation.
+        local swing, holy = Amount(), {}
+        At(start + 4.1)
+        Event("PLAYER_SWING", 2.8, 0)
+        Line("swing")
+        for index = 1, 4 do Line("spell") end
+        for index = 1, 4 do
+            holy[index] = Amount()
+            Hit(holy[index], "target", 2)
+        end
+        At(start + 4.5)
+        Hit(swing, "target", 1)
+        At(start + 5)
+
+        -- Then every amount survives and the seal cast supplies no false icon.
+        assert(Displayed(swing) == 1 and Record(swing).melee)
+        for _, amount in ipairs(holy) do
+            local result = Record(amount)
+            assert(Displayed(amount) == 1 and result.who == "you")
+            assert(result.spell == nil and result.procSpell == nil,
+                "the active seal was treated as the damage cast")
+        end
+        for _, output in ipairs(displayed) do
+            if output.amount ~= swing then
+                assert(output.icon == nil, "an unidentifiable seal hit got an icon")
+            end
+        end
+    end
+    UnitClass, GetWeaponEnchantInfo = previousClass, previousEnchant
+    C_Spell.GetSpellDescription = previousDescription
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Outgoing capture replay tests passed")
