@@ -1408,6 +1408,46 @@ for _, forever in ipairs({ false, true }) do
 		"ownership ranking did not pass the critical flag to matching")
 	C_Spell.GetSpellDescription = previousDescription
 
+	-- Given an ability alias containing text that resembles format tokens.
+	do
+		Advance(4)
+		local savedMessage, savedHide =
+			events.OUTGOING_SPELL_DAMAGE.message, activeProfile.hideSkills
+		local savedSecret = issecretvalue
+		local opaqueAliasHit = {}
+		issecretvalue = function(value) return value == opaqueAliasHit end
+		spellNames[1999] = "Alias spell"
+		activeProfile.abilitySubstitutions["Alias spell"] = "Literal %a %s"
+		activeProfile.hideSkills = false
+		events.OUTGOING_SPELL_DAMAGE.message = "%s: %a"
+
+		-- When a confirmed opaque hit runs through the outgoing display.
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 1999)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", opaqueAliasHit, 4)
+		Advance(0.5)
+		local output = displayed[#displayed]
+
+		-- Then the alias is literal and the hit goes in the original amount slot.
+		assert(output[4] == opaqueAliasHit)
+		assert(string.format(output[2], "123") == "Literal %a %s: |cFFff7f00123|r",
+			"restricted display reinterpreted the alias: " .. output[2])
+
+		-- When the amount is readable, the alias is still literal.
+		Advance(4)
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 1999)
+		Dispatch("COMBAT_LOG_MESSAGE", "opaque", rgb.r, rgb.g, rgb.b, 1)
+		Dispatch("UNIT_COMBAT", "target", "WOUND", "", 42, 4)
+		Advance(0.5)
+		assert(displayed[#displayed][2] == "Literal %a %s: |cFFff7f0042|r",
+			"readable display reinterpreted the alias")
+
+		activeProfile.abilitySubstitutions["Alias spell"] = nil
+		activeProfile.hideSkills = savedHide
+		events.OUTGOING_SPELL_DAMAGE.message = savedMessage
+		issecretvalue = savedSecret
+	end
+
 	-- Given the active filter was changed to include another player's lines.
 	local before = #displayed
 	filter.filters[1].sourceFlags[99] = true

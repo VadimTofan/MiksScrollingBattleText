@@ -48,7 +48,7 @@ function Formatter:FormatRestrictedAmount(amount, profile)
 	return amount
 end
 
-local RESTRICTED_AMOUNT_TOKEN = "\001"
+Formatter.restrictedAmountToken = "\001"
 
 function Formatter:ColorDamageAmount(amount, damageType)
 	local profile = self:GetProfile()
@@ -61,15 +61,19 @@ function Formatter:ColorDamageAmount(amount, damageType)
 	return amount
 end
 
-function Formatter:BuildRestrictedTemplate(message, suffix, damageType)
-	message = string.gsub(message, "%%a", RESTRICTED_AMOUNT_TOKEN, 1)
-	message = string.gsub(message, "%%a", "")
+function Formatter:MarkRestrictedAmount(message)
+	message = string.gsub(message, "%%a", self.restrictedAmountToken, 1)
+	return (string.gsub(message, "%%a", ""))
+end
+
+function Formatter:BuildRestrictedTemplate(message, suffix, damageType, amountMarked)
+	if not amountMarked then message = self:MarkRestrictedAmount(message) end
 	if suffix then
 		message = message .. suffix
 	end
 	message = string.gsub(message, "%%", "%%%%")
 	local placeholder = self:ColorDamageAmount("%s", damageType)
-	return (string.gsub(message, RESTRICTED_AMOUNT_TOKEN, function()
+	return (string.gsub(message, self.restrictedAmountToken, function()
 		return placeholder
 	end))
 end
