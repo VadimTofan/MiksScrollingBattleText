@@ -591,6 +591,7 @@ end
 -- strike of someone who joins.
 local STRANGER_QUIET = 5
 reader.strangers = {}
+reader.unmatchedDamage = {}
 local function NoteStranger(key, at)
     for other, seen in pairs(reader.strangers) do
         if at - seen > STRANGER_QUIET then reader.strangers[other] = nil end
@@ -652,7 +653,17 @@ function ns.DecideHit(hit, line, restrict)
             swingChecks = swingChecks,
         }
     end
-    if line == false and (kind == "damage" or kind == "miss") then NoteStranger(hit.key, hit.at) end
+    if line == false and (kind == "damage" or kind == "miss") then
+        NoteStranger(hit.key, hit.at)
+        if kind == "damage" then
+            local damage = reader.unmatchedDamage
+            local cutoff = Now() - STRANGER_QUIET
+            for at in pairs(damage) do
+                if at < cutoff then damage[at] = nil end
+            end
+            damage[hit.at] = true
+        end
+    end
     reader.pendingHits[hit] = nil
     if ns.traceCombat then
         ns.traceCombat("decision", hit, { stage = "decision",
@@ -1237,7 +1248,7 @@ local function DecideDungeonDirect(hit)
                     break
                 end
             end
-            for _, at in pairs(reader.strangers) do
+            for at in pairs(reader.unmatchedDamage) do
                 if math.abs(line.at - at) <= LATE_LINE then
                     line.dungeonContested = true
                     break
@@ -2933,6 +2944,7 @@ local function OnEvent(_, event, ...)
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil
         reader.pendingHits = setmetatable({}, { __mode = "k" })
+        reader.unmatchedDamage = {}
         reader.targetKey = nil
         reader.departedTargetKey, reader.departedTargetAt = nil, nil
         reader.epoch = reader.epoch + 1

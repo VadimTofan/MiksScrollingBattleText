@@ -1375,5 +1375,97 @@ Replay("isolated dungeon confirmations name hidden-target Arcane Missiles", func
     end
 end)
 
+Replay("an unrelated dodge cannot contest a dungeon damage line", function()
+    -- Given a hidden-target Frostbolt and its isolated direct confirmation.
+    local start, impact = Start(), Amount()
+    local previousInstance = IsInInstance
+    IsInInstance = function() return true, "party" end
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "dungeon-dodge", 116)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "dungeon-dodge", 116)
+    At(start + 2)
+    Line("spell")
+
+    -- When another attacker is dodged shortly before the damage report.
+    At(start + 2.01)
+    Event("UNIT_COMBAT", "target", "DODGE", "", 0, 1)
+    At(start + 2.06)
+    Hit(impact, "target", 16)
+    At(start + 2.6)
+    IsInInstance = previousInstance
+
+    -- Then the typed damage line still identifies the confirmed hit.
+    assert(Displayed(impact) == 1 and Record(impact).spell == 116,
+        "a dodge contested a direct damage confirmation")
+end)
+
+Replay("replacing a channel preserves its last buffered hit", function()
+    -- Given an Arcane Missiles channel with a hidden target.
+    local start, final, first = Start(), Amount(), Amount()
+    local previousInstance, previousDescription = IsInInstance, C_Spell.GetSpellDescription
+    IsInInstance = function() return true, "party" end
+    C_Spell.GetSpellDescription = function(id)
+        if id == 5143 or id == 5144 then
+            return "Launches Arcane Missiles at the enemy, causing 26 Arcane damage each second for 3 sec."
+        end
+        return previousDescription(id)
+    end
+    local function StartMissiles(guid, spell)
+        Event("UNIT_SPELLCAST_SENT", "player", Amount(), guid, spell)
+        Event("UNIT_SPELLCAST_CHANNEL_START", "player", guid, spell)
+        Event("UNIT_SPELLCAST_SUCCEEDED", "player", guid, spell)
+    end
+    StartMissiles("first", 5143)
+
+    -- When the player starts another channel before the first hit settles.
+    At(start + 2)
+    Line("spell")
+    At(start + 2.06)
+    Hit(final, "target", 64)
+    At(start + 2.10)
+    Event("UNIT_SPELLCAST_CHANNEL_STOP", "player", "first", 5143)
+    At(start + 2.11)
+    StartMissiles("second", 5144)
+    At(start + 3.05)
+    Line("spell")
+    Hit(first, "target", 64)
+    At(start + 3.6)
+    IsInInstance, C_Spell.GetSpellDescription = previousInstance, previousDescription
+
+    -- Then each hit retains the identity of its own channel.
+    assert(Displayed(final) == 1 and Record(final).spell == 5143,
+        "the replacement discarded the old channel's buffered hit")
+    assert(Displayed(first) == 1 and Record(first).spell == 5144,
+        "the old channel took the replacement's hit")
+end)
+
+Replay("localized Arcane Missiles keeps the icon without English spell text", function()
+    -- Given a Chinese-client tooltip and a hidden-target max-rank cast.
+    local start, impact = Start(), Amount()
+    local previousInstance, previousLocale = IsInInstance, GetLocale
+    local previousDescription, previousSchool = C_Spell.GetSpellDescription, STRING_SCHOOL_ARCANE
+    IsInInstance = function() return true, "party" end
+    GetLocale = function() return "zhCN" end
+    STRING_SCHOOL_ARCANE = "奥术"
+    C_Spell.GetSpellDescription = function()
+        return "向敌人发射奥术飞弹，每秒造成209点奥术伤害。"
+    end
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "localized", 25345)
+    Event("UNIT_SPELLCAST_CHANNEL_START", "player", "localized", 25345)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "localized", 25345)
+
+    -- When the typed direct line confirms a hit.
+    At(start + 1)
+    Line("spell")
+    Hit(impact, "target", 64)
+    At(start + 1.5)
+    IsInInstance, GetLocale = previousInstance, previousLocale
+    C_Spell.GetSpellDescription, STRING_SCHOOL_ARCANE = previousDescription, previousSchool
+
+    -- Then the real spell rank reaches the icon display.
+    assert(Displayed(impact) == 1 and Record(impact).spell == 25345,
+        "localized Arcane Missiles lost its spell identity")
+    assert(displayed[1].icon == "icon-25345")
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Outgoing capture replay tests passed")

@@ -359,12 +359,26 @@ end
 
 end
 
+-- Arcane Missiles cast ranks from the Forever 1.60.1.70888 client spellbook.
+-- https://www.60.tools/spellbook/mage
+-- UNIT_SPELLCAST_CHANNEL_START/STOP supply the actual channel lifetime.
+local arcaneMissiles = {
+    [5143] = true, [5144] = true, [5145] = true, [8416] = true,
+    [8417] = true, [10211] = true, [10212] = true, [25345] = true,
+}
+
 -- Return a fresh normalized record: source ranks share immutable tables.
 -- Unconstrained direct casts keep MSBT's existing three-second flight policy:
 -- upstream Identity's 1.5 seconds is an inference window, not spell metadata.
 -- Explicit per-spell windows and Pairing's 2.5-second shot window are retained.
 -- A nil school is deliberate for Shoot, whose wand sets its school.
 function engine.CatalogSpellFacts(spellID)
+    if arcaneMissiles[spellID] then
+        return {
+            damages = true, school = 64, direct = true, ticks = false,
+            source = "forever-client", sourceBuild = "1.60.1.70888",
+        }
+    end
     local direct = source.DirectSpells[spellID]
     local ticking = source.TickSpells[spellID]
     local spell = ticking or direct

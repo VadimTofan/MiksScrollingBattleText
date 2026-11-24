@@ -429,11 +429,19 @@ local function ChannelFits(channel, key, school, now)
         and (not channel.stoppedAt or now <= channel.stoppedAt)
 end
 
+local function RetireChannel(self, caster)
+    local channel = self.channels[caster]
+    if not channel then return end
+    self.retiredChannels[#self.retiredChannels + 1] = channel
+    if #self.retiredChannels > MAX then table.remove(self.retiredChannels, 1) end
+    self.channels[caster] = nil
+end
+
 function Mine:StartChannel(caster, spell, key, now, targetUncertain)
     caster = caster == "pet" and "pet" or "you"
     -- Beginning another channel also ends any retired channel of that caster.
     self:StopChannel(caster, nil, now)
-    self.channels[caster] = nil
+    RetireChannel(self, caster)
     local facts = self.facts(spell)
     if type(facts) ~= "table" or facts.damages ~= true then return end
 
@@ -776,11 +784,7 @@ function Mine:Forget(key)
     end
     for caster, channel in pairs(self.channels) do
         if channel.key == key then
-            self.retiredChannels[#self.retiredChannels + 1] = channel
-            while #self.retiredChannels > MAX do
-                table.remove(self.retiredChannels, 1)
-            end
-            self.channels[caster] = nil
+            RetireChannel(self, caster)
         end
     end
     for _, list in ipairs({ self.pending, self.dots, self.swings, self.held }) do
@@ -1776,6 +1780,15 @@ function Mine:UntargetedDirectCandidate(key, school, now, leech, allowChannel)
         if ChannelFits(channel, key, school, now) then
             if candidate or not allowChannel then return nil end
             candidate, isChannel = channel, true
+        end
+    end
+    if allowChannel then
+        -- Match against report time even if a newer channel has started.
+        for _, channel in ipairs(self.retiredChannels) do
+            if ChannelFits(channel, key, school, now) then
+                if candidate then return nil end
+                candidate, isChannel = channel, true
+            end
         end
     end
 
