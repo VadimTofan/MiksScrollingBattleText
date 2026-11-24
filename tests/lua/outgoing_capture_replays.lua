@@ -1310,5 +1310,70 @@ Replay("dungeon fallback leaves competing reports unnamed", function()
         "a competing dungeon report took the player's confirmation")
 end)
 
+Replay("a later dungeon report can still contest the confirmation", function()
+    -- Given a hidden-target bolt and two equally plausible reports.
+    local start, first, second = Start(), Amount(), Amount()
+    local previousInstance = IsInInstance
+    IsInInstance = function() return true, "party" end
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "dungeon-race", 116)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "dungeon-race", 116)
+
+    -- When the second report arrives within the line's matching window.
+    At(start + 2)
+    Hit(first, "target", 16)
+    At(start + 2.02)
+    Line("spell")
+    At(start + 2.13)
+    Hit(second, "target", 16)
+    At(start + 2.6)
+    IsInInstance = previousInstance
+
+    -- Then neither report gets assigned to the player.
+    assert(Displayed(first) == 0 and Displayed(second) == 0,
+        "the first report spent the line before the second could contest it")
+end)
+
+Replay("isolated dungeon confirmations name hidden-target Arcane Missiles", function()
+    -- Given a channel whose selected recipient cannot be read.
+    local start = Start()
+    local previousInstance, previousDescription = IsInInstance, C_Spell.GetSpellDescription
+    IsInInstance = function() return true, "party" end
+    C_Spell.GetSpellDescription = function(id)
+        if id == 5143 then
+            return "Launches Arcane Missiles at the enemy, causing 26 Arcane damage each second for 3 sec."
+        end
+        return previousDescription(id)
+    end
+    Event("UNIT_SPELLCAST_SENT", "player", Amount(), "missiles", 5143)
+    Event("UNIT_SPELLCAST_CHANNEL_START", "player", "missiles", 5143)
+    Event("UNIT_SPELLCAST_SUCCEEDED", "player", "missiles", 5143)
+
+    -- When separate typed lines confirm hits during the channel.
+    local first, later, unconfirmed = Amount(), Amount(), Amount()
+    At(start + 1)
+    Line("spell")
+    Hit(first, "target", 64)
+    At(start + 2)
+    Line("spell")
+    At(start + 2.06)
+    Hit(later, "target", 64)
+    At(start + 2.6)
+    Hit(unconfirmed, "target", 64)
+    At(start + 3.2)
+    IsInInstance, C_Spell.GetSpellDescription = previousInstance, previousDescription
+
+    -- Then both confirmed hits get the icon without spending the channel.
+    assert(Displayed(first) == 1 and Record(first).spell == 5143,
+        "the same-frame confirmation left Arcane Missiles unnamed")
+    assert(Displayed(later) == 1 and Record(later).spell == 5143,
+        "the cross-frame confirmation left Arcane Missiles unnamed")
+    assert(Displayed(unconfirmed) == 0)
+    for _, output in ipairs(displayed) do
+        if output.amount == first or output.amount == later then
+            assert(output.icon == "icon-5143")
+        end
+    end
+end)
+
 assert(#failures == 0, table.concat(failures, "\n"))
 print("Outgoing capture replay tests passed")

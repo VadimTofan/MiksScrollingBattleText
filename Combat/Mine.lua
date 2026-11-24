@@ -1769,13 +1769,16 @@ function Mine:MixedFrameDirectSchool(key, firstSchool, secondSchool, now)
 end
 
 -- A typed spell line can identify a cast while its target stays hidden.
-function Mine:UntargetedDirectCandidate(key, school, now, leech)
+function Mine:UntargetedDirectCandidate(key, school, now, leech, allowChannel)
     if not school or self.petOut then return nil end
+    local candidate, isChannel
     for _, channel in pairs(self.channels) do
-        if ChannelFits(channel, key, school, now) then return nil end
+        if ChannelFits(channel, key, school, now) then
+            if candidate or not allowChannel then return nil end
+            candidate, isChannel = channel, true
+        end
     end
 
-    local candidate
     for _, entry in ipairs(self.pending) do
         -- A spell line can come from an impact outside the selected target.
         if DirectCandidateScore(self, entry, entry.key or key, school, now) then
@@ -1784,8 +1787,11 @@ function Mine:UntargetedDirectCandidate(key, school, now, leech)
         end
     end
     if not candidate or candidate.at > now or candidate.caster ~= "you"
-        or not candidate.targetUncertain or candidate.key or candidate.cast.candidates
-        or candidate.ambiguous or candidate.cast.ambiguous then return nil end
+        or not candidate.targetUncertain or candidate.key or candidate.ambiguous then
+        return nil
+    end
+    local cast = candidate.cast
+    if cast and (cast.candidates or cast.ambiguous) then return nil end
     local facts = self.facts(candidate.spell)
     if not facts or facts.direct ~= true or facts.ticks ~= false
         or facts.school ~= school or facts.area or facts.nextSwing or facts.shot
@@ -1802,7 +1808,7 @@ function Mine:UntargetedDirectCandidate(key, school, now, leech)
         end
     end
 
-    return candidate
+    return candidate, isChannel
 end
 
 function Mine:Likeliest(school, now, restrict, key)
@@ -1984,9 +1990,12 @@ function Mine:Hit(key, kind, school, now, petAttacking, line, amount, crit,
     self.leechNow = kind == "damage" and leech or nil
     local allowed = Allowed(self.restrictNow)
     if isolatedDirectSpell and self.restrictNow == "direct" then
-        local candidate = self:UntargetedDirectCandidate(key, school, now, leech)
+        local candidate, isChannel = self:UntargetedDirectCandidate(
+            key, school, now, leech, isolatedDirectSpell == "party")
         if candidate then
-            SpendDirect(self, candidate.spell, candidate.cast, nil, false)
+            if not isChannel then
+                SpendDirect(self, candidate.spell, candidate.cast, nil, false)
+            end
             return Result("you", candidate.spell, false)
         end
     end

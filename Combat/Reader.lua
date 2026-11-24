@@ -1213,13 +1213,15 @@ local function UntargetedDirectLine(hit, line)
         and line.targetContext == hit.key
 end
 
-local function IsolatedDirectSpell(hit, line)
+local function IsolatedDirectInstance(hit, line)
     if not UntargetedDirectLine(hit, line) or line.at ~= hit.at then return false end
     local instance = UntargetedDirectInstance(hit)
-    if instance ~= "pvp" and instance ~= "party" then return false end
-    if hit.record.school ~= ns.SCHOOL_PHYSICAL then return true end
-    return not (SwingLine(hit) or OrphanSwingLine(hit)
-        or SwingFrame(hit.at, WEAPON_PROC_TRIGGER_WINDOW))
+    if instance ~= "pvp" and instance ~= "party" then return end
+    if hit.record.school ~= ns.SCHOOL_PHYSICAL
+        or not (SwingLine(hit) or OrphanSwingLine(hit)
+            or SwingFrame(hit.at, WEAPON_PROC_TRIGGER_WINDOW)) then
+        return instance
+    end
 end
 
 local function DecideDungeonDirect(hit)
@@ -1248,10 +1250,18 @@ local function DecideDungeonDirect(hit)
             best = line
         end
     end
+    if best then
+        -- A line after the hit can still match reports after the hit's timer.
+        local remaining = best.at + LATE_LINE - Now()
+        if remaining >= 0 then
+            C_Timer.After(remaining + 0.001, function() DecideDungeonDirect(hit) end)
+            return
+        end
+    end
     if best and ns.mine:UntargetedDirectCandidate(
-        hit.key, hit.record.school, hit.at, Leech(hit)) then
+        hit.key, hit.record.school, hit.at, Leech(hit), true) then
         best.claimed = true
-        hit.isolatedDirectSpell = true
+        hit.isolatedDirectSpell = "party"
         ConfirmingEvidence(hit, best)
         ns.DecideHit(hit, true, "direct")
     else
@@ -1264,9 +1274,8 @@ end
 -- on an enemy without a plate also sends one) and every hit is yours; none
 -- and none is; fewer, and the engine decides as it would without lines.
 function DecideGroup(group, frameLines, decided, settled)
-    if #group == 1 and #frameLines == 1
-        and IsolatedDirectSpell(group[1], frameLines[1]) then
-        group[1].isolatedDirectSpell = true
+    if #group == 1 and #frameLines == 1 then
+        group[1].isolatedDirectSpell = IsolatedDirectInstance(group[1], frameLines[1])
     end
     local reportsBySchool, periodicConfirmations = {}, 0
     for _, line in ipairs(frameLines) do
@@ -1427,12 +1436,19 @@ function DecideGroup(group, frameLines, decided, settled)
         for _, hit in ipairs(rest) do
             local record = hit.record
             local procLine = ProcLine(hit)
+            local dungeonCandidate
+            if not procLine and record.school ~= ns.SCHOOL_PHYSICAL
+                and UntargetedDirectInstance(hit) == "party" then
+                dungeonCandidate = ns.mine:UntargetedDirectCandidate(
+                    hit.key, record.school, hit.at, nil, true)
+            end
             if procLine then
                 procLine.claimed, procLine.hit = true, { at = hit.at, record = record }
 
                 ns.mine.procSwing = true
                 Decide(hit, true, LineRestrict(procLine), procLine)
-            elseif record.event == "damage" and ns.mine:InFlight(hit.key, record.school, hit.at) then
+            elseif not dungeonCandidate and record.event == "damage"
+                and ns.mine:InFlight(hit.key, record.school, hit.at) then
                 if settled then
                     -- Periodic matching already waited for this hit's line.
                     ns.DecideLate(hit)
@@ -1445,9 +1461,7 @@ function DecideGroup(group, frameLines, decided, settled)
 
                 ns.mine.procSwing = true
                 Decide(hit, true, LineRestrict(flight), flight)
-            elseif #group == 1 and record.school ~= ns.SCHOOL_PHYSICAL
-                and UntargetedDirectInstance(hit) == "party"
-                and ns.mine:UntargetedDirectCandidate(hit.key, record.school, hit.at) then
+            elseif #group == 1 and dungeonCandidate then
                 if settled then
                     DecideDungeonDirect(hit)
                 else
