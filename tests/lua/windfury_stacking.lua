@@ -15,6 +15,9 @@ local secret = setmetatable({}, {
     __tostring = function() error("formatted restricted damage in Lua") end,
 })
 local Batcher = dofile("Components/OutgoingBatcher.lua")
+-- Both TOCs load the batcher before the combat class modules.
+MikSBT.CombatEngine = { classRules = {} }
+dofile("Combat/Classes/Shaman.lua")
 local batcher = Batcher:New({
     getProfile = function() return profile end,
     getSpellTexture = function() return "windfury" end,

@@ -113,7 +113,8 @@ local function Load(path)
 	assert(loadstring(source, "@" .. path))()
 end
 for _, path in ipairs({
-	"Combat/Context.lua", "Combat/Helpers.lua", "Combat/Mine.lua",
+	"Combat/Context.lua", "Combat/Classes/Shaman.lua",
+	"Combat/Helpers.lua", "Combat/Mine.lua",
 	"Combat/Spells.lua", "Combat/Healing.lua", "Combat/Reader.lua",
 	"Components/CombatLogFilter.lua",
 	"Components/CombatPresentation.lua", "Components/CombatEngine.lua",

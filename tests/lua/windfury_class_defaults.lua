@@ -4,6 +4,9 @@ MikSBT = {
     CombatEngine = { mine = {}, Timer = { After = function() end } },
 }
 dofile("API/RestrictedValue.lua")
+dofile("Combat/Context.lua")
+MikSBT.CombatEngine.mine = {}
+dofile("Combat/Classes/Shaman.lua")
 dofile("Combat/WindfuryInference.lua")
 local Engine = dofile("Components/CombatEngine.lua")
 local class
@@ -59,3 +62,19 @@ profile = nil
 engine:UpdateInference()
 -- Then it cannot start an inference stage.
 assert(engine.inference == nil)
+
+-- Given a readable Shaman class with a valid profile but no class policy.
+profile = {}
+local shaman = MikSBT.CombatEngine.classRules.SHAMAN
+MikSBT.CombatEngine.classRules.SHAMAN = {}
+
+-- When the engine checks eligibility, the class must explicitly opt in.
+assert(engine:InferenceEnabled() == false)
+
+-- Then restoring the class rules restores the Weapon policy and spell data.
+MikSBT.CombatEngine.classRules.SHAMAN = shaman
+assert(engine:InferenceEnabled() == true)
+assert(shaman.windfuryWeapon.iconSpell == 8232)
+assert(shaman.windfuryWeapon.procSpell == 439440)
+assert(shaman.windfuryWeapon.triggerSpell == 17364)
+assert(shaman.windfuryWeapon.enchants[283])

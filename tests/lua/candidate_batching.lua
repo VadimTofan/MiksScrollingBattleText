@@ -1,4 +1,5 @@
-MikSBT = { Components = {} }
+MikSBT = { Components = {}, CombatEngine = { classRules = {} } }
+dofile("Combat/Classes/Shaman.lua")
 local profile = {
     stackSimilarHits = true,
     events = { OUTGOING_SPELL_DAMAGE = {} },

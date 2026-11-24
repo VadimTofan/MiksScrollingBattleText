@@ -439,16 +439,13 @@ end
 -- once (a seal and an enchant), so a hit takes the newest one of its school,
 -- and none when no source of its school is on (Thunderfury beside a seal).
 local PROC_KEEP = { seal = 35, poison = 3660, oil = 1860, enchant = math.huge }
--- Windfury Weapon's four Vanilla enchant ranks share the same spell icon.
-local WINDFURY_ENCHANTS = {
-    [283] = true, [284] = true, [525] = true, [1669] = true,
-}
+local windfuryWeapon = ns.WindfuryWeapon or {}
 local MELEE_WEAPON_SLOTS = { 16, 17 }
-local WINDFURY_WEAPON_SPELL_ID = 8232
 
 local function ActiveWindfurySpell(school)
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
-    if not client or not client.isForever or school ~= ns.SCHOOL_PHYSICAL then
+    if not windfuryWeapon.enchants or not client or not client.isForever
+        or school ~= ns.SCHOOL_PHYSICAL then
         return nil
     end
     local getEnchant = C_PaperDollInfo
@@ -459,8 +456,8 @@ local function ActiveWindfurySpell(school)
             if not ok then return nil end
             if type(info) == "table" and ns.Public(info)
                 and ns.Number(info.enchantID, 1)
-                and WINDFURY_ENCHANTS[info.enchantID] then
-                return WINDFURY_WEAPON_SPELL_ID
+                and windfuryWeapon.enchants[info.enchantID] then
+                return windfuryWeapon.iconSpell
             end
         end
         return nil
@@ -470,9 +467,9 @@ local function ActiveWindfurySpell(school)
         hasOff, offTime, offCharges, offID = pcall(GetWeaponEnchantInfo)
     if not ok then return nil end
     if ns.Bool(hasMain) and hasMain and ns.Number(mainID, 1)
-        and WINDFURY_ENCHANTS[mainID] then return WINDFURY_WEAPON_SPELL_ID end
+        and windfuryWeapon.enchants[mainID] then return windfuryWeapon.iconSpell end
     if ns.Bool(hasOff) and hasOff and ns.Number(offID, 1)
-        and WINDFURY_ENCHANTS[offID] then return WINDFURY_WEAPON_SPELL_ID end
+        and windfuryWeapon.enchants[offID] then return windfuryWeapon.iconSpell end
 end
 ns.ActiveWindfurySpell = ActiveWindfurySpell
 
@@ -537,8 +534,8 @@ local function ProcCandidate(at, school, key)
         -- A bleed application can share the swing's direct confirmations.
         -- Keep this candidate separate from the known periodic effect.
         if PeriodicProcCast(at, school, key) then return nil end
-        local _, class = UnitClass("player")
-        if ns.Text(class) and class == "SHAMAN" then return windfury end
+        local rules = ns.PlayerClassRules()
+        if rules and rules.windfuryWeapon then return windfury end
         return nil
     end
     local best
@@ -629,9 +626,9 @@ function ns.DecideHit(hit, line, restrict)
     if line == true and restrict == "direct" and result.who == "you"
         and not result.ambiguous
         and not result.spell and not result.melee and not result.tick
-        and WeaponProcTrigger(hit.at, hit.key)
+        and windfuryWeapon.iconSpell and WeaponProcTrigger(hit.at, hit.key)
         and ProcCandidate(hit.at, record.school, hit.key)
-            == WINDFURY_WEAPON_SPELL_ID then
+            == windfuryWeapon.iconSpell then
         result.proc = true
     end
     -- A shield's miss is reported as Physical whatever shield caused it, so
@@ -971,7 +968,7 @@ end
 local function WeaponProcLine(hit)
     local record = hit.record
     if record.event ~= "damage" or record.school ~= ns.SCHOOL_PHYSICAL
-        or ActiveWindfurySpell(record.school) ~= WINDFURY_WEAPON_SPELL_ID then
+        or not ActiveWindfurySpell(record.school) then
         return nil
     end
     -- Keep the delay relative to the confirmation, including procs triggered
@@ -1741,7 +1738,6 @@ end
 
 local lastCast
 local queuedStrike
-local WINDFURY_ATTACK_SPELL_ID = 439440
 local WINDFURY_TOTEM_ATTACK_SPELL_ID = 10610
 local MAX_WINDFURY_CASTS = 16
 
@@ -1763,8 +1759,8 @@ local function WindfuryNotice(spell, now)
 
     local router = Router()
     if router then
-        local fallbackSpell = spell == WINDFURY_ATTACK_SPELL_ID
-            and WINDFURY_WEAPON_SPELL_ID
+        local fallbackSpell = spell == windfuryWeapon.procSpell
+            and windfuryWeapon.iconSpell
         router:Alert({ kind = "proc",
             text = ns.SpellName(spell)
                 or (fallbackSpell and ns.SpellName(fallbackSpell)) or "Windfury",
@@ -1816,7 +1812,7 @@ end
 local function WindfuryCooldown(spell)
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     if not (client and client.isForever) or not ns.Number(spell, 1)
-        or (spell ~= WINDFURY_ATTACK_SPELL_ID
+        or (spell ~= windfuryWeapon.procSpell
             and spell ~= WINDFURY_TOTEM_ATTACK_SPELL_ID) then return end
     local at = Now()
     local triggerAt = spell == WINDFURY_TOTEM_ATTACK_SPELL_ID
@@ -1846,7 +1842,7 @@ end
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
-    if unit == "player" and spell == WINDFURY_ATTACK_SPELL_ID then
+    if unit == "player" and spell == windfuryWeapon.procSpell then
         local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
         if client and client.isForever then
             if FirstWindfuryCast(guid) then
@@ -1879,7 +1875,8 @@ local function OnCast(unit, spell, guid)
     local facts = ns.SpellFacts and ns.SpellFacts(spell)
     if ns.windfuryInference and unit == "player" then
         local certain = observed == true and uncertain ~= true
-        local conflict = spell ~= 17364 and spell ~= WINDFURY_ATTACK_SPELL_ID
+        local conflict = spell ~= windfuryWeapon.triggerSpell
+            and spell ~= windfuryWeapon.procSpell
             and (not facts or (facts.school == ns.SCHOOL_PHYSICAL
                 and facts.damages ~= false))
         ns.windfuryInference:Cast({ at = now, key = certain and key or nil,
@@ -2830,9 +2827,9 @@ local function OnEvent(_, event, ...)
         local spell = ...
         if ns.windfuryInference and ns.Number(spell, 1)
             and (spell == WINDFURY_TOTEM_ATTACK_SPELL_ID
-                or (spell == WINDFURY_ATTACK_SPELL_ID
-                    and ActiveWindfurySpell(ns.SCHOOL_PHYSICAL) == 8232)) then
-            local target = spell == WINDFURY_ATTACK_SPELL_ID and ns.TargetKey() or nil
+                or (spell == windfuryWeapon.procSpell
+                    and ActiveWindfurySpell(ns.SCHOOL_PHYSICAL))) then
+            local target = spell == windfuryWeapon.procSpell and ns.TargetKey() or nil
             ns.windfuryInference:Signal(Now(), spell, target)
         end
         WindfuryCooldown(...)

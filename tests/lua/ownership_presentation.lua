@@ -1,4 +1,5 @@
-MikSBT = { Components = {}, Services = {} }
+MikSBT = { Components = {}, Services = {}, CombatEngine = { classRules = {} } }
+dofile("Combat/Classes/Shaman.lua")
 dofile("API/RestrictedValue.lua")
 local Presentation = dofile("Components/CombatPresentation.lua")
 local secret = setmetatable({}, {

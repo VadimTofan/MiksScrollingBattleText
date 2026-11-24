@@ -1,4 +1,5 @@
-MikSBT = { Components = {}, CombatEngine = {}, Display = {} }
+MikSBT = { Components = {}, CombatEngine = { classRules = {} }, Display = {} }
+dofile("Combat/Classes/Shaman.lua")
 dofile("API/RestrictedValue.lua")
 dofile("Combat/WindfuryTrace.lua")
 local now, timers, dispatches, reports = 10, {}, 0, 0

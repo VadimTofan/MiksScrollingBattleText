@@ -1,5 +1,7 @@
 MikSBT = { Components = {} }
 dofile("API/RestrictedValue.lua")
+dofile("Combat/Context.lua")
+dofile("Combat/Classes/Shaman.lua")
 local file = io.open("Combat/WindfuryInference.lua", "r")
 assert(file, "production inferred Windfury runtime is missing")
 file:close()

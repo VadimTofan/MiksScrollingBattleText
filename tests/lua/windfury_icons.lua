@@ -1,6 +1,7 @@
 MikSBT = { Compatibility = { Client = { isForever = true } } }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+dofile("Combat/Classes/Shaman.lua")
 dofile("Combat/Mine.lua")
 dofile("Combat/Reader.lua")
 local engine = MikSBT.CombatEngine

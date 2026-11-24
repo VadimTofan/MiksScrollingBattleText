@@ -15,6 +15,8 @@ local callbacks = {}
 local displayed
 local outputs = {}
 local OutgoingBatcher = dofile("Components/OutgoingBatcher.lua")
+MikSBT.CombatEngine = { classRules = {} }
+dofile("Combat/Classes/Shaman.lua")
 local batcher = OutgoingBatcher:New({
 	getProfile = function()
 		return profile
