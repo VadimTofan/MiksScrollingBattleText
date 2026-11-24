@@ -265,8 +265,8 @@ for _, show in ipairs({ P.ShowAcknowledge, P.ShowScrollAreaSelection,
 	-- Then it uses the same menu header and stacking as the editors.
 	CheckWindow(frame, UIParent)
 	if show == P.ShowDamageColors then
-		assert(frame.colorCheckbox == nil,
-			"baseline damage colors still have an enable checkbox")
+		assert(frame.colorCheckbox and not frame.colorCheckbox:GetChecked(),
+			"all damage school colors should start enabled")
 		for school = 1, 32 do
 			assert(frame["school" .. school .. "Checkbox"] == nil,
 				"baseline damage school still has an enable checkbox")
@@ -320,6 +320,32 @@ function MikSBT.Profiles.SetOption(path, key, value)
 		or MikSBT.Profiles.currentProfile
 	target[key] = value
 end
+
+-- Given the shared Damage Colors popup and a customized school swatch.
+P.ShowDamageColors(Config())
+local damageColors = popups[#popups]
+local school = MikSBT.Profiles.currentProfile.school1
+local disableColors = damageColors.colorCheckbox
+
+-- When the player disables all school colors and reopens the popup.
+disableColors.clickHandler(disableColors, true)
+damageColors:Hide()
+P.ShowDamageColors(Config())
+
+-- Then the profile remembers the setting and keeps the school palette.
+assert(MikSBT.Profiles.currentProfile.damageSchoolColorsDisabled == true)
+assert(disableColors:GetChecked())
+assert(school.colorR == 1 and school.colorG == 0.5 and school.colorB == 0)
+
+-- When the player clears the checkbox.
+disableColors.clickHandler(disableColors, false)
+damageColors:Hide()
+P.ShowDamageColors(Config())
+
+-- Then the popup reflects the restored school coloring.
+assert(not MikSBT.Profiles.currentProfile.damageSchoolColorsDisabled)
+assert(not disableColors:GetChecked())
+damageColors:Hide()
 
 -- When their editors are opened and closed using the footer.
 for _, show in ipairs({ P.ShowPartialEffects, P.ShowClassColors }) do

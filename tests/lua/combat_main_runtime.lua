@@ -823,6 +823,18 @@ for _, forever in ipairs({ false, true }) do
 		end
 		assert(events.OUTGOING_DAMAGE.colorR == 0.2,
 			"melee coloring mutated saved event settings")
+
+		-- Given the profile opts out of all school colors.
+		profile.damageSchoolColorsDisabled = true
+		-- When a physical swing reaches the same batcher with its custom color.
+		Out(42, 1, { who = "you", melee = true })
+		Advance(0.31)
+		-- Then the damage uses the event's configured color.
+		local eventColored = displayed[#displayed]
+		assert(eventColored[1].colorR == 0.2 and eventColored[1].colorG == 0.3
+			and eventColored[1].colorB == 0.4, "built-in swing color overrode event color")
+		profile.damageSchoolColorsDisabled = false
+
 		-- Given grouping is enabled for repeated physical ability hits.
 		profile.stackSimilarHits = true
 		-- When two hits are combined in one batching window.

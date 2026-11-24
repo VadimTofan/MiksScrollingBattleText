@@ -118,6 +118,22 @@ assert(hiddenTemplate == "Hit |cFFff0000%s|r",
 	"legacy disabled flags suppressed hidden school coloring")
 assert(Formatter:ColorDamageAmount("42", 999) == "42")
 
+-- Given school colors are disabled for the active profile.
+profile.damageSchoolColorsDisabled = true
+
+-- When readable damage and a restricted template are formatted.
+local eventColored = Formatter:FormatEvent({ message = "Hit %a (%t)",
+	amount = 4500, damageType = 1 })
+local hiddenEventColored = Formatter:BuildRestrictedTemplate("Hit %a", nil, 1)
+
+-- Then both amounts inherit the event color and the school name remains.
+assert(eventColored == "Hit 4.5k (Physical)", "readable damage kept its school color")
+assert(hiddenEventColored == "Hit %s", "hidden damage kept its school color")
+
+-- When the same profile re-enables school colors, its palette is restored.
+profile.damageSchoolColorsDisabled = false
+assert(Formatter:ColorDamageAmount("42", 1) == "|cFFff000042|r")
+
 -- Describe: a partial effect's trailer.
 -- Given the Block partial effect's text and color.
 local block = { trailer = " <%a blocked>", colorR = 0.5, colorG = 0, colorB = 1 }
