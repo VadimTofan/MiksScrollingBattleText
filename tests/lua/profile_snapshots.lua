@@ -375,3 +375,16 @@ do
 end
 
 print("Profile snapshot tests passed")
+
+-- Given an existing save missing the Default profile and version metadata.
+MSBTProfiles_SavedVars = { profiles = {
+	Legacy = { creationVersion = "unknown", normalFontSize = 26 },
+} }
+
+-- When the addon loads its saved variables again.
+local recovered = LoadProfiles()
+
+-- Then the default is usable and existing appearance overrides survive.
+assert(recovered.savedVariables.profiles.Default.creationVersion == "12.052.0")
+assert(recovered.savedVariables.profiles.Legacy.creationVersion == "12.052.0")
+assert(recovered.savedVariables.profiles.Legacy.normalFontSize == 26)

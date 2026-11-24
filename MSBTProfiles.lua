@@ -2801,10 +2801,10 @@ local function UpdateProfiles(profiles)
 
 	for profileName, profile in pairs(profiles) do
 
-		local creationVersion = tonumber(select(3, string_find(tostring(profile.creationVersion), "(%d+%.%d+)")))
-
-		if (creationVersion < 5.2) then
-			profile.triggers = nil
+		local versionText = tostring(profile.creationVersion):match("(%d+%.%d+)")
+		local creationVersion = tonumber(versionText)
+		if not creationVersion or creationVersion < 5.2 then
+			if creationVersion then profile.triggers = nil end
 			profile.creationVersion = MikSBT.VERSION .. "." .. MikSBT.SVN_REVISION
 		end
 	end
