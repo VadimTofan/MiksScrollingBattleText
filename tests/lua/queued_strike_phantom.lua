@@ -2,6 +2,7 @@
 MikSBT = { Components = {}, Compatibility = { Client = { isForever = true } } }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+dofile("Combat/Classes/Hunter.lua")
 dofile("Combat/Helpers.lua")
 dofile("Combat/Mine.lua")
 dofile("Combat/Spells.lua")

@@ -1,7 +1,10 @@
 MikSBT = { Components = {} }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+dofile("Combat/Classes/Druid.lua")
+dofile("Combat/Classes/Hunter.lua")
 dofile("Combat/Classes/Shaman.lua")
+dofile("Combat/Classes/Warrior.lua")
 dofile("Combat/Helpers.lua")
 dofile("Combat/Mine.lua")
 dofile("Combat/Spells.lua")

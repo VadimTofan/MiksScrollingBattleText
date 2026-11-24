@@ -1152,19 +1152,14 @@ local function SettleTie(hits, lines, Decide)
     return true
 end
 
--- Classic ranks of the three queued-strike families supported on Forever.
-local QUEUED_STRIKES = {
-    -- Heroic Strike.
-    [78] = true, [284] = true, [285] = true, [1608] = true,
-    [11564] = true, [11565] = true, [11566] = true,
-    [11567] = true, [25286] = true,
-    -- Maul.
-    [6807] = true, [6808] = true, [6809] = true, [8972] = true,
-    [9745] = true, [9880] = true, [9881] = true,
-    -- Raptor Strike.
-    [2973] = true, [14260] = true, [14261] = true, [14262] = true,
-    [14263] = true, [14264] = true, [14265] = true, [14266] = true,
-}
+local queuedStrikes = {}
+for _, rules in pairs(ns.classRules or {}) do
+    if rules.queuedStrikes then
+        for spell, enabled in pairs(rules.queuedStrikes) do
+            queuedStrikes[spell] = enabled
+        end
+    end
+end
 
 local function PreferQueuedStrikeHit(group, lines, restrict)
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
@@ -1177,7 +1172,7 @@ local function PreferQueuedStrikeHit(group, lines, restrict)
         or last.record.school ~= ns.SCHOOL_PHYSICAL then return false end
     for _, cast in ipairs(ns.mine.pending) do
         local facts = ns.SpellFacts(cast.spell)
-        local nextSwing = QUEUED_STRIKES[cast.spell]
+        local nextSwing = queuedStrikes[cast.spell]
             or (facts and facts.nextSwing == true)
         if not cast.used and cast.caster == "you" and cast.key == first.key
             and cast.at == first.at and nextSwing then
@@ -1893,7 +1888,7 @@ local function OnCast(unit, spell, guid)
     lastCast = { at = now, spell = spell, unit = unit }
     -- A queued strike of yours is kept apart from lastCast: a pet cast in the
     -- same frame must not hide that the next main-hand swing is the strike's.
-    if unit == "player" and QUEUED_STRIKES[spell] then queuedStrike = { at = now, spell = spell } end
+    if unit == "player" and queuedStrikes[spell] then queuedStrike = { at = now, spell = spell } end
     if unit == "player" and facts and facts.weaponProc then
         reader.procSources[facts.weaponProc] = { spell = spell, at = now, kind = facts.weaponProc, school = facts.procSchool }
     end

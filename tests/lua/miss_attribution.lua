@@ -1,5 +1,8 @@
 -- Describe: a miss goes only to an action that can have caused it.
-MikSBT = { CombatEngine = {} }
+MikSBT = {}
+dofile("API/RestrictedValue.lua")
+dofile("Combat/Context.lua")
+dofile("Combat/Classes/Hunter.lua")
 dofile("Combat/Spells.lua")
 dofile("Combat/Mine.lua")
 local ns = MikSBT.CombatEngine
@@ -34,6 +37,13 @@ assert(ns.SpellCanAvoid(2973, "PARRY") and ns.SpellCanAvoid(5116, "DODGE"))
 assert(not ns.SpellCanAvoid(5116, "PARRY") and not ns.SpellCanAvoid(1130, "DODGE"))
 assert(ns.SpellCanAvoid(1130, "RESIST") and ns.SpellCanAvoid(1130, "IMMUNE"))
 assert(ns.SpellCanAvoid(999, "PARRY"), "an unreadable range ruled something out")
+
+-- Given no class-specific range reference, when the same spell is checked,
+-- then the shared classifier falls back to spell range.
+local hunter = ns.classRules.HUNTER
+ns.classRules.HUNTER = {}
+assert(ns.SpellReach(5116) == "spell", "the shared matcher owns the shot rule")
+ns.classRules.HUNTER = hunter
 
 -- Given Hunter's Mark, then the pet's swing parried.
 local mine = New()

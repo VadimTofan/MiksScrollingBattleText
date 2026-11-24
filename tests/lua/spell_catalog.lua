@@ -154,6 +154,21 @@ copy.school = 1
 assert(mage.CatalogSpellFacts(5143).school == 64)
 assert(mage.CatalogSpellFacts(25345).school == 64)
 
+-- Given each class's module, when queued strikes are looked up,
+-- then only the owning class supplies the special rank list.
+local queued = Load(true, true, { "Warrior", "Druid", "Hunter" }).classRules
+for _, example in ipairs({ { "WARRIOR", 78, 25286 },
+    { "DRUID", 6807, 9881 }, { "HUNTER", 2973, 14266 } }) do
+    local rules = queued[example[1]].queuedStrikes
+    assert(rules and rules[example[2]] and rules[example[3]],
+        "missing class-owned queued strike ranks for " .. example[1])
+end
+assert(not queued.WARRIOR.queuedStrikes[6807])
+assert(not queued.DRUID.queuedStrikes[2973])
+assert(not queued.HUNTER.queuedStrikes[78])
+assert(queued.HUNTER.rangedAttackSpell == 75)
+assert(queued.HUNTER.targetlessHealRecipients[136] == "pet")
+
 -- Given a different client and an old harness without the optional catalog.
 locale = "enUS"
 for _, context in ipairs({ { false, true }, { true, false } }) do

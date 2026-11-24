@@ -3,7 +3,8 @@
 MikSBT = { Components = {},
     Compatibility = { Client = { isForever = true } } }
 dofile("API/RestrictedValue.lua")
-for _, file in ipairs({ "Context", "Classes/Mage", "Classes/Paladin", "Classes/Shaman",
+for _, file in ipairs({ "Context", "Classes/Druid", "Classes/Hunter", "Classes/Mage",
+    "Classes/Paladin", "Classes/Shaman", "Classes/Warrior",
     "Helpers", "SpellCatalog", "Mine",
     "Spells", "Healing", "Reader" }) do
     dofile("Combat/" .. file .. ".lua")

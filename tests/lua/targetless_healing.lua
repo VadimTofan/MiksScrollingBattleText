@@ -2,6 +2,7 @@
 MikSBT = { Components = {} }
 dofile("API/RestrictedValue.lua")
 dofile("Combat/Context.lua")
+dofile("Combat/Classes/Hunter.lua")
 dofile("Combat/Helpers.lua")
 local ns = MikSBT.CombatEngine
 local selectedUnit = "enemy"
