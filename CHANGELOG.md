@@ -1,5 +1,13 @@
 # Changelog
 
+## v12.059
+
+- Disable all damage school colors in Damage Colors to use your configured
+  event colors for damage numbers.
+- Restored Extra Attacks notifications on Forever. When the client confirms
+  the source, the notification can name Hack and Slash, Thrash Blade,
+  Ironfoe, or Hand of Justice. Unidentified grants use the generic text.
+
 ## v12.058
 
 - Added a Forever-style options window with General, Events, Sounds, and
