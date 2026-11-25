@@ -114,7 +114,7 @@ local function Load(path)
 end
 for _, path in ipairs({
 	"Combat/Context.lua", "Combat/Classes/Druid.lua", "Combat/Classes/Hunter.lua",
-	"Combat/Classes/Shaman.lua", "Combat/Classes/Warrior.lua",
+	"Combat/Classes/Rogue.lua", "Combat/Classes/Shaman.lua", "Combat/Classes/Warrior.lua",
 	"Combat/Helpers.lua", "Combat/Mine.lua",
 	"Combat/Spells.lua", "Combat/Healing.lua", "Combat/Reader.lua",
 	"Components/CombatLogFilter.lua",
@@ -299,6 +299,58 @@ for _, forever in ipairs({ false, true }) do
 	assert(#displayed == beforeExtra, "disabled extra-attack grant was displayed")
 
 	if forever then
+		-- Given a Rogue and the client's spell metadata for Hack and Slash.
+		local unitClass, spellName = UnitClass, C_Spell.GetSpellName
+		UnitClass = function() return "Rogue", "ROGUE" end
+		C_Spell.GetSpellName = function(id)
+			if id == 16459 then return "Hack and Slash" end
+			return spellName(id)
+		end
+		extraSettings.disabled = false
+
+		for index, castFirst in ipairs({ true, false }) do
+			-- When the public proc cast and protected grant arrive in either order.
+			local guid = "Cast-rogue-proc-" .. index
+			beforeExtra = #displayed
+			if castFirst then
+				Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", guid, 16459)
+				Advance(0.04)
+			end
+			Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+				extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+			if castFirst then
+				-- A simultaneous grant can come from another source such as Thrash Blade.
+				Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+					extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+			end
+			if not castFirst then
+				Advance(0.04)
+				Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", guid, 16459)
+			end
+			Advance(0.2)
+
+			-- Then the existing notification displays the named grant once.
+			assert(#displayed == beforeExtra + (castFirst and 2 or 1),
+				"extra-attack notice was missing or duplicated")
+			assert(displayed[beforeExtra + 1][2] == "Hack and Slash!", "Rogue grant was unnamed")
+			assert(displayed[beforeExtra + 1][3] == "icon")
+			if castFirst then assert(displayed[beforeExtra + 2][2] == "Extra attack!") end
+		end
+
+		-- Given an unrelated extra attack and duplicate, talent, or pet cast metadata.
+		beforeExtra = #displayed
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-rogue-proc-2", 16459)
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", nil, 13960)
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "pet", nil, 16459)
+		-- When the grant arrives, then earlier Rogue evidence cannot name it.
+		Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+			extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+		Advance(0.2)
+		assert(#displayed == beforeExtra + 1)
+		assert(displayed[#displayed][2] == "Extra attack!")
+		extraSettings.disabled = true
+		UnitClass, C_Spell.GetSpellName = unitClass, spellName
+
 		for _, spell in ipairs({ 2973, 78, 6807 }) do
 			-- Given a queued strike with two opaque physical hit reports.
 			Advance(4)

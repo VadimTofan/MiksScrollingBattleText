@@ -1837,9 +1837,18 @@ end
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
-    if unit == "player" and spell == windfuryWeapon.procSpell then
-        local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
-        if client and client.isForever then
+    local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+    if unit == "player" and client and client.isForever then
+        local rules = ns.PlayerClassRules()
+        if rules and rules.extraAttackSpells and rules.extraAttackSpells[spell] then
+            local cast = reader.extraAttackCast
+            local castGUID = ns.Text(guid) and guid or nil
+            if not castGUID or not cast or cast.guid ~= castGUID then
+                reader.extraAttackCast = { at = now, spell = spell, guid = castGUID }
+            end
+            return
+        end
+        if spell == windfuryWeapon.procSpell then
             if FirstWindfuryCast(guid) then
                 -- Let the proc corroborate the burst without reserving a normal hit.
                 if ns.windfuryInference then
@@ -2708,9 +2717,17 @@ local function KindAlert(router, line)
     if line.source == "mine" and line.kind == "extra" then
         local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
         if client and client.isForever then
-            -- The filter identifies a grant, but the spell name is protected.
+            -- A nearby public cast can name one grant without reading the log text.
             local text = (MikSBT.translations or {}).MSG_EXTRA_ATTACK or "Extra attack"
-            router:Alert({ kind = "extraAttack", text = text })
+            local cast, icon = reader.extraAttackCast, nil
+            if cast and not cast.used and math.abs(cast.at - line.at) <= LOG_PAIR then
+                cast.used = true
+                local name = ns.SpellName(cast.spell)
+                if name then
+                    text, icon = name, ns.SpellIcon(cast.spell)
+                end
+            end
+            router:Alert({ kind = "extraAttack", text = text, icon = icon })
         end
         return
     end
@@ -2942,6 +2959,7 @@ local function OnEvent(_, event, ...)
         RebuildAuras()
         reader.windfuryCooldownFrames, reader.windfuryNoticeAt = {}, nil
         reader.windfuryCasts = {}
+        reader.extraAttackCast = nil
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil
         reader.pendingHits = setmetatable({}, { __mode = "k" })
