@@ -2330,10 +2330,6 @@ if Client.isForever then
 		masterProfile.events["OUTGOING_RANGED_" .. outcome] =
 			CopyTable(masterProfile.events["OUTGOING_SPELL_" .. outcome])
 	end
-	local gear = MikSBT.CombatEngine and MikSBT.CombatEngine.GearProcs
-	for _, rule in ipairs(gear and gear.items or {}) do
-		masterProfile.events[rule.event] = CopyTable(masterProfile.events.NOTIFICATION_EXTRA_ATTACK)
-	end
 end
 
 for eventType, settings in pairs(masterProfile.events) do

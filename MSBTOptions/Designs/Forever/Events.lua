@@ -838,16 +838,6 @@ end
 local function CreatePage(page, width, height)
 	content = CreateFrame("Frame", nil, page)
 	content:SetAllPoints(page)
-	local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
-	if client and client.isForever then
-		content:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-		content:SetScript("OnEvent", function(self)
-			if self:IsVisible() and shownArg and (type(shownArg) == "string"
-				or shownArg[1] == "NOTIFICATION_EVENTS") then
-				Refresh(page, shownArg)
-			end
-		end)
-	end
 	tableWidth, tableHeight = width - PANEL_WIDTH - 12, height
 	CreateTable()
 	CreateLootPanel()

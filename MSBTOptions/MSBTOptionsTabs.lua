@@ -1243,32 +1243,8 @@ local function EventsTab_SetupEvents()
 	EventsTab_AddEvent(category, "NOTIFICATION_PC_KILLING_BLOW", c.UNIT_KILLED)
 	EventsTab_AddEvent(category, "NOTIFICATION_NPC_KILLING_BLOW", c.UNIT_KILLED)
 	EventsTab_AddEvent(category, "NOTIFICATION_EXTRA_ATTACK", c.EXTRA_ATTACKS .. c.SKILL_LONG)
-	local gear = MikSBT.CombatEngine and MikSBT.CombatEngine.GearProcs
-	if IsForever and gear then
-		for _, rule in ipairs(gear.items) do
-			local rows = orderedEvents[category]
-			rows[#rows + 1] = { eventType = rule.event, gear = rule,
-				label = rule.name, tooltip = L.GEAR_PROC_TOOLTIP, codes = c.SKILL_LONG }
-		end
-	end
 	EventsTab_AddEvent(category, "NOTIFICATION_ENEMY_BUFF", c.BUFFED_NAME .. c.BUFF_NAME .. c.SKILL_LONG)
 	EventsTab_AddEvent(category, "NOTIFICATION_MONSTER_EMOTE", c.EMOTE_TEXT)
-end
-
-
-local function EventsTab_GetEvents(category)
-	if not orderedEvents[category] then EventsTab_SetupEvents() end
-	local rows = orderedEvents[category]
-	local gear = MikSBT.CombatEngine and MikSBT.CombatEngine.GearProcs
-	if category ~= "NOTIFICATION_EVENTS" or not IsForever or not gear then return rows end
-	local visible = {}
-	for _, row in ipairs(rows) do
-		if not row.gear or gear.IsEquipped(row.gear) then
-			if row.gear then row.label = gear.Name(row.gear) end
-			visible[#visible + 1] = row
-		end
-	end
-	return visible
 end
 
 
@@ -1301,7 +1277,7 @@ local function EventsTab_EventsInArea(areaKey)
 		end
 	end
 	for _, category in ipairs(EVENT_CATEGORY_MAP) do
-		AddRows(EventsTab_GetEvents(category))
+		AddRows(orderedEvents[category])
 	end
 	AddRows(orderedEvents.LOOT_EVENTS)
 	return events
@@ -1312,7 +1288,7 @@ local function EventsTab_ChangeEventCategory(category, firstAuraID)
 	local controls = tabFrames.events.controls
 	local areaKey = EventsTab_ScrollArea(category)
 	controls.visibleEvents = areaKey and EventsTab_EventsInArea(areaKey)
-		or EventsTab_GetEvents(category)
+		or orderedEvents[category]
 
 	controls.eventsListbox:Clear()
 	controls.visibleAuras = nil
@@ -1693,16 +1669,6 @@ local function EventsTab_Create()
 
 
 	EventsTab_SetupEvents()
-	if IsForever then
-		tabFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-		tabFrame:SetScript("OnEvent", function()
-			local category = dropdown:GetSelectedID()
-			if tabFrame:IsVisible() and (category == "NOTIFICATION_EVENTS"
-				or EventsTab_ScrollArea(category)) then
-				EventsTab_ChangeEventCategory(category)
-			end
-		end)
-	end
 
 	tabFrame.created = true
 end
@@ -1736,6 +1702,13 @@ local function EventsTab_OnShow()
 	dropdown:SetSelectedID(selected)
 	EventsTab_ChangeEventCategory(selected)
 end
+
+
+local function EventsTab_GetEvents(category)
+	if (not orderedEvents[category]) then EventsTab_SetupEvents() end
+	return orderedEvents[category]
+end
+
 
 
 -- The loot events with the labels and codes of the Loot Alerts tab, also a category of the designs' Events pages.

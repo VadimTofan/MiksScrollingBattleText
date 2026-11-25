@@ -2743,15 +2743,15 @@ local function KindAlert(router, line)
             -- A nearby public cast can name one grant without reading the log text.
             local text = (MikSBT.translations or {}).MSG_EXTRA_ATTACK or "Extra attack"
             local cast = TakeExtraAttackCast(line.at)
-            local gearEvent, icon
+            local icon
             if cast and cast.gear then
-                gearEvent, text = cast.gear.event, GearProcs.Name(cast.gear)
+                text = GearProcs.Name(cast.gear)
                 icon = ns.SpellIcon(cast.spell)
             elseif cast then
                 local name = ns.SpellName(cast.spell)
                 if name then text, icon = name, ns.SpellIcon(cast.spell) end
             end
-            router:Alert({ kind = "extraAttack", gearEvent = gearEvent, text = text, icon = icon })
+            router:Alert({ kind = "extraAttack", text = text, icon = icon })
         end
         return
     end

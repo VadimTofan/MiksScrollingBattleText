@@ -299,7 +299,7 @@ for _, forever in ipairs({ false, true }) do
 	assert(#displayed == beforeExtra, "disabled extra-attack grant was displayed")
 
 	if forever then
-		-- Given equipped weapons and independently configured gear notices.
+		-- Given equipped weapons and the shared Extra Attacks notification.
 		local itemAPI = C_Item
 		local equipped = { [17705] = true, [11684] = true }
 		C_Item = {
@@ -308,10 +308,7 @@ for _, forever in ipairs({ false, true }) do
 				return ({ [17705] = "Thrash Blade", [11684] = "Ironfoe" })[id]
 			end,
 		}
-		local thrash = { message = "Proc: %sl", scrollArea = "My notices" }
-		local ironfoe = { message = "%sl!", scrollArea = "My notices" }
-		events.NOTIFICATION_GEAR_THRASH_BLADE = thrash
-		events.NOTIFICATION_GEAR_IRONFOE = ironfoe
+		extraSettings.disabled = false
 		local function Grant()
 			Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
 				extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
@@ -325,29 +322,33 @@ for _, forever in ipairs({ false, true }) do
 		Grant()
 		Advance(0.2)
 
-		-- Then both gear profiles are used even with generic notices disabled.
+		-- Then both named procs use the same notification settings.
 		assert(#displayed == beforeExtra + 2, "equipped gear notices did not display")
-		assert(displayed[beforeExtra + 1][1] == thrash)
-		assert(displayed[beforeExtra + 1][2] == "Proc: Thrash Blade")
-		assert(displayed[beforeExtra + 2][1] == ironfoe)
+		assert(displayed[beforeExtra + 1][1] == extraSettings)
+		assert(displayed[beforeExtra + 1][2] == "Thrash Blade!")
+		assert(displayed[beforeExtra + 2][1] == extraSettings)
 		assert(displayed[beforeExtra + 2][2] == "Ironfoe!")
 
-		-- Given Thrash Blade is unequipped before display and Ironfoe is muted.
+		-- Given a Thrash proc followed by unequipping its weapon.
 		beforeExtra = #displayed
 		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-thrash-2", 21919)
 		equipped[17705] = nil
-		ironfoe.disabled = true
-		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-ironfoe-2", 15494)
-		-- When the grants arrive, then neither gear notice displays.
-		Grant()
+		-- When the grant arrives, then it uses the generic notice.
 		Grant()
 		Advance(0.2)
-		assert(#displayed == beforeExtra, "inactive gear notice reached the display")
+		assert(#displayed == beforeExtra + 1)
+		assert(displayed[#displayed][2] == "Extra attack!")
+
+		-- When Extra Attacks is muted, then the equipped Ironfoe proc stays hidden.
+		beforeExtra = #displayed
+		extraSettings.disabled = true
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-ironfoe-2", 15494)
+		Grant()
+		Advance(0.2)
+		assert(#displayed == beforeExtra, "disabled gear notice reached the display")
 
 		-- Given an equipped Hand of Justice and generic notifications enabled.
 		equipped[11815] = true
-		local trinket = { message = "%sl!", scrollArea = "My notices" }
-		events.NOTIFICATION_GEAR_HAND_OF_JUSTICE = trinket
 		extraSettings.disabled = false
 
 		-- When the trinket proc and another source each grant an attack.
@@ -356,9 +357,9 @@ for _, forever in ipairs({ false, true }) do
 		Grant()
 		Advance(0.2)
 
-		-- Then the trinket and unidentified grant keep separate settings.
+		-- Then the trinket and unidentified grant use the shared setting.
 		assert(#displayed == beforeExtra + 2)
-		assert(displayed[beforeExtra + 1][1] == trinket)
+		assert(displayed[beforeExtra + 1][1] == extraSettings)
 		assert(displayed[beforeExtra + 1][2] == "Hand of Justice!")
 		assert(displayed[beforeExtra + 2][1] == extraSettings)
 		assert(displayed[beforeExtra + 2][2] == "Extra attack!")

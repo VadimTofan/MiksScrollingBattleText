@@ -32,13 +32,6 @@ function Methods:SetParent(parent)
 	if parent then parent.children[#parent.children + 1] = self end
 end
 function Methods:IsShown() return self.shown end
-function Methods:IsVisible()
-	return self.shown and (not self.parent or self.parent:IsVisible())
-end
-function Methods:RegisterEvent(event)
-	self.events = self.events or {}
-	self.events[event] = true
-end
 function Methods:Show()
 	if self.shown then return end
 	self.shown = true
@@ -304,44 +297,18 @@ dofile("MSBTOptions/Designs/Forever/Events.lua")
 local Window = MSBTOptions.Window
 local Popups = MSBTOptions.Popups
 
--- Given a localized item name and a loadout with only Thrash Blade equipped.
+-- Given supported gear is equipped.
 do
 	local itemAPI = C_Item
-	local equipped = { [17705] = true }
-	C_Item = {
-		IsEquippedItem = function(id) return equipped[id] == true end,
-		GetItemNameByID = function(id)
-			if id == 17705 then return "Lame de battage" end
-		end,
-	}
-	local function GearRows()
-		local rows = {}
-		for _, event in ipairs(MSBTOptions.Tabs.events.GetEvents("NOTIFICATION_EVENTS")) do
-			if event.eventType:find("^NOTIFICATION_GEAR_") then
-				rows[event.eventType] = event.label
-			end
-		end
-		return rows
-	end
+	C_Item = { IsEquippedItem = function() return true end }
 
-	-- When the Notifications list is built, then it uses only equipped items.
-	local rows = GearRows()
-	if isForever then
-		assert(rows.NOTIFICATION_GEAR_THRASH_BLADE == "Lame de battage",
-			"equipped Thrash Blade is missing from the options")
-		assert(not rows.NOTIFICATION_GEAR_IRONFOE)
-	else
-		assert(next(rows) == nil, "Forever gear options appeared on Retail")
+	-- When Notifications is built, then it offers one Extra Attacks option.
+	local extraAttacks = 0
+	for _, event in ipairs(MSBTOptions.Tabs.events.GetEvents("NOTIFICATION_EVENTS")) do
+		assert(not event.eventType:find("^NOTIFICATION_GEAR_"), "a gear option was added")
+		if event.eventType == "NOTIFICATION_EXTRA_ATTACK" then extraAttacks = extraAttacks + 1 end
 	end
-
-	-- When the loadout changes, then the same list reflects the new gear.
-	equipped = { [11684] = true, [11815] = true }
-	rows = GearRows()
-	assert(not rows.NOTIFICATION_GEAR_THRASH_BLADE)
-	if isForever then
-		assert(rows.NOTIFICATION_GEAR_IRONFOE == "Ironfoe")
-		assert(rows.NOTIFICATION_GEAR_HAND_OF_JUSTICE == "Hand of Justice")
-	end
+	assert(extraAttacks == 1, "expected one Extra Attacks option")
 	C_Item = itemAPI
 end
 
@@ -443,33 +410,6 @@ local function VisibleRow(eventType)
 		if row.eventType == eventType then return row end
 	end
 	error("no visible row for " .. eventType)
-end
-
-if isForever then
-	-- Given an equipped item with a muted notification in the open options.
-	local itemAPI = C_Item
-	local equipped = true
-	C_Item = { IsEquippedItem = function(id) return id == 17705 and equipped end }
-	local key = "NOTIFICATION_GEAR_THRASH_BLADE"
-	Profiles.currentProfile.events[key] = { message = "%sl!", disabled = true }
-	ClickEntry("notifications")
-	assert(not VisibleRow(key).enableCheckbox:GetChecked())
-	local equipmentListener = Find(MSBTOptionsWindowFrame, function(region)
-		return region.events and region.events.PLAYER_EQUIPMENT_CHANGED
-	end)
-
-	-- When the equipment changes, then the visible list updates immediately.
-	equipped = false
-	equipmentListener.scripts.OnEvent(equipmentListener, "PLAYER_EQUIPMENT_CHANGED")
-	for _, event in ipairs(Items()) do
-		assert(event ~= key, "the unequipped item stayed in the options")
-	end
-	equipped = true
-	equipmentListener.scripts.OnEvent(equipmentListener, "PLAYER_EQUIPMENT_CHANGED")
-	assert(not VisibleRow(key).enableCheckbox:GetChecked(), "re-equipping reset the item setting")
-	C_Item = itemAPI
-	Profiles.currentProfile.events[key] = nil
-	ClickEntry("incoming")
 end
 local expected = {}
 

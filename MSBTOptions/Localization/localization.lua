@@ -541,7 +541,6 @@ obj["NOTIFICATION_EXPERIENCE_GAIN"]		= { label="Experience Gains", tooltip="Enab
 obj["NOTIFICATION_PC_KILLING_BLOW"]		= { label="Player Killing Blows", tooltip="Enable when you get a killing blow against a hostile player."}
 obj["NOTIFICATION_NPC_KILLING_BLOW"]	= { label="NPC Killing Blows", tooltip="Enable NPC killing blows and kills whose victim type is unknown."}
 obj["NOTIFICATION_EXTRA_ATTACK"]		= { label="Extra Attacks", tooltip="Enable when you gain extra attacks such as windfury, thrash, sword spec, etc."}
-L.GEAR_PROC_TOOLTIP = "Show confirmed extra attacks from this item while it is equipped."
 obj["NOTIFICATION_PROC"] = { label="Ability Procs", tooltip="Show highlighted ability procs." }
 obj["NOTIFICATION_REACTIVE"] = { label="Reactive Abilities", tooltip="Show abilities becoming available in combat." }
 obj["NOTIFICATION_CROWD_CONTROL"] = { label="Crowd Control", tooltip="Show crowd control and interrupted control effects." }
