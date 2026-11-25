@@ -65,6 +65,9 @@ MikSBT = {
 LoadFile("Configuration/ProfileStore.lua")
 LoadFile("Configuration/RuntimeController.lua")
 LoadFile("Configuration/ProfileTransfer.lua")
+LoadFile("API/RestrictedValue.lua")
+LoadFile("Combat/Context.lua")
+LoadFile("Combat/GearProcs.lua")
 
 -- Given the actual default profile on each supported content branch.
 local environment = setmetatable({}, {
@@ -114,6 +117,22 @@ for _, forever in ipairs({ false, true }) do
 	profiles.SelectProfile("Default")
 
 	if forever then
+		-- Given a saved profile with no item settings from before this feature.
+		profiles.SelectProfile("InferredLegacy")
+		local gearEvent = "NOTIFICATION_GEAR_THRASH_BLADE"
+		assert(profiles.currentProfile.events[gearEvent].message == "%sl!",
+			"an older profile did not inherit the gear notice")
+
+		-- When an item notice is muted and the saved profile is selected again.
+		profiles.SetOption("events." .. gearEvent, "disabled", true)
+		profiles.SelectProfile("Default")
+		profiles.SelectProfile("InferredLegacy")
+
+		-- Then that item remains muted and another item's setting stays independent.
+		assert(profiles.currentProfile.events[gearEvent].disabled)
+		assert(not profiles.currentProfile.events.NOTIFICATION_GEAR_IRONFOE.disabled)
+		profiles.SelectProfile("Default")
+
 		-- Given only Blizzard is showing resource gains.
 		profiles.SetOption("events.NOTIFICATION_RESOURCE_GAIN", "disabled", true)
 		CombatTextTypeInfo = {
@@ -483,6 +502,14 @@ local combatName = assert(profiles.ImportProfile(combatExport, "Combat toggles")
 assert(combatName == "Combat toggles")
 assert(profiles.currentProfile.blizzardDamageEnabled == false,
 	"profile transfer lost the Blizzard damage preference")
+
+-- Given a named profile with a gear preference saved while the item is unequipped.
+local gearProfile = "InferredLegacy"
+local gearExport = assert(profiles.ExportProfile(gearProfile))
+
+-- When the profile is imported, then the item's setting survives the transfer.
+assert(profiles.ImportProfile(gearExport, "Gear notices"))
+assert(profiles.currentProfile.events.NOTIFICATION_GEAR_THRASH_BLADE.disabled)
 
 -- Given a saved profile with old solo/group restrictions.
 profiles.savedVariables.profiles.LegacyCombatText = {

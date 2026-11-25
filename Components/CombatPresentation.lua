@@ -578,7 +578,9 @@ local ALERT_EVENTS = {
 }
 function Presentation:Alert(record)
 	local key = ALERT_EVENTS[record.kind]
-	if record.kind == "kill" then
+	if record.kind == "extraAttack" and record.gearEvent then
+		key = record.gearEvent
+	elseif record.kind == "kill" then
 		local player = RestrictedValue:Boolean(record.victimIsPlayer)
 		if player == true then key = "NOTIFICATION_PC_KILLING_BLOW" end
 	elseif record.kind == "combat" then

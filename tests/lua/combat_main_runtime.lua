@@ -115,7 +115,7 @@ end
 for _, path in ipairs({
 	"Combat/Context.lua", "Combat/Classes/Druid.lua", "Combat/Classes/Hunter.lua",
 	"Combat/Classes/Rogue.lua", "Combat/Classes/Shaman.lua", "Combat/Classes/Warrior.lua",
-	"Combat/Helpers.lua", "Combat/Mine.lua",
+	"Combat/GearProcs.lua", "Combat/Helpers.lua", "Combat/Mine.lua",
 	"Combat/Spells.lua", "Combat/Healing.lua", "Combat/Reader.lua",
 	"Components/CombatLogFilter.lua",
 	"Components/CombatPresentation.lua", "Components/CombatEngine.lua",
@@ -299,6 +299,71 @@ for _, forever in ipairs({ false, true }) do
 	assert(#displayed == beforeExtra, "disabled extra-attack grant was displayed")
 
 	if forever then
+		-- Given equipped weapons and independently configured gear notices.
+		local itemAPI = C_Item
+		local equipped = { [17705] = true, [11684] = true }
+		C_Item = {
+			IsEquippedItem = function(id) return equipped[id] == true end,
+			GetItemNameByID = function(id)
+				return ({ [17705] = "Thrash Blade", [11684] = "Ironfoe" })[id]
+			end,
+		}
+		local thrash = { message = "Proc: %sl", scrollArea = "My notices" }
+		local ironfoe = { message = "%sl!", scrollArea = "My notices" }
+		events.NOTIFICATION_GEAR_THRASH_BLADE = thrash
+		events.NOTIFICATION_GEAR_IRONFOE = ironfoe
+		local function Grant()
+			Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+				extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+		end
+
+		-- When each weapon reports a proc and both grants arrive in one frame.
+		beforeExtra = #displayed
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-thrash-1", 21919)
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-ironfoe-1", 15494)
+		Grant()
+		Grant()
+		Advance(0.2)
+
+		-- Then both gear profiles are used even with generic notices disabled.
+		assert(#displayed == beforeExtra + 2, "equipped gear notices did not display")
+		assert(displayed[beforeExtra + 1][1] == thrash)
+		assert(displayed[beforeExtra + 1][2] == "Proc: Thrash Blade")
+		assert(displayed[beforeExtra + 2][1] == ironfoe)
+		assert(displayed[beforeExtra + 2][2] == "Ironfoe!")
+
+		-- Given Thrash Blade is unequipped before display and Ironfoe is muted.
+		beforeExtra = #displayed
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-thrash-2", 21919)
+		equipped[17705] = nil
+		ironfoe.disabled = true
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-ironfoe-2", 15494)
+		-- When the grants arrive, then neither gear notice displays.
+		Grant()
+		Grant()
+		Advance(0.2)
+		assert(#displayed == beforeExtra, "inactive gear notice reached the display")
+
+		-- Given an equipped Hand of Justice and generic notifications enabled.
+		equipped[11815] = true
+		local trinket = { message = "%sl!", scrollArea = "My notices" }
+		events.NOTIFICATION_GEAR_HAND_OF_JUSTICE = trinket
+		extraSettings.disabled = false
+
+		-- When the trinket proc and another source each grant an attack.
+		Dispatch("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-trinket-1", 15601)
+		Grant()
+		Grant()
+		Advance(0.2)
+
+		-- Then the trinket and unidentified grant keep separate settings.
+		assert(#displayed == beforeExtra + 2)
+		assert(displayed[beforeExtra + 1][1] == trinket)
+		assert(displayed[beforeExtra + 1][2] == "Hand of Justice!")
+		assert(displayed[beforeExtra + 2][1] == extraSettings)
+		assert(displayed[beforeExtra + 2][2] == "Extra attack!")
+		C_Item = itemAPI
+
 		-- Given a Rogue and the client's spell metadata for Hack and Slash.
 		local unitClass, spellName = UnitClass, C_Spell.GetSpellName
 		UnitClass = function() return "Rogue", "ROGUE" end
@@ -306,8 +371,6 @@ for _, forever in ipairs({ false, true }) do
 			if id == 16459 then return "Hack and Slash" end
 			return spellName(id)
 		end
-		extraSettings.disabled = false
-
 		for index, castFirst in ipairs({ true, false }) do
 			-- When the public proc cast and protected grant arrive in either order.
 			local guid = "Cast-rogue-proc-" .. index

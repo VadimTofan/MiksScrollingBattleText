@@ -2,6 +2,10 @@
 -- See Combat/LICENSE-ForeverCombatText. MSBT uses its own presentation.
 local ns = MikSBT.CombatEngine
 local C_Timer = ns.Timer
+local GearProcs = ns.GearProcs
+
+local LOG_PAIR = 0.1  -- a line and a hit this close together may be one event
+local LOG_WAIT = 0.15 -- a line waits this long for its hit before it is drawn
 
 -- Read hits, casts, swings, auras, and combat-log timing. MSBT owns
 -- presentation and its dedicated loot, gain, and cooldown sources.
@@ -11,6 +15,7 @@ local reader = {
     lastGlow = {}, lastCC = {}, swingTimes = {}, castTargets = {},
     windfuryCasts = {},
     windfuryCooldownFrames = {},
+    extraAttackCasts = {}, extraAttackGUIDs = {},
     pendingHits = setmetatable({}, { __mode = "k" }),
 }
 ns.reader = reader
@@ -1834,17 +1839,28 @@ local function WindfuryCooldown(spell)
     end)
 end
 
+local function RememberExtraAttackCast(spell, guid, now, gear)
+    if ns.Text(guid) then
+        if reader.extraAttackGUIDs[spell] == guid then return end
+        reader.extraAttackGUIDs[spell] = guid
+    end
+    local casts = reader.extraAttackCasts
+    while casts[1] and now - casts[1].at > LOG_WAIT + LOG_PAIR do
+        table.remove(casts, 1)
+    end
+    casts[#casts + 1] = { at = now, spell = spell, gear = gear }
+end
+
 local function OnCast(unit, spell, guid)
     if not ns.Number(spell, 1) then return end
     local now = Now()
     local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
     if unit == "player" and client and client.isForever then
+        local gear = GearProcs and GearProcs.bySpell[spell]
         local rules = ns.PlayerClassRules()
-        if rules and rules.extraAttackSpells and rules.extraAttackSpells[spell] then
-            local cast = reader.extraAttackCast
-            local castGUID = ns.Text(guid) and guid or nil
-            if not castGUID or not cast or cast.guid ~= castGUID then
-                reader.extraAttackCast = { at = now, spell = spell, guid = castGUID }
+        if gear or (rules and rules.extraAttackSpells and rules.extraAttackSpells[spell]) then
+            if not gear or GearProcs.IsEquipped(gear) then
+                RememberExtraAttackCast(spell, guid, now, gear)
             end
             return
         end
@@ -2435,8 +2451,6 @@ end
 -- line first, so a teammate's blow landing in the same moment stays theirs.
 -- Worked out, not read: the settings page says so, and the in-client check
 -- fct-log-timing measures it.
-local LOG_PAIR = 0.1  -- a line and a hit this close together may be one event
-local LOG_WAIT = 0.15 -- a line waits this long for its hit before it is drawn
 local LOG_KEEP = 2.5 -- 0.6.3: an enemy's blow on you came 1.5 s after its line
 reader.logLines, reader.yourHits = {}, {}
 -- Blizzard's combat log filter, from its own saved table (read only).
@@ -2713,21 +2727,31 @@ local CAST_BEFORE = 1.0 -- a dispel's or interrupt's line comes within this of i
 local function CastIcon(at)
     if lastCast and lastCast.at <= at + LOG_PAIR and at - lastCast.at <= CAST_BEFORE then return ns.SpellIcon(lastCast.spell) end
 end
+local function TakeExtraAttackCast(at)
+    for index, cast in ipairs(reader.extraAttackCasts) do
+        if math.abs(cast.at - at) <= LOG_PAIR
+            and (not cast.gear or GearProcs.IsEquipped(cast.gear)) then
+            return table.remove(reader.extraAttackCasts, index)
+        end
+    end
+end
+
 local function KindAlert(router, line)
     if line.source == "mine" and line.kind == "extra" then
         local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
         if client and client.isForever then
             -- A nearby public cast can name one grant without reading the log text.
             local text = (MikSBT.translations or {}).MSG_EXTRA_ATTACK or "Extra attack"
-            local cast, icon = reader.extraAttackCast, nil
-            if cast and not cast.used and math.abs(cast.at - line.at) <= LOG_PAIR then
-                cast.used = true
+            local cast = TakeExtraAttackCast(line.at)
+            local gearEvent, icon
+            if cast and cast.gear then
+                gearEvent, text = cast.gear.event, GearProcs.Name(cast.gear)
+                icon = ns.SpellIcon(cast.spell)
+            elseif cast then
                 local name = ns.SpellName(cast.spell)
-                if name then
-                    text, icon = name, ns.SpellIcon(cast.spell)
-                end
+                if name then text, icon = name, ns.SpellIcon(cast.spell) end
             end
-            router:Alert({ kind = "extraAttack", text = text, icon = icon })
+            router:Alert({ kind = "extraAttack", gearEvent = gearEvent, text = text, icon = icon })
         end
         return
     end
@@ -2959,7 +2983,7 @@ local function OnEvent(_, event, ...)
         RebuildAuras()
         reader.windfuryCooldownFrames, reader.windfuryNoticeAt = {}, nil
         reader.windfuryCasts = {}
-        reader.extraAttackCast = nil
+        reader.extraAttackCasts, reader.extraAttackGUIDs = {}, {}
         reader.plates, reader.targetPlate, reader.held = {}, nil, {}
         reader.castTargets, reader.lastCastTarget = {}, nil
         reader.pendingHits = setmetatable({}, { __mode = "k" })

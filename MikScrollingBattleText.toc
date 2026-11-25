@@ -42,6 +42,7 @@ Combat\Classes\Rogue.lua
 Combat\Classes\Shaman.lua
 Combat\Classes\Warlock.lua
 Combat\Classes\Warrior.lua
+Combat\GearProcs.lua
 Combat\Helpers.lua
 Combat\SpellCatalog.lua
 Combat\HealSpells.lua
