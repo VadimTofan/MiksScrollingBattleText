@@ -2705,6 +2705,15 @@ local function CastIcon(at)
     if lastCast and lastCast.at <= at + LOG_PAIR and at - lastCast.at <= CAST_BEFORE then return ns.SpellIcon(lastCast.spell) end
 end
 local function KindAlert(router, line)
+    if line.source == "mine" and line.kind == "extra" then
+        local client = MikSBT.Compatibility and MikSBT.Compatibility.Client
+        if client and client.isForever then
+            -- The filter identifies a grant, but the spell name is protected.
+            local text = (MikSBT.translations or {}).MSG_EXTRA_ATTACK or "Extra attack"
+            router:Alert({ kind = "extraAttack", text = text })
+        end
+        return
+    end
     local alert = line.source == "mine" and KIND_ALERTS[line.kind]
     if line.source == "mine" and line.kind == "interrupt" then
         -- Shown once: by UNIT_SPELLCAST_INTERRUPTED when the interrupter

@@ -251,6 +251,53 @@ for _, forever in ipairs({ false, true }) do
 	assert(not mainFrame.events.UNIT_COMBAT, "legacy incoming reader remained active")
 	assert(meterReads == 0, "duplicate damage-meter source was queried")
 
+	-- Given a configured Extra Attacks notification and a protected log line.
+	local extraSettings = { message = "%sl!", scrollArea = "My notices" }
+	local extraColour = filter.colors.eventColoring.SPELL_EXTRA_ATTACKS
+	local protectedText = "|Kprotected|k"
+	local beforeExtra = #displayed
+	events.NOTIFICATION_EXTRA_ATTACK = extraSettings
+
+	-- When the combat log replays history and then reports a new grant.
+	Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+		extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Oldest)
+	Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+		extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+	Advance(0.2)
+
+	-- Then Forever displays just the new grant using the profile template.
+	if forever then
+		assert(#displayed == beforeExtra + 1, "extra-attack grant was not displayed once")
+		assert(displayed[#displayed][1] == extraSettings)
+		assert(displayed[#displayed][2] == "Extra attack!")
+		assert(displayed[#displayed][3] == nil)
+	else
+		assert(#displayed == beforeExtra, "Forever extra-attack notice appeared on Retail")
+	end
+
+	-- Given a filter that also admits other actors' extra attacks.
+	local sourceFlags = filter.filters[1].sourceFlags
+	local otherSourceFlag = 3
+	sourceFlags[otherSourceFlag] = true
+	beforeExtra = #displayed
+
+	-- When the typed colour arrives with that filter, then no notice is shown.
+	Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+		extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+	Advance(0.2)
+	assert(#displayed == beforeExtra, "untrusted extra-attack grant was displayed")
+	sourceFlags[otherSourceFlag] = nil
+
+	-- Given the same profile with Extra Attacks disabled.
+	extraSettings.disabled = true
+	beforeExtra = #displayed
+
+	-- When another grant arrives, then the notification stays hidden.
+	Dispatch("COMBAT_LOG_MESSAGE", protectedText, extraColour.r,
+		extraColour.g, extraColour.b, Enum.CombatLogMessageOrder.Newest)
+	Advance(0.2)
+	assert(#displayed == beforeExtra, "disabled extra-attack grant was displayed")
+
 	if forever then
 		for _, spell in ipairs({ 2973, 78, 6807 }) do
 			-- Given a queued strike with two opaque physical hit reports.
