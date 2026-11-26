@@ -49,6 +49,10 @@ MikSBT = {
 		isClassicContent = false, hasModernAPI = true, interfaceVersion = 120100,
 	} },
 	GetSkillName = function(id) return "Spell " .. tostring(id) end,
+	GetSpellInfo = function(id)
+		if id == 412735 or id == 1243120 then return "Demonic Knowledge" end
+		if id == 1299038 then return "Plainsrunning" end
+	end,
 	Print = Noop,
 	CopyTable = CopyTable,
 	EraseTable = function(value) for key in pairs(value) do value[key] = nil end end,
@@ -87,6 +91,56 @@ for _, forever in ipairs({ false, true }) do
 	chunk()
 	frame.scripts.OnEvent(frame, "ADDON_LOADED", "MikScrollingBattleText")
 	local profiles = MikSBT.Profiles
+
+	-- Given the default profile and a legacy profile with explicit aura choices.
+	local demonicKnowledge = "name:Demonic Knowledge"
+	local plainsrunning = "name:Plainsrunning"
+	local expectedDefault
+	if forever then expectedDefault = false end
+	assert(profiles.currentProfile.auraTracking[demonicKnowledge]
+		== expectedDefault, "Demonic Knowledge default is incorrect")
+	assert(profiles.currentProfile.auraTracking[plainsrunning]
+		== expectedDefault, "Plainsrunning default is incorrect")
+	profiles.savedVariables.profiles.LegacyAuras = {
+		creationVersion = "12.059.0",
+		auraTracking = { [demonicKnowledge] = true, ["17"] = false },
+	}
+	profiles.savedVariables.profiles.LegacyIDAuras = {
+		creationVersion = "12.059.0",
+		auraTracking = { ["1243120"] = true },
+	}
+
+	-- When the existing profiles are selected.
+	profiles.SelectProfile("LegacyAuras")
+	local rules = profiles.currentProfile.auraTracking
+	-- Then saved choices survive and missing entries receive their default.
+	assert(rules[demonicKnowledge] == true and rules["17"] == false)
+	assert(rules[plainsrunning] == expectedDefault)
+	profiles.SelectProfile("LegacyIDAuras")
+	assert(profiles.currentProfile.auraTracking["1243120"] == true)
+	assert(profiles.currentProfile.auraTracking[demonicKnowledge] == nil,
+		"the default name exclusion overrides a saved enabled spell ID")
+
+	-- Given the default rows were enabled or removed using the aura controls.
+	profiles.SelectProfile("Default")
+	profiles.SetOption(nil, "auraTracking", { [demonicKnowledge] = true })
+	profiles.SelectProfile("LegacyAuras")
+	profiles.SelectProfile("Default")
+	assert(profiles.currentProfile.auraTracking[plainsrunning] == nil,
+		"the removed default returned after reselecting the profile")
+	-- When those choices are exported and imported.
+	local editedAuras = assert(profiles.ExportProfile("Default"))
+	assert(profiles.ImportProfile(editedAuras, "EditedAuras" .. tostring(forever)))
+	-- Then both user choices survive the round trip.
+	assert(profiles.currentProfile.auraTracking[demonicKnowledge] == true)
+	assert(profiles.currentProfile.auraTracking[plainsrunning] == nil,
+		"the removed default returned after importing the profile")
+
+	-- When the profile is reset, the client defaults return.
+	profiles.ResetProfile("Default")
+	profiles.SelectProfile("Default")
+	assert(profiles.currentProfile.auraTracking[demonicKnowledge] == expectedDefault)
+	assert(profiles.currentProfile.auraTracking[plainsrunning] == expectedDefault)
 
 	-- Given the loaded loot diagnostic and its command entry point.
 	local lootCommands = {}
