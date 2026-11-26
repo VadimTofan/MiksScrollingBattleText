@@ -1,5 +1,11 @@
 # Changelog
 
+## v12.060
+
+- On Forever, Plainsrunning and Demonic Knowledge gain and fade alerts are
+  hidden by default. Enable either aura under Events → Notifications.
+  Existing enabled rules are preserved.
+
 ## v12.059
 
 - Disable all damage school colors in Damage Colors to use your configured
